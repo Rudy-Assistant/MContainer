@@ -226,7 +226,13 @@ export default function UserLibrary() {
         {MODEL_HOMES.map((model) => (
           <div
             key={model.id}
-            onClick={() => placeModelHome(model.id)}
+            onClick={() => {
+              const store = useStore.getState();
+              const ids = Object.keys(store.containers);
+              if (ids.length > 0 && !window.confirm('This will replace your current design. Continue?')) return;
+              ids.forEach(id => store.removeContainer(id));
+              placeModelHome(model.id);
+            }}
             style={{
               display: "flex", alignItems: "center", gap: "8px",
               padding: "6px 8px", borderRadius: "7px",

@@ -173,3 +173,31 @@ describe('palette system', () => {
     expect(s().palettes.find(p => p.id === newId)).toBeUndefined();
   });
 });
+
+describe('fresh launch behavior', () => {
+  beforeEach(() => {
+    const initial = useStore.getInitialState();
+    useStore.setState(initial, true);
+  });
+
+  it('empty state has zero containers (hydration seed is a React effect, not store default)', () => {
+    const s = useStore.getState();
+    expect(Object.keys(s.containers).length).toBe(0);
+  });
+
+  it('placeModelHome adds containers to state', () => {
+    const s = useStore.getState;
+    const ids = s().placeModelHome('micro_studio');
+    expect(ids.length).toBeGreaterThan(0);
+    expect(Object.keys(s().containers).length).toBeGreaterThan(0);
+  });
+
+  it('placeModelHome two_story creates stacked containers', () => {
+    const s = useStore.getState;
+    const ids = s().placeModelHome('two_story');
+    expect(ids.length).toBe(2);
+    const containers = Object.values(s().containers);
+    const hasStacked = containers.some(c => c.position.y > 1);
+    expect(hasStacked).toBe(true);
+  });
+});

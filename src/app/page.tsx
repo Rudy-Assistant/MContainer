@@ -3,7 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useStore } from "@/store/useStore";
-import { ViewMode } from "@/types/container";
+import { ContainerSize, ViewMode } from "@/types/container";
 import { useFrameStore } from "@/store/frameStore";
 import Sidebar from "@/components/ui/Sidebar";
 import BayContextMenu from "@/components/ui/BayContextMenu";
@@ -16,7 +16,6 @@ import LevelSlicer from "@/components/ui/LevelSlicer";
 import TopToolbar from "@/components/ui/TopToolbar";
 import SmartHotbar from "@/components/ui/SmartHotbar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
-import StartScreen from "@/components/ui/StartScreen";
 import VoxelContextMenu from "@/components/ui/VoxelContextMenu";
 import FaceContextMenu from "@/components/ui/FaceContextMenu";
 import MaterialPaletteModal from "@/components/ui/MaterialPaletteModal";
@@ -29,15 +28,15 @@ const SceneCanvas = dynamic(
 
 // ── Seed + Hydration ────────────────────────────────────────
 
-/** Hydration hook — start screen replaces auto-seeding. Also checks for shared design URL. */
+/** Hydration hook — seeds a default container on fresh state. Also checks for shared design URL. */
 function useHydrationSeed() {
   const hasHydrated = useStore((s) => s._hasHydrated);
   const [checked, setChecked] = useState(false);
 
-  // Check for shared design URL parameter after hydration
   if (hasHydrated && !checked) {
     setChecked(true);
     if (typeof window !== 'undefined') {
+      // Check for shared design URL parameter
       const params = new URLSearchParams(window.location.search);
       const designParam = params.get('d');
       if (designParam) {
@@ -45,10 +44,15 @@ function useHydrationSeed() {
           const design = decodeDesign(designParam);
           if (design) {
             useStore.getState().importSharedDesign(design);
-            // Clean URL without reload
             window.history.replaceState({}, '', window.location.pathname);
           }
         });
+      } else {
+        // Fresh state with no containers → seed a default container
+        const store = useStore.getState();
+        if (Object.keys(store.containers).length === 0) {
+          store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+        }
       }
     }
   }
@@ -116,9 +120,6 @@ export default function Home() {
 
   return (
     <div className="flex flex-col w-screen h-screen bg-white">
-      {/* Start screen — shown when canvas is empty */}
-      <StartScreen />
-
       {/* Top Header Toolbar - Production Light Theme */}
       <TopToolbar onOpenBudget={() => setBudgetOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
 
