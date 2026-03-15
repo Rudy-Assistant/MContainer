@@ -1,0 +1,47 @@
+[
+  {
+    "n": "EffectComposer no error",
+    "p": true,
+    "d": ""
+  },
+  {
+    "n": "setSelectedFace sets face",
+    "p": true,
+    "d": ""
+  },
+  {
+    "n": "FaceContextWidget renders",
+    "p": true,
+    "d": ""
+  },
+  {
+    "n": "Quick material swap",
+    "p": true,
+    "d": ""
+  },
+  {
+    "n": "Door config hinge+type",
+    "p": true,
+    "d": "hingeEdge=left type=slide"
+  },
+  {
+    "n": "Window_Standard screenshot",
+    "p": true,
+    "d": "VISUAL: steel+glass+steel profile"
+  },
+  {
+    "n": "Ground screenshot",
+    "p": true,
+    "d": "VISUAL: no texture bleeding through container floor"
+  },
+  {
+    "n": "Golden hour",
+    "p": true,
+    "d": "VISUAL: warm sky, subtle shadow, grass visible"
+  },
+  {
+    "n": "Block grid sync screenshot",
+    "p": true,
+    "d": "VISUAL: voxel 10 highlighted in block grid"
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-03-12T15:00:00",
+  "drawCalls": 1,
+  "triangles": 1,
+  "texturesLoaded": 29,
+  "geometries": 46,
+  "shadowMapEnabled": true,
+  "shadowMapType": 2,
+  "meshCount": 402,
+  "meshesWithCastShadow": 49,
+  "meshesWithReceiveShadow": 42,
+  "materialTypes": {
+    "ShaderMaterial": 1,
+    "MeshStandardMaterial": 167,
+    "MeshBasicMaterial": 234
+  },
+  "environmentMapPresent": true,
+  "contactShadowsPresent": false,
+  "cloudsPresent": false,
+  "starsPresent": false,
+  "fogPresent": true,
+  "fogType": "Fog",
+  "lightsCount": 4,
+  "lightTypes": ["DirectionalLight", "AmbientLight", "HemisphereLight", "PointLight"],
+  "physicalMaterialCount": 0,
+  "normalMapsLoadedCount": 137,
+  "emissiveCeilingPanels": 11,
+  "directionalShadow": {
+    "mapSize": 4096,
+    "cameraLeft": -25,
+    "cameraRight": 25
+  }
+}

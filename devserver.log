@@ -1,0 +1,13 @@
+
+> moduhome-temp@0.1.0 dev
+> next dev
+
+⚠ Port 3000 is in use by an unknown process, using available port 3002 instead.
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3002
+- Network:       http://10.5.0.2:3002
+
+✓ Starting...
+⨯ Unable to acquire lock at C:\MContainer\.next\dev\lock, is another instance of next dev running?
+  Suggestion: If you intended to restart next dev, terminate the other process, and then try again.
+[?25h

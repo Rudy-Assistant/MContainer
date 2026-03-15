@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-03-12T15:00:00",
+  "fixes_applied": [
+    "ContactShadows added (position=[0,0.01,0], scale=60, blur=2.5, opacity=0.4, resolution=512)",
+    "Clouds added (3 Cloud instances at Y=30,35,40 via drei Clouds wrapper)",
+    "DevSceneExpose component for Playwright inspection"
+  ],
+  "meshCount": 404,
+  "meshesWithCastShadow": 49,
+  "meshesWithReceiveShadow": 42,
+  "environmentMapPresent": true,
+  "contactShadowsPresent": true,
+  "cloudsPresent": true,
+  "starsPresent": false,
+  "fogPresent": true,
+  "shadowMapEnabled": true,
+  "physicalMaterialCount": 0,
+  "normalMapsCount": 137,
+  "lightTypes": ["DirectionalLight", "AmbientLight", "HemisphereLight", "PointLight"],
+  "notes": {
+    "physicalMaterialCount_0": "Glass uses MeshPhysicalMaterial but default container has no glass faces. Will be non-zero after Great Room build with glass walls.",
+    "starsPresent_false": "Stars only render at night (timeOfDay < 5 or > 21). At 15:00, no stars expected.",
+    "cloudsPresent_detection": "Cloud groups detected at Y=30,35,40 with 53 instanced particles. Name-based detection fails; position-based confirms presence."
+  }
+}

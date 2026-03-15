@@ -1,0 +1,16 @@
+{
+  "containerBase": {
+    "20ft_standard": 2500,
+    "40ft_standard": 4200,
+    "40ft_high_cube": 5000
+  },
+  "cutFee": 500,
+  "moduleCosts": {
+    "panel_solid": 0,
+    "panel_glass": 1200,
+    "hinged_wall": 2800,
+    "open_void": 500
+  },
+  "glassSurcharge": 350,
+  "hingeMechanism": 1500
+}

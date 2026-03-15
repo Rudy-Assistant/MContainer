@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ark Designer v7.0 (Groups & Corners)</title>
+<style>
+  :root {
+    --primary: #1565c0;
+    --primary-light: #e3f2fd;
+    --primary-hover: #bbdefb;
+    --accent: #2979ff;
+    --surface: #ffffff;
+    --bg: #f4f6f8;
+    --border: #cfd8dc;
+    --text: #37474f;
+    --wall: #263238;
+    --win: #039be5;
+    --glass: #4fc3f7;
+    --door: #43a047;
+    --gap-fill: rgba(255, 152, 0, 0.15); /* Orange tint for corner fills */
+  }
+
+  body { 
+    margin: 0; height: 100vh; display: flex; flex-direction: column; 
+    background: var(--bg); color: var(--text); font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden;
+  }
+
+  /* HEADER */
+  header {
+    height: 56px; background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 10;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  h1 { font-size: 16px; font-weight: 700; color: var(--primary); margin-right: 12px; }
+  
+  .btn-grp { display: flex; gap: 4px; border-right: 1px solid var(--border); padding-right: 10px; margin-right: 6px; }
+  
+  button {
+    height: 32px; padding: 0 12px; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer;
+    transition: all 0.1s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  button:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+  button:active { transform: translateY(1px); }
+
+  /* WORKSPACE */
+  .workspace { flex: 1; display: flex; overflow: hidden; }
+  
+  aside {
+    width: 240px; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; z-index: 5;
+  }
+  .scroll-area { flex: 1; overflow-y: auto; padding: 12px; }
+  
+  .sec-title { font-size: 11px; font-weight: 700; color: #78909c; text-transform: uppercase; margin: 16px 0 8px 0; }
+  .sec-title:first-child { margin-top: 0; }
+
+  /* LIBRARY */
+  .lib-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--border);
+    border-radius: 6px; background: white; margin-bottom: 6px; cursor: grab;
+  }
+  .lib-item:hover { border-color: var(--primary); background: var(--primary-light); }
+  .lib-icon {
+    width: 32px; height: 24px; background: white; border: 1px solid var(--primary); color: var(--primary);
+    border-radius: 3px; display: grid; place-items: center; font-size: 10px; font-weight: 700;
+  }
+  
+  /* CONTEXT */
+  #ctx { display: none; background: #eceff1; border-radius: 6px; padding: 10px; }
+  #ctx.active { display: block; }
+  .ctx-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+
+  /* CANVAS */
+  #stage { flex: 1; position: relative; background: #fafafa; cursor: crosshair; overflow: hidden; }
+  canvas { display: block; }
+
+  /* GHOST DRAG */
+  #ghost {
+    position: fixed; pointer-events: none; z-index: 999; display: none;
+    background: var(--primary); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;
+    opacity: 0.8; transform: translate(-50%, -50%);
+  }
+
+  /* FLOATING UI */
+  .dock {
+    position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+    background: white; border: 1px solid var(--border); border-radius: 20px;
+    padding: 6px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  .dock button { width: 28px; height: 28px; border-radius: 50%; padding: 0; justify-content: center; }
+
+</style>
+</head>
+<body>
+
+<div id="ghost"></div>
+
+<header>
+  <h1>Ark v7.0</h1>
+  <div class="btn-grp">
+    <button onclick="App.act('clear')">Clear</button>
+    <button onclick="App.act('rotate')">Rotate (R)</button>
+    <button onclick="App.act('delete')">Delete</button>
+  </div>
+  <div class="btn-grp">
+    <button onclick="App.act('group')">Group</button>
+    <button onclick="App.act('ungroup')">Ungroup</button>
+  </div>
+  <div style="flex:1"></div>
+  <button onclick="App.act('export')">Export</button>
+</header>
+
+<div class="workspace">
+  <aside>
+    <div class="scroll-area">
+      <div class="sec-title">Library</div>
+      <div class="lib-item" onmousedown="App.dragStart(event, '4x10')">
+        <div class="lib-icon">20'</div>
+        <div><b>20' Standard</b><br><span style="font-size:10px; color:#666">8' x 20'</span></div>
+      </div>
+      <div class="lib-item" onmousedown="App.dragStart(event, '4x20')">
+        <div class="lib-icon">40'</div>
+        <div><b>40' Standard</b><br><span style="font-size:10px; color:#666">8' x 40'</span></div>
+      </div>
+
+      <div id="ctx">
+        <div class="sec-title" style="margin-top:0">Selection</div>
+        <div class="ctx-row">
+          <span id="selInfo">0 items</span>
+          <button style="height:22px" onclick="App.act('rename')">Rename</button>
+        </div>
+        <div style="font-size:11px; color:#546e7a; margin-top:8px; line-height:1.4">
+          • <b>Shift+Click Wall:</b> Cycle Wall / Window / Door<br>
+          • <b>Corners:</b> Click orange zones to fill gaps between flaps.
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div id="stage">
+    <canvas id="cvs"></canvas>
+    <div class="dock">
+      <button onclick="App.act('lvlUp')">▲</button>
+      <div style="text-align:center; font-size:12px; font-weight:700; color:var(--primary)" id="lvl">1</div>
+      <button onclick="App.act('lvlDn')">▼</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const App = (function() {
+  
+  // CONFIG
+  const GRID = 32; // 32px = 2ft (approx scale)
+  const WALL_TYPES = ['wall', 'window', 'glass', 'door', 'open'];
+  const TYPES = {
+    '4x10': { w: 4, d: 10, lbl: "20'" },
+    '4x20': { w: 4, d: 20, lbl: "40'" }
+  };
+
+  // STATE
+  let frames = [];
+  let corners = []; // Dynamic corner fillers
+  let groups = [];  // { id, name, members: [] }
+  let selection = []; 
+  let level = 0;
+  let nextId = 1;
+  let nextGrpId = 1;
+
+  // UI STATE
+  let mode = 'idle'; // idle, drag, box
+  let dragStartPos = {x:0, y:0};
+  let ghost = { type: null };
+  let hover = null; 
+  let boxSel = null;
+
+  // DOM
+  const cvs = document.getElementById('cvs');
+  const ctx = cvs.getContext('2d');
+  const elGhost = document.getElementById('ghost');
+
+  // INIT
+  function init() {
+    window.addEventListener('resize', resize);
+    cvs.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    
+    // Default Scene
+    const f1 = addFrame('4x10', 6, 6);
+    const f2 = addFrame('4x10', 12, 6);
+    // Auto-open facing flaps for demo
+    f1.flaps.r.on = true; 
+    f2.flaps.l.on = true;
+    
+    resize();
+  }
+
+  function resize() {
+    cvs.width = cvs.parentElement.clientWidth;
+    cvs.height = cvs.parentElement.clientHeight;
+    draw();
+  }
+
+  // --- MODEL ---
+
+  function addFrame(type, gx, gy) {
+    const t = TYPES[type];
+    const f = {
+      id: nextId++,
+      type: type,
+      x: gx, y: gy,
+      w: t.w, d: t.d,
+      lvl: level,
+      rot: 0,
+      name: `Unit ${nextId}`,
+      grp: null, // Group ID if any
+      flaps: { 
+        u: {on:false}, d: {on:false}, l: {on:false}, r: {on:false}
+      },
+      edges: { t:'wall', b:'wall', l:'wall', r:'wall' }
+    };
+    frames.push(f);
+    calcCorners(); // Recalc corners whenever layout changes
+    draw();
+    return f;
+  }
+
+  function createGroup() {
+    if(selection.length < 2) return;
+    const gid = nextGrpId++;
+    const name = `Group ${gid}`;
+    
+    // Remove selected items from any existing groups
+    frames.forEach(f => {
+      if(selection.includes(f.id)) f.grp = gid;
+    });
+
+    // Register group
+    groups.push({ id: gid, name: name });
+    selection = []; // Deselect to show group state
+    draw();
+  }
+
+  function ungroup() {
+    const affected = new Set();
+    frames.forEach(f => {
+      if(selection.includes(f.id) && f.grp) {
+        affected.add(f.grp);
+        f.grp = null;
+      }
+    });
+    // Cleanup empty groups
+    groups = groups.filter(g => !affected.has(g.id));
+    draw();
+  }
+
+  // --- CORNER DETECTION (RED ZONE LOGIC) ---
+  function calcCorners() {
+    corners = [];
+    // Only current level
+    const active = frames.filter(f => f.lvl === level);
+    
+    // We look for intersections of flap extension zones
+    // A flap zone extends 2 units out.
+    // If two flaps meet at 90 degrees or abut, we might want to fill.
+    // Simpler heuristic for "Red Zones":
+    // Look for a 2x2 empty space that is bordered by 2 active flaps.
+    
+    // Let's iterate grid points (coarse) or check adjacencies.
+    // Better: Iterate every pair of active flaps.
+    
+    const activeFlaps = [];
+    active.forEach(f => {
+      const fw = (f.rot%180)?f.d:f.w; const fd = (f.rot%180)?f.w:f.d;
+      const th = 2;
+      if(f.flaps.u.on) activeFlaps.push({x:f.x, y:f.y-th, w:fw, h:th, p:f});
+      if(f.flaps.d.on) activeFlaps.push({x:f.x, y:f.y+fd, w:fw, h:th, p:f});
+      if(f.flaps.l.on) activeFlaps.push({x:f.x-th, y:f.y, w:th, h:fd, p:f});
+      if(f.flaps.r.on) activeFlaps.push({x:f.x+fw, y:f.y, w:th, h:fd, p:f});
+    });
+
+    // Check for gaps.
+    // A common gap is the 2x2 corner between a Top Flap of Unit A and Left Flap of Unit B?
+    // Or simpler: Just look for corners relative to a single container?
+    // The user screenshot showed corners BETWEEN containers.
+    
+    // Heuristic: Identify 2x2 squares that are adjacent to at least 2 flap zones but contain no frame.
+    // For performance, we will just scan near active flaps.
+    
+    const candidates = [];
+    activeFlaps.forEach(f1 => {
+      activeFlaps.forEach(f2 => {
+        if(f1 === f2) return;
+        
+        // Check if they are close (gap of 2 units?)
+        // If f1 is horizontal and f2 is vertical, the corner might be between them.
+        // Let's cheat: Just offer corners on ALL 4 corners of every active flap?
+        // No, too messy.
+        
+        // Let's implement the specific request: "Join container flaps".
+        // If 2 flaps touch or nearly touch, offer a fill.
+        
+        // Detection: Horizontal Flap 1 ends at X. Vertical Flap 2 starts at X.
+        // Corner is (X, Y).
+        
+        // Let's just generate 4 corner zones for every container and show them if they touch an active flap.
+      });
+    });
+
+    // SIMPLIFIED APPROACH:
+    // Every frame has 4 corner slots (NW, NE, SE, SW). 
+    // If adjacent flaps are ON, the corner becomes available to toggle.
+    active.forEach(f => {
+      const fw = (f.rot%180)?f.d:f.w; const fd = (f.rot%180)?f.w:f.d;
+      const th = 2; // Flap depth
+      
+      // Check NE Corner (Right of Top Flap, Top of Right Flap)
+      // If Top OR Right flap is on, offer corner fill? Or AND?
+      // Usually AND for a wraparound deck.
+      
+      const checkC = (cx, cy, f1, f2) => {
+        if(f1.on && f2.on) {
+          corners.push({ x:cx, y:cy, w:th, h:th, p:f, id:`${f.id}_c_${cx}_${cy}`, on: false }); 
+          // We rely on persistent state if we want it to stay ON. 
+          // For this v1 demo, corners reset on move. (Can improve later)
+        }
+      };
+
+      // NW (Left of Top, Top of Left)
+      checkC(f.x-th, f.y-th, f.flaps.u, f.flaps.l);
+      // NE
+      checkC(f.x+fw, f.y-th, f.flaps.u, f.flaps.r);
+      // SW
+      checkC(f.x-th, f.y+fd, f.flaps.d, f.flaps.l);
+      // SE
+      checkC(f.x+fw, f.y+fd, f.flaps.d, f.flaps.r);
+    });
+  }
+
+  // --- INTERACTION ---
+
+  function hitTest(mx, my) {
+    const gx = mx/GRID;
+    const gy = my/GRID;
+    const active = frames.filter(f => f.lvl === level);
+
+    // 1. Corners (Priority)
+    for(let c of corners) {
+      if(gx>=c.x && gx<=c.x+c.w && gy>=c.y && gy<=c.y+c.h) return {type:'corner', target:c};
+    }
+
+    // 2. Frames
+    for(let i=active.length-1; i>=0; i--) {
+      const f = active[i];
+      const fw = (f.rot%180)?f.d:f.w; const fd = (f.rot%180)?f.w:f.d;
+      const th = 2;
+
+      // Flap Toggles (Light Zones)
+      const hitFlap = (rx,ry,rw,rh, meta) => {
+        if(gx>=rx && gx<=rx+rw && gy>=ry && gy<=ry+rh) return {type:'flap', target:f, meta};
+      };
+      
+      let h;
+      if(h=hitFlap(f.x, f.y-th, fw, th, 'u')) return h;
+      if(h=hitFlap(f.x, f.y+fd, fw, th, 'd')) return h;
+      if(h=hitFlap(f.x-th, f.y, th, fd, 'l')) return h;
+      if(h=hitFlap(f.x+fw, f.y, th, fd, 'r')) return h;
+
+      // Walls
+      const tol = 0.25;
+      if(gx>=f.x && gx<=f.x+fw && gy>=f.y-tol && gy<=f.y+tol) return {type:'wall', target:f, meta:'t'};
+      if(gx>=f.x && gx<=f.x+fw && gy>=f.y+fd-tol && gy<=f.y+fd+tol) return {type:'wall', target:f, meta:'b'};
+      if(gx>=f.x-tol && gx<=f.x+tol && gy>=f.y && gy<=f.y+fd) return {type:'wall', target:f, meta:'l'};
+      if(gx>=f.x+fw-tol && gx<=f.x+fw+tol && gy>=f.y && gy<=f.y+fd) return {type:'wall', target:f, meta:'r'};
+
+      // Body
+      if(gx>=f.x && gx<=f.x+fw && gy>=f.y && gy<=f.y+fd) return {type:'body', target:f};
+    }
+    return null;
+  }
+
+  function onDown(e) {
+    const r = cvs.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const h = hitTest(mx, my);
+
+    if(h) {
+      if(h.type === 'body') {
+        const f = h.target;
+        // Group Logic
+        const toSel = [];
+        if(f.grp) {
+          // Select all in group
+          frames.filter(x => x.grp === f.grp).forEach(x => toSel.push(x.id));
+        } else {
+          toSel.push(f.id);
+        }
+
+        if(e.shiftKey) {
+          // Toggle add
+          toSel.forEach(id => {
+            if(selection.includes(id)) selection = selection.filter(x=>x!==id);
+            else selection.push(id);
+          });
+        } else {
+          if(!selection.includes(f.id)) selection = toSel;
+        }
+
+        mode = 'drag';
+        dragStartPos = { x: mx/GRID, y: my/GRID };
+      }
+      else if(h.type === 'flap') {
+        const fl = h.target.flaps[h.meta];
+        fl.on = !fl.on;
+        calcCorners();
+      }
+      else if(h.type === 'wall' && e.shiftKey) {
+        cycleWall(h.target.edges, h.meta);
+      }
+      else if(h.type === 'corner') {
+        h.target.on = !h.target.on;
+      }
+    } else {
+      mode = 'box';
+      boxSel = { x:mx, y:my, w:0, h:0 };
+      if(!e.shiftKey) selection = [];
+    }
+    draw();
+    updateUI();
+  }
+
+  function onMove(e) {
+    if(ghost.type) {
+      elGhost.style.left = e.clientX+'px'; elGhost.style.top = e.clientY+'px';
+      return;
+    }
+    
+    const r = cvs.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+
+    if(mode === 'drag') {
+      const dx = Math.round((mx/GRID) - dragStartPos.x);
+      const dy = Math.round((my/GRID) - dragStartPos.y);
+      
+      if(dx !== 0 || dy !== 0) {
+        frames.forEach(f => {
+          if(selection.includes(f.id)) { f.x += dx; f.y += dy; }
+        });
+        dragStartPos.x += dx;
+        dragStartPos.y += dy;
+        calcCorners(); // Update corners on move
+        draw();
+      }
+    } else if(mode === 'box') {
+      boxSel.w = mx - boxSel.x;
+      boxSel.h = my - boxSel.y;
+      // selection logic...
+      draw();
+    } else {
+      hover = hitTest(mx, my);
+      cvs.style.cursor = hover ? (hover.type==='body'?'move':'pointer') : 'default';
+      draw();
+    }
+  }
+
+  function onUp(e) {
+    if(ghost.type) {
+      const r = cvs.getBoundingClientRect();
+      const gx = Math.round((e.clientX - r.left)/GRID)-2;
+      const gy = Math.round((e.clientY - r.top)/GRID)-2;
+      addFrame(ghost.type, gx, gy);
+      ghost.type = null;
+      elGhost.style.display = 'none';
+    }
+    mode = 'idle';
+    draw();
+  }
+
+  // --- ACTIONS ---
+
+  function dragStart(e, type) {
+    e.preventDefault();
+    ghost.type = type;
+    elGhost.innerText = TYPES[type].lbl;
+    elGhost.style.display = 'block';
+  }
+
+  function act(a) {
+    if(a==='clear') { frames=[]; groups=[]; selection=[]; nextId=1; nextGrpId=1; }
+    if(a==='delete') {
+      frames = frames.filter(f => !selection.includes(f.id));
+      selection = [];
+    }
+    if(a==='rotate') {
+      // Find center of selection?
+      // Simple: rotate each around its own axis
+      frames.forEach(f => { if(selection.includes(f.id)) f.rot += 90; });
+      calcCorners();
+    }
+    if(a==='group') createGroup();
+    if(a==='ungroup') ungroup();
+    if(a==='rename') {
+      // Find what we are renaming. 
+      // If selection belongs to a group, rename group.
+      const first = frames.find(f => selection.includes(f.id));
+      if(!first) return;
+      
+      let oldName = first.name;
+      if(first.grp) {
+        const g = groups.find(x => x.id === first.grp);
+        if(g) oldName = g.name;
+      }
+      
+      const n = prompt("Name:", oldName);
+      if(n) {
+        if(first.grp) {
+          const g = groups.find(x => x.id === first.grp);
+          if(g) g.name = n;
+        } else {
+          first.name = n;
+        }
+      }
+    }
+    draw();
+  }
+
+  function cycleWall(edges, side) {
+    const cur = edges[side];
+    edges[side] = WALL_TYPES[(WALL_TYPES.indexOf(cur)+1)%WALL_TYPES.length];
+    draw();
+  }
+
+  function updateUI() {
+    document.getElementById('selInfo').innerText = selection.length + " selected";
+    const p = document.getElementById('ctx');
+    if(selection.length) p.classList.add('active'); else p.classList.remove('active');
+  }
+
+  // --- DRAW ---
+
+  function toPx(u) { return u*GRID; }
+
+  function draw() {
+    // Clear
+    ctx.fillStyle = '#f4f6f8';
+    ctx.fillRect(0,0,cvs.width,cvs.height);
+
+    // Grid
+    ctx.beginPath(); ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1;
+    for(let x=0; x<cvs.width; x+=GRID) { ctx.moveTo(x,0); ctx.lineTo(x,cvs.height); }
+    for(let y=0; y<cvs.height; y+=GRID) { ctx.moveTo(0,y); ctx.lineTo(cvs.width,y); }
+    ctx.stroke();
+
+    // Frames
+    frames.filter(f=>f.lvl===level).forEach(drawFrame);
+
+    // Groups Labels (Overlay)
+    drawGroupLabels();
+
+    // Box Select
+    if(mode==='box') {
+      ctx.fillStyle = 'rgba(33,150,243,0.1)'; ctx.fillRect(boxSel.x,boxSel.y,boxSel.w,boxSel.h);
+      ctx.strokeStyle = '#2196f3'; ctx.strokeRect(boxSel.x,boxSel.y,boxSel.w,boxSel.h);
+    }
+  }
+
+  function drawFrame(f) {
+    const sel = selection.includes(f.id);
+    const fw = (f.rot%180)?f.d:f.w; const fd = (f.rot%180)?f.w:f.d;
+    const px=toPx(f.x), py=toPx(f.y), pw=toPx(fw), pd=toPx(fd);
+
+    // 1. Flaps
+    const th = 2;
+    const drawFlap = (gx, gy, gw, gd, fl) => {
+      const active = fl.on;
+      const hov = (hover && hover.target===f && hover.type==='flap'); // simplified hover check
+      if(active || hov || sel) {
+        ctx.fillStyle = active ? '#ffffff' : 'rgba(33,150,243,0.05)';
+        if(hov) ctx.fillStyle = 'rgba(33,150,243,0.15)';
+        ctx.fillRect(toPx(gx), toPx(gy), toPx(gw), toPx(gd));
+        ctx.strokeStyle = '#cfd8dc'; ctx.strokeRect(toPx(gx), toPx(gy), toPx(gw), toPx(gd));
+      }
+    };
+    drawFlap(f.x, f.y-th, fw, th, f.flaps.u);
+    drawFlap(f.x, f.y+fd, fw, th, f.flaps.d);
+    drawFlap(f.x-th, f.y, th, fd, f.flaps.l);
+    drawFlap(f.x+fw, f.y, th, fd, f.flaps.r);
+
+    // 2. Corners
+    corners.filter(c => c.p === f).forEach(c => {
+      // Draw if active or hovered
+      if(c.on || (hover && hover.target === c)) {
+        ctx.fillStyle = c.on ? '#fff3e0' : 'rgba(255,152,0,0.1)';
+        ctx.fillRect(toPx(c.x), toPx(c.y), toPx(c.w), toPx(c.h));
+        ctx.strokeStyle = '#ffe0b2'; ctx.setLineDash([4,2]);
+        ctx.strokeRect(toPx(c.x), toPx(c.y), toPx(c.w), toPx(c.h));
+        ctx.setLineDash([]);
+      }
+    });
+
+    // 3. Body
+    ctx.fillStyle = sel ? '#e3f2fd' : '#ffffff';
+    ctx.fillRect(px, py, pw, pd);
+    ctx.strokeStyle = sel ? '#2196f3' : '#90a4ae';
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.strokeRect(px, py, pw, pd);
+
+    // 4. Walls
+    drawWall(px, py, pw, 0, f.edges.t);
+    drawWall(px, py+pd, pw, 0, f.edges.b);
+    drawWall(px, py, 0, pd, f.edges.l);
+    drawWall(px+pw, py, 0, pd, f.edges.r);
+
+    // 5. Name (Only if NOT in a group, otherwise group handles it)
+    if(!f.grp) {
+      ctx.fillStyle = '#607d8b'; ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(f.name, px+pw/2, py+pd/2);
+    }
+  }
+
+  function drawWall(x, y, w, h, type) {
+    if(type === 'open') {
+       ctx.strokeStyle = '#cfd8dc'; ctx.setLineDash([2,4]);
+       ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w,y+h); ctx.stroke();
+       ctx.setLineDash([]); return;
+    }
+    
+    ctx.lineWidth = 3; ctx.lineCap = 'square';
+    if(type === 'wall') ctx.strokeStyle = '#263238';
+    if(type === 'window') ctx.strokeStyle = '#039be5';
+    if(type === 'glass') { ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 5; }
+    if(type === 'door') {
+      ctx.strokeStyle = '#43a047';
+      // Draw Gap
+      ctx.beginPath(); 
+      // If horizontal
+      if(h===0) {
+        ctx.moveTo(x,y); ctx.lineTo(x+w*0.2, y);
+        ctx.moveTo(x+w*0.8, y); ctx.lineTo(x+w, y);
+        // Arc
+        ctx.moveTo(x+w*0.2, y); ctx.quadraticCurveTo(x+w*0.2, y+w*0.6, x+w*0.8, y+w*0.6);
+      } else {
+        ctx.moveTo(x,y); ctx.lineTo(x, y+h*0.2);
+        ctx.moveTo(x, y+h*0.8); ctx.lineTo(x, y+h);
+      }
+      ctx.stroke();
+      return;
+    }
+
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w,y+h); ctx.stroke();
+  }
+
+  function drawGroupLabels() {
+    // Find centers of groups
+    groups.forEach(g => {
+      const mems = frames.filter(f => f.grp === g.id);
+      if(!mems.length) return;
+      
+      // Avg pos
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      mems.forEach(f => {
+        const fw = (f.rot%180)?f.d:f.w; const fd = (f.rot%180)?f.w:f.d;
+        minX = Math.min(minX, f.x); minY = Math.min(minY, f.y);
+        maxX = Math.max(maxX, f.x+fw); maxY = Math.max(maxY, f.y+fd);
+      });
+      
+      const cx = toPx((minX+maxX)/2);
+      const cy = toPx((minY+maxY)/2);
+      
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(g.name, cx, cy);
+    });
+  }
+
+  return { init, dragStart, act };
+})();
+
+window.onload = App.init;
+</script>
+</body>
+</html>
