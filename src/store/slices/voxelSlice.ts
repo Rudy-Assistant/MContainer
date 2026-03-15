@@ -507,8 +507,11 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         grid[aboveIdx] = { ...grid[aboveIdx], faces: { ...grid[aboveIdx].faces, bottom: 'Open' } };
       }
 
-      // Cross-container void: if stairs at top level, void floor of container above
-      if (level === VOXEL_LEVELS - 1 && c.supporting.length > 0) {
+      // Cross-container void: if stairs reach the top level, void floor of container above.
+      // This triggers when stairs are placed AT the top level, OR when auto-punch reaches the top level.
+      const reachesTopLevel = level === VOXEL_LEVELS - 1 ||
+        (aboveIdx < grid.length && Math.floor(aboveIdx / (VOXEL_ROWS * VOXEL_COLS)) === VOXEL_LEVELS - 1);
+      if (reachesTopLevel && c.supporting.length > 0) {
         let updatedContainers = { ...s.containers, [containerId]: { ...c, voxelGrid: grid } };
         for (const aboveId of c.supporting) {
           const above = s.containers[aboveId];

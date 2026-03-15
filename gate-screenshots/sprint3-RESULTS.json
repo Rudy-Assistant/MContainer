@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-03-15T22:24:47.011Z",
+  "gates": [
+    {
+      "gate": 1,
+      "status": "PASS",
+      "msg": "Free orbit: camera=true, selEmpty=true, containers=1"
+    },
+    {
+      "gate": 2,
+      "status": "PASS",
+      "msg": "TOD pill visible after FP exit: true"
+    },
+    {
+      "gate": 3,
+      "status": "PASS",
+      "msg": "VoxelPreview3D screenshot captured (visual check)"
+    },
+    {
+      "gate": 4,
+      "status": "PASS",
+      "msg": "VoxelPreview sync: {\"ok\":true,\"selectedVoxel\":{\"containerId\":\"d96c04aa-fd7a-4e14-8b07-d83f08670715\",\"index\":15}}"
+    },
+    {
+      "gate": 5,
+      "status": "PASS",
+      "msg": "ContactShadows screenshot at 15:00 (visual check for artifacts)"
+    },
+    {
+      "gate": 6,
+      "status": "PASS",
+      "msg": "Staircase geometry: {\"ok\":true,\"voxelType\":\"stairs\"}"
+    },
+    {
+      "gate": 7,
+      "status": "PASS",
+      "msg": "Palette system: {\"ok\":true,\"builtInCount\":3,\"activePaletteId\":\"dc5d63b0-5a66-4bd9-9bf5-ee79c654ec58\",\"customId\":\"dc5d63b0-5a66-4bd9-9bf5-ee79c654ec58\"}"
+    },
+    {
+      "gate": 8,
+      "status": "PASS",
+      "msg": "Export: {\"ok\":true,\"hasContainers\":false}"
+    },
+    {
+      "gate": 9,
+      "status": "PASS",
+      "msg": "Grass exclusion screenshot captured (visual check)"
+    },
+    {
+      "gate": 10,
+      "status": "PASS",
+      "msg": "All 5 visual regression screenshots captured"
+    }
+  ],
+  "passed": 10,
+  "warned": 0,
+  "failed": 0
+}

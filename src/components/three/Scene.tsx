@@ -1691,8 +1691,8 @@ function RaycasterConfig() {
 }
 
 function SceneExporter() {
-  const { scene } = useThree();
-  useEffect(() => { setExportScene(scene); (window as any).__scene = scene; }, [scene]);
+  const { scene, camera } = useThree();
+  useEffect(() => { setExportScene(scene); (window as any).__scene = scene; (window as any).__camera = camera; }, [scene, camera]);
   return null;
 }
 
