@@ -96,6 +96,7 @@ export default function SceneCanvas() {
     <SceneErrorBoundary>
       <div data-testid="canvas-3d" style={{ width: "100%", height: "100%" }}>
       <Canvas
+        frameloop="always"
         shadows={{ type: THREE.PCFSoftShadowMap }}
         camera={{
           position: [14, 5, 14],  // human-scale perspective — shows long wall + roof
@@ -121,7 +122,8 @@ export default function SceneCanvas() {
         onContextMenu={(e) => e.preventDefault()}
         style={{ width: "100%", height: "100%", touchAction: "none", cursor }}
       >
-        {/* Scene components may suspend (e.g. Text font loading) — catch with fallback */}
+        {/* Scene background: keeps sky-blue clear color so Suspense fallback doesn't flash */}
+        <color attach="background" args={[0x5b8fbf]} />
         <Suspense fallback={null}>
           <Scene />
         </Suspense>
