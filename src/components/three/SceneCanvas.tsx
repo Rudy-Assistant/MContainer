@@ -107,6 +107,7 @@ export default function SceneCanvas() {
           antialias: true,
           toneMapping: THREE.NoToneMapping,
           toneMappingExposure: 1.0,
+          preserveDrawingBuffer: true, // WHY: required for WebGL readPixels in acceptance gates
         }}
         onPointerMissed={() => {
           const s = useStore.getState();

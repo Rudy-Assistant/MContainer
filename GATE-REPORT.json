@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T05:25:14.307Z",
+  "timestamp": "2026-03-16T10:59:27.531Z",
   "sprint": 8,
   "gates": [
     {
@@ -50,7 +50,7 @@
     {
       "gate": "G7-middayVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (10.52% diff)"
     },
     {
       "gate": "G7-todGoldenHour",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor guard OK: left-drag-down=1.66, right-drag-down=N/A, orbit-target-y=N/A"
+      "msg": "Floor guard OK: left-drag-down=1.66, right-drag-down=N/A, orbit-target-y=N/A, pixel-center=rgb(91,143,191)"
     },
     {
       "gate": "G16-frameAction",
@@ -135,7 +135,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=63e6b852-eb67-4285-ae65-fdaec1112b2f"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=d41bc37e-18fe-47d0-9271-68a545c78b84"
     },
     {
       "gate": "G21-leftDragMove",
