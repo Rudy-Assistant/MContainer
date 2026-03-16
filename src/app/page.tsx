@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useStore } from "@/store/useStore";
 import { ContainerSize, ViewMode } from "@/types/container";
@@ -31,31 +31,30 @@ const SceneCanvas = dynamic(
 /** Hydration hook — seeds a default container on fresh state. Also checks for shared design URL. */
 function useHydrationSeed() {
   const hasHydrated = useStore((s) => s._hasHydrated);
-  const [checked, setChecked] = useState(false);
 
-  if (hasHydrated && !checked) {
-    setChecked(true);
-    if (typeof window !== 'undefined') {
-      // Check for shared design URL parameter
-      const params = new URLSearchParams(window.location.search);
-      const designParam = params.get('d');
-      if (designParam) {
-        import('@/utils/shareUrl').then(({ decodeDesign }) => {
-          const design = decodeDesign(designParam);
-          if (design) {
-            useStore.getState().importSharedDesign(design);
-            window.history.replaceState({}, '', window.location.pathname);
-          }
-        });
-      } else {
-        // Fresh state with no containers → seed a default container
-        const store = useStore.getState();
-        if (Object.keys(store.containers).length === 0) {
-          store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (typeof window === 'undefined') return;
+
+    // Check for shared design URL parameter
+    const params = new URLSearchParams(window.location.search);
+    const designParam = params.get('d');
+    if (designParam) {
+      import('@/utils/shareUrl').then(({ decodeDesign }) => {
+        const design = decodeDesign(designParam);
+        if (design) {
+          useStore.getState().importSharedDesign(design);
+          window.history.replaceState({}, '', window.location.pathname);
         }
+      });
+    } else {
+      // Fresh state with no containers → seed a default container
+      const store = useStore.getState();
+      if (Object.keys(store.containers).length === 0) {
+        store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
       }
     }
-  }
+  }, [hasHydrated]);
 }
 
 // ── Canvas Hint Overlay ───────────────────────────────────────
