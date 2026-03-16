@@ -335,24 +335,64 @@ async function run() {
     await page.waitForTimeout(200);
   } catch (e) { fail('G14-debugToggle', e.message); }
 
-  // ═══ G15: Camera floor constraint ═══
+  // ═══ G15: Camera floor constraint (blue screen prevention) ═══
   try {
-    // Orbit camera down with mouse drag on canvas
     const canvasBox = await page.locator('[data-testid="canvas-3d"] canvas').boundingBox();
+    const results = [];
     if (canvasBox) {
       const cx = canvasBox.x + canvasBox.width / 2;
       const cy = canvasBox.y + canvasBox.height / 2;
-      // Drag downward to orbit camera low
+
+      // Test 1: Aggressive left-drag downward (orbit attempt)
       await page.mouse.move(cx, cy);
       await page.mouse.down({ button: 'left' });
-      await page.mouse.move(cx, cy + 200, { steps: 10 });
+      await page.mouse.move(cx, cy + 300, { steps: 15 });
       await page.mouse.up({ button: 'left' });
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(600);
+      const camY1 = await page.evaluate(() => window.__camera?.position?.y ?? -999);
+      results.push({ test: 'left-drag-down', camY: camY1 });
+
+      // Test 2: Right-drag downward (pan/truck attempt)
+      await page.mouse.move(cx, cy);
+      await page.mouse.down({ button: 'right' });
+      await page.mouse.move(cx, cy + 300, { steps: 15 });
+      await page.mouse.up({ button: 'right' });
+      await page.waitForTimeout(600);
+      const camY2 = await page.evaluate(() => {
+        const y = window.__camera?.position?.y;
+        return typeof y === 'number' && !isNaN(y) ? y : null;
+      });
+      results.push({ test: 'right-drag-down', camY: camY2 });
+
+      // Test 3: Check orbit target Y via scene controls
+      const targetY = await page.evaluate(() => {
+        // camera-controls exposes target on the controls instance
+        const scene = window.__scene;
+        if (!scene) return null;
+        // Try to find controls via drei's makeDefault
+        const cam = window.__camera;
+        if (!cam) return null;
+        // Access camera-controls target directly
+        try {
+          const ctrl = cam.userData?.controls ?? cam.__r3f?.controls;
+          if (ctrl?.target) return ctrl.target.y;
+        } catch {}
+        return null;
+      });
+      results.push({ test: 'orbit-target-y', camY: targetY });
     }
-    const camY = await page.evaluate(() => window.__camera?.position?.y ?? -1);
-    camY >= 0.4
-      ? pass('G15-cameraFloor', `camera Y=${camY.toFixed(2)} (above floor)`)
-      : pass('G15-cameraFloor', `camera Y=${camY.toFixed(2)} (orbit may not respond in SwiftShader)`);
+
+    // Check results — null means the test couldn't read the value (SwiftShader limitation, not a failure)
+    // But if we got a numeric value, it must be above the floor
+    const failures = results.filter(r => {
+      if (r.camY === null) return false; // couldn't read — skip
+      if (r.test === 'orbit-target-y') return r.camY < -0.1;
+      return r.camY < 0.4;
+    });
+    const detail = results.map(r => `${r.test}=${r.camY === null ? 'N/A' : r.camY.toFixed(2)}`).join(', ');
+    failures.length === 0
+      ? pass('G15-cameraFloor', `Floor guard OK: ${detail}`)
+      : fail('G15-cameraFloor', `Camera below floor: ${detail}`);
   } catch (e) { fail('G15-cameraFloor', e.message); }
 
   // ═══ G16: Frame action exists (read-only check) ═══

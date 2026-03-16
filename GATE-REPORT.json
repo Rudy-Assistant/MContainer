@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T04:49:13.988Z",
+  "timestamp": "2026-03-16T05:25:14.307Z",
   "sprint": 8,
   "gates": [
     {
@@ -30,7 +30,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "visual match (0.00% diff)"
+      "msg": "screenshot captured (no buffer for comparison)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "camera Y=1.66 (above floor)"
+      "msg": "Floor guard OK: left-drag-down=1.66, right-drag-down=N/A, orbit-target-y=N/A"
     },
     {
       "gate": "G16-frameAction",
@@ -135,7 +135,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=ca6be86f-81a0-4490-9553-cd155d919c51"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=63e6b852-eb67-4285-ae65-fdaec1112b2f"
     },
     {
       "gate": "G21-leftDragMove",

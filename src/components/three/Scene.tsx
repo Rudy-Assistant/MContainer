@@ -771,6 +771,8 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
     if (!ctrl.target) return;
     // Exponential decay lerp — ~7× per second half-life feels like smooth glide
     _lerpTarget.lerp(_desiredTarget, 1 - Math.pow(0.001, delta));
+    // Clamp target Y to prevent looking through ground
+    if (_lerpTarget.y < 0) _lerpTarget.y = 0;
     ctrl.target.copy(_lerpTarget);
     ctrl.update();
   });
@@ -779,6 +781,9 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
 
 // ── Camera floor guard — prevents camera going below ground ──
 const _floorGuardVec = new THREE.Vector3();
+const _targetGuardVec = new THREE.Vector3();
+/** Minimum orbit target Y — prevents looking through the ground (blue screen) */
+const CAMERA_TARGET_MIN_Y = 0.0;
 
 function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsImpl | null> }) {
   // Set right-click to TRUCK (pan) instead of ROTATE on mount
@@ -792,9 +797,15 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
   useFrame(() => {
     const cc = cameraControlsRef.current;
     if (!cc) return;
+    // Clamp camera position Y
     cc.getPosition(_floorGuardVec);
     if (_floorGuardVec.y < CAMERA_FLOOR_Y) {
       cc.setPosition(_floorGuardVec.x, CAMERA_FLOOR_Y, _floorGuardVec.z, false);
+    }
+    // Clamp orbit target Y — prevents looking through ground (blue screen on drag)
+    cc.getTarget(_targetGuardVec);
+    if (_targetGuardVec.y < CAMERA_TARGET_MIN_Y) {
+      cc.setTarget(_targetGuardVec.x, CAMERA_TARGET_MIN_Y, _targetGuardVec.z, false);
     }
   });
   return null;
