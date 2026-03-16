@@ -20,15 +20,15 @@
 | Time of Day | **PRODUCTION** | G7-todSlider, G7-todGoldenHour | G7-todSlider: PASS — TOD set to 12 via slider; G7-todGoldenHour: PASS — TOD set to 17.5 via slider |
 | Undo/Redo | **PRODUCTION** | G9-undoKeyboard | G9-undoKeyboard: PASS — undo via Ctrl+Z: 2 -> 1 |
 | Material Palette | **PRODUCTION** | G10-paletteModal | G10-paletteModal: PASS — palette button clicked, modal state=undefined, overlays=false |
-| Export | **PRODUCTION** | G11-exportDropdown | G11-exportDropdown: PASS — export function exists (dropdown requires non-forced click) |
+| Export | **PRODUCTION** | G11-exportDropdown | G11-exportDropdown: PASS — export verified: 1 containers, 24682 bytes JSON |
 | Model Homes | **PRODUCTION** | G12-modelHomeLoad | G12-modelHomeLoad: PASS — micro_studio loaded, 1 containers |
 | Staircase System | **PRODUCTION** | G13-staircase | G13-staircase: PASS — voxelType=stairs (store action — no UI for voxel-index stair) |
 | Debug Mode | **PRODUCTION** | G14-debugToggle | G14-debugToggle: PASS — debug toggled: false -> true |
-| Camera | **PRODUCTION** | G15-cameraFloor | G15-cameraFloor: PASS — Floor guard OK: left-drag-down=1.66, right-drag-down=N/A, orbit-target-y=N/A, pixel-center=rgb(91,143,191) |
+| Camera | **PRODUCTION** | G15-cameraFloor | G15-cameraFloor: PASS — Floor guard OK: left-cam=1.71, right-cam=null, pixel=rgb(91,143,191) |
 | Structural Frame | **PRODUCTION** | G16-frameAction, G17-frameToggle | G16-frameAction: PASS — toggleStructuralElement exists; G17-frameToggle: PASS — hide+restore OK (store action — no direct UI gesture) |
 | Ground/Atmosphere | **PRODUCTION** | G18-noGrass | G18-noGrass: PASS — no instanced grass blades |
 | Visual Integrity | **PRODUCTION** | G19-defaultVisual | G19-defaultVisual: PASS — default state restored via UI |
-| Container Stacking | **PRODUCTION** | G20-stackSnap | G20-stackSnap: PASS — Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=d41bc37e-18fe-47d0-9271-68a545c78b84 |
+| Container Stacking | **PRODUCTION** | G20-stackSnap | G20-stackSnap: PASS — Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=0844f79c-1fa7-4d33-9379-118cd376c305 |
 | Drag-to-Move | **PRODUCTION** | G21-leftDragMove | G21-leftDragMove: PASS — drag-to-move API exists |
 | Add Container UI | **PRODUCTION** | G22-addContainerUI | G22-addContainerUI: PASS — container added via UI: 2 → 3 |
 | Two-Level Home | **PRODUCTION** | G23-twoLevelHome | G23-twoLevelHome: PASS — Full workflow: Y=2.90, walk=true, exit=true, tod=true |
@@ -63,7 +63,7 @@ The following features exist in V1 but have no Playwright gates. They cannot be 
 
 ## Gate Report Source
 
-- Timestamp: 2026-03-16T10:59:27.531Z
+- Timestamp: 2026-03-16T11:44:12.995Z
 - Total gates: 32
 - Passed: 32
 - Failed: 0

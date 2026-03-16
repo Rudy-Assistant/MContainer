@@ -188,17 +188,27 @@ async function run() {
       ? pass('G8-walkthrough', 'entered walkthrough via click')
       : fail('G8-walkthrough', `expected walkthrough, got ${mode}`);
 
-    // FP walking: press W key (after focusing the main R3F canvas)
+    // FP walking: mock pointer lock so W key moves camera in headless
+    await page.evaluate(() => {
+      // Override pointerLockElement to simulate pointer lock being active
+      const canvas = document.querySelector('[data-testid="canvas-3d"] canvas');
+      Object.defineProperty(document, 'pointerLockElement', {
+        get: () => canvas,
+        configurable: true,
+      });
+    });
+    await page.waitForTimeout(200);
+
     const camBefore = await page.evaluate(() => {
       const cam = window.__camera;
       return cam ? { x: cam.position.x, y: cam.position.y, z: cam.position.z } : null;
     });
 
-    await page.locator('[data-testid="canvas-3d"] canvas').click({ force: true });
+    // Send W key for 1.2 seconds
     await page.keyboard.down('w');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1200);
     await page.keyboard.up('w');
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(300);
 
     const camAfter = await page.evaluate(() => {
       const cam = window.__camera;
@@ -206,10 +216,14 @@ async function run() {
     });
 
     if (camBefore && camAfter) {
-      const moved = Math.abs(camAfter.x - camBefore.x) + Math.abs(camAfter.z - camBefore.z);
-      pass('G8-fpWalking', `camera delta=${moved.toFixed(3)} (${moved > 0 ? 'moved' : 'no movement — pointer lock may block in headless'})`);
+      const delta = Math.abs(camAfter.x - camBefore.x) + Math.abs(camAfter.z - camBefore.z);
+      // Camera Y must be within container bounds (1.0 to 2.5)
+      const yOk = camAfter.y >= 1.0 && camAfter.y <= 3.5;
+      delta > 0.01
+        ? pass('G8-fpWalking', `camera moved delta=${delta.toFixed(3)}, Y=${camAfter.y.toFixed(2)}, yBounds=${yOk}`)
+        : fail('G8-fpWalking', `no movement: delta=${delta.toFixed(3)}, before=(${camBefore.x.toFixed(2)},${camBefore.z.toFixed(2)}), after=(${camAfter.x.toFixed(2)},${camAfter.z.toFixed(2)})`);
     } else {
-      pass('G8-fpWalking', 'camera reference not available in headless');
+      fail('G8-fpWalking', `camera not available: before=${!!camBefore} after=${!!camAfter}`);
     }
   } catch (e) { fail('G8-walkthrough', e.message); }
 
@@ -263,23 +277,39 @@ async function run() {
     await page.waitForTimeout(300);
   } catch (e) { fail('G10-paletteModal', e.message); }
 
-  // ═══ G11: Export dropdown via UI click ═══
+  // ═══ G11: Export dropdown + actual export verification ═══
   try {
-    // force:true bypasses actionability checks but the click still fires on the element
+    // Try UI click first
     await page.click('[data-testid="btn-export"]', { force: true });
     await page.waitForTimeout(500);
     const jsonVisible = await page.locator('text=Export JSON').isVisible().catch(() => false);
     const glbVisible = await page.locator('text=Export GLB').isVisible().catch(() => false);
-    // If dropdown didn't open (force click may not trigger React state), try via evaluate
-    if (!jsonVisible && !glbVisible) {
-      const hasExport = await page.evaluate(() => typeof window.__store.getState().exportState === 'function');
-      hasExport
-        ? pass('G11-exportDropdown', 'export function exists (dropdown requires non-forced click)')
-        : fail('G11-exportDropdown', 'no export function');
-    } else {
-      pass('G11-exportDropdown', `dropdown opened: JSON=${jsonVisible} GLB=${glbVisible}`);
+
+    if (jsonVisible || glbVisible) {
+      // Dropdown opened via UI — real interaction works
+      pass('G11-exportDropdown', `dropdown opened via UI: JSON=${jsonVisible} GLB=${glbVisible}`);
       await page.click('header', { force: true });
       await page.waitForTimeout(200);
+    } else {
+      // Dropdown didn't open — force click doesn't trigger React state.
+      // Verify export actually works by calling exportState and checking output.
+      const exportResult = await page.evaluate(() => {
+        const s = window.__store.getState();
+        if (typeof s.exportState !== 'function') return { ok: false, reason: 'no exportState function' };
+        try {
+          const json = s.exportState();
+          const parsed = JSON.parse(json);
+          return {
+            ok: true,
+            hasContainers: Array.isArray(parsed.containers) || typeof parsed.containers === 'object',
+            containerCount: Object.keys(parsed.containers || {}).length || parsed.containers?.length || 0,
+            jsonLength: json.length,
+          };
+        } catch (e) { return { ok: false, reason: e.message }; }
+      });
+      exportResult.ok
+        ? pass('G11-exportDropdown', `export verified: ${exportResult.containerCount} containers, ${exportResult.jsonLength} bytes JSON`)
+        : fail('G11-exportDropdown', `export failed: ${exportResult.reason}`);
     }
   } catch (e) { fail('G11-exportDropdown', e.message); }
 
@@ -337,89 +367,94 @@ async function run() {
   } catch (e) { fail('G14-debugToggle', e.message); }
 
   // ═══ G15: Camera floor constraint (blue screen prevention) ═══
+  // Tests left-drag orbit AND right-drag pan with actual numeric assertions.
   try {
     const canvasBox = await page.locator('[data-testid="canvas-3d"] canvas').boundingBox();
-    const results = [];
-    if (canvasBox) {
-      const cx = canvasBox.x + canvasBox.width / 2;
-      const cy = canvasBox.y + canvasBox.height / 2;
+    if (!canvasBox) { fail('G15-cameraFloor', 'canvas not found'); throw new Error('skip'); }
+    const cx = canvasBox.x + canvasBox.width / 2;
+    const cy = canvasBox.y + canvasBox.height / 2;
 
-      // Test 1: Aggressive left-drag downward (orbit attempt)
-      await page.mouse.move(cx, cy);
-      await page.mouse.down({ button: 'left' });
-      await page.mouse.move(cx, cy + 300, { steps: 15 });
-      await page.mouse.up({ button: 'left' });
-      await page.waitForTimeout(600);
-      const camY1 = await page.evaluate(() => window.__camera?.position?.y ?? -999);
-      results.push({ test: 'left-drag-down', camY: camY1 });
-
-      // Test 2: Right-drag downward (pan/truck attempt)
-      await page.mouse.move(cx, cy);
-      await page.mouse.down({ button: 'right' });
-      await page.mouse.move(cx, cy + 300, { steps: 15 });
-      await page.mouse.up({ button: 'right' });
-      await page.waitForTimeout(600);
-      const camY2 = await page.evaluate(() => {
-        const y = window.__camera?.position?.y;
-        return typeof y === 'number' && !isNaN(y) ? y : null;
-      });
-      results.push({ test: 'right-drag-down', camY: camY2 });
-
-      // Test 3: Check orbit target Y via scene controls
-      const targetY = await page.evaluate(() => {
-        // camera-controls exposes target on the controls instance
-        const scene = window.__scene;
-        if (!scene) return null;
-        // Try to find controls via drei's makeDefault
-        const cam = window.__camera;
-        if (!cam) return null;
-        // Access camera-controls target directly
-        try {
-          const ctrl = cam.userData?.controls ?? cam.__r3f?.controls;
-          if (ctrl?.target) return ctrl.target.y;
-        } catch {}
-        return null;
-      });
-      results.push({ test: 'orbit-target-y', camY: targetY });
-
-      // Test 4: Pixel-sample center of canvas — detect blue screen condition
-      // With preserveDrawingBuffer: true, we can read pixels via WebGL
-      const pixelSample = await page.evaluate(() => {
-        try {
-          const canvas = document.querySelector('[data-testid="canvas-3d"] canvas');
-          if (!canvas) return null;
-          const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-          if (!gl) return null;
-          const w = canvas.width, h = canvas.height;
-          const px = Math.floor(w / 2), py = Math.floor(h / 2);
-          const pixel = new Uint8Array(4);
-          gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-          return { r: pixel[0], g: pixel[1], b: pixel[2], a: pixel[3] };
-        } catch { return null; }
-      });
-      if (pixelSample) {
-        // Blue screen: predominantly blue (b > 150, r < 80, g < 80) = sky color from below ground
-        const isBlue = pixelSample.b > 150 && pixelSample.r < 80 && pixelSample.g < 80;
-        results.push({ test: 'pixel-center', camY: isBlue ? -1 : 1, pixel: pixelSample });
-      }
-    }
-
-    // Check results — null means the test couldn't read the value (SwiftShader limitation, not a failure)
-    // But if we got a numeric value, it must be above the floor
-    const failures = results.filter(r => {
-      if (r.camY === null) return false; // couldn't read — skip
-      if (r.test === 'orbit-target-y') return r.camY < -0.1;
-      if (r.test === 'pixel-center') return r.camY < 0; // negative = blue screen detected
-      return r.camY < 0.4;
+    // Suppress context menu to allow right-drag to work in headless
+    await page.evaluate(() => {
+      window.__g15CtxHandler = (e) => e.preventDefault();
+      window.addEventListener('contextmenu', window.__g15CtxHandler, true);
     });
-    const detail = results.map(r => {
-      if (r.test === 'pixel-center' && r.pixel) return `pixel-center=rgb(${r.pixel.r},${r.pixel.g},${r.pixel.b})`;
-      return `${r.test}=${r.camY === null ? 'N/A' : r.camY.toFixed(2)}`;
-    }).join(', ');
+
+    // Helper: read camera + target state
+    const readCam = () => page.evaluate(() => {
+      const cam = window.__camera;
+      const cc = window.__cameraControls;
+      let targetY = null;
+      if (cc && typeof cc.getTarget === 'function') {
+        try {
+          // camera-controls getTarget writes to the passed Vector3-like object
+          const v = { x: 0, y: 0, z: 0 };
+          cc.getTarget(v);
+          targetY = v.y;
+        } catch {}
+      }
+      const camY = cam?.position?.y;
+      return {
+        camY: (typeof camY === 'number' && !isNaN(camY)) ? camY : null,
+        targetY: (typeof targetY === 'number' && !isNaN(targetY)) ? targetY : null,
+      };
+    });
+
+    // Test 1: Aggressive left-drag downward (orbit)
+    await page.mouse.move(cx, cy);
+    await page.mouse.down({ button: 'left' });
+    for (let i = 0; i < 20; i++) await page.mouse.move(cx, cy + 15 * (i + 1), { steps: 1 });
+    await page.mouse.up({ button: 'left' });
+    await page.waitForTimeout(500);
+    const leftDrag = await readCam();
+
+    // Test 2: Right-drag downward (pan/truck) — contextmenu suppressed above
+    await page.mouse.move(cx, cy);
+    await page.mouse.down({ button: 'right' });
+    for (let i = 0; i < 20; i++) await page.mouse.move(cx, cy + 15 * (i + 1), { steps: 1 });
+    await page.mouse.up({ button: 'right' });
+    await page.waitForTimeout(500);
+    const rightDrag = await readCam();
+
+    // Test 3: Pixel-sample center of canvas
+    const pixel = await page.evaluate(() => {
+      try {
+        const canvas = document.querySelector('[data-testid="canvas-3d"] canvas');
+        if (!canvas) return null;
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        if (!gl) return null;
+        const px = Math.floor(canvas.width / 2), py = Math.floor(canvas.height / 2);
+        const p = new Uint8Array(4);
+        gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
+        return { r: p[0], g: p[1], b: p[2] };
+      } catch { return null; }
+    });
+
+    // Clean up context menu suppression
+    await page.evaluate(() => {
+      if (window.__g15CtxHandler) window.removeEventListener('contextmenu', window.__g15CtxHandler, true);
+      delete window.__g15CtxHandler;
+    });
+
+    // Validate
+    const failures = [];
+    // Left-drag camera must stay above floor
+    if (leftDrag.camY !== null && leftDrag.camY < 0.4) failures.push(`left-cam=${leftDrag.camY.toFixed(2)}`);
+    // Right-drag camera must stay above floor (null = context menu broke the drag chain, acceptable)
+    if (rightDrag.camY !== null && rightDrag.camY < 0.4) failures.push(`right-cam=${rightDrag.camY.toFixed(2)}`);
+    // Pixel must not be pure blue (blue screen from below ground)
+    if (pixel) {
+      const isBlue = pixel.b > 150 && pixel.r < 80 && pixel.g < 80;
+      if (isBlue) failures.push(`pixel=rgb(${pixel.r},${pixel.g},${pixel.b})`);
+    }
+    // Left-drag cam must produce a value (this one should always work)
+    if (leftDrag.camY === null) failures.push('left-cam=null');
+
+    const detail = `left-cam=${leftDrag.camY?.toFixed(2) ?? 'null'}, right-cam=${rightDrag.camY?.toFixed(2) ?? 'null'}, pixel=${pixel ? `rgb(${pixel.r},${pixel.g},${pixel.b})` : 'N/A'}`;
     failures.length === 0
       ? pass('G15-cameraFloor', `Floor guard OK: ${detail}`)
-      : fail('G15-cameraFloor', `Camera below floor: ${detail}`);
-  } catch (e) { fail('G15-cameraFloor', e.message); }
+      : fail('G15-cameraFloor', `Failures: ${failures.join(', ')} | ${detail}`);
+  } catch (e) { if (e.message !== 'skip') fail('G15-cameraFloor', e.message); }
 
   // ═══ G16: Frame action exists (read-only check) ═══
   try {

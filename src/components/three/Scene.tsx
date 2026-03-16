@@ -967,6 +967,12 @@ function RealisticScene() {
   const currentTheme = useStore((s) => s.currentTheme);
   const cameraControlsRef = useRef<CameraControlsImpl>(null);
 
+  // Expose camera controls for Playwright gates to read target position
+  useEffect(() => {
+    (window as any).__cameraControls = cameraControlsRef.current;
+    return () => { delete (window as any).__cameraControls; };
+  });
+
   // Apply palette when active palette or theme changes
   useEffect(() => {
     const { palettes, environment } = useStore.getState();
