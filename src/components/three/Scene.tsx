@@ -43,7 +43,7 @@ import {
   applyTexturesToMaterial,
 } from "@/config/pbrTextures";
 import GroundManager from "./GroundManager";
-import { GrassField } from "./GrassField";
+import DebugOverlay from "./DebugOverlay";
 import { FaceContextWidget } from "./FaceContextWidget";
 import { _themeMats } from "@/config/materialCache";
 import { type ThemeId } from "@/config/themes";
@@ -784,6 +784,28 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
   return null;
 }
 
+// ── Camera floor guard — prevents camera going below ground ──
+const _floorGuardVec = new THREE.Vector3();
+
+function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsImpl | null> }) {
+  // Set right-click to TRUCK (pan) instead of ROTATE on mount
+  useEffect(() => {
+    const cc = cameraControlsRef.current;
+    if (!cc) return;
+    cc.mouseButtons.right = 2; // ACTION.TRUCK = 2
+  }, [cameraControlsRef]);
+
+  useFrame(() => {
+    const cc = cameraControlsRef.current;
+    if (!cc) return;
+    cc.getPosition(_floorGuardVec);
+    if (_floorGuardVec.y < 0.5) {
+      cc.setPosition(_floorGuardVec.x, 0.5, _floorGuardVec.z, false);
+    }
+  });
+  return null;
+}
+
 // ── Camera Angle Broadcast + 3D Camera Persistence ─────────
 const _sphericalBroadcast = new THREE.Spherical();
 
@@ -890,6 +912,7 @@ function RealisticScene() {
   const containers = useStore((s) => s.containers);
   const viewLevel = useStore((s) => s.viewLevel);
   const clearSelection = useStore((s) => s.clearSelection);
+  const debugMode = useStore((s) => s.debugMode);
   const dragMovingId = useStore((s) => s.dragMovingId);
   const selectedVoxel = useStore((s) => s.selectedVoxel);
   const hoveredVoxel = useStore((s) => s.hoveredVoxel);
@@ -958,7 +981,6 @@ function RealisticScene() {
       <SunLight />
       <FollowLight />
       <GroundManager />
-      <GrassField />
       <PBRTextureLoader />
 
       {/* Phase 8: HDRI environment for PBR reflections (visible corrugation reflections) */}
@@ -1003,6 +1025,9 @@ function RealisticScene() {
       {/* Shared walls for adjacent containers (prevents z-fighting) */}
       <SharedWalls />
 
+      {/* Debug wireframe overlay */}
+      {debugMode && <DebugOverlay />}
+
       {/* Phase 9: Tape measure tool */}
       <TapeMeasure />
 
@@ -1013,13 +1038,14 @@ function RealisticScene() {
         ref={cameraControlsRef}
         makeDefault
         enabled={!dragMovingId}
-        minPolarAngle={0.1}
-        maxPolarAngle={Math.PI / 2 - 0.05}
+        minPolarAngle={0.05}
+        maxPolarAngle={Math.PI / 2 - 0.08}
         minDistance={3}
         maxDistance={120}
         smoothTime={0.15}
         draggingSmoothTime={0.1}
       />
+      <CameraFloorGuard cameraControlsRef={cameraControlsRef} />
 
       {/* Smooth camera orbit pivot lerp — glides target to desired position */}
       <CameraTargetLerp desired={orbitTarget} />
@@ -1574,7 +1600,6 @@ function WalkthroughScene() {
       <SkyDome />
       <SunLight />
       <GroundManager />
-      <GrassField />
 
       {/* Phase 8: HDRI environment for PBR reflections */}
       <TimeOfDayEnvironment intensity={0.4} />

@@ -33,7 +33,7 @@ export const GROUND_PRESETS: Record<GroundPresetId, GroundPreset> = {
     repeatY: 24,
     normalScale: 1.5,
     envMapIntensity: 0.15,
-    displacementScale: 0,
+    displacementScale: 0.15,
   },
   concrete: {
     id: "concrete",

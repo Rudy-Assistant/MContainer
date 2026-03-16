@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-03-16T00:20:56.820Z",
+  "gates": [
+    {
+      "gate": 1,
+      "status": "FAIL",
+      "msg": "Camera exists, Y=undefined"
+    },
+    {
+      "gate": 2,
+      "status": "WARN",
+      "msg": "WASD: before=null, after=null"
+    },
+    {
+      "gate": 3,
+      "status": "PASS",
+      "msg": "Visible line objects: 0 (visual check for afterimage)"
+    },
+    {
+      "gate": 4,
+      "status": "PASS",
+      "msg": "Reset button: found=true, text=\"\""
+    },
+    {
+      "gate": 5,
+      "status": "PASS",
+      "msg": "debugMode on=true, off=false"
+    },
+    {
+      "gate": 6,
+      "status": "PASS",
+      "msg": "designComplexity toggle exists: true"
+    },
+    {
+      "gate": 7,
+      "status": "PASS",
+      "msg": "Instanced grass blades in scene: false"
+    },
+    {
+      "gate": 8,
+      "status": "PASS",
+      "msg": "Stair voxel: {\"ok\":true,\"stairPart\":\"lower\"}"
+    }
+  ],
+  "passed": 6,
+  "warned": 1,
+  "failed": 1
+}

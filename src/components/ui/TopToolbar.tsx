@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
-import { ViewMode } from "@/types/container";
+import { ContainerSize, ViewMode } from "@/types/container";
 import {
   Trash2,
   Group,
@@ -51,6 +51,9 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
   const removeContainerFromZone = useStore((s) => s.removeContainerFromZone);
   const generateRooftopDeck = useStore((s) => s.generateRooftopDeck);
   const updateContainerRotation = useStore((s) => s.updateContainerRotation);
+  const addContainer = useStore((s) => s.addContainer);
+  const debugMode = useStore((s) => s.debugMode);
+  const toggleDebugMode = useStore((s) => s.toggleDebugMode);
   const [wallMenuOpen, setWallMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
@@ -166,14 +169,14 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
         </button>
 
         <button onClick={() => {
-          if (confirm('Clear all containers? This cannot be undone.')) {
+          if (confirm('Reset to empty canvas?')) {
             const ids = Object.keys(containers);
             ids.forEach((id) => removeContainer(id));
             clearSelection();
+            addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
           }
         }} style={btn(Object.keys(containers).length > 0)} disabled={Object.keys(containers).length === 0} title="Reset Canvas">
           <RotateCcw size={15} />
-          <span className="hidden lg:inline">Reset</span>
         </button>
 
         {/* Group/Ungroup — contextual single button */}
@@ -343,6 +346,23 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
             );
           })}
         </div>
+
+        {/* Debug wireframe toggle */}
+        <button
+          onClick={toggleDebugMode}
+          style={{
+            display: "flex", alignItems: "center", gap: "4px",
+            padding: "5px 8px", borderRadius: "6px", border: "1px solid",
+            borderColor: debugMode ? "#ef4444" : "#e5e7eb",
+            background: debugMode ? "#fef2f2" : "transparent",
+            color: debugMode ? "#ef4444" : "#9ca3af",
+            fontSize: "11px", fontWeight: 600, cursor: "pointer",
+            flexShrink: 0,
+          }}
+          title="Toggle Debug Wireframe"
+        >
+          DBG
+        </button>
       </div>
     </header>
   );

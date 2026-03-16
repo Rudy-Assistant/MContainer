@@ -54,6 +54,10 @@ export interface UiSlice {
   // Design complexity toggle (Simple = bay groups, Detailed = per-voxel)
   designComplexity: 'simple' | 'detailed';
   setDesignComplexity: (c: 'simple' | 'detailed') => void;
+
+  // Debug wireframe overlay
+  debugMode: boolean;
+  toggleDebugMode: () => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -91,4 +95,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   designComplexity: 'detailed',
   setDesignComplexity: (c) => set({ designComplexity: c }),
+
+  debugMode: false,
+  toggleDebugMode: () => set((s: any) => ({ debugMode: !s.debugMode })),
 });

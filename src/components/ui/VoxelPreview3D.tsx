@@ -310,24 +310,19 @@ function CubeScene({ containerId, voxelIndex, overrideFaces }: {
     return result;
   }, [voxelGrid, voxelIndex, nW, nD]);
 
-  // 2-Voxel stair parts show a placeholder instead of half-tread geometry
+  // 2-Voxel stair parts — render actual StairMesh geometry
   if (voxel?.stairPart === 'lower' || voxel?.stairPart === 'upper') {
     return (
       <>
         <ambientLight intensity={0.9} />
-        <Html center>
-          <div style={{
-            color: '#6b7280', fontSize: 11, textAlign: 'center',
-            padding: '12px 8px', lineHeight: 1.5, userSelect: 'none',
-            whiteSpace: 'nowrap',
-          }}>
-            <div style={{ fontSize: 20, marginBottom: 4 }}>⬛⬛</div>
-            <strong>2-Voxel Staircase</strong><br />
-            <span style={{ color: '#9ca3af' }}>
-              {voxel.stairPart === 'lower' ? 'Lower section' : 'Upper section'}
-            </span>
-          </div>
-        </Html>
+        <directionalLight position={[2, 4, 3]} intensity={0.6} />
+        <StairMesh
+          voxW={nW} voxD={nD} voxH={nH}
+          ascending={voxel.stairAscending ?? 'n'}
+          faces={voxel.faces}
+          stairPart={voxel.stairPart}
+        />
+        <OrbitControls enableZoom={false} enablePan={false} autoRotate={false} rotateSpeed={0.7} />
       </>
     );
   }
