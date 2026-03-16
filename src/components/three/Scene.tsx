@@ -26,10 +26,10 @@ import {
   CAMERA_MIN_DISTANCE,
   CAMERA_MAX_DISTANCE,
   CAMERA_FLOOR_Y,
-  CAMERA_MOUSE_RIGHT,
   CAMERA_TARGET_MIN_Y,
   CAMERA_MAX_DOWNWARD_ANGLE,
   CAMERA_TARGET_MAX_RADIUS,
+  CAMERA_MOUSE_BUTTONS,
 } from "@/config/cameraConstants";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { findStackTarget, findEdgeSnap, checkOverlap, getFootprintAt, computePoolUnion } from "@/store/spatialEngine";
@@ -828,15 +828,6 @@ const _floorGuardVec = new THREE.Vector3();
 const _targetGuardVec = new THREE.Vector3();
 
 function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsImpl | null> }) {
-  // Set right-click to TRUCK (pan) instead of ROTATE on mount
-  useEffect(() => {
-    const cc = cameraControlsRef.current;
-    if (!cc) return;
-    cc.mouseButtons.right = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK
-    cc.mouseButtons.middle = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK — middle drag also pans
-    // Reduce truck speed to prevent aggressive panning that loses sight of the scene
-    cc.truckSpeed = 1.0;
-  }, [cameraControlsRef]);
 
   // WHY: Store last known-good position/target to recover from NaN.
   // camera-controls TRUCK mode produces NaN on right-drag in some browsers/SwiftShader.
@@ -1171,6 +1162,8 @@ function RealisticScene() {
         maxDistance={CAMERA_MAX_DISTANCE}
         smoothTime={0.15}
         draggingSmoothTime={0.1}
+        mouseButtons={CAMERA_MOUSE_BUTTONS}
+        truckSpeed={0.5}
       />
       <CameraFloorGuard cameraControlsRef={cameraControlsRef} />
 

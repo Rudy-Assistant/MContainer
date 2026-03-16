@@ -2165,30 +2165,55 @@ export default function ContainerMesh({ container }: { container: Container }) {
     };
   }, [startContainerDrag, gl]);
 
-  // Hide the actual container while it's being dragged (ghost shows instead)
-  if (isBeingDragged) return null;
+  // During drag: dim the original container to 30% opacity so user sees where they're dragging FROM.
+  const _savedOpacities = useRef<Map<THREE.Material, { opacity: number; transparent: boolean }>>(new Map());
+  useEffect(() => {
+    if (!groupRef.current) return;
+    const saved = _savedOpacities.current;
+    if (isBeingDragged) {
+      // Dim all materials
+      groupRef.current.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of mats) {
+          if (!saved.has(m)) {
+            saved.set(m, { opacity: (m as any).opacity ?? 1, transparent: m.transparent });
+          }
+          m.transparent = true;
+          (m as any).opacity = 0.3;
+        }
+      });
+    } else if (saved.size > 0) {
+      // Restore all materials
+      for (const [m, orig] of saved) {
+        (m as any).opacity = orig.opacity;
+        m.transparent = orig.transparent;
+      }
+      saved.clear();
+    }
+  }, [isBeingDragged]);
 
   return (
     <group
       ref={groupRef}
       position={[container.position.x, container.position.y, container.position.z]}
       rotation={[0, container.rotation, 0]}
+      visible={true}
       onPointerDown={(e) => {
         e.stopPropagation();
         if (e.nativeEvent.button !== 0) return; // left-click only
-        if (isSelected && e.nativeEvent.shiftKey) {
-          // WHY Shift required: without it, any left-click-drag on a selected container
-          // starts a move, hiding the container and showing only ground ("blue screen" bug).
-          // Shift+drag is explicit intent to move. Plain drag should orbit the camera.
+        if (isSelected) {
+          // Drag-to-move: any left-click-drag on a selected container initiates move.
+          // The original container stays visible (dimmed) during drag, so no disappearing.
           dragPendingRef.current = {
             id: container.id,
             clientX: e.nativeEvent.clientX,
             clientY: e.nativeEvent.clientY,
           };
-        } else if (!isSelected) {
+        } else {
           select(container.id, e.nativeEvent.shiftKey);
         }
-        // If selected but no Shift, do nothing — let CameraControls handle orbit
       }}
       onPointerOver={() => { if (!isWalkthrough) setHovered(true); }}
       onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}

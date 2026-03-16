@@ -331,8 +331,7 @@ function BlueprintContainer({ container }: { container: Container }) {
     return new THREE.MeshBasicMaterial({ color: floorColor, depthTest: false });
   }, [isSelected, floorColor]);
 
-  // All hooks must come before early return
-  if (isBeingDragged) return null;
+  // During drag: keep original visible but dimmed (ghost shows at cursor)
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();

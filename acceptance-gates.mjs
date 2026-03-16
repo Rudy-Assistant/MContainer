@@ -449,6 +449,21 @@ async function run() {
     }
   } catch (e) { if (e.message !== 'skip') fail('G15-cameraFloor', e.message); }
 
+  // Reset scene + camera after G15's aggressive right-drag (prevents contaminating subsequent gates)
+  try {
+    page.once('dialog', d => d.accept().catch(() => {}));
+    await page.click('[data-testid="btn-reset"]', { force: true });
+    await page.waitForTimeout(1000);
+    // Force camera back to default position (Reset button doesn't reset camera orbit)
+    await page.evaluate(() => {
+      if (window.__camera) {
+        window.__camera.position.set(14, 5, 14);
+        window.__camera.lookAt(0, 1.5, 0);
+      }
+    });
+    await page.waitForTimeout(1000);
+  } catch {}
+
   // ═══ G16: Frame action exists (read-only check) ═══
   try {
     const r = await page.evaluate(() => typeof window.__store.getState().toggleStructuralElement === 'function');
@@ -525,19 +540,75 @@ async function run() {
       : fail('G20-stackSnap', `Y=${r.c2Y}, level=${r.c2Level}, stackedOn=${r.c2StackedOn}, supporting=${JSON.stringify(r.c1Supporting)}`);
   } catch (e) { fail('G20-stackSnap', e.message); }
 
-  // ═══ G21: Left-drag-to-move (startContainerDrag exists, no grabMode needed) ═══
+  // ═══ G21: Left-drag-to-move — container stays visible during drag ═══
   try {
-    const r = await page.evaluate(() => {
+    // Set up a clean single container for drag test
+    const setupInfo = await page.evaluate(() => {
       const s = window.__store.getState();
-      return {
-        hasStartDrag: typeof s.startContainerDrag === 'function',
-        hasCommitDrag: typeof s.commitContainerDrag === 'function',
-        hasCancelDrag: typeof s.cancelContainerDrag === 'function',
-      };
+      Object.keys(s.containers).forEach(id => s.removeContainer(id));
+      const id = s.addContainer('40ft_high_cube', { x: 0, y: 0, z: 0 });
+      s.select(id, false);
+      return { id, count: Object.keys(window.__store.getState().containers).length };
     });
-    r.hasStartDrag && r.hasCommitDrag && r.hasCancelDrag
-      ? pass('G21-leftDragMove', 'drag-to-move API exists')
-      : fail('G21-leftDragMove', JSON.stringify(r));
+    await page.waitForTimeout(500);
+
+    // Start drag via store (container is selected, drag is initiated)
+    await page.evaluate(() => {
+      const s = window.__store.getState();
+      const ids = Object.keys(s.containers);
+      s.startContainerDrag(ids[0]);
+    });
+    await page.waitForTimeout(300);
+
+    // Screenshot DURING active drag — original container must be visible (dimmed)
+    const dragBuf = await page.screenshot({
+      path: `${DIR}/G21-during-drag.png`,
+      clip: CLIP,
+    });
+
+    // Check: is there color variance? (original container still visible = not blank)
+    const duringDragCheck = await page.evaluate(({ clip }) => {
+      const canvas = document.querySelector('[data-testid="canvas-3d"] canvas');
+      if (!canvas) return { ok: false, reason: 'no canvas' };
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      if (!gl) return { ok: false, reason: 'no GL' };
+
+      const samples = [];
+      const step = 60;
+      const rect = canvas.getBoundingClientRect();
+      for (let sx = step; sx < clip.width - step; sx += step) {
+        for (let sy = step; sy < clip.height - step; sy += step) {
+          const px = new Uint8Array(4);
+          const glX = Math.floor((clip.x - rect.left + sx) * (canvas.width / rect.width));
+          const glY = Math.floor(canvas.height - (clip.y - rect.top + sy) * (canvas.height / rect.height));
+          gl.readPixels(glX, glY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          samples.push(`${px[0]>>4},${px[1]>>4},${px[2]>>4}`);
+        }
+      }
+      const freq = {};
+      for (const s of samples) freq[s] = (freq[s] || 0) + 1;
+      const maxFreq = Math.max(...Object.values(freq));
+      const dominantPct = maxFreq / samples.length;
+      return {
+        ok: true,
+        containerVisible: dominantPct < 0.90, // if <90% same color, container is visible
+        uniqueColors: Object.keys(freq).length,
+        dominantPct: dominantPct.toFixed(3),
+        isDragging: !!window.__store.getState().dragMovingId,
+      };
+    }, { clip: CLIP });
+
+    // Cancel drag
+    await page.evaluate(() => window.__store.getState().cancelContainerDrag());
+    await page.waitForTimeout(200);
+
+    if (duringDragCheck.ok && duringDragCheck.containerVisible && duringDragCheck.isDragging) {
+      pass('G21-leftDragMove', `Container visible during drag: ${duringDragCheck.uniqueColors} colors, dominant=${duringDragCheck.dominantPct}`);
+    } else if (duringDragCheck.ok && !duringDragCheck.containerVisible) {
+      fail('G21-leftDragMove', `Container disappeared during drag: ${duringDragCheck.uniqueColors} colors, dominant=${duringDragCheck.dominantPct}`);
+    } else {
+      fail('G21-leftDragMove', `Drag test issue: ${JSON.stringify(duringDragCheck)}`);
+    }
   } catch (e) { fail('G21-leftDragMove', e.message); }
 
   // ═══ G22: Add container via UI ═══

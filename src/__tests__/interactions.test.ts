@@ -23,7 +23,7 @@ import {
   CAMERA_MIN_DISTANCE,
   CAMERA_MAX_DISTANCE,
   CAMERA_FLOOR_Y,
-  CAMERA_MOUSE_RIGHT,
+  CAMERA_MOUSE_BUTTONS,
 } from '@/config/cameraConstants';
 
 function resetStore() {
@@ -197,7 +197,7 @@ describe('Sprint 5 camera configuration', () => {
   });
 
   it('right mouse button is ACTION.TRUCK (pan)', () => {
-    expect(CAMERA_MOUSE_RIGHT).toBe(2);
+    expect(CAMERA_MOUSE_BUTTONS.right).toBe(2);
   });
 
   it('zoom range is 3–120', () => {

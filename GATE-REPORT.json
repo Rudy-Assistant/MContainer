@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T18:14:00.225Z",
+  "timestamp": "2026-03-16T18:46:52.896Z",
   "sprint": 8,
   "gates": [
     {
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.846, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.134, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.69, targetY=0.33, 4 unique colors"
+      "msg": "Floor+angle guard OK: posY=1.66, targetY=1.29, 4 unique colors"
     },
     {
       "gate": "G16-frameAction",
@@ -135,17 +135,17 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=23c84c04-e20d-482b-a895-edc9b97106f1"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=e4a81490-9fe2-43af-8966-ff920b4f2456"
     },
     {
       "gate": "G21-leftDragMove",
       "status": "PASS",
-      "msg": "drag-to-move API exists"
+      "msg": "Container visible during drag: 20 colors, dominant=0.205"
     },
     {
       "gate": "G22-addContainerUI",
       "status": "PASS",
-      "msg": "container added via UI: 2 → 3"
+      "msg": "container added via UI: 1 → 2"
     },
     {
       "gate": "G23-twoLevelHome",
