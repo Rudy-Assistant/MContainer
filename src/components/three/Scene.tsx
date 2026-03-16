@@ -375,30 +375,42 @@ export function getSkyParams(timeOfDay: number) {
 }
 
 // ── Sky Dome ────────────────────────────────────────────────
+// WHY imperative scene.background instead of <color attach="background">:
+// R3F's attach lifecycle detaches the old Color (scene.background = null) before
+// attaching the new one on re-render. During that gap the renderer shows clearColor,
+// producing a visible blue flicker on every parent re-render. Setting scene.background
+// directly during render (idempotent, no detach cycle) prevents this entirely.
+
+const _skyBgColor = new THREE.Color();
 
 function SkyDome() {
   const sunPos = useSunPosition();
   const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const scene = useThree((s) => s.scene);
+
+  // Compute background color for current time of day
+  const bgHex = isNightTime(timeOfDay)
+    ? 0x060614
+    : isDeepTwilightTime(timeOfDay)
+      ? 0x1a1a3e
+      : isGoldenHourTime(timeOfDay)
+        ? 0xd4a060
+        : 0x5b8fbf;
+
+  // Set scene.background synchronously during render — idempotent, no attach/detach.
+  // Must be synchronous (not useEffect) so the background is correct on the SAME frame
+  // that changes timeOfDay, avoiding even a single stale-color frame.
+  _skyBgColor.set(bgHex);
+  scene.background = _skyBgColor;
 
   if (isNightTime(timeOfDay)) {
-    return (
-      <>
-        <color attach="background" args={[0x060614]} />
-        <Stars radius={300} depth={60} count={4000} factor={4} saturation={0} fade speed={1} />
-      </>
-    );
+    return <Stars radius={300} depth={60} count={4000} factor={4} saturation={0} fade speed={1} />;
   }
 
-  const deepTwilight = isDeepTwilightTime(timeOfDay);
-  const goldenHour = isGoldenHourTime(timeOfDay);
   const skyParams = getSkyParams(timeOfDay);
-
-  // Fallback background: deep twilight gets dark slate, golden hour gets warm, midday gets sky blue
-  const bgColor = deepTwilight ? 0x1a1a3e : goldenHour ? 0xd4a060 : 0x5b8fbf;
 
   return (
     <>
-      <color attach="background" args={[bgColor]} />
       <Sky
         distance={400}
         sunPosition={[sunPos.x, sunPos.y, sunPos.z]}
