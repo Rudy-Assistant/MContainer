@@ -2176,17 +2176,19 @@ export default function ContainerMesh({ container }: { container: Container }) {
       onPointerDown={(e) => {
         e.stopPropagation();
         if (e.nativeEvent.button !== 0) return; // left-click only
-        if (isSelected) {
-          // Already selected — begin drag-to-move (threshold in useEffect above)
+        if (isSelected && e.nativeEvent.shiftKey) {
+          // WHY Shift required: without it, any left-click-drag on a selected container
+          // starts a move, hiding the container and showing only ground ("blue screen" bug).
+          // Shift+drag is explicit intent to move. Plain drag should orbit the camera.
           dragPendingRef.current = {
             id: container.id,
             clientX: e.nativeEvent.clientX,
             clientY: e.nativeEvent.clientY,
           };
-        } else {
-          // Not selected — select it (don't initiate drag)
+        } else if (!isSelected) {
           select(container.id, e.nativeEvent.shiftKey);
         }
+        // If selected but no Shift, do nothing — let CameraControls handle orbit
       }}
       onPointerOver={() => { if (!isWalkthrough) setHovered(true); }}
       onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}

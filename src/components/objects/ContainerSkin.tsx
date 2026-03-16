@@ -1317,14 +1317,9 @@ function BaseplateCell({
   const onClickFace = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onClick(); };
   const onDownFace = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    if (e.nativeEvent.button === 0) {
-      // Left-click on already-selected container → begin drag
-      const store = useStore.getState();
-      if (store.selection.includes(containerId)) {
-        useStore.getState().startContainerDrag(containerId);
-        return;
-      }
-    }
+    // WHY no startContainerDrag here: ContainerMesh handles drag with a 5px threshold.
+    // Calling startContainerDrag immediately on pointer-down caused the blue screen bug —
+    // any click on a selected container hid it and showed only ground plane.
     onPointerDown?.();
   };
 
@@ -2037,14 +2032,7 @@ export default function ContainerSkin({
               };
               const onDownShared = (e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
-                if (e.nativeEvent.button === 0) {
-                  // Left-click on already-selected container → begin drag
-                  const store = useStore.getState();
-                  if (store.selection.includes(container.id)) {
-                    useStore.getState().startContainerDrag(container.id);
-                    return;
-                  }
-                }
+                // WHY no startContainerDrag: ContainerMesh handles drag with 5px threshold.
               };
               const onCtxShared = (face?: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
@@ -2219,10 +2207,6 @@ export default function ContainerSkin({
                               }}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
-                                if (e.nativeEvent.button === 0 && useStore.getState().selection.includes(container.id)) {
-                                  useStore.getState().startContainerDrag(container.id);
-                                  return;
-                                }
                                 onClickCenter(e as any);
                               }}
                               onDoubleClick={(e: ThreeEvent<MouseEvent>) => {
@@ -2336,10 +2320,6 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
-                                if (e.nativeEvent.button === 0 && useStore.getState().selection.includes(container.id)) {
-                                  useStore.getState().startContainerDrag(container.id);
-                                  return;
-                                }
                                 onClickEdge('top')(e as any);
                               }}
                               onWheel={handleEdgeWheel('top')}
