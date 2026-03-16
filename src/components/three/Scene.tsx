@@ -310,9 +310,9 @@ function PBRTextureLoader() {
       const steel = getSteelTextures();
       if (steel) {
         applyTexturesToMaterial(_themeMats.industrial.steel, steel, 1.2);
-        // Brighten the dark corrugated texture: light tint + high env reflections
-        _themeMats.industrial.steel.color.setHex(0xd0d8e0);
-        _themeMats.industrial.steel.envMapIntensity = 2.5;
+        // Brighten the dark corrugated texture — moderate tint to avoid washed-out roof
+        _themeMats.industrial.steel.color.setHex(0x9aabb8);
+        _themeMats.industrial.steel.envMapIntensity = 0.8;
         _themeMats.industrial.steel.needsUpdate = true;
       }
 
