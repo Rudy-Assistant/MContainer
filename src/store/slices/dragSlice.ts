@@ -141,7 +141,13 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
   // Container move drag
   startContainerDrag: (id) => {
     getTemporalApi().pause();
-    set({ dragMovingId: id });
+    // Clear hover state to prevent stale wireframes during drag
+    set({
+      dragMovingId: id,
+      hoveredVoxel: null,
+      hoveredVoxelEdge: null,
+      faceContext: null,
+    });
   },
   commitContainerDrag: (x, z, stackTargetId) => {
     const { dragMovingId, containers } = get();
@@ -149,24 +155,13 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
     const c = containers[dragMovingId];
     if (!c) { set({ dragMovingId: null }); getTemporalApi().resume(); return; }
 
-    // If stacking, move to position then call stackContainer
+    // If stacking, clear drag state and stack synchronously
     if (stackTargetId && containers[stackTargetId]) {
+      set({ dragMovingId: null });
       getTemporalApi().resume();
-      set((s: any) => ({
-        dragMovingId: null,
-        containers: {
-          ...s.containers,
-          [dragMovingId]: {
-            ...s.containers[dragMovingId],
-            position: { ...s.containers[dragMovingId].position, x, z },
-          },
-        },
-      }));
-      // Auto-stack on drop
-      requestAnimationFrame(() => {
-        get().stackContainer(dragMovingId, stackTargetId);
-        get().refreshAdjacency();
-      });
+      // stackContainer sets position (x, y, z), level, and stacking relationship
+      get().stackContainer(dragMovingId, stackTargetId);
+      requestAnimationFrame(() => get().refreshAdjacency());
       return;
     }
 

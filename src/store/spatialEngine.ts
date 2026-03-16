@@ -288,7 +288,7 @@ export function findEdgeSnap(
   z: number,
   size: ContainerSize,
   rotation: number = 0,
-  snapDistance: number = 1.0
+  snapDistance: number = 1.5
 ): SnapResult {
   const dims = CONTAINER_DIMENSIONS[size];
   const cosA = Math.abs(Math.cos(rotation));
@@ -303,8 +303,9 @@ export function findEdgeSnap(
 
   for (const c of Object.values(containers)) {
     if (c.id === excludeId) continue;
-    // Must be on same Y level (roughly)
-    if (Math.abs(c.position.y) > 0.2) continue;
+    // Skip containers not on ground level for edge snap (stacking handles elevated containers)
+    // Only snap edges with containers at roughly the same Y level as the drag plane (Y=0)
+    if (c.position.y > 0.5) continue;
 
     const cFoot = getFootprint(c);
     const cHalfExtX = (cFoot.maxX - cFoot.minX) / 2;
@@ -359,12 +360,23 @@ export function findEdgeSnap(
     // Also snap Z alignment when X-snapped (align containers along their shared axis)
     if (adjacentTo === c.id) {
       const zAlign = c.position.z;
-      if (Math.abs(z - zAlign) < 1.5) {
+      if (Math.abs(bestZ - zAlign) < 2.0) {
         bestZ = zAlign;
       }
       const xAlign = c.position.x;
-      if (Math.abs(x - xAlign) < 1.5) {
+      if (Math.abs(bestX - xAlign) < 2.0) {
         bestX = xAlign;
+      }
+    }
+
+    // Center alignment snap — strongly prefer same-center positions (for stacking / flush placement)
+    if (adjacentTo !== c.id) {
+      const centerDist = Math.sqrt(Math.pow(x - c.position.x, 2) + Math.pow(z - c.position.z, 2));
+      if (centerDist < snapDistance && centerDist < bestDist) {
+        bestX = c.position.x;
+        bestZ = c.position.z;
+        bestDist = centerDist;
+        adjacentTo = c.id;
       }
     }
   }
@@ -378,12 +390,14 @@ export function findStackTarget(
   containers: Record<string, Container>,
   x: number,
   z: number,
-  size: ContainerSize
+  size: ContainerSize,
+  excludeId: string | null = null
 ): StackTarget | null {
   const newFoot = getFootprintAt(x, z, size);
   let bestTarget: StackTarget | null = null;
 
   for (const c of Object.values(containers)) {
+    if (c.id === excludeId) continue;
     if (c.level >= MAX_STACK_LEVEL) continue;
 
     const existingFoot = getFootprint(c);

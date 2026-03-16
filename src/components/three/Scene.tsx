@@ -1328,8 +1328,8 @@ function DragMoveGhost() {
     const snap = findEdgeSnap(containers, dragMovingId, sx, sz, container.size, container.rotation);
     if (snap.snapped) { sx = snap.x; sz = snap.z; }
 
-    // Check for stacking target
-    const stackTarget = findStackTarget(containers, sx, sz, container.size);
+    // Check for stacking target (exclude the container being dragged)
+    const stackTarget = findStackTarget(containers, sx, sz, container.size, dragMovingId);
     const stacking = stackTarget !== null;
     // Elevate ghost to level-2 Y when stacking onto an existing container
     let ghostY = 0;

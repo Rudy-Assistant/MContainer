@@ -28,7 +28,7 @@
 | Structural Frame | **PRODUCTION** | G16-frameAction, G17-frameToggle | G16-frameAction: PASS — toggleStructuralElement exists; G17-frameToggle: PASS — hide+restore OK (store action — no direct UI gesture) |
 | Ground/Atmosphere | **PRODUCTION** | G18-noGrass | G18-noGrass: PASS — no instanced grass blades |
 | Visual Integrity | **PRODUCTION** | G19-defaultVisual | G19-defaultVisual: PASS — default state restored via UI |
-| Container Stacking | **PRODUCTION** | G20-stackSnap | G20-stackSnap: PASS — Containers aligned for stacking (2 containers) |
+| Container Stacking | **PRODUCTION** | G20-stackSnap | G20-stackSnap: PASS — Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=805eef4d-8bae-45d1-822b-52be07729704 |
 | Drag-to-Move | **PRODUCTION** | G21-leftDragMove | G21-leftDragMove: PASS — drag-to-move API exists |
 
 ---
@@ -61,7 +61,7 @@ The following features exist in V1 but have no Playwright gates. They cannot be 
 
 ## Gate Report Source
 
-- Timestamp: 2026-03-16T04:07:04.832Z
+- Timestamp: 2026-03-16T04:37:53.796Z
 - Total gates: 30
 - Passed: 30
 - Failed: 0

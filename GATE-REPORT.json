@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T04:07:04.832Z",
+  "timestamp": "2026-03-16T04:37:53.796Z",
   "sprint": 8,
   "gates": [
     {
@@ -30,7 +30,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (0.00% diff)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -135,7 +135,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Containers aligned for stacking (2 containers)"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=805eef4d-8bae-45d1-822b-52be07729704"
     },
     {
       "gate": "G21-leftDragMove",
