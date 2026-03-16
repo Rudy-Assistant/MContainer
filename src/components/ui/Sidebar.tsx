@@ -383,6 +383,7 @@ function GlobalTools() {
             return (
               <button
                 key={tid}
+                data-testid={`theme-${tid}`}
                 onClick={() => { setTheme(tid); setActivePalette(tid); }}
                 style={{
                   flex: 1, height: "28px", border: "none", cursor: "pointer",
@@ -412,6 +413,7 @@ function GlobalTools() {
             return (
               <button
                 key={gid}
+                data-testid={`ground-${gid}`}
                 onClick={() => setGroundPreset(gid)}
                 style={{
                   flex: 1, height: "28px", border: "none", cursor: "pointer",

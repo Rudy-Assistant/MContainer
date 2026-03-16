@@ -219,6 +219,7 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
               zIndex: 2,
             }} />
             <input type="range" min={0} max={24} step={0.25} value={timeOfDay}
+              data-testid="tod-slider"
               onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 3, margin: 0 }}
             />

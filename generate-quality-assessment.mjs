@@ -7,21 +7,21 @@
 import { readFileSync, writeFileSync } from 'fs';
 
 const FEATURE_GATES = {
-  'Container System':    ['G1-store', 'G2-addContainer'],
-  'View Modes':          ['G3-viewMode'],
-  'Undo/Redo':           ['G4-undo', 'G19-undoBehavioral'],
-  'Custom Palettes':     ['G5-palette'],
-  'Staircase System':    ['G6-staircase', 'G15-stairPreview'],
-  'Export':              ['G7-export'],
-  'Voxel Selection':     ['G8-selectedVoxel'],
-  'Launch UX':           ['G9-noStartScreen'],
-  'Model Homes':         ['G10-modelHome'],
-  'Camera':              ['G11-camera'],
-  'Ground/Atmosphere':   ['G12-noGrass'],
-  'Debug Mode':          ['G13-debugMode'],
-  'UI Polish':           ['G14-resetBtn'],
-  'Structural Frame':    ['G16-frameStructure', 'G17-frameToggle'],
-  'Theme System':        ['G18-themeSwitch'],
+  'Page Load':           ['G1-noErrors', 'G2-noStartScreen', 'G3-defaultContainer'],
+  'Reset Button':        ['G4-resetButton'],
+  'View Modes':          ['G5-blueprintMode', 'G8-walkthrough', 'G8-fpExit'],
+  'Theme System':        ['G6-themeJapanese'],
+  'Time of Day':         ['G7-todSlider', 'G7-todGoldenHour'],
+  'Undo/Redo':           ['G9-undoKeyboard'],
+  'Material Palette':    ['G10-paletteModal'],
+  'Export':              ['G11-exportDropdown'],
+  'Model Homes':         ['G12-modelHomeLoad'],
+  'Staircase System':    ['G13-staircase'],
+  'Debug Mode':          ['G14-debugToggle'],
+  'Camera':              ['G15-cameraFloor'],
+  'Structural Frame':    ['G16-frameAction', 'G17-frameToggle'],
+  'Ground/Atmosphere':   ['G18-noGrass'],
+  'Visual Integrity':    ['G19-defaultVisual'],
 };
 
 const UNGATED_FEATURES = [

@@ -54,6 +54,8 @@ Every sprint follows this structure:
 | Blind UX changes without browser check | Three consecutive failed UX fixes prove this doesn't work |
 | `expect(literal).toBe(literal)` | Tautological test — tests nothing |
 | Replacing WalkthroughControls.tsx | 1182 lines of tested production code — extend, don't rewrite |
+| `page.evaluate()` to trigger UI behavior | Bypasses event handlers — tests store not app. Use page.click(), page.keyboard.press() instead |
+| Visual gates without baseline comparison | 'VISUAL: human review' is not a gate. Use pixelmatch against committed baseline |
 
 ## Quality Assessment Policy
 

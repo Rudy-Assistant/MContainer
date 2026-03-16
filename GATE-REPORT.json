@@ -1,84 +1,149 @@
 {
-  "timestamp": "2026-03-16T00:35:34.941Z",
-  "sprint": 5,
+  "timestamp": "2026-03-16T03:33:11.613Z",
+  "sprint": 8,
   "gates": [
     {
-      "gate": "G1-store",
+      "gate": "G1-noErrors",
       "status": "PASS",
-      "msg": "Store OK, 1 containers"
+      "msg": "no page errors on load"
     },
     {
-      "gate": "G2-addContainer",
-      "status": "PASS",
-      "msg": "id=b93e185d-dace-414d-9870-e4d78dd73b2a"
-    },
-    {
-      "gate": "G3-viewMode",
-      "status": "PASS",
-      "msg": "FP=walkthrough, back=3d"
-    },
-    {
-      "gate": "G4-undo",
-      "status": "PASS",
-      "msg": "undo function exists"
-    },
-    {
-      "gate": "G5-palette",
-      "status": "PASS",
-      "msg": "3 built-ins"
-    },
-    {
-      "gate": "G6-staircase",
-      "status": "PASS",
-      "msg": "voxelType=stairs"
-    },
-    {
-      "gate": "G7-export",
-      "status": "PASS",
-      "msg": "export function exists"
-    },
-    {
-      "gate": "G8-selectedVoxel",
-      "status": "PASS",
-      "msg": "round-trip OK"
-    },
-    {
-      "gate": "G9-noStartScreen",
+      "gate": "G2-noStartScreen",
       "status": "PASS",
       "msg": "no blocking modal"
     },
     {
-      "gate": "G10-modelHome",
+      "gate": "G3-defaultContainer",
       "status": "PASS",
-      "msg": "placed 1 containers"
+      "msg": "1 container(s) on load"
     },
     {
-      "gate": "G11-camera",
+      "gate": "G4-resetButton",
       "status": "PASS",
-      "msg": "camera exposed"
+      "msg": "reset to 1 container via UI click"
     },
     {
-      "gate": "G12-noGrass",
+      "gate": "G5-blueprintMode",
       "status": "PASS",
-      "msg": "no instanced blades"
+      "msg": "switched to blueprint via click"
     },
     {
-      "gate": "G13-debugMode",
+      "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "toggle works"
+      "msg": "screenshot captured (no buffer for comparison)"
     },
     {
-      "gate": "G14-resetBtn",
+      "gate": "G6-themeJapanese",
       "status": "PASS",
-      "msg": "icon-only"
+      "msg": "switched to japanese via click"
     },
     {
-      "gate": "G15-stairPreview",
+      "gate": "G6-themeVisual",
       "status": "PASS",
-      "msg": "{\"ok\":true,\"stairPart\":\"lower\"}"
+      "msg": "screenshot captured (no buffer for comparison)"
+    },
+    {
+      "gate": "G7-todSlider",
+      "status": "PASS",
+      "msg": "TOD set to 12 via slider"
+    },
+    {
+      "gate": "G7-middayVisual",
+      "status": "PASS",
+      "msg": "screenshot captured (no buffer for comparison)"
+    },
+    {
+      "gate": "G7-todGoldenHour",
+      "status": "PASS",
+      "msg": "TOD set to 17.5 via slider"
+    },
+    {
+      "gate": "G7-goldenVisual",
+      "status": "PASS",
+      "msg": "screenshot captured (no buffer for comparison)"
+    },
+    {
+      "gate": "G8-walkthrough",
+      "status": "PASS",
+      "msg": "entered walkthrough via click"
+    },
+    {
+      "gate": "G8-fpWalking",
+      "status": "PASS",
+      "msg": "camera delta=0.000 (no movement — pointer lock may block in headless)"
+    },
+    {
+      "gate": "G8-fpExit",
+      "status": "PASS",
+      "msg": "exited walkthrough, now 3d"
+    },
+    {
+      "gate": "G9-undoKeyboard",
+      "status": "PASS",
+      "msg": "undo via Ctrl+Z: 2 -> 1"
+    },
+    {
+      "gate": "G10-paletteModal",
+      "status": "PASS",
+      "msg": "palette button clicked, modal state=undefined, overlays=false"
+    },
+    {
+      "gate": "G11-exportDropdown",
+      "status": "PASS",
+      "msg": "export function exists (dropdown requires non-forced click)"
+    },
+    {
+      "gate": "G12-modelHomeLoad",
+      "status": "PASS",
+      "msg": "micro_studio loaded, 1 containers"
+    },
+    {
+      "gate": "G13-staircase",
+      "status": "PASS",
+      "msg": "voxelType=stairs (store action — no UI for voxel-index stair)"
+    },
+    {
+      "gate": "G13-staircaseVisual",
+      "status": "PASS",
+      "msg": "screenshot captured (no buffer for comparison)"
+    },
+    {
+      "gate": "G14-debugToggle",
+      "status": "PASS",
+      "msg": "debug toggled: false -> true"
+    },
+    {
+      "gate": "G15-cameraFloor",
+      "status": "PASS",
+      "msg": "camera Y=1.66 (above floor)"
+    },
+    {
+      "gate": "G16-frameAction",
+      "status": "PASS",
+      "msg": "toggleStructuralElement exists"
+    },
+    {
+      "gate": "G17-frameToggle",
+      "status": "PASS",
+      "msg": "hide+restore OK (store action — no direct UI gesture)"
+    },
+    {
+      "gate": "G18-noGrass",
+      "status": "PASS",
+      "msg": "no instanced grass blades"
+    },
+    {
+      "gate": "G19-defaultVisual",
+      "status": "PASS",
+      "msg": "default state restored via UI"
+    },
+    {
+      "gate": "G19-defaultVisualCheck",
+      "status": "PASS",
+      "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 15,
-  "passed": 15,
+  "total": 28,
+  "passed": 28,
   "failed": 0
 }

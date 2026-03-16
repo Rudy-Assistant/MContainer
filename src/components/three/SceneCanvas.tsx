@@ -94,6 +94,7 @@ export default function SceneCanvas() {
 
   return (
     <SceneErrorBoundary>
+      <div data-testid="canvas-3d" style={{ width: "100%", height: "100%" }}>
       <Canvas
         shadows={{ type: THREE.PCFSoftShadowMap }}
         camera={{
@@ -124,6 +125,7 @@ export default function SceneCanvas() {
           <Scene />
         </Suspense>
       </Canvas>
+      </div>
     </SceneErrorBoundary>
   );
 }

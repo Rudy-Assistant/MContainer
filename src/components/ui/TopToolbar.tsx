@@ -168,7 +168,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           <span className="hidden lg:inline">Roof</span>
         </button>
 
-        <button onClick={() => {
+        <button data-testid="btn-reset" onClick={() => {
           if (confirm('Reset to empty canvas?')) {
             const ids = Object.keys(containers);
             ids.forEach((id) => removeContainer(id));
@@ -275,7 +275,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
 
         {/* Export dropdown */}
         <div style={{ position: "relative", flexShrink: 0 }}>
-          <button onClick={() => setExportMenuOpen(!exportMenuOpen)} style={btn(true)} title="Export">
+          <button data-testid="btn-export" onClick={() => setExportMenuOpen(!exportMenuOpen)} style={btn(true)} title="Export">
             <Download size={15} />
             <span className="hidden xl:inline">Export</span>
             <ChevronDown size={12} style={{ transform: exportMenuOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
@@ -306,7 +306,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           )}
         </div>
 
-        <button onClick={onOpenPalette} style={btn(true)} title="Material Palette">
+        <button data-testid="btn-palette" onClick={onOpenPalette} style={btn(true)} title="Material Palette">
           <Palette size={15} />
         </button>
 
@@ -327,6 +327,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
             return (
               <button
                 key={mode}
+                data-testid={`view-${mode}`}
                 onClick={() => setViewMode(mode)}
                 style={{
                   display: "flex", alignItems: "center", gap: "4px",
@@ -349,6 +350,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
 
         {/* Debug wireframe toggle */}
         <button
+          data-testid="btn-debug"
           onClick={toggleDebugMode}
           style={{
             display: "flex", alignItems: "center", gap: "4px",

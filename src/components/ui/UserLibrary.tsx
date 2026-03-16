@@ -226,6 +226,7 @@ export default function UserLibrary() {
         {MODEL_HOMES.map((model) => (
           <div
             key={model.id}
+            data-testid={`model-home-${model.id}`}
             onClick={() => {
               const store = useStore.getState();
               const ids = Object.keys(store.containers);
