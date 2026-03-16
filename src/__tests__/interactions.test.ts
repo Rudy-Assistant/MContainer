@@ -183,9 +183,10 @@ describe('palette system', () => {
 });
 
 describe('Sprint 5 camera configuration', () => {
-  it('maxPolarAngle leaves at least 0.08 rad buffer from horizon', () => {
+  it('maxPolarAngle leaves at least 0.3 rad buffer from horizon (prevents brown screen)', () => {
     expect(CAMERA_MAX_POLAR_ANGLE).toBeLessThan(Math.PI / 2);
-    expect(Math.PI / 2 - CAMERA_MAX_POLAR_ANGLE).toBeGreaterThanOrEqual(0.08);
+    // WHY 0.6: smaller values allowed camera to see only ground plane on aggressive drag
+    expect(Math.PI / 2 - CAMERA_MAX_POLAR_ANGLE).toBeGreaterThanOrEqual(0.6);
   });
 
   it('minPolarAngle prevents camera from going below ground plane', () => {
@@ -193,7 +194,7 @@ describe('Sprint 5 camera configuration', () => {
   });
 
   it('camera Y floor guard is 0.5m', () => {
-    expect(CAMERA_FLOOR_Y).toBe(0.5);
+    expect(CAMERA_FLOOR_Y).toBe(1.0);
   });
 
   it('right mouse button is ACTION.TRUCK (pan)', () => {
