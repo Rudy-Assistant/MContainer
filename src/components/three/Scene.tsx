@@ -713,8 +713,11 @@ function KeyboardPanControls() {
     }
 
     // ── 3D Mode ─────────────────────────────────────────────
+    // Use CameraControls API (setPosition/setTarget) instead of direct camera.position
+    // mutation — camera-controls recalculates position from internal state each frame,
+    // so direct writes are overwritten.
     const controls = state.controls as any;
-    const hasOrbit = controls && "target" in controls;
+    const hasCC = controls && typeof controls.getPosition === 'function';
 
     // WASD = Pan/Fly relative to camera facing
     let dx = 0, dz = 0, dy = 0;
@@ -737,13 +740,22 @@ function KeyboardPanControls() {
     if (panKeys["KeyF"]) dy -= panSpeed * dt;
 
     if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001 || Math.abs(dy) > 0.001) {
-      _v3A.set(dx, dy, dz);
-      camera.position.add(_v3A);
-      if (hasOrbit) controls.target.add(_v3A);
+      if (hasCC) {
+        // Move via CameraControls API so internal state stays in sync
+        const pos = _v3A;
+        const tgt = _v3B;
+        controls.getPosition(pos);
+        controls.getTarget(tgt);
+        controls.setPosition(pos.x + dx, pos.y + dy, pos.z + dz, false);
+        controls.setTarget(tgt.x + dx, tgt.y + dy, tgt.z + dz, false);
+      } else {
+        _v3A.set(dx, dy, dz);
+        camera.position.add(_v3A);
+      }
     }
 
     // Arrow keys = Orbit rotation (yaw and pitch around target)
-    if (hasOrbit) {
+    if (hasCC) {
       const orbitSpeed = 1.8; // radians/sec
       let dTheta = 0, dPhi = 0;
       if (panKeys["ArrowLeft"]) dTheta += orbitSpeed * dt;
@@ -752,14 +764,7 @@ function KeyboardPanControls() {
       if (panKeys["ArrowDown"]) dPhi += orbitSpeed * dt;
 
       if (Math.abs(dTheta) > 0.0001 || Math.abs(dPhi) > 0.0001) {
-        const target = controls.target as THREE.Vector3;
-        _v3A.copy(camera.position).sub(target);
-        spherical.setFromVector3(_v3A);
-        spherical.theta += dTheta;
-        spherical.phi = Math.max(0.15, Math.min(Math.PI / 2 - 0.05, spherical.phi + dPhi));
-        _v3A.setFromSpherical(spherical);
-        camera.position.copy(target).add(_v3A);
-        camera.lookAt(target);
+        controls.rotate(dTheta, dPhi, false);
       }
     }
   });
