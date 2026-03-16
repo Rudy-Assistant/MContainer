@@ -121,9 +121,12 @@ export default function SceneCanvas() {
         }}
         onContextMenu={(e) => e.preventDefault()}
         style={{ width: "100%", height: "100%", touchAction: "none", cursor }}
+        onCreated={({ gl }) => {
+          // Set renderer clear color as Suspense fallback — NOT scene.background,
+          // which would compete with SkyDome's <color attach="background"> and flicker.
+          gl.setClearColor(0x5b8fbf);
+        }}
       >
-        {/* Scene background: keeps sky-blue clear color so Suspense fallback doesn't flash */}
-        <color attach="background" args={[0x5b8fbf]} />
         <Suspense fallback={null}>
           <Scene />
         </Suspense>

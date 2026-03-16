@@ -27,6 +27,8 @@ import {
   CAMERA_MAX_DISTANCE,
   CAMERA_FLOOR_Y,
   CAMERA_TARGET_MIN_Y,
+  CAMERA_TARGET_MAX_Y,
+  CAMERA_MAX_Y,
   CAMERA_MAX_DOWNWARD_ANGLE,
   CAMERA_TARGET_MAX_RADIUS,
   CAMERA_MOUSE_BUTTONS,
@@ -860,14 +862,22 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
       cc.getTarget(_targetGuardVec);
     }
 
-    // Clamp camera position Y
+    // Clamp camera position Y (floor and ceiling)
     if (_floorGuardVec.y < CAMERA_FLOOR_Y) {
       cc.setPosition(_floorGuardVec.x, CAMERA_FLOOR_Y, _floorGuardVec.z, false);
       cc.getPosition(_floorGuardVec);
     }
-    // Clamp orbit target Y
+    if (_floorGuardVec.y > CAMERA_MAX_Y) {
+      cc.setPosition(_floorGuardVec.x, CAMERA_MAX_Y, _floorGuardVec.z, false);
+      cc.getPosition(_floorGuardVec);
+    }
+    // Clamp orbit target Y (floor and ceiling)
     if (_targetGuardVec.y < CAMERA_TARGET_MIN_Y) {
       cc.setTarget(_targetGuardVec.x, CAMERA_TARGET_MIN_Y, _targetGuardVec.z, false);
+      cc.getTarget(_targetGuardVec);
+    }
+    if (_targetGuardVec.y > CAMERA_TARGET_MAX_Y) {
+      cc.setTarget(_targetGuardVec.x, CAMERA_TARGET_MAX_Y, _targetGuardVec.z, false);
       cc.getTarget(_targetGuardVec);
     }
 
@@ -1031,8 +1041,6 @@ function RealisticScene() {
   const debugMode = useStore((s) => s.debugMode);
   const dragMovingId = useStore((s) => s.dragMovingId);
   const selectedVoxel = useStore((s) => s.selectedVoxel);
-  const hoveredVoxel = useStore((s) => s.hoveredVoxel);
-  const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
   const isPreviewMode = useStore((s) => s.isPreviewMode);
   const activePaletteId = useStore((s) => s.activePaletteId);
   const currentTheme = useStore((s) => s.currentTheme);
