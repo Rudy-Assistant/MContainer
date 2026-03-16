@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T12:41:04.588Z",
+  "timestamp": "2026-03-16T11:44:12.995Z",
   "sprint": 8,
   "gates": [
     {
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.748, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.400, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor guard OK: meshes=203, camY=1.66, targetY=0.00"
+      "msg": "Floor guard OK: left-cam=1.71, right-cam=null, pixel=rgb(91,143,191)"
     },
     {
       "gate": "G16-frameAction",
@@ -135,7 +135,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=e024252c-41f5-41a3-b60a-fd497c03f7ae"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=0844f79c-1fa7-4d33-9379-118cd376c305"
     },
     {
       "gate": "G21-leftDragMove",

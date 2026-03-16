@@ -795,8 +795,8 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
     if (!ctrl.target) return;
     // Exponential decay lerp — ~7× per second half-life feels like smooth glide
     _lerpTarget.lerp(_desiredTarget, 1 - Math.pow(0.001, delta));
-    // Clamp target Y to prevent looking through/at ground (blue/brown screen)
-    if (_lerpTarget.y < CAMERA_TARGET_MIN_Y) _lerpTarget.y = CAMERA_TARGET_MIN_Y;
+    // Clamp target Y to prevent looking through ground
+    if (_lerpTarget.y < 0) _lerpTarget.y = 0;
     ctrl.target.copy(_lerpTarget);
     ctrl.update();
   });
@@ -810,7 +810,7 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
  * PROTECTED SYSTEM — this is the primary defense against the "blue screen" bug.
  * Three things are clamped every frame:
  * 1. Camera position Y >= CAMERA_FLOOR_Y (0.5m) — prevents camera inside ground
- * 2. Orbit target Y >= CAMERA_TARGET_MIN_Y (0.5m) — prevents looking through/at ground
+ * 2. Orbit target Y >= CAMERA_TARGET_MIN_Y (0.0m) — prevents looking through ground
  * 3. CameraTargetLerp also clamps its own lerp target (defense in depth)
  *
  * Also sets mouseButtons on mount:
@@ -822,9 +822,8 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
  */
 const _floorGuardVec = new THREE.Vector3();
 const _targetGuardVec = new THREE.Vector3();
-/** Minimum orbit target Y — prevents looking through ground AND looking only at ground plane.
- * WHY 0.5: keeps orbit target above ground plane so camera always sees container geometry. */
-const CAMERA_TARGET_MIN_Y = 0.5;
+/** Minimum orbit target Y — prevents looking through the ground (blue screen) */
+const CAMERA_TARGET_MIN_Y = 0.0;
 
 function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsImpl | null> }) {
   // Set right-click to TRUCK (pan) instead of ROTATE on mount
