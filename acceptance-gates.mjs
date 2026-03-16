@@ -366,65 +366,53 @@ async function run() {
     await page.waitForTimeout(200);
   } catch (e) { fail('G14-debugToggle', e.message); }
 
-  // ═══ G15: Camera floor constraint (blue screen prevention) ═══
-  // Real scenario: click container to select, then try to orbit, then inspect screenshot.
+  // ═══ G15: Camera blue screen prevention ═══
+  // Reproduction: right-click drag downward causes camera position to become NaN,
+  // rendering only sky (solid blue). The root cause is camera-controls TRUCK mode
+  // producing NaN position/target values that bypass the < 0.5 floor clamp
+  // (because NaN < 0.5 === false in JS).
   try {
     const canvasBox = await page.locator('[data-testid="canvas-3d"] canvas').boundingBox();
     if (!canvasBox) { fail('G15-cameraFloor', 'canvas not found'); throw new Error('skip'); }
     const cx = canvasBox.x + canvasBox.width / 2;
     const cy = canvasBox.y + canvasBox.height / 2;
 
-    // Step 1: Click the container to select it (center of viewport where container is)
-    await page.mouse.click(cx, cy);
-    await page.waitForTimeout(300);
+    // Wait for camera diagnostics to be available
+    await page.waitForFunction(() => !!window.__camDiag, { timeout: 10000 }).catch(() => {});
+    const before = await page.evaluate(() => window.__camDiag);
 
-    // Step 2: Try to orbit (left-drag on canvas near container)
-    await page.mouse.move(cx - 50, cy - 100);
-    await page.mouse.down({ button: 'left' });
-    for (let i = 0; i < 30; i++) {
-      await page.mouse.move(cx - 50, cy - 100 + i * 15);
+    // Right-click drag downward — the exact action that causes the blue screen
+    await page.mouse.move(cx, cy - 50);
+    await page.mouse.down({ button: 'right' });
+    for (let i = 0; i < 40; i++) {
+      await page.mouse.move(cx, cy - 50 + i * 10);
       await page.waitForTimeout(16);
     }
-    await page.mouse.up({ button: 'left' });
+    await page.mouse.up({ button: 'right' });
     await page.waitForTimeout(500);
 
-    // Step 3: Screenshot and read camera state
+    // Screenshot after right-drag
     await page.screenshot({
-      path: `${DIR}/G15-container-click-then-orbit.jpg`,
+      path: `${DIR}/G15-after-right-drag.jpg`,
       type: 'jpeg', quality: 80,
       clip: { x: 335, y: 50, width: 920, height: 580 },
     });
 
-    const sceneState = await page.evaluate(() => {
-      let visibleMeshes = 0;
-      window.__scene?.traverse(o => {
-        if (o.isMesh && o.visible && o.material && !o.material.transparent) visibleMeshes++;
-      });
-      const camY = window.__camera?.position?.y;
-      const cam = window.__camera;
-      return {
-        visibleMeshes,
-        camY: (typeof camY === 'number' && !isNaN(camY)) ? camY : null,
-        camPos: cam ? { x: cam.position.x, y: cam.position.y, z: cam.position.z } : null,
-        dragMovingId: window.__store?.getState?.()?.dragMovingId ?? null,
-      };
-    });
+    // Read camera diagnostic
+    const after = await page.evaluate(() => window.__camDiag);
 
-    // The key assertion: camera Y must be >= 0.4, and there must be no active drag
-    // (if dragMovingId is set, the test hit the container and started a drag instead of orbiting)
-    const camOk = sceneState.camY !== null && sceneState.camY >= 0.4;
-    const noDrag = sceneState.dragMovingId === null;
-    const detail = `camY=${sceneState.camY?.toFixed(2) ?? 'null'}, meshes=${sceneState.visibleMeshes}, drag=${sceneState.dragMovingId ?? 'none'}`;
+    // The assertion: posY and targetY must be valid numbers (not NaN, not null)
+    // and posY must be >= 0.4
+    const posY = after?.posY ? parseFloat(after.posY) : null;
+    const targetY = after?.targetY ? parseFloat(after.targetY) : null;
+    const posValid = posY !== null && !isNaN(posY) && posY >= 0.4;
+    const targetValid = targetY !== null && !isNaN(targetY);
+    const detail = `before=${JSON.stringify(before)}, after=${JSON.stringify(after)}`;
 
-    if (!noDrag) {
-      // The click started a container drag — this IS the bug scenario.
-      // Cancel the drag to clean up.
-      await page.evaluate(() => window.__store.getState().cancelContainerDrag());
-      fail('G15-cameraFloor', `Left-click started container drag instead of orbit: ${detail}`);
-    } else if (!camOk) {
-      fail('G15-cameraFloor', `Camera below floor: ${detail}`);
+    if (!posValid || !targetValid) {
+      fail('G15-cameraFloor', `Camera NaN/below-floor after right-drag: posY=${posY}, targetY=${targetY} | ${detail}`);
     } else {
-      pass('G15-cameraFloor', `Floor guard OK: ${detail}`);
+      pass('G15-cameraFloor', `Floor guard OK: posY=${posY.toFixed(2)}, targetY=${targetY.toFixed(2)}`);
     }
   } catch (e) { if (e.message !== 'skip') fail('G15-cameraFloor', e.message); }
 

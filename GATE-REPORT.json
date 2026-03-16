@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T13:37:19.736Z",
+  "timestamp": "2026-03-16T17:01:20.706Z",
   "sprint": 8,
   "gates": [
     {
@@ -30,7 +30,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (0.00% diff)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -49,8 +49,8 @@
     },
     {
       "gate": "G7-middayVisual",
-      "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "status": "FAIL",
+      "msg": "visual mismatch: 45.31% diff (241763/533600 pixels). Diff: gate-screenshots/diff-baseline-midday.png"
     },
     {
       "gate": "G7-todGoldenHour",
@@ -60,7 +60,7 @@
     {
       "gate": "G7-goldenVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (10.46% diff)"
     },
     {
       "gate": "G8-walkthrough",
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.836, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.645, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor guard OK: camY=1.86, meshes=203, drag=none"
+      "msg": "Floor guard OK: posY=1.71, targetY=0.05"
     },
     {
       "gate": "G16-frameAction",
@@ -135,7 +135,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=b786614b-1d50-440e-9e05-d7b6b2e1462d"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=72f5b3af-2516-41c4-8f4e-40484e7df130"
     },
     {
       "gate": "G21-leftDragMove",
@@ -164,6 +164,6 @@
     }
   ],
   "total": 32,
-  "passed": 32,
-  "failed": 0
+  "passed": 31,
+  "failed": 1
 }

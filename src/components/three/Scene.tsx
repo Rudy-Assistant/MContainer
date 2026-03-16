@@ -834,18 +834,55 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
     cc.mouseButtons.middle = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK — middle drag also pans
   }, [cameraControlsRef]);
 
+  // WHY: Store last known-good position/target to recover from NaN.
+  // camera-controls TRUCK mode produces NaN on right-drag in some browsers/SwiftShader.
+  // NaN < 0.5 === false in JS, so simple clamp doesn't catch it.
+  const _lastGoodPos = useRef(new THREE.Vector3(14, 5, 14));
+  const _lastGoodTarget = useRef(new THREE.Vector3(0, 1.5, 0));
+  const _diagFrameCount = useRef(0);
+
   useFrame(() => {
     const cc = cameraControlsRef.current;
     if (!cc) return;
-    // Clamp camera position Y
+
+    // Read current position and target
     cc.getPosition(_floorGuardVec);
+    cc.getTarget(_targetGuardVec);
+
+    // NaN recovery: if position or target becomes NaN, restore last known-good values
+    const posNaN = isNaN(_floorGuardVec.x) || isNaN(_floorGuardVec.y) || isNaN(_floorGuardVec.z);
+    const targetNaN = isNaN(_targetGuardVec.x) || isNaN(_targetGuardVec.y) || isNaN(_targetGuardVec.z);
+
+    if (posNaN || targetNaN) {
+      cc.setPosition(_lastGoodPos.current.x, _lastGoodPos.current.y, _lastGoodPos.current.z, false);
+      cc.setTarget(_lastGoodTarget.current.x, _lastGoodTarget.current.y, _lastGoodTarget.current.z, false);
+      cc.getPosition(_floorGuardVec);
+      cc.getTarget(_targetGuardVec);
+    }
+
+    // Clamp camera position Y
     if (_floorGuardVec.y < CAMERA_FLOOR_Y) {
       cc.setPosition(_floorGuardVec.x, CAMERA_FLOOR_Y, _floorGuardVec.z, false);
+      cc.getPosition(_floorGuardVec);
     }
-    // Clamp orbit target Y — prevents looking through ground (blue screen on drag)
-    cc.getTarget(_targetGuardVec);
+    // Clamp orbit target Y
     if (_targetGuardVec.y < CAMERA_TARGET_MIN_Y) {
       cc.setTarget(_targetGuardVec.x, CAMERA_TARGET_MIN_Y, _targetGuardVec.z, false);
+      cc.getTarget(_targetGuardVec);
+    }
+
+    // Store known-good values for NaN recovery
+    if (!isNaN(_floorGuardVec.y)) _lastGoodPos.current.copy(_floorGuardVec);
+    if (!isNaN(_targetGuardVec.y)) _lastGoodTarget.current.copy(_targetGuardVec);
+
+    // Diagnostic: expose camera state for Playwright gates
+    if (_diagFrameCount.current++ % 10 === 0) {
+      (window as any).__camDiag = {
+        posY: _floorGuardVec.y.toFixed(3),
+        targetY: _targetGuardVec.y.toFixed(3),
+        polarAngle: (cc as any).polarAngle?.toFixed(3),
+        azimuthAngle: (cc as any).azimuthAngle?.toFixed(3),
+      };
     }
   });
   return null;
@@ -967,10 +1004,11 @@ function RealisticScene() {
   const currentTheme = useStore((s) => s.currentTheme);
   const cameraControlsRef = useRef<CameraControlsImpl>(null);
 
-  // Expose camera controls for Playwright gates to read target position
-  useEffect(() => {
-    (window as any).__cameraControls = cameraControlsRef.current;
-    return () => { delete (window as any).__cameraControls; };
+  // Expose camera controls ref for Playwright gates — update via useFrame to ensure ref is populated
+  useFrame(() => {
+    if (cameraControlsRef.current && !(window as any).__cameraControls) {
+      (window as any).__cameraControls = cameraControlsRef.current;
+    }
   });
 
   // Apply palette when active palette or theme changes
