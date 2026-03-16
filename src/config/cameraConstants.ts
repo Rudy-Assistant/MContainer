@@ -9,5 +9,14 @@ export const CAMERA_MIN_DISTANCE = 3;
 export const CAMERA_MAX_DISTANCE = 120;
 /** Minimum camera Y position (floor guard clamps below this) */
 export const CAMERA_FLOOR_Y = 0.5;
+/** Minimum orbit target Y — prevents looking through the ground */
+export const CAMERA_TARGET_MIN_Y = 0.3;
+/** Maximum downward viewing angle in radians (~70°). Prevents ground-filling viewport after TRUCK. */
+export const CAMERA_MAX_DOWNWARD_ANGLE = 70 * (Math.PI / 180);
 /** camera-controls ACTION.TRUCK = 2 (right-click pans instead of rotates) */
 export const CAMERA_MOUSE_RIGHT = 2;
+/** Maximum distance the orbit target can drift from origin XZ before clamping.
+ * Prevents right-drag TRUCK from panning camera out of sight of the scene.
+ * Must be generous enough for multi-container layouts but tight enough to
+ * prevent losing the scene entirely. */
+export const CAMERA_TARGET_MAX_RADIUS = 40;

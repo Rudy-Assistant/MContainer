@@ -27,6 +27,9 @@ import {
   CAMERA_MAX_DISTANCE,
   CAMERA_FLOOR_Y,
   CAMERA_MOUSE_RIGHT,
+  CAMERA_TARGET_MIN_Y,
+  CAMERA_MAX_DOWNWARD_ANGLE,
+  CAMERA_TARGET_MAX_RADIUS,
 } from "@/config/cameraConstants";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { findStackTarget, findEdgeSnap, checkOverlap, getFootprintAt, computePoolUnion } from "@/store/spatialEngine";
@@ -796,7 +799,7 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
     // Exponential decay lerp — ~7× per second half-life feels like smooth glide
     _lerpTarget.lerp(_desiredTarget, 1 - Math.pow(0.001, delta));
     // Clamp target Y to prevent looking through ground
-    if (_lerpTarget.y < 0) _lerpTarget.y = 0;
+    if (_lerpTarget.y < CAMERA_TARGET_MIN_Y) _lerpTarget.y = CAMERA_TARGET_MIN_Y;
     ctrl.target.copy(_lerpTarget);
     ctrl.update();
   });
@@ -808,10 +811,11 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
  *
  * @remarks
  * PROTECTED SYSTEM — this is the primary defense against the "blue screen" bug.
- * Three things are clamped every frame:
+ * Four things are clamped every frame:
  * 1. Camera position Y >= CAMERA_FLOOR_Y (0.5m) — prevents camera inside ground
- * 2. Orbit target Y >= CAMERA_TARGET_MIN_Y (0.0m) — prevents looking through ground
- * 3. CameraTargetLerp also clamps its own lerp target (defense in depth)
+ * 2. Orbit target Y >= CAMERA_TARGET_MIN_Y (0.3m) — prevents looking through ground
+ * 3. Viewing angle <= CAMERA_MAX_DOWNWARD_ANGLE (70°) — prevents ground-filling viewport
+ * 4. CameraTargetLerp also clamps its own lerp target (defense in depth)
  *
  * Also sets mouseButtons on mount:
  * - right = TRUCK (pan, not orbit) — prevents orbit below ground
@@ -822,8 +826,6 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
  */
 const _floorGuardVec = new THREE.Vector3();
 const _targetGuardVec = new THREE.Vector3();
-/** Minimum orbit target Y — prevents looking through the ground (blue screen) */
-const CAMERA_TARGET_MIN_Y = 0.0;
 
 function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsImpl | null> }) {
   // Set right-click to TRUCK (pan) instead of ROTATE on mount
@@ -832,6 +834,8 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
     if (!cc) return;
     cc.mouseButtons.right = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK
     cc.mouseButtons.middle = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK — middle drag also pans
+    // Reduce truck speed to prevent aggressive panning that loses sight of the scene
+    cc.truckSpeed = 1.0;
   }, [cameraControlsRef]);
 
   // WHY: Store last known-good position/target to recover from NaN.
@@ -868,6 +872,40 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
     // Clamp orbit target Y
     if (_targetGuardVec.y < CAMERA_TARGET_MIN_Y) {
       cc.setTarget(_targetGuardVec.x, CAMERA_TARGET_MIN_Y, _targetGuardVec.z, false);
+      cc.getTarget(_targetGuardVec);
+    }
+
+    // Angle guard: prevent ground-filling viewport after TRUCK.
+    // If the camera→target vector is too steep downward, raise the target Y
+    // so the viewing angle stays within CAMERA_MAX_DOWNWARD_ANGLE (~70°).
+    const dy = _floorGuardVec.y - _targetGuardVec.y;
+    if (dy > 0) {
+      const dx = _floorGuardVec.x - _targetGuardVec.x;
+      const dz = _floorGuardVec.z - _targetGuardVec.z;
+      const horizDist = Math.sqrt(dx * dx + dz * dz);
+      const downAngle = Math.atan2(dy, horizDist);
+      if (downAngle > CAMERA_MAX_DOWNWARD_ANGLE) {
+        // Raise target Y so angle equals max
+        const newDy = horizDist * Math.tan(CAMERA_MAX_DOWNWARD_ANGLE);
+        const newTargetY = Math.max(_floorGuardVec.y - newDy, CAMERA_TARGET_MIN_Y);
+        cc.setTarget(_targetGuardVec.x, newTargetY, _targetGuardVec.z, false);
+        cc.getTarget(_targetGuardVec);
+      }
+    }
+
+    // XZ radius clamp: prevent TRUCK from panning camera out of sight of the scene.
+    // If target drifts too far from origin, clamp it back to the max radius.
+    const targetR = Math.sqrt(_targetGuardVec.x * _targetGuardVec.x + _targetGuardVec.z * _targetGuardVec.z);
+    if (targetR > CAMERA_TARGET_MAX_RADIUS) {
+      const scale = CAMERA_TARGET_MAX_RADIUS / targetR;
+      const clampedX = _targetGuardVec.x * scale;
+      const clampedZ = _targetGuardVec.z * scale;
+      // Move both target and position by the same offset to preserve viewing angle
+      const offsetX = clampedX - _targetGuardVec.x;
+      const offsetZ = clampedZ - _targetGuardVec.z;
+      cc.setTarget(clampedX, _targetGuardVec.y, clampedZ, false);
+      cc.setPosition(_floorGuardVec.x + offsetX, _floorGuardVec.y, _floorGuardVec.z + offsetZ, false);
+      cc.getPosition(_floorGuardVec);
       cc.getTarget(_targetGuardVec);
     }
 

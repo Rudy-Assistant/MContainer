@@ -366,11 +366,10 @@ async function run() {
     await page.waitForTimeout(200);
   } catch (e) { fail('G14-debugToggle', e.message); }
 
-  // ═══ G15: Camera blue screen prevention ═══
-  // Reproduction: right-click drag downward causes camera position to become NaN,
-  // rendering only sky (solid blue). The root cause is camera-controls TRUCK mode
-  // producing NaN position/target values that bypass the < 0.5 floor clamp
-  // (because NaN < 0.5 === false in JS).
+  // ═══ G15: Camera blue/brown screen prevention ═══
+  // Reproduction: right-click drag downward can push camera target to ground level,
+  // filling the entire viewport with ground (brown screen) or sky (blue screen).
+  // The gate verifies BOTH numeric camera values AND visual output.
   try {
     const canvasBox = await page.locator('[data-testid="canvas-3d"] canvas').boundingBox();
     if (!canvasBox) { fail('G15-cameraFloor', 'canvas not found'); throw new Error('skip'); }
@@ -379,9 +378,8 @@ async function run() {
 
     // Wait for camera diagnostics to be available
     await page.waitForFunction(() => !!window.__camDiag, { timeout: 10000 }).catch(() => {});
-    const before = await page.evaluate(() => window.__camDiag);
 
-    // Right-click drag downward — the exact action that causes the blue screen
+    // Right-click drag downward — the exact action that causes the brown/blue screen
     await page.mouse.move(cx, cy - 50);
     await page.mouse.down({ button: 'right' });
     for (let i = 0; i < 40; i++) {
@@ -391,28 +389,63 @@ async function run() {
     await page.mouse.up({ button: 'right' });
     await page.waitForTimeout(500);
 
-    // Screenshot after right-drag
-    await page.screenshot({
-      path: `${DIR}/G15-after-right-drag.jpg`,
-      type: 'jpeg', quality: 80,
-      clip: { x: 335, y: 50, width: 920, height: 580 },
-    });
+    // Screenshot after right-drag (PNG for pixel analysis)
+    const clipRect = { x: 335, y: 50, width: 920, height: 580 };
+    const buf = await page.screenshot({ path: `${DIR}/G15-after-right-drag.png`, clip: clipRect });
+    // Also save JPEG for human review
+    await page.screenshot({ path: `${DIR}/G15-after-right-drag.jpg`, type: 'jpeg', quality: 80, clip: clipRect });
 
     // Read camera diagnostic
     const after = await page.evaluate(() => window.__camDiag);
-
-    // The assertion: posY and targetY must be valid numbers (not NaN, not null)
-    // and posY must be >= 0.4
     const posY = after?.posY ? parseFloat(after.posY) : null;
     const targetY = after?.targetY ? parseFloat(after.targetY) : null;
     const posValid = posY !== null && !isNaN(posY) && posY >= 0.4;
-    const targetValid = targetY !== null && !isNaN(targetY);
-    const detail = `before=${JSON.stringify(before)}, after=${JSON.stringify(after)}`;
+    const targetValid = targetY !== null && !isNaN(targetY) && targetY >= 0.2;
+
+    // Visual check: sample pixels in a grid across the viewport.
+    // If >90% of sampled pixels are the same color, the viewport is broken
+    // (showing only ground or only sky).
+    const colorVariance = await page.evaluate(({ clip }) => {
+      const canvas = document.querySelector('[data-testid="canvas-3d"] canvas');
+      if (!canvas) return { varied: false, reason: 'no canvas' };
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      if (!gl) return { varied: false, reason: 'no GL context' };
+
+      const samples = [];
+      const step = 80; // sample every 80px
+      const rect = canvas.getBoundingClientRect();
+      for (let sx = step; sx < clip.width - step; sx += step) {
+        for (let sy = step; sy < clip.height - step; sy += step) {
+          const px = new Uint8Array(4);
+          // GL reads from bottom-left, convert from top-left coords
+          const glX = Math.floor((clip.x - rect.left + sx) * (canvas.width / rect.width));
+          const glY = Math.floor((canvas.height) - (clip.y - rect.top + sy) * (canvas.height / rect.height));
+          gl.readPixels(glX, glY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          // Quantize to reduce noise (bucket to nearest 16)
+          samples.push(`${px[0]>>4},${px[1]>>4},${px[2]>>4}`);
+        }
+      }
+      // Count most common color
+      const freq = {};
+      for (const s of samples) freq[s] = (freq[s] || 0) + 1;
+      const maxFreq = Math.max(...Object.values(freq));
+      const dominantPct = maxFreq / samples.length;
+      return {
+        varied: dominantPct < 0.85,
+        dominantPct: dominantPct.toFixed(3),
+        totalSamples: samples.length,
+        uniqueColors: Object.keys(freq).length,
+      };
+    }, { clip: clipRect });
+
+    const detail = `posY=${posY}, targetY=${targetY}, colorVariance=${JSON.stringify(colorVariance)}`;
 
     if (!posValid || !targetValid) {
-      fail('G15-cameraFloor', `Camera NaN/below-floor after right-drag: posY=${posY}, targetY=${targetY} | ${detail}`);
+      fail('G15-cameraFloor', `Camera NaN/below-floor: ${detail}`);
+    } else if (!colorVariance.varied) {
+      fail('G15-cameraFloor', `Viewport is uniform color (brown/blue screen): ${detail}`);
     } else {
-      pass('G15-cameraFloor', `Floor guard OK: posY=${posY.toFixed(2)}, targetY=${targetY.toFixed(2)}`);
+      pass('G15-cameraFloor', `Floor+angle guard OK: posY=${posY.toFixed(2)}, targetY=${targetY.toFixed(2)}, ${colorVariance.uniqueColors} unique colors`);
     }
   } catch (e) { if (e.message !== 'skip') fail('G15-cameraFloor', e.message); }
 
