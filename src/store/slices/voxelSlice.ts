@@ -121,6 +121,17 @@ function _computeSmartDoorConfig(
   };
 }
 
+/**
+ * createVoxelSlice — Voxel-level operations: face painting, stair placement, templates.
+ *
+ * @remarks
+ * All voxel mutations operate on Container.voxelGrid (32-element array for 4x8 grid).
+ * Body voxels: rows 1-2, cols 1-6. Extensions: rows 0,3 and cols 0,7.
+ * Face painting: setFace/setFaces/fillFaces modify individual VoxelFaces (n/s/e/w/top/bottom).
+ * Stair placement: applyStairsFromFace creates 2-voxel stair with floor void above.
+ *
+ * @see types/container.ts for VoxelFaces, SurfaceType, and coordinate system
+ */
 export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   setFloorMaterial: (id, material) => {

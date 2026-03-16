@@ -1078,6 +1078,23 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
   // ── Vertical Stacking ──────────────────────────────────────
 
+  /**
+   * stackContainer — Places topId container on top of bottomId container.
+   *
+   * @remarks
+   * Sets top.position.y = bottom.position.y + CONTAINER_DIMENSIONS[bottom.size].height.
+   * Also snaps top.position.x/z to match bottom (flush alignment).
+   * Records stacking relationship: top.stackedOn = bottomId, bottom.supporting.push(topId).
+   * Auto-generates rooftop deck on the newly stacked container.
+   *
+   * Called by commitContainerDrag (dragSlice) when stackTargetId is set.
+   * Must be called SYNCHRONOUSLY after clearing dragMovingId — do NOT use requestAnimationFrame
+   * between clearing drag state and calling this (causes one frame of wrong Y).
+   *
+   * @returns false if validation fails (max level exceeded, already stacked)
+   * @see dragSlice.ts commitContainerDrag for the drag-to-stack flow
+   * @see spatialEngine.ts findStackTarget for stack target detection
+   */
   stackContainer: (topId, bottomId) => {
     const s = get();
     const top = s.containers[topId] as Container | undefined;
@@ -1162,6 +1179,19 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
   // ── Adjacency Detection ───────────────────────────────────
 
+  /**
+   * refreshAdjacency — Detects flush container pairs and merges shared walls.
+   *
+   * @remarks
+   * Uses findAdjacentPairs (spatialEngine) to detect containers sharing a wall face.
+   * Merges shared walls by setting the inner-facing voxel faces to 'Open' on both containers.
+   * Tracks original wall states in mergedWalls for restoration when containers are separated.
+   *
+   * Called after: moveContainer, addContainer, removeContainer, stackContainer, commitContainerDrag.
+   * Always wrapped in requestAnimationFrame to batch multiple position changes.
+   *
+   * @see spatialEngine.ts findAdjacentPairs for the AABB-based adjacency detection
+   */
   refreshAdjacency: () => {
     const { containers } = get();
     const pairs = findAdjacentPairs(containers);

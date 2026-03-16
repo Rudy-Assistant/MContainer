@@ -138,7 +138,20 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
   // Library drag payload
   setLibraryDragPayload: (payload) => set({ libraryDragPayload: payload }),
 
-  // Container move drag
+  /**
+   * startContainerDrag — Initiates a container move drag.
+   *
+   * @remarks
+   * Pauses temporal (undo) tracking during drag. Clears hover state to prevent
+   * stale wireframes. The actual position tracking happens in DragMoveGhost
+   * (Scene.tsx) which raycasts to a ground plane each frame.
+   *
+   * Flow: startContainerDrag → DragMoveGhost.useFrame (tracks position) →
+   *       pointerup → commitContainerDrag(x, z, stackTargetId?)
+   *
+   * @see Scene.tsx DragMoveGhost for the ghost rendering and snap logic
+   * @see commitContainerDrag for the commit/stack logic
+   */
   startContainerDrag: (id) => {
     getTemporalApi().pause();
     // Clear hover state to prevent stale wireframes during drag
@@ -149,6 +162,22 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
       faceContext: null,
     });
   },
+  /**
+   * commitContainerDrag — Finalizes a container move at the given position.
+   *
+   * @remarks
+   * If stackTargetId is provided and valid, calls stackContainer SYNCHRONOUSLY
+   * (not in requestAnimationFrame) to avoid a frame of wrong Y position.
+   * Otherwise validates overlap and updates position.
+   *
+   * WHY synchronous stack: Previously used requestAnimationFrame which caused
+   * one frame where the container was at Y=0 before being moved to stack height.
+   * This produced a visible flicker and incorrect gate readings.
+   *
+   * @param x - Target X position (grid-snapped by DragMoveGhost)
+   * @param z - Target Z position (grid-snapped by DragMoveGhost)
+   * @param stackTargetId - If set, the container to stack onto (auto-stack on drop)
+   */
   commitContainerDrag: (x, z, stackTargetId) => {
     const { dragMovingId, containers } = get();
     if (!dragMovingId) return;

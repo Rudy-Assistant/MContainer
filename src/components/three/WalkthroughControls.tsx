@@ -245,6 +245,27 @@ function generateInteriorTourWaypoints(): { waypoints: THREE.Vector3[]; center: 
 
 // ── Component ────────────────────────────────────────────────
 
+/**
+ * WalkthroughControls — First-person navigation controller.
+ *
+ * @remarks
+ * PROTECTED SYSTEM — Do NOT replace with drei's PointerLockControls.
+ * Reasons:
+ * 1. Per-voxel wall collision (0.06m thick collision boxes, passable on Open faces)
+ * 2. Auto-tour mode (T key cycles through containers via buildAutoTourPlan)
+ * 3. Hotbar keys 1-0 remain active during FP mode for in-situ painting
+ * 4. Stair traversal with floor-level switching (Y transitions between levels)
+ *
+ * Spawn logic: Finds largest ground-floor container (level 0), places camera
+ * at (container.position.x, container.position.y + 0.06 + EYE_HEIGHT, container.position.z).
+ * EYE_HEIGHT = 1.6m. Saved FPV position restored if available.
+ *
+ * Exit: ESC → saves camera position/yaw to store, sets viewMode to '3d'.
+ * Camera position is restored by CameraBroadcast on re-entering 3D mode.
+ *
+ * History: Rewritten twice toward PointerLockControls, restored both times.
+ * @see CLAUDE.md rule "WalkthroughControls.tsx is NOT a candidate for replacement"
+ */
 export default function WalkthroughControls() {
   const controlsRef = useRef<any>(null);
   const { camera, scene } = useThree();

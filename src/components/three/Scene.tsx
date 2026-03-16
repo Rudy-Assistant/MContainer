@@ -347,6 +347,17 @@ function getFogParams(t: number) {
 
 // ── Sky Parameters (pure function — testable) ───────────────
 
+/**
+ * getSkyParams — Computes three.js Sky shader parameters from time of day.
+ *
+ * @remarks
+ * Pure function, no side effects. Used by SkyDome component.
+ * Values tuned to avoid white-out at midday (rayleigh 2.0) and
+ * ensure visible blue sky at 10AM (mieCoefficient 0.005).
+ *
+ * @param timeOfDay - Hours (0-24), fractional allowed (e.g. 17.5 = 5:30 PM)
+ * @returns Sky shader parameters: rayleigh, turbidity, mieCoefficient, mieDirectionalG
+ */
 export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
@@ -753,7 +764,20 @@ function KeyboardPanControls() {
   return null;
 }
 
-// ── Camera Target Lerp — smoothly glides orbit pivot to desired target ────
+/**
+ * CameraTargetLerp — Smoothly glides the orbit pivot to a desired target position.
+ *
+ * @remarks
+ * IMPORTANT: _lerpTarget.y is clamped to >= 0 before applying to prevent the camera
+ * from looking through the ground plane ("blue screen" bug). If this clamp is removed,
+ * panning or switching selections can move the orbit target below ground, causing the
+ * camera to see only sky color from underneath.
+ *
+ * Frozen during container drag (dragMovingId) and camera restore (cameraRestoring).
+ *
+ * @see CameraFloorGuard for position Y and target Y clamping
+ */
+// WHY: module-level vectors avoid per-frame allocation (reused across all frames)
 const _lerpTarget = new THREE.Vector3(0, 1.5, 0);
 const _desiredTarget = new THREE.Vector3(0, 1.5, 0);
 
@@ -779,7 +803,23 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
   return null;
 }
 
-// ── Camera floor guard — prevents camera going below ground ──
+/**
+ * CameraFloorGuard — Prevents camera position and orbit target from going below ground.
+ *
+ * @remarks
+ * PROTECTED SYSTEM — this is the primary defense against the "blue screen" bug.
+ * Three things are clamped every frame:
+ * 1. Camera position Y >= CAMERA_FLOOR_Y (0.5m) — prevents camera inside ground
+ * 2. Orbit target Y >= CAMERA_TARGET_MIN_Y (0.0m) — prevents looking through ground
+ * 3. CameraTargetLerp also clamps its own lerp target (defense in depth)
+ *
+ * Also sets mouseButtons on mount:
+ * - right = TRUCK (pan, not orbit) — prevents orbit below ground
+ * - middle = TRUCK (pan)
+ *
+ * @see CameraTargetLerp for the lerp-side Y clamp
+ * @see cameraConstants.ts for CAMERA_FLOOR_Y, CAMERA_MOUSE_RIGHT values
+ */
 const _floorGuardVec = new THREE.Vector3();
 const _targetGuardVec = new THREE.Vector3();
 /** Minimum orbit target Y — prevents looking through the ground (blue screen) */
