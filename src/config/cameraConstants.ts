@@ -22,6 +22,10 @@ export const CAMERA_MOUSE_BUTTONS = {
   middle: 2,  // ACTION.TRUCK
   wheel: 16,  // ACTION.DOLLY
 } as const;
+/** Maximum orbit target Y — prevents TRUCK from pushing target above scene into blue sky */
+export const CAMERA_TARGET_MAX_Y = 20;
+/** Maximum camera Y — prevents TRUCK from pushing camera above scene */
+export const CAMERA_MAX_Y = 30;
 /** Maximum distance the orbit target can drift from origin XZ before clamping.
  * Prevents right-drag TRUCK from panning camera out of sight of the scene.
  * Must be generous enough for multi-container layouts but tight enough to
