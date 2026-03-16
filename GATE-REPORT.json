@@ -1,0 +1,84 @@
+{
+  "timestamp": "2026-03-16T00:35:34.941Z",
+  "sprint": 5,
+  "gates": [
+    {
+      "gate": "G1-store",
+      "status": "PASS",
+      "msg": "Store OK, 1 containers"
+    },
+    {
+      "gate": "G2-addContainer",
+      "status": "PASS",
+      "msg": "id=b93e185d-dace-414d-9870-e4d78dd73b2a"
+    },
+    {
+      "gate": "G3-viewMode",
+      "status": "PASS",
+      "msg": "FP=walkthrough, back=3d"
+    },
+    {
+      "gate": "G4-undo",
+      "status": "PASS",
+      "msg": "undo function exists"
+    },
+    {
+      "gate": "G5-palette",
+      "status": "PASS",
+      "msg": "3 built-ins"
+    },
+    {
+      "gate": "G6-staircase",
+      "status": "PASS",
+      "msg": "voxelType=stairs"
+    },
+    {
+      "gate": "G7-export",
+      "status": "PASS",
+      "msg": "export function exists"
+    },
+    {
+      "gate": "G8-selectedVoxel",
+      "status": "PASS",
+      "msg": "round-trip OK"
+    },
+    {
+      "gate": "G9-noStartScreen",
+      "status": "PASS",
+      "msg": "no blocking modal"
+    },
+    {
+      "gate": "G10-modelHome",
+      "status": "PASS",
+      "msg": "placed 1 containers"
+    },
+    {
+      "gate": "G11-camera",
+      "status": "PASS",
+      "msg": "camera exposed"
+    },
+    {
+      "gate": "G12-noGrass",
+      "status": "PASS",
+      "msg": "no instanced blades"
+    },
+    {
+      "gate": "G13-debugMode",
+      "status": "PASS",
+      "msg": "toggle works"
+    },
+    {
+      "gate": "G14-resetBtn",
+      "status": "PASS",
+      "msg": "icon-only"
+    },
+    {
+      "gate": "G15-stairPreview",
+      "status": "PASS",
+      "msg": "{\"ok\":true,\"stairPart\":\"lower\"}"
+    }
+  ],
+  "total": 15,
+  "passed": 15,
+  "failed": 0
+}
