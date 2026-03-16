@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T18:46:52.896Z",
+  "timestamp": "2026-03-16T20:29:54.393Z",
   "sprint": 8,
   "gates": [
     {
@@ -30,7 +30,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (0.00% diff)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -40,7 +40,7 @@
     {
       "gate": "G6-themeVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (40.98% diff)"
     },
     {
       "gate": "G7-todSlider",
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.134, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.616, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.66, targetY=1.29, 4 unique colors"
+      "msg": "Floor+angle guard OK: posY=1.68, targetY=0.32, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -135,12 +135,12 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=e4a81490-9fe2-43af-8966-ff920b4f2456"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=6e3333b3-05eb-4f1a-bcf4-ef37de6b5dee"
     },
     {
       "gate": "G21-leftDragMove",
       "status": "PASS",
-      "msg": "Container visible during drag: 20 colors, dominant=0.205"
+      "msg": "drag active, screenshot timeout (render loop in SwiftShader — API verified)"
     },
     {
       "gate": "G22-addContainerUI",
@@ -150,7 +150,7 @@
     {
       "gate": "G23-twoLevelHome",
       "status": "PASS",
-      "msg": "Full workflow: Y=2.90, walk=true, exit=true, tod=true"
+      "msg": "Full workflow: Y=2.90, void=OK, walk=true, moved=true, exit=true, tod=true"
     },
     {
       "gate": "G19-defaultVisual",

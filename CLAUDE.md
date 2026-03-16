@@ -112,7 +112,7 @@ Do not modify V2 files. Read them for reference only.
 ### Container Manipulation
 | Key | Action |
 |-----|--------|
-| Shift+G | Grab mode (arrows move, Enter confirm, Esc cancel) |
+| Left-drag (selected) | Move container (drag to reposition, ghost follows cursor) |
 | G | Group selected into zone |
 | R | Rotate module / rotate container |
 | Q | Rotate stamp faces / rotate container |
@@ -147,3 +147,45 @@ Before removing ANY toolbar button or sidebar element:
 
 Removals require explicit sign-off — do not remove UI elements speculatively
 during cleanup sprints. When in doubt, move to a secondary location rather than delete.
+
+## Sprint Close Checklist
+
+Every sprint must complete ALL of these before being declared done:
+
+1. `npx tsc --noEmit` → 0 errors
+2. `npx vitest run` → all tests pass (288+ currently)
+3. `node acceptance-gates.mjs` → all gates pass, 0 FAIL
+4. `node generate-quality-assessment.mjs` → CURRENT-QUALITY-ASSESSMENT.md updated
+5. Read ALL gate screenshots with view tool — describe what each shows
+6. If any visual gate shows broken state (uniform color, missing geometry), fix before closing
+7. Git tag: `sprint-N-complete` with test count in annotation
+8. GATE-REPORT.json committed with `failed: 0`
+
+## Known Regression History
+
+Regressions that have occurred in past sprints. Check these specifically during verification:
+
+| Bug | Root Cause | Fix | Sprint |
+|-----|-----------|-----|--------|
+| Camera brown/blue screen after right-drag | TRUCK mode pushes target to ground, viewport fills with ground/sky | CameraFloorGuard: target Y >= 0.3, angle guard <= 70°, XZ radius <= 40, truckSpeed 0.5 | 8 |
+| Container disappears during drag | `if (isBeingDragged) return null` hides original | Keep original visible at 30% opacity; ghost follows cursor | 8 |
+| Gate passes but screenshot shows failure | G15 checked numeric values only, not visual output | readPixels color variance check: fail if >85% pixels same color | 8 |
+| Gates contaminated by prior gate state | G15 right-drag moves camera, all subsequent gates inherit bad camera | Camera reset (btn-reset click + position restore) between destructive gates | 8 |
+| Start Fresh button broken but gates pass | Gates called `store.addContainer()` directly, bypassing broken button | Sprint 8 principle: page.evaluate() for reading only, never triggering behavior | 8 |
+| isExteriorFace n/s↔e/w swapped | row=X axis but n/s was mapped to rows instead of e/w | Correct: e→row=BODY_ROW_END, w→row=BODY_ROW_START | 9 |
+| Extension platforms/moats rendering | Extension top/bottom returned true from isExteriorFace | Extension top/bottom now return false | 10 |
+| Stale baselines cause visual gate failures | Scene changes without baseline recapture | Run `npm run baselines` after any visual change, commit PNGs | 8 |
+
+## Camera Safety Architecture
+
+The camera has 4 layers of defense (see `cameraConstants.ts` + `Scene.tsx:CameraFloorGuard`):
+
+1. **Position Y clamp**: camera.position.y >= CAMERA_FLOOR_Y (0.5m)
+2. **Target Y clamp**: orbit target.y >= CAMERA_TARGET_MIN_Y (0.3m)
+3. **Angle guard**: viewing angle <= CAMERA_MAX_DOWNWARD_ANGLE (70°) — raises target if too steep
+4. **XZ radius clamp**: target XZ radius <= CAMERA_TARGET_MAX_RADIUS (40m) — prevents TRUCK panning out of scene
+5. **NaN recovery**: stores last-known-good position/target, restores on NaN detection
+
+Mouse buttons configured via `CAMERA_MOUSE_BUTTONS` prop (not imperative useEffect):
+- Left: ROTATE (1), Right: TRUCK (2), Middle: TRUCK (2), Wheel: DOLLY (16)
+- truckSpeed: 0.5 (reduced from default 2.0)
