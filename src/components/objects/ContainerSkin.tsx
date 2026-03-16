@@ -1317,9 +1317,13 @@ function BaseplateCell({
   const onClickFace = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onClick(); };
   const onDownFace = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    if (e.nativeEvent.shiftKey) {
-      useStore.getState().startContainerDrag(containerId);
-      return;
+    if (e.nativeEvent.button === 0) {
+      // Left-click on already-selected container → begin drag
+      const store = useStore.getState();
+      if (store.selection.includes(containerId)) {
+        useStore.getState().startContainerDrag(containerId);
+        return;
+      }
     }
     onPointerDown?.();
   };
@@ -2033,8 +2037,13 @@ export default function ContainerSkin({
               };
               const onDownShared = (e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
-                if (e.nativeEvent.shiftKey) {
-                  useStore.getState().startContainerDrag(container.id);
+                if (e.nativeEvent.button === 0) {
+                  // Left-click on already-selected container → begin drag
+                  const store = useStore.getState();
+                  if (store.selection.includes(container.id)) {
+                    useStore.getState().startContainerDrag(container.id);
+                    return;
+                  }
                 }
               };
               const onCtxShared = (face?: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
@@ -2210,7 +2219,7 @@ export default function ContainerSkin({
                               }}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
-                                if (e.nativeEvent.shiftKey) {
+                                if (e.nativeEvent.button === 0 && useStore.getState().selection.includes(container.id)) {
                                   useStore.getState().startContainerDrag(container.id);
                                   return;
                                 }
@@ -2327,7 +2336,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
-                                if (e.nativeEvent.shiftKey) {
+                                if (e.nativeEvent.button === 0 && useStore.getState().selection.includes(container.id)) {
                                   useStore.getState().startContainerDrag(container.id);
                                   return;
                                 }

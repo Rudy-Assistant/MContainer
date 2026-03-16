@@ -439,33 +439,7 @@ function useKeyboardShortcuts() {
         return;
       }
 
-      // Grab mode: arrow keys move, Enter confirms, Escape cancels
-      if (store.grabMode.active && store.grabMode.containerId) {
-        const gId = store.grabMode.containerId;
-        const gc = store.containers[gId];
-        if (gc) {
-          // Direct position update (no refreshAdjacency per keypress — only on Enter commit)
-          const moveGrab = (pos: { x: number; y: number; z: number }) => {
-            useStore.setState((s: any) => ({
-              containers: { ...s.containers, [gId]: { ...s.containers[gId], position: pos } },
-            }));
-          };
-          const step = e.shiftKey ? 1.0 : 0.1;
-          if (e.code === "ArrowLeft")  { e.preventDefault(); moveGrab({ x: gc.position.x - step, y: gc.position.y, z: gc.position.z }); return; }
-          if (e.code === "ArrowRight") { e.preventDefault(); moveGrab({ x: gc.position.x + step, y: gc.position.y, z: gc.position.z }); return; }
-          if (e.code === "ArrowUp")    { e.preventDefault(); moveGrab({ x: gc.position.x, y: gc.position.y, z: gc.position.z - step }); return; }
-          if (e.code === "ArrowDown")  { e.preventDefault(); moveGrab({ x: gc.position.x, y: gc.position.y, z: gc.position.z + step }); return; }
-          if (e.code === "Enter")      { e.preventDefault(); store.clearGrabMode(); store.refreshAdjacency(); return; }
-          if (e.code === "Escape")     {
-            e.preventDefault();
-            const origin = store.grabMode.origin;
-            if (origin) moveGrab(origin);
-            store.clearGrabMode();
-            return;
-          }
-        }
-        return; // Block all other keys while in grab mode
-      }
+      // (Grab mode arrow-key handler removed — Sprint 9: replaced by left-drag-to-move)
 
       // Q = Rotate stamp faces 90° CW (when stamp active), else rotate selected containers
       if (e.code === "KeyQ" && !e.ctrlKey && !e.metaKey) {
@@ -553,18 +527,29 @@ function useKeyboardShortcuts() {
         // Fall through to SmartHotbar's R for module orientation rotation
       }
 
-      // Shift+G = Grab mode (single container)
-      if (e.code === "KeyG" && e.shiftKey && !e.ctrlKey && !e.metaKey) {
-        if (store.selection.length === 1) {
-          const id = store.selection[0];
-          const c = store.containers[id];
-          if (c) {
-            e.preventDefault();
-            store.setGrabMode({ active: true, containerId: id, origin: { x: c.position.x, y: c.position.y, z: c.position.z } });
+      // , (comma) / . (period) = Rotate selected containers by 45 degrees
+      if ((e.key === ',' || e.key === '<') && !e.ctrlKey && !e.metaKey) {
+        if (store.selection.length > 0) {
+          e.preventDefault();
+          for (const id of store.selection) {
+            const c = store.containers[id];
+            if (c) store.updateContainerRotation(id, c.rotation - Math.PI / 4);
           }
+          return;
         }
-        return;
       }
+      if ((e.key === '.' || e.key === '>') && !e.ctrlKey && !e.metaKey) {
+        if (store.selection.length > 0) {
+          e.preventDefault();
+          for (const id of store.selection) {
+            const c = store.containers[id];
+            if (c) store.updateContainerRotation(id, c.rotation + Math.PI / 4);
+          }
+          return;
+        }
+      }
+
+      // (Shift+G grab mode removed — Sprint 9: replaced by left-drag-to-move on selected containers)
 
       // G = Group selected containers into a zone
       if (e.code === "KeyG" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -801,6 +786,7 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
     const cc = cameraControlsRef.current;
     if (!cc) return;
     cc.mouseButtons.right = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK
+    cc.mouseButtons.middle = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK — middle drag also pans
   }, [cameraControlsRef]);
 
   useFrame(() => {
@@ -1316,14 +1302,14 @@ function DragMoveGhost() {
 
   const groundPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
-  const ghostPos = useRef({ x: 0, y: 0, z: 0, valid: true, snapped: false, stacking: false });
+  const ghostPos = useRef({ x: 0, y: 0, z: 0, valid: true, snapped: false, stacking: false, stackTargetId: null as string | null });
 
   // Initialize ghostPos to container's current position to prevent jump-to-origin on quick click
   useEffect(() => {
     if (!dragMovingId) return;
     const container = useStore.getState().containers[dragMovingId];
     if (container) {
-      ghostPos.current = { x: container.position.x, y: container.position.y, z: container.position.z, valid: true, snapped: false, stacking: false };
+      ghostPos.current = { x: container.position.x, y: container.position.y, z: container.position.z, valid: true, snapped: false, stacking: false, stackTargetId: null };
     }
   }, [dragMovingId]);
 
@@ -1358,7 +1344,7 @@ function DragMoveGhost() {
     // If stacking, overlap with the container below is expected — check only same-level overlap
     const valid = stacking ? true : !overlaps;
 
-    ghostPos.current = { x: sx, y: ghostY, z: sz, valid, snapped: snap.snapped, stacking };
+    ghostPos.current = { x: sx, y: ghostY, z: sz, valid, snapped: snap.snapped, stacking, stackTargetId: stackTarget?.containerId ?? null };
   });
 
   useLayoutEffect(() => {
@@ -1366,7 +1352,7 @@ function DragMoveGhost() {
     const handleUp = () => {
       const g = ghostPos.current;
       if (g.valid) {
-        commitContainerDrag(g.x, g.z);
+        commitContainerDrag(g.x, g.z, g.stackTargetId);
       } else {
         cancelContainerDrag();
       }
@@ -1400,7 +1386,7 @@ function MoveGhostVisual({
   container,
 }: {
   dims: { length: number; width: number; height: number };
-  ghostPos: React.RefObject<{ x: number; y: number; z: number; valid: boolean; snapped: boolean; stacking: boolean }>;
+  ghostPos: React.RefObject<{ x: number; y: number; z: number; valid: boolean; snapped: boolean; stacking: boolean; stackTargetId: string | null }>;
   container: Container;
 }) {
   const groupRef = useRef<THREE.Group>(null);

@@ -2175,17 +2175,16 @@ export default function ContainerMesh({ container }: { container: Container }) {
       rotation={[0, container.rotation, 0]}
       onPointerDown={(e) => {
         e.stopPropagation();
+        if (e.nativeEvent.button !== 0) return; // left-click only
         if (isSelected) {
-          // Require Shift to initiate drag-to-move — plain click stays as selection
-          if (e.nativeEvent.shiftKey) {
-            dragPendingRef.current = {
-              id: container.id,
-              clientX: e.nativeEvent.clientX,
-              clientY: e.nativeEvent.clientY,
-            };
-          }
+          // Already selected — begin drag-to-move (threshold in useEffect above)
+          dragPendingRef.current = {
+            id: container.id,
+            clientX: e.nativeEvent.clientX,
+            clientY: e.nativeEvent.clientY,
+          };
         } else {
-          // Select the container
+          // Not selected — select it (don't initiate drag)
           select(container.id, e.nativeEvent.shiftKey);
         }
       }}

@@ -57,7 +57,7 @@ export interface DragSlice {
   // ── Container move drag ─────────────────────────────────
   dragMovingId: string | null;
   startContainerDrag: (id: string) => void;
-  commitContainerDrag: (x: number, z: number) => void;
+  commitContainerDrag: (x: number, z: number, stackTargetId?: string | null) => void;
   cancelContainerDrag: () => void;
 
   // ── Bay context menu ────────────────────────────────────
@@ -143,11 +143,32 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
     getTemporalApi().pause();
     set({ dragMovingId: id });
   },
-  commitContainerDrag: (x, z) => {
+  commitContainerDrag: (x, z, stackTargetId) => {
     const { dragMovingId, containers } = get();
     if (!dragMovingId) return;
     const c = containers[dragMovingId];
     if (!c) { set({ dragMovingId: null }); getTemporalApi().resume(); return; }
+
+    // If stacking, move to position then call stackContainer
+    if (stackTargetId && containers[stackTargetId]) {
+      getTemporalApi().resume();
+      set((s: any) => ({
+        dragMovingId: null,
+        containers: {
+          ...s.containers,
+          [dragMovingId]: {
+            ...s.containers[dragMovingId],
+            position: { ...s.containers[dragMovingId].position, x, z },
+          },
+        },
+      }));
+      // Auto-stack on drop
+      requestAnimationFrame(() => {
+        get().stackContainer(dragMovingId, stackTargetId);
+        get().refreshAdjacency();
+      });
+      return;
+    }
 
     // Check overlap at target position (using full footprint including extensions)
     const movedContainer = { ...c, position: { ...c.position, x, z } };

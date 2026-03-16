@@ -393,6 +393,47 @@ async function run() {
       : fail('G18-noGrass', 'large InstancedMesh found');
   } catch (e) { fail('G18-noGrass', e.message); }
 
+  // ═══ G20: Stacking — containers can be aligned for auto-stack ═══
+  try {
+    const snapResult = await page.evaluate(() => {
+      const s = window.__store.getState();
+      // Set up two containers at same position
+      const ids = Object.keys(s.containers);
+      ids.forEach(id => s.removeContainer(id));
+      s.addContainer('40ft_high_cube', { x: 0, y: 0, z: 0 });
+      s.addContainer('40ft_high_cube', { x: 20, y: 0, z: 0 });
+      const newIds = Object.keys(window.__store.getState().containers);
+      // Move second container to same XZ as first
+      window.__store.getState().updateContainerPosition(newIds[1], { x: 0, y: 0, z: 0 });
+      const c1 = window.__store.getState().containers[newIds[0]];
+      const c2 = window.__store.getState().containers[newIds[1]];
+      return {
+        count: newIds.length,
+        sameX: Math.abs(c1.position.x - c2.position.x) < 1,
+        sameZ: Math.abs(c1.position.z - c2.position.z) < 1,
+        hasStackFn: typeof s.stackContainer === 'function',
+      };
+    });
+    snapResult.sameX && snapResult.sameZ && snapResult.hasStackFn
+      ? pass('G20-stackSnap', `Containers aligned for stacking (${snapResult.count} containers)`)
+      : fail('G20-stackSnap', JSON.stringify(snapResult));
+  } catch (e) { fail('G20-stackSnap', e.message); }
+
+  // ═══ G21: Left-drag-to-move (startContainerDrag exists, no grabMode needed) ═══
+  try {
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      return {
+        hasStartDrag: typeof s.startContainerDrag === 'function',
+        hasCommitDrag: typeof s.commitContainerDrag === 'function',
+        hasCancelDrag: typeof s.cancelContainerDrag === 'function',
+      };
+    });
+    r.hasStartDrag && r.hasCommitDrag && r.hasCancelDrag
+      ? pass('G21-leftDragMove', 'drag-to-move API exists')
+      : fail('G21-leftDragMove', JSON.stringify(r));
+  } catch (e) { fail('G21-leftDragMove', e.message); }
+
   // ═══ G19: Default visual — restore defaults + visual comparison ═══
   try {
     // Reset to clean state

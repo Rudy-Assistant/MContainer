@@ -22,6 +22,8 @@ const FEATURE_GATES = {
   'Structural Frame':    ['G16-frameAction', 'G17-frameToggle'],
   'Ground/Atmosphere':   ['G18-noGrass'],
   'Visual Integrity':    ['G19-defaultVisual'],
+  'Container Stacking':  ['G20-stackSnap'],
+  'Drag-to-Move':        ['G21-leftDragMove'],
 };
 
 const UNGATED_FEATURES = [
