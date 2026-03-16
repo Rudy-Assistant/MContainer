@@ -1,5 +1,5 @@
 /**
- * Cumulative Acceptance Gates — Sprints 1-5
+ * Cumulative Acceptance Gates — Sprints 1-7
  *
  * Verifies all features remain working after each sprint.
  * Run: node acceptance-gates.mjs
@@ -217,11 +217,65 @@ async function run() {
     pass('G15-stairPreview', JSON.stringify(r));
   } catch (e) { fail('G15-stairPreview', e.message); }
 
+  // ═══ SPRINT 7 GATES ═══
+
+  // G16: Frame structure exists
+  try {
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      return { ok: typeof s.toggleStructuralElement === 'function' };
+    });
+    r.ok ? pass('G16-frameStructure', 'toggleStructuralElement exists') : fail('G16-frameStructure', JSON.stringify(r));
+  } catch (e) { fail('G16-frameStructure', e.message); }
+
+  // G17: Frame toggle behavioral
+  try {
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      const ids = Object.keys(s.containers);
+      if (!ids.length) return { ok: false };
+      s.toggleStructuralElement(ids[0], 'post_front_right');
+      const hidden = window.__store.getState().containers[ids[0]].structureConfig?.hiddenElements ?? [];
+      const wasHidden = hidden.includes('post_front_right');
+      s.toggleStructuralElement(ids[0], 'post_front_right');
+      const restored = !(window.__store.getState().containers[ids[0]].structureConfig?.hiddenElements ?? []).includes('post_front_right');
+      return { ok: wasHidden && restored };
+    });
+    r.ok ? pass('G17-frameToggle', 'hide+restore OK') : fail('G17-frameToggle', JSON.stringify(r));
+  } catch (e) { fail('G17-frameToggle', e.message); }
+
+  // G18: Theme switch behavioral
+  try {
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      const orig = s.currentTheme;
+      s.setTheme('japanese');
+      const switched = window.__store.getState().currentTheme;
+      s.setTheme(orig);
+      return { ok: switched === 'japanese', switched };
+    });
+    r.ok ? pass('G18-themeSwitch', `switched to ${r.switched}`) : fail('G18-themeSwitch', JSON.stringify(r));
+  } catch (e) { fail('G18-themeSwitch', e.message); }
+
+  // G19: Undo behavioral (add container, undo, verify count)
+  try {
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      const before = Object.keys(s.containers).length;
+      s.addContainer('40ft_high_cube', { x: 50, y: 0, z: 0 });
+      const after = Object.keys(window.__store.getState().containers).length;
+      window.__store.getState().undo();
+      const undone = Object.keys(window.__store.getState().containers).length;
+      return { ok: after > before && undone === before, before, after, undone };
+    });
+    r.ok ? pass('G19-undoBehavioral', `before=${r.before} after=${r.after} undone=${r.undone}`) : fail('G19-undoBehavioral', JSON.stringify(r));
+  } catch (e) { fail('G19-undoBehavioral', e.message); }
+
   // ═══ SUMMARY ═══
   await shot(page, 'final');
   const summary = {
     timestamp: new Date().toISOString(),
-    sprint: 5,
+    sprint: 7,
     gates: results,
     total: results.length,
     passed: results.filter(r => r.status === 'PASS').length,

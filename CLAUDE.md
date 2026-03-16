@@ -55,6 +55,12 @@ Every sprint follows this structure:
 | `expect(literal).toBe(literal)` | Tautological test — tests nothing |
 | Replacing WalkthroughControls.tsx | 1182 lines of tested production code — extend, don't rewrite |
 
+## Quality Assessment Policy
+
+CURRENT-QUALITY-ASSESSMENT.md is AUTO-GENERATED. Never edit it manually.
+To update: `npm run gates && npm run quality`
+A feature cannot be rated PRODUCTION without a passing Playwright gate.
+
 ## V2 Reference
 
 V2 codebase is at `C:\MHome\` (parent of MContainer). It contains useful reference implementations for:

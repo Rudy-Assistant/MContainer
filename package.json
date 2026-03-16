@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:e2e": "npx tsx e2e/run-workflow-tests.ts"
+    "test:e2e": "npx tsx e2e/run-workflow-tests.ts",
+    "gates": "node acceptance-gates.mjs",
+    "quality": "node generate-quality-assessment.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
