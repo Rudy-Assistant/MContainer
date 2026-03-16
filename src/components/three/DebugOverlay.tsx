@@ -34,8 +34,12 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
   if (!grid) return null;
 
   const vHeight = dims.height;
-  const bodyW = dims.length / VOXEL_COLS;
-  const bodyD = dims.width / VOXEL_ROWS;
+  // Must match ContainerSkin's halo architecture exactly:
+  //   colPitch = length / 6 (core cols), rowPitch = width / 2 (core rows)
+  //   Halo (extension) width = container height (foldDepth)
+  const coreW = dims.length / 6;
+  const coreD = dims.width / 2;
+  const foldDepth = dims.height;
 
   const voxels = useMemo(() => {
     const result: { px: number; py: number; pz: number; w: number; h: number; d: number; isExt: boolean }[] = [];
@@ -47,19 +51,28 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       const row = Math.floor(i / VOXEL_COLS);
       const col = i % VOXEL_COLS;
 
-      // Body voxels: rows 1-2, cols 1-6
-      const isBody = row >= 1 && row <= 2 && col >= 1 && col <= 6;
-      const vW = isBody ? bodyW : bodyW * 1.5; // extensions slightly larger
-      const vD = isBody ? bodyD : bodyD * 1.5;
+      const isHaloCol = col === 0 || col === VOXEL_COLS - 1;
+      const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
+      const isBody = !isHaloCol && !isHaloRow;
 
-      // Position: center of voxel in container-local space
-      const px = (col - (VOXEL_COLS - 1) / 2) * bodyW;
-      const pz = (row - (VOXEL_ROWS - 1) / 2) * bodyD;
+      const vW = isHaloCol ? foldDepth : coreW;
+      const vD = isHaloRow ? foldDepth : coreD;
+
+      // Position: match ContainerSkin's getVoxelLayout exactly (NEGATED X for cols)
+      let px: number;
+      if (col === 0)                   px = dims.length / 2 + foldDepth / 2;
+      else if (col === VOXEL_COLS - 1) px = -(dims.length / 2 + foldDepth / 2);
+      else                             px = -(col - 3.5) * coreW;
+
+      let pz: number;
+      if (row === 0)                   pz = -(dims.width / 2 + foldDepth / 2);
+      else if (row === VOXEL_ROWS - 1) pz = dims.width / 2 + foldDepth / 2;
+      else                             pz = (row - 1.5) * coreD;
 
       result.push({ px, py: vHeight / 2, pz, w: vW, h: vHeight, d: vD, isExt: !isBody });
     }
     return result;
-  }, [grid, bodyW, bodyD, vHeight]);
+  }, [grid, coreW, coreD, foldDepth, vHeight, dims.length, dims.width]);
 
   return (
     <group position={[container.position.x, container.position.y, container.position.z]}>
