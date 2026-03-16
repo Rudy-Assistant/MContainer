@@ -17,6 +17,14 @@ vi.mock('idb-keyval', () => {
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize, CONTAINER_DIMENSIONS, ViewMode, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
+import {
+  CAMERA_MIN_POLAR_ANGLE,
+  CAMERA_MAX_POLAR_ANGLE,
+  CAMERA_MIN_DISTANCE,
+  CAMERA_MAX_DISTANCE,
+  CAMERA_FLOOR_Y,
+  CAMERA_MOUSE_RIGHT,
+} from '@/config/cameraConstants';
 
 function resetStore() {
   const initial = useStore.getInitialState();
@@ -171,6 +179,96 @@ describe('palette system', () => {
     expect(s().palettes.find(p => p.id === newId)).toBeDefined();
     s().deletePalette(newId);
     expect(s().palettes.find(p => p.id === newId)).toBeUndefined();
+  });
+});
+
+describe('Sprint 5 camera configuration', () => {
+  it('maxPolarAngle leaves at least 0.08 rad buffer from horizon', () => {
+    expect(CAMERA_MAX_POLAR_ANGLE).toBeLessThan(Math.PI / 2);
+    expect(Math.PI / 2 - CAMERA_MAX_POLAR_ANGLE).toBeGreaterThanOrEqual(0.08);
+  });
+
+  it('minPolarAngle prevents camera from going below ground plane', () => {
+    expect(CAMERA_MIN_POLAR_ANGLE).toBeGreaterThan(0);
+  });
+
+  it('camera Y floor guard is 0.5m', () => {
+    expect(CAMERA_FLOOR_Y).toBe(0.5);
+  });
+
+  it('right mouse button is ACTION.TRUCK (pan)', () => {
+    expect(CAMERA_MOUSE_RIGHT).toBe(2);
+  });
+
+  it('zoom range is 3–120', () => {
+    expect(CAMERA_MIN_DISTANCE).toBe(3);
+    expect(CAMERA_MAX_DISTANCE).toBe(120);
+  });
+});
+
+describe('debug mode', () => {
+  beforeEach(() => resetStore());
+
+  it('toggleDebugMode flips debugMode', () => {
+    const s = useStore.getState;
+    expect(s().debugMode).toBe(false);
+    s().toggleDebugMode();
+    expect(s().debugMode).toBe(true);
+    s().toggleDebugMode();
+    expect(s().debugMode).toBe(false);
+  });
+});
+
+describe('reset behavior', () => {
+  beforeEach(() => resetStore());
+
+  it('removing all containers leaves empty state', () => {
+    const s = useStore.getState;
+    s().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    s().addContainer(ContainerSize.Standard40, { x: 15, y: 0, z: 0 });
+    const ids = Object.keys(s().containers);
+    ids.forEach(id => s().removeContainer(id));
+    expect(Object.keys(s().containers).length).toBe(0);
+  });
+});
+
+describe('Ctrl+V multi-paste', () => {
+  beforeEach(() => resetStore());
+
+  it('pasteToSelection applies clipboard to all selected voxels', () => {
+    const s = useStore.getState;
+    const id = s().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    // Copy a voxel (captures its faces)
+    s().copyVoxel(id, 8);
+    const clip = s().clipboardVoxel!;
+    expect(clip).toBeDefined();
+    // Select multiple voxels
+    s().setSelectedVoxels({ containerId: id, indices: [10, 11, 12] });
+    // Paste to selection
+    s().pasteToSelection();
+    // Verify all targets have clipboard faces
+    const grid = s().containers[id].voxelGrid!;
+    for (const idx of [10, 11, 12]) {
+      expect(grid[idx].faces).toEqual(clip);
+    }
+  });
+
+  it('pasteToSelection does nothing without clipboard', () => {
+    const s = useStore.getState;
+    const id = s().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    const originalFaces = { ...s().containers[id].voxelGrid![10].faces };
+    s().setSelectedVoxels({ containerId: id, indices: [10] });
+    s().pasteToSelection(); // no clipboard set
+    expect(s().containers[id].voxelGrid![10].faces).toEqual(originalFaces);
+  });
+
+  it('pasteToSelection does nothing without selection', () => {
+    const s = useStore.getState;
+    const id = s().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    s().copyVoxel(id, 8);
+    // No selection set
+    s().pasteToSelection(); // should not throw
+    expect(s().selectedVoxels).toBeNull();
   });
 });
 

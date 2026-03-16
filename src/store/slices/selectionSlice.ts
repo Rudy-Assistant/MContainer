@@ -40,6 +40,7 @@ export interface SelectionSlice {
   clipboardVoxel: VoxelFaces | null;
   copyVoxel: (containerId: string, voxelIndex: number) => void;
   pasteVoxel: (containerId: string, voxelIndex: number) => void;
+  pasteToSelection: () => void;
   clearClipboard: () => void;
 
   // Overlapping edges (Spacebar cycling)
@@ -153,6 +154,26 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
         selectedVoxel: { containerId, index: voxelIndex },
+      };
+    });
+  },
+
+  pasteToSelection: () => {
+    const clip = get().clipboardVoxel;
+    if (!clip) return;
+    const sel = get().selectedVoxels;
+    if (!sel || sel.indices.length === 0) return;
+    set((s: any) => {
+      const c = s.containers[sel.containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      for (const idx of sel.indices) {
+        if (s.lockedVoxels[`${sel.containerId}_${idx}`]) continue;
+        const v = grid[idx];
+        if (v) grid[idx] = { ...v, active: true, faces: { ...clip } };
+      }
+      return {
+        containers: { ...s.containers, [sel.containerId]: { ...c, voxelGrid: grid } },
       };
     });
   },

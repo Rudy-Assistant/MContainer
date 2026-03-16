@@ -1548,7 +1548,12 @@ export default function ContainerSkin({
         useStore.getState().copyVoxel(hv.containerId, hvIndex);
       } else if (e.key === 'v') {
         e.preventDefault();
-        useStore.getState().pasteVoxel(hv.containerId, hvIndex);
+        const store = useStore.getState();
+        if (store.selectedVoxels && store.selectedVoxels.indices.length > 0) {
+          store.pasteToSelection();
+        } else {
+          store.pasteVoxel(hv.containerId, hvIndex);
+        }
       }
     };
     window.addEventListener('keydown', handleKey);

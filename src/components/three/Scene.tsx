@@ -20,6 +20,14 @@ import {
 import type CameraControlsImpl from "camera-controls";
 import { useStore } from "@/store/useStore";
 import { ViewMode, CONTAINER_DIMENSIONS, type Container } from "@/types/container";
+import {
+  CAMERA_MIN_POLAR_ANGLE,
+  CAMERA_MAX_POLAR_ANGLE,
+  CAMERA_MIN_DISTANCE,
+  CAMERA_MAX_DISTANCE,
+  CAMERA_FLOOR_Y,
+  CAMERA_MOUSE_RIGHT,
+} from "@/config/cameraConstants";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { findStackTarget, findEdgeSnap, checkOverlap, getFootprintAt, computePoolUnion } from "@/store/spatialEngine";
 import ContainerMesh from "./ContainerMesh";
@@ -792,15 +800,15 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
   useEffect(() => {
     const cc = cameraControlsRef.current;
     if (!cc) return;
-    cc.mouseButtons.right = 2; // ACTION.TRUCK = 2
+    cc.mouseButtons.right = CAMERA_MOUSE_RIGHT; // ACTION.TRUCK
   }, [cameraControlsRef]);
 
   useFrame(() => {
     const cc = cameraControlsRef.current;
     if (!cc) return;
     cc.getPosition(_floorGuardVec);
-    if (_floorGuardVec.y < 0.5) {
-      cc.setPosition(_floorGuardVec.x, 0.5, _floorGuardVec.z, false);
+    if (_floorGuardVec.y < CAMERA_FLOOR_Y) {
+      cc.setPosition(_floorGuardVec.x, CAMERA_FLOOR_Y, _floorGuardVec.z, false);
     }
   });
   return null;
@@ -1038,10 +1046,10 @@ function RealisticScene() {
         ref={cameraControlsRef}
         makeDefault
         enabled={!dragMovingId}
-        minPolarAngle={0.05}
-        maxPolarAngle={Math.PI / 2 - 0.08}
-        minDistance={3}
-        maxDistance={120}
+        minPolarAngle={CAMERA_MIN_POLAR_ANGLE}
+        maxPolarAngle={CAMERA_MAX_POLAR_ANGLE}
+        minDistance={CAMERA_MIN_DISTANCE}
+        maxDistance={CAMERA_MAX_DISTANCE}
         smoothTime={0.15}
         draggingSmoothTime={0.1}
       />
