@@ -660,6 +660,7 @@ function DesignModePanel() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ position: "relative" }}>
         <button
+          data-testid="btn-add-container"
           onClick={() => setSizeMenuOpen(!sizeMenuOpen)}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -682,6 +683,7 @@ function DesignModePanel() {
             {STRUCTURE_ITEMS.map((item) => (
               <button
                 key={item.size}
+                data-testid={`add-container-${item.size}`}
                 onClick={() => handleAdd(item.size)}
                 style={{
                   display: "block", width: "100%", padding: "8px 14px", textAlign: "left",

@@ -1290,8 +1290,8 @@ const moveInvalid = new THREE.MeshBasicMaterial({ color: "#c62828", transparent:
 const moveInvalidEdge = new THREE.MeshBasicMaterial({ color: "#c62828", transparent: true, opacity: 0.6, wireframe: true });
 const moveSnap = new THREE.MeshBasicMaterial({ color: "#1565c0", transparent: true, opacity: 0.3 });
 const moveSnapEdge = new THREE.MeshBasicMaterial({ color: "#42a5f5", transparent: true, opacity: 0.7, wireframe: true });
-const moveStack = new THREE.MeshBasicMaterial({ color: "#7b1fa2", transparent: true, opacity: 0.3 });
-const moveStackEdge = new THREE.MeshBasicMaterial({ color: "#ab47bc", transparent: true, opacity: 0.7, wireframe: true });
+const moveStack = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.4 });
+const moveStackEdge = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.7, wireframe: true });
 
 function DragMoveGhost() {
   const dragMovingId = useStore((s) => s.dragMovingId);

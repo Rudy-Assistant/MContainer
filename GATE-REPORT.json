@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T04:37:53.796Z",
+  "timestamp": "2026-03-16T04:49:13.988Z",
   "sprint": 8,
   "gates": [
     {
@@ -135,12 +135,22 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=805eef4d-8bae-45d1-822b-52be07729704"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=ca6be86f-81a0-4490-9553-cd155d919c51"
     },
     {
       "gate": "G21-leftDragMove",
       "status": "PASS",
       "msg": "drag-to-move API exists"
+    },
+    {
+      "gate": "G22-addContainerUI",
+      "status": "PASS",
+      "msg": "container added via UI: 2 → 3"
+    },
+    {
+      "gate": "G23-twoLevelHome",
+      "status": "PASS",
+      "msg": "Full workflow: Y=2.90, walk=true, exit=true, tod=true"
     },
     {
       "gate": "G19-defaultVisual",
@@ -153,7 +163,7 @@
       "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 30,
-  "passed": 30,
+  "total": 32,
+  "passed": 32,
   "failed": 0
 }

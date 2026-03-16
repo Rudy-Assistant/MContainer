@@ -24,6 +24,8 @@ const FEATURE_GATES = {
   'Visual Integrity':    ['G19-defaultVisual'],
   'Container Stacking':  ['G20-stackSnap'],
   'Drag-to-Move':        ['G21-leftDragMove'],
+  'Add Container UI':    ['G22-addContainerUI'],
+  'Two-Level Home':      ['G23-twoLevelHome'],
 };
 
 const UNGATED_FEATURES = [
