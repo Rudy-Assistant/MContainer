@@ -719,7 +719,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       if (!voxel) return {};
       const current = voxel.faces[face];
       const i = cycle.indexOf(current as SurfaceType);
-      const nextIdx = ((i >= 0 ? i : 0) + 1) % cycle.length;
+      const nextIdx = i < 0 ? 0 : (i + 1) % cycle.length;
       grid[voxelIndex] = {
         ...voxel,
         faces: { ...voxel.faces, [face]: cycle[nextIdx] },

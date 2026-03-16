@@ -1042,7 +1042,7 @@ export default function SmartHotbar() {
           deltaAccumRef.current += e.deltaY > 0 ? 1 : -1;
           const committedSurface = voxel.faces[edge.face];
           const baseIdx = cycle.indexOf(committedSurface as SurfaceType);
-          const previewIdx = ((baseIdx + deltaAccumRef.current) % cycle.length + cycle.length) % cycle.length;
+          const previewIdx = baseIdx < 0 ? 0 : ((baseIdx + deltaAccumRef.current) % cycle.length + cycle.length) % cycle.length;
           const nextSurface = cycle[previewIdx];
 
           store.setFacePreview({ containerId: edge.containerId, voxelIndex: edge.voxelIndex, face: edge.face, surface: nextSurface });

@@ -651,7 +651,7 @@ export default function WalkthroughControls() {
     const currentSurface = voxel.faces[face];
     const cycle = getCycleForFace(face);
     const currentIdx = cycle.indexOf(currentSurface as never);
-    const nextSurface = cycle[((currentIdx + delta) % cycle.length + cycle.length) % cycle.length];
+    const nextSurface = cycle[currentIdx < 0 ? 0 : ((currentIdx + delta) % cycle.length + cycle.length) % cycle.length];
     store.setVoxelFace(edge.containerId, edge.voxelIndex, face, nextSurface as never);
   }, []);
 

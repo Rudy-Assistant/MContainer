@@ -2167,7 +2167,7 @@ export default function ContainerSkin({
                 const current = voxel.faces[face];
                 const cycle = getCycleForFace(face);
                 const i = cycle.indexOf(current as SurfaceType);
-                store.setVoxelFace(container.id, idx, face, cycle[((i >= 0 ? i : 0) + dir + cycle.length) % cycle.length]);
+                store.setVoxelFace(container.id, idx, face, cycle[i < 0 ? 0 : ((i + dir) % cycle.length + cycle.length) % cycle.length]);
                 store.setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face });
               };
 
