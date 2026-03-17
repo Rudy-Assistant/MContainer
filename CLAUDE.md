@@ -176,16 +176,41 @@ Regressions that have occurred in past sprints. Check these specifically during 
 | Extension platforms/moats rendering | Extension top/bottom returned true from isExteriorFace | Extension top/bottom now return false | 10 |
 | Stale baselines cause visual gate failures | Scene changes without baseline recapture | Run `npm run baselines` after any visual change, commit PNGs | 8 |
 
-## Camera Safety Architecture
+## Camera Architecture
 
-The camera has 4 layers of defense (see `cameraConstants.ts` + `Scene.tsx:CameraFloorGuard`):
+Three mutually exclusive camera modes, switched by `viewMode` in store:
 
-1. **Position Y clamp**: camera.position.y >= CAMERA_FLOOR_Y (0.5m)
-2. **Target Y clamp**: orbit target.y >= CAMERA_TARGET_MIN_Y (0.3m)
-3. **Angle guard**: viewing angle <= CAMERA_MAX_DOWNWARD_ANGLE (70°) — raises target if too steep
-4. **XZ radius clamp**: target XZ radius <= CAMERA_TARGET_MAX_RADIUS (40m) — prevents TRUCK panning out of scene
-5. **NaN recovery**: stores last-known-good position/target, restores on NaN detection
+| Mode | Controller | Mount Location | Input |
+|------|-----------|----------------|-------|
+| **Realistic3D** (Design) | drei `<CameraControls>` (orbit) | `RealisticScene` | Left-drag=rotate, Right-drag=TRUCK pan, Scroll=dolly |
+| **Blueprint** | `<OrthographicCamera>` + auto-fit | `CameraController` | Top-down only |
+| **Walkthrough** (Walk) | drei `<PointerLockControls>` + WASD | `WalkthroughScene` | Mouse look, WASD move, Q/Z fly, Shift sprint |
+
+### Orbit Mode Helper Components (RealisticScene only)
+
+| Component | Purpose | Key Invariant |
+|-----------|---------|---------------|
+| `CameraTargetLerp` | Smoothly moves orbit target when selection changes | **Settle-and-release**: lerps toward new target, then stops. Does NOT continuously override — user can freely TRUCK/WASD after settling. |
+| `CameraBroadcast` | Saves/restores 3D camera across view switches; broadcasts angles to store ~10Hz | Uses `controlsRef` pattern (not ref prop) — safe during React unmount cleanup. |
+| `CameraFloorGuard` | NaN recovery + `__camDiag` diagnostic exposure | Pure safety net — no user-visible constraints. |
+| `KeyboardPanControls` | WASD=horizontal pan, Arrows=orbit rotate in 3D mode | Only mounted when `viewMode !== Walkthrough`. Uses camera-controls API (setPosition/setTarget), not direct mutation. |
+
+### Camera Safety Layers (cameraConstants.ts)
+
+1. **Polar angle clamp**: `minPolarAngle`/`maxPolarAngle` on `<CameraControls>` props — prevents ground/sky fill
+2. **Distance clamp**: `minDistance=3` / `maxDistance=60`
+3. **Target Y clamp**: `CAMERA_TARGET_MIN_Y=0.3` enforced in CameraTargetLerp
+4. **NaN recovery**: CameraFloorGuard stores last-known-good, restores on NaN detection
 
 Mouse buttons configured via `CAMERA_MOUSE_BUTTONS` prop (not imperative useEffect):
 - Left: ROTATE (1), Right: TRUCK (2), Middle: TRUCK (2), Wheel: DOLLY (16)
 - truckSpeed: 0.5 (reduced from default 2.0)
+
+### Anti-Patterns (Camera-Specific)
+
+| Pattern | Why Broken | Correct Approach |
+|---------|-----------|-----------------|
+| `CameraTargetLerp` calling `setTarget()` every frame | Fights TRUCK/WASD — user can't pan | Settle-and-release: stop after reaching target |
+| Ref props for camera components | React 19 nulls refs during unmount → TypeError crashes canvas | `useThree().controls` + `controlsRef = useRef(controls)` pattern |
+| `boundaryEnclosesCamera = true` | Over-constrains TRUCK — camera position locked in box | Removed. Polar angle + distance constraints are sufficient |
+| Direct `camera.position` mutation in orbit mode | camera-controls overwrites from internal state next frame | Use `cc.setPosition()` / `cc.setTarget()` API |

@@ -135,6 +135,16 @@ Grass: solid color `#4a6630` + procedural displacement (no texture tiling). Othe
 
 Built on drei `<PointerLockControls>`. Adds: voxel-granular wall collision, floor detection with stair support, auto-tour (interior + exterior waypoints), smart spawn, door toggling, camera save/restore, fly mode. **Not a candidate for replacement.**
 
+### Camera System (Scene.tsx)
+
+Three mutually exclusive modes switched by `viewMode`. CameraControls (orbit) is only mounted in RealisticScene; PointerLockControls only in WalkthroughScene.
+
+**CameraTargetLerp** uses a "settle-and-release" pattern: when selection or containers change, it lerps the orbit target smoothly toward the new center, then **stops calling setTarget()** once within 1cm. This is critical — without settling, every frame would override the user's TRUCK pan, making right-click and WASD feel locked.
+
+**CameraBroadcast** saves/restores 3D camera position across view mode switches (Design ↔ Walk ↔ Blueprint). Uses `controlsRef = useRef(controls)` pattern so cleanup closures always access the latest camera-controls instance (React 19 nulls ref objects during unmount).
+
+**CameraFloorGuard** is a pure safety net: NaN recovery + diagnostic exposure via `window.__camDiag`.
+
 ---
 
 ## §4 Voxel Data Model
