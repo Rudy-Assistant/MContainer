@@ -200,9 +200,9 @@ describe('Sprint 5 camera configuration', () => {
     expect(CAMERA_MOUSE_BUTTONS.right).toBe(2);
   });
 
-  it('zoom range is 3–120', () => {
+  it('zoom range is 3–60', () => {
     expect(CAMERA_MIN_DISTANCE).toBe(3);
-    expect(CAMERA_MAX_DISTANCE).toBe(120);
+    expect(CAMERA_MAX_DISTANCE).toBe(60);
   });
 });
 

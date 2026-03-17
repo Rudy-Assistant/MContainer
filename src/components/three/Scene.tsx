@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { setExportScene } from "@/utils/exportGLB";
@@ -25,12 +25,7 @@ import {
   CAMERA_MAX_POLAR_ANGLE,
   CAMERA_MIN_DISTANCE,
   CAMERA_MAX_DISTANCE,
-  CAMERA_FLOOR_Y,
   CAMERA_TARGET_MIN_Y,
-  CAMERA_TARGET_MAX_Y,
-  CAMERA_MAX_Y,
-  CAMERA_MAX_DOWNWARD_ANGLE,
-  CAMERA_TARGET_MAX_RADIUS,
   CAMERA_MOUSE_BUTTONS,
 } from "@/config/cameraConstants";
 import { createDefaultVoxelGrid } from "@/types/factories";
@@ -292,7 +287,20 @@ function DimensionLabels() {
 // Loads PBR textures once and applies to cached theme materials.
 // Must be inside <Canvas> tree for useThree/invalidate access.
 
-function TimeOfDayEnvironment({ intensity = 0.4 }: { intensity?: number }) {
+// ── Time-of-Day HDRI Environment ─────────────────────────────
+// drei's <Environment preset="..."> uses useLoader internally, which SUSPENDS
+// until the HDRI file loads from a CDN (polyhaven via drei's preset system).
+//
+// CRITICAL: This must be wrapped in its OWN <Suspense> boundary.
+// Without it, a slow/failed HDRI fetch blocks the ENTIRE scene tree
+// (because SceneCanvas wraps <Scene> in <Suspense fallback={null}>).
+// The user sees a blank canvas (blue/grey) until the HDRI loads.
+//
+// With its own Suspense, the scene renders immediately with the Sky dome
+// and all geometry, and the HDRI environment map loads asynchronously.
+// Reflections appear once loaded — this is an acceptable progressive enhancement.
+
+function TimeOfDayEnvironmentInner({ intensity = 0.4 }: { intensity?: number }) {
   const timeOfDay = useStore((s) => s.environment.timeOfDay);
   const envPreset = useMemo(() => {
     if (timeOfDay >= 17 && timeOfDay <= 20) return 'sunset' as const;
@@ -302,6 +310,14 @@ function TimeOfDayEnvironment({ intensity = 0.4 }: { intensity?: number }) {
   }, [timeOfDay]);
 
   return <Environment preset={envPreset} background={false} environmentIntensity={intensity} />;
+}
+
+function TimeOfDayEnvironment({ intensity = 0.4 }: { intensity?: number }) {
+  return (
+    <Suspense fallback={null}>
+      <TimeOfDayEnvironmentInner intensity={intensity} />
+    </Suspense>
+  );
 }
 
 function PBRTextureLoader() {
@@ -375,11 +391,16 @@ export function getSkyParams(timeOfDay: number) {
 }
 
 // ── Sky Dome ────────────────────────────────────────────────
-// WHY imperative scene.background instead of <color attach="background">:
-// R3F's attach lifecycle detaches the old Color (scene.background = null) before
-// attaching the new one on re-render. During that gap the renderer shows clearColor,
-// producing a visible blue flicker on every parent re-render. Setting scene.background
-// directly during render (idempotent, no detach cycle) prevents this entirely.
+// scene.background is a flat color fallback behind the Sky mesh sphere.
+// It fills any gaps the Sky mesh doesn't cover (e.g. near the horizon).
+//
+// Set IMPERATIVELY (not via <color attach="background">) because R3F's
+// attach lifecycle nulls scene.background between re-renders (detach old
+// → attach new). The imperative assignment is idempotent and gap-free.
+//
+// The blue sky IS expected when the camera looks upward. Camera bounds
+// (cameraConstants.ts + CameraFloorGuard) are the defense against
+// excessive sky visibility — not rendering hacks.
 
 const _skyBgColor = new THREE.Color();
 
@@ -398,8 +419,6 @@ function SkyDome() {
         : 0x5b8fbf;
 
   // Set scene.background synchronously during render — idempotent, no attach/detach.
-  // Must be synchronous (not useEffect) so the background is correct on the SAME frame
-  // that changes timeOfDay, avoiding even a single stale-color frame.
   _skyBgColor.set(bgHex);
   scene.background = _skyBgColor;
 
@@ -733,8 +752,10 @@ function KeyboardPanControls() {
     const controls = state.controls as any;
     const hasCC = controls && typeof controls.getPosition === 'function';
 
-    // WASD = Pan/Fly relative to camera facing
-    let dx = 0, dz = 0, dy = 0;
+    // WASD = Horizontal pan relative to camera facing direction.
+    // Vertical fly (R/F) removed: conflicts with Rotate and Walkthrough toggle.
+    // Use right-click TRUCK drag for vertical panning instead.
+    let dx = 0, dz = 0;
     const panSpeed = 15;
     camera.getWorldDirection(forwardVec);
     forwardVec.y = 0;
@@ -749,21 +770,17 @@ function KeyboardPanControls() {
     const len = Math.sqrt(mx * mx + mz * mz);
     if (len > 0.001) { dx = (mx / len) * panSpeed * dt; dz = (mz / len) * panSpeed * dt; }
 
-    // R/F = Fly up/down (avoids Ctrl+Z conflict on KeyZ)
-    if (panKeys["KeyR"]) dy += panSpeed * dt;
-    if (panKeys["KeyF"]) dy -= panSpeed * dt;
-
-    if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001 || Math.abs(dy) > 0.001) {
+    if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
       if (hasCC) {
         // Move via CameraControls API so internal state stays in sync
         const pos = _v3A;
         const tgt = _v3B;
         controls.getPosition(pos);
         controls.getTarget(tgt);
-        controls.setPosition(pos.x + dx, pos.y + dy, pos.z + dz, false);
-        controls.setTarget(tgt.x + dx, tgt.y + dy, tgt.z + dz, false);
+        controls.setPosition(pos.x + dx, pos.y, pos.z + dz, false);
+        controls.setTarget(tgt.x + dx, tgt.y, tgt.z + dz, false);
       } else {
-        _v3A.set(dx, dy, dz);
+        _v3A.set(dx, 0, dz);
         camera.position.add(_v3A);
       }
     }
@@ -786,84 +803,92 @@ function KeyboardPanControls() {
   return null;
 }
 
-/**
- * CameraTargetLerp — Smoothly glides the orbit pivot to a desired target position.
- *
- * @remarks
- * IMPORTANT: _lerpTarget.y is clamped to >= 0 before applying to prevent the camera
- * from looking through the ground plane ("blue screen" bug). If this clamp is removed,
- * panning or switching selections can move the orbit target below ground, causing the
- * camera to see only sky color from underneath.
- *
- * Frozen during container drag (dragMovingId) and camera restore (cameraRestoring).
- *
- * @see CameraFloorGuard for position Y and target Y clamping
- */
+// (CameraBoundarySetup removed — setBoundary + boundaryEnclosesCamera over-constrained
+// TRUCK panning, making right-click feel locked. Polar angle constraints on <CameraControls>
+// props + CameraFloorGuard NaN recovery are sufficient.)
+
 // WHY: module-level vectors avoid per-frame allocation (reused across all frames)
 const _lerpTarget = new THREE.Vector3(0, 1.5, 0);
 const _desiredTarget = new THREE.Vector3(0, 1.5, 0);
+const _prevDesired = new THREE.Vector3(Infinity, Infinity, Infinity);
+
+/**
+ * CameraTargetLerp — smoothly moves the orbit target when selection/containers change.
+ *
+ * CRITICAL DESIGN: Only actively lerps for a short settling period after `desired` changes.
+ * Once the lerp target is close enough to the desired position, it STOPS calling setTarget().
+ * This allows the user to freely TRUCK (right-drag pan) and WASD without the orbit target
+ * being yanked back to the container center every frame.
+ *
+ * Without this settling behavior, every frame would override the user's TRUCK pan position,
+ * making right-click feel "locked" and WASD useless in orbit mode.
+ */
+const LERP_SETTLE_THRESHOLD = 0.01; // Stop lerping when within 1cm of target
 
 function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
   const { controls } = useThree();
   const dragMovingId = useStore((s) => s.dragMovingId);
-  // Keep _desiredTarget in sync with prop every frame
+  const isSettled = useRef(false);
+
+  // Detect when desired target actually changes → restart lerp
   _desiredTarget.set(...desired);
+  if (_desiredTarget.distanceToSquared(_prevDesired) > 0.0001) {
+    _prevDesired.copy(_desiredTarget);
+    isSettled.current = false;
+    // Seed _lerpTarget from current camera target so lerp starts from where user is
+    const ctrl = controls as any;
+    if (ctrl && typeof ctrl.getTarget === 'function') {
+      ctrl.getTarget(_lerpTarget);
+    }
+  }
 
   useFrame((_, delta) => {
     if (!controls || dragMovingId) return; // freeze lerp during container drag
+    if (isSettled.current) return; // already settled — don't fight user TRUCK/WASD
     // WU-6: Skip lerp while 3D camera is being restored (prevents "spring" fight with CameraBroadcast)
     if (useStore.getState().cameraRestoring) return;
     const ctrl = controls as any;
-    if (!ctrl.target) return;
+    // CRITICAL: Use setTarget() API, NOT direct ctrl.target.copy().
+    // Direct target mutation bypasses camera-controls' polar angle and boundary
+    // constraints, causing the viewing angle to escape maxPolarAngle → sky fills viewport.
+    if (typeof ctrl.setTarget !== 'function') return;
     // Exponential decay lerp — ~7× per second half-life feels like smooth glide
     _lerpTarget.lerp(_desiredTarget, 1 - Math.pow(0.001, delta));
-    // Clamp target Y to prevent looking through ground
+    // Clamp target Y to prevent looking through ground (defense in depth)
     if (_lerpTarget.y < CAMERA_TARGET_MIN_Y) _lerpTarget.y = CAMERA_TARGET_MIN_Y;
-    ctrl.target.copy(_lerpTarget);
-    ctrl.update();
+    // setTarget(x, y, z, enableTransition) — false = immediate, no smoothing.
+    // camera-controls will internally enforce polar angle and boundary constraints.
+    ctrl.setTarget(_lerpTarget.x, _lerpTarget.y, _lerpTarget.z, false);
+
+    // Check if settled — stop lerping so user can pan freely
+    if (_lerpTarget.distanceToSquared(_desiredTarget) < LERP_SETTLE_THRESHOLD * LERP_SETTLE_THRESHOLD) {
+      isSettled.current = true;
+    }
   });
   return null;
 }
 
 /**
- * CameraFloorGuard — Prevents camera position and orbit target from going below ground.
- *
- * @remarks
- * PROTECTED SYSTEM — this is the primary defense against the "blue screen" bug.
- * Four things are clamped every frame:
- * 1. Camera position Y >= CAMERA_FLOOR_Y (0.5m) — prevents camera inside ground
- * 2. Orbit target Y >= CAMERA_TARGET_MIN_Y (0.3m) — prevents looking through ground
- * 3. Viewing angle <= CAMERA_MAX_DOWNWARD_ANGLE (70°) — prevents ground-filling viewport
- * 4. CameraTargetLerp also clamps its own lerp target (defense in depth)
- *
- * Also sets mouseButtons on mount:
- * - right = TRUCK (pan, not orbit) — prevents orbit below ground
- * - middle = TRUCK (pan)
- *
- * @see CameraTargetLerp for the lerp-side Y clamp
- * @see cameraConstants.ts for CAMERA_FLOOR_Y, CAMERA_MOUSE_RIGHT values
+ * CameraFloorGuard — NaN recovery + diagnostics.
+ * Uses useThree().controls (not a ref prop) so it cannot crash on unmount.
+ * Polar angle / distance constraints are on <CameraControls> props directly.
  */
 const _floorGuardVec = new THREE.Vector3();
 const _targetGuardVec = new THREE.Vector3();
 
-function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefObject<CameraControlsImpl | null> }) {
-
-  // WHY: Store last known-good position/target to recover from NaN.
-  // camera-controls TRUCK mode produces NaN on right-drag in some browsers/SwiftShader.
-  // NaN < 0.5 === false in JS, so simple clamp doesn't catch it.
+function CameraFloorGuard() {
+  const { controls } = useThree();
   const _lastGoodPos = useRef(new THREE.Vector3(14, 5, 14));
   const _lastGoodTarget = useRef(new THREE.Vector3(0, 1.5, 0));
   const _diagFrameCount = useRef(0);
 
   useFrame(() => {
-    const cc = cameraControlsRef.current;
-    if (!cc) return;
+    const cc = controls as any;
+    if (!cc || typeof cc.getPosition !== 'function') return;
 
-    // Read current position and target
     cc.getPosition(_floorGuardVec);
     cc.getTarget(_targetGuardVec);
 
-    // NaN recovery: if position or target becomes NaN, restore last known-good values
     const posNaN = isNaN(_floorGuardVec.x) || isNaN(_floorGuardVec.y) || isNaN(_floorGuardVec.z);
     const targetNaN = isNaN(_targetGuardVec.x) || isNaN(_targetGuardVec.y) || isNaN(_targetGuardVec.z);
 
@@ -874,60 +899,6 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
       cc.getTarget(_targetGuardVec);
     }
 
-    // Clamp camera position Y (floor and ceiling)
-    if (_floorGuardVec.y < CAMERA_FLOOR_Y) {
-      cc.setPosition(_floorGuardVec.x, CAMERA_FLOOR_Y, _floorGuardVec.z, false);
-      cc.getPosition(_floorGuardVec);
-    }
-    if (_floorGuardVec.y > CAMERA_MAX_Y) {
-      cc.setPosition(_floorGuardVec.x, CAMERA_MAX_Y, _floorGuardVec.z, false);
-      cc.getPosition(_floorGuardVec);
-    }
-    // Clamp orbit target Y (floor and ceiling)
-    if (_targetGuardVec.y < CAMERA_TARGET_MIN_Y) {
-      cc.setTarget(_targetGuardVec.x, CAMERA_TARGET_MIN_Y, _targetGuardVec.z, false);
-      cc.getTarget(_targetGuardVec);
-    }
-    if (_targetGuardVec.y > CAMERA_TARGET_MAX_Y) {
-      cc.setTarget(_targetGuardVec.x, CAMERA_TARGET_MAX_Y, _targetGuardVec.z, false);
-      cc.getTarget(_targetGuardVec);
-    }
-
-    // Angle guard: prevent ground-filling viewport after TRUCK.
-    // If the camera→target vector is too steep downward, raise the target Y
-    // so the viewing angle stays within CAMERA_MAX_DOWNWARD_ANGLE (~70°).
-    const dy = _floorGuardVec.y - _targetGuardVec.y;
-    if (dy > 0) {
-      const dx = _floorGuardVec.x - _targetGuardVec.x;
-      const dz = _floorGuardVec.z - _targetGuardVec.z;
-      const horizDist = Math.sqrt(dx * dx + dz * dz);
-      const downAngle = Math.atan2(dy, horizDist);
-      if (downAngle > CAMERA_MAX_DOWNWARD_ANGLE) {
-        // Raise target Y so angle equals max
-        const newDy = horizDist * Math.tan(CAMERA_MAX_DOWNWARD_ANGLE);
-        const newTargetY = Math.max(_floorGuardVec.y - newDy, CAMERA_TARGET_MIN_Y);
-        cc.setTarget(_targetGuardVec.x, newTargetY, _targetGuardVec.z, false);
-        cc.getTarget(_targetGuardVec);
-      }
-    }
-
-    // XZ radius clamp: prevent TRUCK from panning camera out of sight of the scene.
-    // If target drifts too far from origin, clamp it back to the max radius.
-    const targetR = Math.sqrt(_targetGuardVec.x * _targetGuardVec.x + _targetGuardVec.z * _targetGuardVec.z);
-    if (targetR > CAMERA_TARGET_MAX_RADIUS) {
-      const scale = CAMERA_TARGET_MAX_RADIUS / targetR;
-      const clampedX = _targetGuardVec.x * scale;
-      const clampedZ = _targetGuardVec.z * scale;
-      // Move both target and position by the same offset to preserve viewing angle
-      const offsetX = clampedX - _targetGuardVec.x;
-      const offsetZ = clampedZ - _targetGuardVec.z;
-      cc.setTarget(clampedX, _targetGuardVec.y, clampedZ, false);
-      cc.setPosition(_floorGuardVec.x + offsetX, _floorGuardVec.y, _floorGuardVec.z + offsetZ, false);
-      cc.getPosition(_floorGuardVec);
-      cc.getTarget(_targetGuardVec);
-    }
-
-    // Store known-good values for NaN recovery
     if (!isNaN(_floorGuardVec.y)) _lastGoodPos.current.copy(_floorGuardVec);
     if (!isNaN(_targetGuardVec.y)) _lastGoodTarget.current.copy(_targetGuardVec);
 
@@ -936,8 +907,8 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
       (window as any).__camDiag = {
         posY: _floorGuardVec.y.toFixed(3),
         targetY: _targetGuardVec.y.toFixed(3),
-        polarAngle: (cc as any).polarAngle?.toFixed(3),
-        azimuthAngle: (cc as any).azimuthAngle?.toFixed(3),
+        polarAngle: cc.polarAngle?.toFixed(3),
+        azimuthAngle: cc.azimuthAngle?.toFixed(3),
       };
     }
   });
@@ -945,7 +916,20 @@ function CameraFloorGuard({ cameraControlsRef }: { cameraControlsRef: React.RefO
 }
 
 // ── Camera Angle Broadcast + 3D Camera Persistence ─────────
+// CameraBroadcast:
+//   1. Saves/restores 3D camera position across view mode switches (3D ↔ FP)
+//   2. Broadcasts spherical angles to store (~10Hz) for UI
+//
+// Uses useThree().controls (not a ref prop) — safe during unmount cleanup
+// because useThree values are captured at render time, not via a ref that
+// may already be nulled when cleanup runs.
+//
+// INVARIANT: Use camera-controls API (setTarget/setPosition/getTarget) for
+// writes. Direct mutation of controls.target bypasses internal polar angle
+// and smoothing state. Do NOT call controls.update() — drei manages that.
+
 const _sphericalBroadcast = new THREE.Spherical();
+const _broadcastTarget = new THREE.Vector3();
 
 function CameraBroadcast() {
   const { camera, controls } = useThree();
@@ -954,50 +938,56 @@ function CameraBroadcast() {
   const saveCamera3D = useStore((s) => s.saveCamera3D);
   const savedCamera3D = useStore((s) => s.savedCamera3D);
 
-  // Restore saved camera position on mount (after view mode switch)
-  useLayoutEffect(() => {
+  // Track latest controls value so cleanup closures always access the
+  // current camera-controls instance, not a stale value from initial render.
+  // (useThree().controls changes after CameraControls sets makeDefault.)
+  const controlsRef = useRef(controls);
+  controlsRef.current = controls;
+
+  // Restore saved 3D camera on mount (returning from FP/Blueprint).
+  // Deferred 1 frame so CameraControls has set makeDefault and populated
+  // the R3F controls store.
+  useEffect(() => {
     if (!savedCamera3D) return;
-    // WU-6: Set restore-lock so CameraTargetLerp won't fight the restoration
-    useStore.getState().setCameraRestoring(true);
-    camera.position.set(...savedCamera3D.position);
-    const controls = (camera as any).__r3f?.controls;
-    if (controls?.target) {
-      controls.target.set(...savedCamera3D.target);
-      controls.update?.();
-    }
-    // Release lock after lerp would have settled (~600ms)
-    const timer = setTimeout(() => useStore.getState().setCameraRestoring(false), 600);
+    const timer = setTimeout(() => {
+      const cc = controlsRef.current as any;
+      if (!cc || typeof cc.setPosition !== 'function') return;
+      useStore.getState().setCameraRestoring(true);
+      const [px, py, pz] = savedCamera3D.position;
+      const [tx, ty, tz] = savedCamera3D.target;
+      cc.setPosition(px, py, pz, false);
+      cc.setTarget(tx, ty, tz, false);
+      setTimeout(() => useStore.getState().setCameraRestoring(false), 600);
+    }, 0);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount only
 
-  // Save camera state on unmount (before view mode switch)
+  // Save camera on unmount (before switching to FP/Blueprint).
+  // controlsRef.current gives the latest camera-controls instance.
   useEffect(() => {
     return () => {
-      const controls = (camera as any).__r3f?.controls;
-      const target = controls?.target ?? new THREE.Vector3(0, 1.5, 0);
-      saveCamera3D(
-        camera.position.toArray() as [number, number, number],
-        [target.x, target.y, target.z]
-      );
+      const cc = controlsRef.current as any;
+      const pos = camera.position.toArray() as [number, number, number];
+      if (cc && typeof cc.getTarget === 'function') {
+        cc.getTarget(_broadcastTarget);
+        saveCamera3D(pos, [_broadcastTarget.x, _broadcastTarget.y, _broadcastTarget.z]);
+      } else {
+        saveCamera3D(pos, [0, 1.5, 0]);
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // cleanup only
 
   useFrame(() => {
-    // Unconditionally enforce upright camera every frame — prevents quaternion roll drift.
-    // Then force OrbitControls to re-derive spherical coords from corrected up vector.
-    camera.up.set(0, 1, 0);
-    (controls as any)?.update?.();
-    // Throttle to ~10 updates/sec at 60fps
     if (++frameCount.current % 6 !== 0) return;
-    _v3A.set(0, 0, 0);
-    // Use OrbitControls target if available (default controls store it)
-    const orbitCtrl = (camera as any).__r3f?.controls;
-    if (orbitCtrl?.target) {
-      _v3A.copy(orbitCtrl.target);
+    const cc = controlsRef.current as any;
+    if (cc && typeof cc.getTarget === 'function') {
+      cc.getTarget(_broadcastTarget);
+    } else {
+      _broadcastTarget.set(0, 0, 0);
     }
-    _v3B.copy(camera.position).sub(_v3A);
+    _v3B.copy(camera.position).sub(_broadcastTarget);
     _sphericalBroadcast.setFromVector3(_v3B);
     setCameraAngles(_sphericalBroadcast.theta, _sphericalBroadcast.phi);
   });
@@ -1147,13 +1137,18 @@ function RealisticScene() {
       />
 
       {/* Atmospheric clouds */}
-      <Clouds material={THREE.MeshBasicMaterial}>
-        <Cloud position={[-20, 22, -40]} speed={0.2} opacity={0.5} bounds={[20, 3, 8]} segments={20} />
-        <Cloud position={[30, 25, -60]} speed={0.15} opacity={0.4} bounds={[15, 2, 6]} segments={15} />
-        <Cloud position={[10, 28, -80]} speed={0.1} opacity={0.35} bounds={[25, 4, 10]} segments={18} />
-        <Cloud position={[-40, 24, -50]} speed={0.12} opacity={0.35} bounds={[18, 3, 7]} segments={16} />
-        <Cloud position={[50, 26, -70]} speed={0.18} opacity={0.3} bounds={[22, 3, 9]} segments={17} />
-      </Clouds>
+      {/* Atmospheric clouds — wrapped in Suspense because drei's Cloud
+           uses useTexture internally which suspends until the cloud texture loads.
+           Without this wrapper, slow texture fetch blocks the entire scene. */}
+      <Suspense fallback={null}>
+        <Clouds material={THREE.MeshBasicMaterial}>
+          <Cloud position={[-20, 22, -40]} speed={0.2} opacity={0.5} bounds={[20, 3, 8]} segments={20} />
+          <Cloud position={[30, 25, -60]} speed={0.15} opacity={0.4} bounds={[15, 2, 6]} segments={15} />
+          <Cloud position={[10, 28, -80]} speed={0.1} opacity={0.35} bounds={[25, 4, 10]} segments={18} />
+          <Cloud position={[-40, 24, -50]} speed={0.12} opacity={0.35} bounds={[18, 3, 7]} segments={16} />
+          <Cloud position={[50, 26, -70]} speed={0.18} opacity={0.3} bounds={[22, 3, 9]} segments={17} />
+        </Clouds>
+      </Suspense>
 
       {/* Active level containers — 100% opacity, fully interactive */}
       {activeContainers.map((container) => (
@@ -1176,7 +1171,11 @@ function RealisticScene() {
 
       <DragMoveGhost />
 
-      {/* CameraControls: smooth transitions, BVH-friendly, programmatic target control */}
+      {/* ── Camera System ─────────────────────────────────────
+           minPolarAngle/maxPolarAngle on <CameraControls> prevent sky/ground fill.
+           CameraTargetLerp smoothly moves orbit target toward selected container.
+           CameraBroadcast saves/restores camera across view mode switches.
+           CameraFloorGuard handles NaN recovery + exposes __camDiag for tests. */}
       <CameraControls
         ref={cameraControlsRef}
         makeDefault
@@ -1190,13 +1189,9 @@ function RealisticScene() {
         mouseButtons={CAMERA_MOUSE_BUTTONS}
         truckSpeed={0.5}
       />
-      <CameraFloorGuard cameraControlsRef={cameraControlsRef} />
-
-      {/* Smooth camera orbit pivot lerp — glides target to desired position */}
       <CameraTargetLerp desired={orbitTarget} />
-
-      {/* Broadcast camera orientation to store for IsoEditor sync */}
       <CameraBroadcast />
+      <CameraFloorGuard />
 
       {/* Click empty space to deselect (transparent but raycastable) */}
       <mesh

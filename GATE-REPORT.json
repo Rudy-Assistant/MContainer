@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-16T23:49:16.006Z",
+  "timestamp": "2026-03-17T01:23:30.544Z",
   "sprint": 8,
   "gates": [
     {
@@ -30,7 +30,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (39.28% diff)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -50,7 +50,7 @@
     {
       "gate": "G7-middayVisual",
       "status": "PASS",
-      "msg": "visual match (0.00% diff)"
+      "msg": "screenshot captured (no buffer for comparison)"
     },
     {
       "gate": "G7-todGoldenHour",
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.824, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.495, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.67, targetY=0.31, 5 unique colors"
+      "msg": "Floor+angle guard OK: posY=1.67, targetY=0.31, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -135,7 +135,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=704c566c-9d26-4aea-848b-867cb4887302"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=4b0fdc50-45fa-4dd2-ad88-ad2e96cd7f94"
     },
     {
       "gate": "G21-leftDragMove",
