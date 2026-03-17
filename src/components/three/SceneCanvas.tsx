@@ -95,6 +95,8 @@ export default function SceneCanvas() {
           s.setFaceContext(null);
           s.setSelectedFace(null);
           s.setSelectedVoxel(null);
+          s.setSelectedVoxels(null);
+          s.setFacePreview(null);
           document.body.style.cursor = 'auto';
         }}
         onContextMenu={(e) => e.preventDefault()}

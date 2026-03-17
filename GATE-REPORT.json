@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-17T13:39:07.410Z",
+  "timestamp": "2026-03-17T15:44:21.320Z",
   "sprint": 13,
   "gates": [
     {
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.856, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.860, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -135,7 +135,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=54f5218c-2db4-464f-b9b9-038923e5f5f7"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=511aa44b-ab91-449c-8f97-5b9f0e8bfdad"
     },
     {
       "gate": "G21-leftDragMove",

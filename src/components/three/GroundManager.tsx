@@ -131,7 +131,7 @@ function TexturedGround({ presetId }: { presetId: GroundPresetId }) {
         roughness={1.0}
         metalness={0}
         envMapIntensity={preset.envMapIntensity}
-        color={0xffffff}
+        color={preset.tint ?? 0xffffff}
         displacementMap={_displacementTex}
         displacementScale={preset.displacementScale}
         displacementBias={-preset.displacementScale * 0.3}

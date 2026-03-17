@@ -530,13 +530,13 @@ function SidebarBOMFooter() {
 // ═══════════════════════════════════════════════════════════
 
 function DesignModePanel() {
-  const addContainer = useStore((s) => s.addContainer);
-  const setAllExtensions = useStore((s) => s.setAllExtensions);
+  const setDragContainer = useStore((s) => s.setDragContainer);
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
 
+  // Click-to-equip: clicking a size starts ghost placement (Sims pattern)
+  // The ghost follows the cursor, click to place at the target location
   const handleAdd = (size: ContainerSize) => {
-    const id = addContainer(size, { x: 0, y: 0, z: 0 });
-    setAllExtensions(id, 'all_deck', false);
+    setDragContainer(size);
     setSizeMenuOpen(false);
   };
 
@@ -661,9 +661,9 @@ export default function Sidebar() {
         <button
           onClick={() => {
             const store = useStore.getState();
-            store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+            store.setDragContainer(ContainerSize.HighCube40);
           }}
-          title="Add 40' High Cube"
+          title="Place 40' High Cube (click to position)"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 32, height: 32, borderRadius: 6,

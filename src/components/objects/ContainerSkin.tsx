@@ -1468,7 +1468,7 @@ export default function ContainerSkin({
   const viewMode             = useStore((s) => s.viewMode);
   const isWalkthrough        = viewMode === ViewMode.Walkthrough;
   const isPreviewMode        = useStore((s) => s.isPreviewMode);
-  const facePreview          = useStore((s) => s.facePreview); // WU-3: in-place face preview (hover + scroll)
+  // facePreview hover removed (Sprint 15) — no longer swaps materials on hover
 
   // Sync module-scope material aliases whenever theme changes
   syncThemeMats(currentTheme);
@@ -1882,12 +1882,7 @@ export default function ContainerSkin({
         // Build face nodes — hitbox rendering is CONTEXTUAL (Phase 5):
         // Open faces only get hitboxes when this voxel is selected.
         const faceNodes = FACE_DIRS.map((dir) => {
-          // WU-3: Apply face-preview override if this face is being previewed (hover or scroll)
-          const previewSurface = (facePreview?.containerId === container.id
-            && facePreview?.voxelIndex === idx
-            && facePreview?.face === dir)
-            ? facePreview.surface : null;
-          const surface = previewSurface ?? voxel.faces[dir];
+          const surface = voxel.faces[dir];
 
           // ★ Phase 15: Intelligent face melting — replaces dual adjIsActive + railing bypass.
           // Culls internal walls when surfaces are semantically compatible (same type, railings, or solids).

@@ -383,10 +383,10 @@ export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
   return {
-    rayleigh: deepTwilight ? 4 : goldenHour ? 2.5 : 2.0,
-    turbidity: deepTwilight ? 15 : goldenHour ? 6 : 2.5,
-    mieCoefficient: goldenHour ? 0.008 : 0.005,
-    mieDirectionalG: goldenHour ? 0.95 : 0.87,
+    rayleigh: deepTwilight ? 4 : goldenHour ? 2.5 : 2.5,     // 2.5 midday = richer blue
+    turbidity: deepTwilight ? 15 : goldenHour ? 6 : 1.8,    // 1.8 = clearer atmosphere
+    mieCoefficient: goldenHour ? 0.008 : 0.003,              // 0.003 = less haze
+    mieDirectionalG: goldenHour ? 0.95 : 0.85,
   };
 }
 
@@ -668,7 +668,9 @@ function useKeyboardShortcuts() {
 
       // Escape = Deselect / cancel drag
       if (e.code === "Escape") {
-        if (store.dragMovingId) {
+        if (store.dragContainer) {
+          store.setDragContainer(null);
+        } else if (store.dragMovingId) {
           store.cancelContainerDrag();
         } else {
           store.clearSelection();
@@ -695,7 +697,28 @@ function useKeyboardShortcuts() {
       }
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    // Ctrl+Scroll = level switching (Sims 4 pattern)
+    const wheelHandler = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const store = useStore.getState();
+      const maxLvl = Math.max(2, ...Object.values(store.containers).map((c: any) => c.level));
+      const cur = store.viewLevel;
+      if (e.deltaY < 0) {
+        // Scroll up = go up a level
+        if (cur !== null) store.setViewLevel(cur >= maxLvl ? null : cur + 1);
+      } else {
+        // Scroll down = go down a level
+        store.setViewLevel(cur === null ? maxLvl : Math.max(-1, cur - 1));
+      }
+    };
+    window.addEventListener("wheel", wheelHandler, { passive: false });
+
+    return () => {
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("wheel", wheelHandler);
+    };
   }, []);
 }
 

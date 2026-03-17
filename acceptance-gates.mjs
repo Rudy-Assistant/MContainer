@@ -612,10 +612,19 @@ async function run() {
     if (await addBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await addBtn.click();
       await page.waitForTimeout(300);
-      // Click first dropdown option (40ft HC)
+      // Click first dropdown option — now triggers ghost placement (Sprint 15)
       const firstOption = page.locator('[data-testid^="add-container-"]').first();
       if (await firstOption.isVisible({ timeout: 1000 }).catch(() => false)) {
         await firstOption.click();
+        await page.waitForTimeout(300);
+        // Ghost is now active — complete placement via store (headless has no real pointer)
+        await page.evaluate(() => {
+          const s = window.__store.getState();
+          if (s.dragContainer) {
+            s.addContainer(s.dragContainer, { x: 0, y: 0, z: 0 });
+            s.setDragContainer(null);
+          }
+        });
         await page.waitForTimeout(500);
       }
       const after = await page.evaluate(() => Object.keys(window.__store.getState().containers).length);

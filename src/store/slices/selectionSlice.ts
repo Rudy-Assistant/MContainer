@@ -112,7 +112,7 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
 
   selectMultiple: (ids) => set({ selection: ids }),
 
-  clearSelection: () => set({ selection: [], selectionContext: null, selectedVoxel: null, selectedFace: null, hoveredVoxel: null, faceContext: null }),
+  clearSelection: () => set({ selection: [], selectionContext: null, selectedVoxel: null, selectedFace: null, selectedVoxels: null, hoveredVoxel: null, faceContext: null }),
 
   setSelectionContext: (ctx) => set({ selectionContext: ctx }),
 

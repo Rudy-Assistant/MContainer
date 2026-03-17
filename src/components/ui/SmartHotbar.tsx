@@ -5,7 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { useStore, type HotbarSlot, type HotbarCategory } from "@/store/useStore";
 import { ViewMode, type SurfaceType, type VoxelFaces, FURNITURE_CATALOG } from "@/types/container";
-import { getCycleForFace } from "@/components/objects/ContainerSkin";
+// getCycleForFace import removed (Sprint 15) — dotRingIndicator deleted
 import { MODULE_PRESETS, resolveModuleFaces } from "@/config/moduleCatalog";
 
 // ── Room module slots for the Rooms tab ─────────────────────────
@@ -23,63 +23,74 @@ const RARITY_ACCENT: Record<HotbarCategory, string> = {
   prefab:   "#f59e0b",    // gold (prefabs)
 };
 
-// ── Fixed 8-slot preset list — hardcoded, no legacy presets ────
+// ── Fixed 10-slot preset list — human-friendly names ────────
 const FIXED_PRESETS: Array<{
   key: number;
   label: string;
+  description: string;
   category: HotbarCategory;
   color: string;
   icon: string;
   faces: VoxelFaces;
   contexts: Array<'wall' | 'floor' | 'roof'>;
 }> = [
-  // 1 — Floor: wood deck floor, open above and sides
-  { key: 1, category: 'basic', color: '#94a3b8', label: 'Floor',
+  // 1 — Open Deck: wood floor, open above and sides
+  { key: 1, category: 'basic', color: '#94a3b8', label: 'Deck',
+    description: 'Open wood deck — no walls or ceiling',
     icon: 'M3 18h18 M6 18v-2h12v2',
     faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
     contexts: ['floor', 'wall', 'roof'] },
-  // 2 — Floor + Ceiling: enclosed platform
-  { key: 2, category: 'standard', color: '#3b82f6', label: 'Fl+Ceil',
+  // 2 — Platform: enclosed floor + ceiling
+  { key: 2, category: 'standard', color: '#3b82f6', label: 'Platform',
+    description: 'Floor and ceiling — no walls',
     icon: 'M3 6h18 M3 18h18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
     contexts: ['wall', 'roof'] },
-  // 3 — Floor + Ceiling + Railing: enclosed balcony
-  { key: 3, category: 'standard', color: '#3b82f6', label: 'Fl+Cl+Rail',
+  // 3 — Balcony: floor + ceiling + cable railings
+  { key: 3, category: 'standard', color: '#3b82f6', label: 'Balcony',
+    description: 'Railed platform — cable railings all sides',
     icon: 'M3 6h18 M3 18h18 M5 6v12 M19 6v12',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Railing_Cable', s: 'Railing_Cable', e: 'Railing_Cable', w: 'Railing_Cable' },
     contexts: ['wall'] },
-  // 4 — Windows: full glass walls with floor and ceiling
-  { key: 4, category: 'complex', color: '#8b5cf6', label: 'Windows',
+  // 4 — Glass Box: full glass walls, enclosed
+  { key: 4, category: 'complex', color: '#8b5cf6', label: 'Glass Box',
+    description: 'Floor-to-ceiling glass on all sides',
     icon: 'M3 3h18v18H3z M12 3v18 M3 12h18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Glass_Pane', s: 'Glass_Pane', e: 'Glass_Pane', w: 'Glass_Pane' },
     contexts: ['wall'] },
-  // 5 — Door: north face is a door, steel walls elsewhere
-  { key: 5, category: 'complex', color: '#8b5cf6', label: 'Door',
+  // 5 — Entry: door on one side, steel walls elsewhere
+  { key: 5, category: 'complex', color: '#8b5cf6', label: 'Entry',
+    description: 'Front door with steel walls',
     icon: 'M3 3h18v18H3z M8 21v-6h8v6',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Door', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
     contexts: ['wall'] },
-  // 6 — Walls + Windows: glass N/S, steel E/W
-  { key: 6, category: 'prefab', color: '#f59e0b', label: 'Walls+Win',
+  // 6 — Gallery: glass front/back, steel sides
+  { key: 6, category: 'prefab', color: '#f59e0b', label: 'Gallery',
+    description: 'Glass windows front & back, steel sides',
     icon: 'M3 3h18v18H3z M3 12h18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Glass_Pane', s: 'Glass_Pane', e: 'Solid_Steel', w: 'Solid_Steel' },
     contexts: ['wall'] },
-  // 7 — Clear: all open (empty voxel)
-  { key: 7, category: 'basic', color: '#94a3b8', label: 'Clear',
+  // 7 — Empty: all faces open
+  { key: 7, category: 'basic', color: '#94a3b8', label: 'Empty',
+    description: 'Remove all surfaces — fully open',
     icon: 'M3 3h18v18H3z',
     faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
     contexts: ['wall', 'floor', 'roof'] },
-  // 8 — Default: sealed steel box with wood floor
-  { key: 8, category: 'basic', color: '#94a3b8', label: 'Default',
+  // 8 — Sealed: solid steel box with wood floor
+  { key: 8, category: 'basic', color: '#94a3b8', label: 'Sealed',
+    description: 'Steel walls + ceiling, wood floor',
     icon: 'M3 3h18v18H3z M3 3l18 18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
     contexts: ['wall', 'roof'] },
-  // 9 — Hallway: steel walls N/S, open passages E/W
-  { key: 9, category: 'standard', color: '#3b82f6', label: 'Hall',
+  // 9 — Corridor: steel walls N/S, open passage E/W
+  { key: 9, category: 'standard', color: '#3b82f6', label: 'Corridor',
+    description: 'Walk-through passage — walls on long sides',
     icon: 'M3 3v18 M21 3v18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Open', w: 'Open' },
     contexts: ['wall'] },
-  // 0 — Pool Basin: concrete basin
-  { key: 0, category: 'prefab', color: '#f59e0b', label: 'Pool',
+  // 0 — Basin: concrete pool/planter
+  { key: 0, category: 'prefab', color: '#f59e0b', label: 'Basin',
+    description: 'Concrete basin — pool or planter',
     icon: 'M3 6h18v12H3z M5 8h14v8H5z',
     faces: { top: 'Open', bottom: 'Concrete', n: 'Concrete', s: 'Concrete', e: 'Concrete', w: 'Concrete' },
     contexts: ['floor'] },
@@ -470,10 +481,10 @@ export function SvgVoxelIcon({
   activeFace?: keyof VoxelFaces;
 }) {
   const isFloorSlab = faces.n === 'Open' && faces.s === 'Open' && faces.e === 'Open' && faces.w === 'Open';
-  // Floor slab: H=10 gives a visible but clearly thin flat icon.
-  // cy=60 centers the top-face diamond vertically in the viewBox.
-  const W = 42, D = 25, H = isFloorSlab ? 10 : 60;
-  const cx = 25, cy = isFloorSlab ? 60 : 55;
+  // Floor slab: very thin (H=6) with centered positioning so it reads as a flat platform.
+  // Full cube: standard isometric box.
+  const W = 42, D = 25, H = isFloorSlab ? 6 : 60;
+  const cx = 25, cy = isFloorSlab ? 52 : 55;
 
   const p = (x: number, y: number, z: number) => getIsoPoint(x, y, z, cx, cy);
   const vx = {
@@ -881,7 +892,7 @@ export default function SmartHotbar() {
   const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
   const hoveredVoxel = useStore((s) => s.hoveredVoxel);
   const faceContext = useStore((s) => s.faceContext);
-  const facePreview = useStore((s) => s.facePreview);
+  // facePreview hover removed (Sprint 15) — click to select, then click to apply
   // Module preset state
   const activeModulePreset = useStore((s) => s.activeModulePreset);
   const setActiveModulePreset = useStore((s) => s.setActiveModulePreset);
@@ -892,8 +903,7 @@ export default function SmartHotbar() {
   const cycleHotbarTab = useStore((s) => s.cycleHotbarTab);
   const hotbarMode: 'rooms' | 'materials' | 'furniture' = activeHotbarTab === 0 ? 'rooms' : activeHotbarTab === 1 ? 'materials' : 'furniture';
 
-  // Ghost scroll state — preview adjacent slot before committing
-  const [ghostSlot, setGhostSlot] = useState<number | null>(null);
+  // Ghost scroll removed (Sprint 15) — use number keys or click to select hotbar slot
 
   const viewMode = useStore((s) => s.viewMode);
   const isWalkthrough = viewMode === ViewMode.Walkthrough;
@@ -949,7 +959,6 @@ export default function SmartHotbar() {
     (index: number) => {
       if (index >= FIXED_PRESETS.length) return;
       setActiveSlot(activeSlot === index ? null : index);
-      setGhostSlot(null);
     },
     [activeSlot, setActiveSlot]
   );
@@ -964,7 +973,6 @@ export default function SmartHotbar() {
       if (e.key === 'Escape') {
         setActiveSlot(null);
         setActiveModulePreset(null);
-        setGhostSlot(null);
         useStore.getState().setActiveBrush(null);
         return;
       }
@@ -1004,7 +1012,6 @@ export default function SmartHotbar() {
         e.preventDefault();
         e.stopPropagation();
         setActiveSlot(activeSlot === slotIndex ? null : slotIndex);
-        setGhostSlot(null);
       }
     };
     window.addEventListener("keydown", handler);
@@ -1015,26 +1022,8 @@ export default function SmartHotbar() {
   // Material cycling: use hotbar number keys (1-9) + click/E to apply.
   // Block preset cycling: use hotbar presets + click to stamp.
 
-  // Persistent equipped-tool hover hologram
-  const setFacePreview = useStore((s) => s.setFacePreview);
-  useEffect(() => {
-    const store = useStore.getState();
-    if (activeSlot !== null && hoveredVoxelEdge && activeSlot < FIXED_PRESETS.length) {
-      const equippedFaces = FIXED_PRESETS[activeSlot].faces;
-      const equippedSurface = equippedFaces[hoveredVoxelEdge.face as keyof VoxelFaces];
-      if (equippedSurface) {
-        setFacePreview({
-          containerId: hoveredVoxelEdge.containerId,
-          voxelIndex: hoveredVoxelEdge.voxelIndex,
-          face: hoveredVoxelEdge.face,
-          surface: equippedSurface,
-        });
-      }
-    } else if (hoveredVoxelEdge === null && activeSlot !== null) {
-      if (!store.facePreview) return;
-      setFacePreview(null);
-    }
-  }, [activeSlot, hoveredVoxelEdge, setFacePreview]);
+  // Face preview hover hologram REMOVED (Sprint 15) — was distracting.
+  // Users now: click to select voxel/face → pick hotbar slot → click/E to apply.
 
   // Current material indicator — which preset slot matches the committed face
   const containers = useStore((s) => s.containers);
@@ -1055,71 +1044,14 @@ export default function SmartHotbar() {
   const hoveredPreset = hoveredSlot !== null && hoveredSlot < FIXED_PRESETS.length ? FIXED_PRESETS[hoveredSlot] : null;
   const hoveredAccent = hoveredPreset ? RARITY_ACCENT[hoveredPreset.category] : null;
 
-  // ── Dot+Ring Indicator ──
-  const dotRingIndicator = (() => {
-    if (!hoveredVoxelEdge) return null;
-    const face = hoveredVoxelEdge.face;
-    const cycle = getCycleForFace(face);
-    const container = useStore.getState().containers[hoveredVoxelEdge.containerId];
-    const vox = container?.voxelGrid?.[hoveredVoxelEdge.voxelIndex];
-    if (!vox) return null;
-    const committed = vox.faces[face];
-    const dotIdx = cycle.indexOf(committed as SurfaceType);
-    const previewSurface = facePreview?.containerId === hoveredVoxelEdge.containerId
-      && facePreview?.voxelIndex === hoveredVoxelEdge.voxelIndex
-      && facePreview?.face === face
-      ? facePreview.surface
-      : null;
-    const ringIdx = previewSurface ? cycle.indexOf(previewSurface) : dotIdx;
-    return (
-      <div style={{ display: "flex", gap: 4, padding: "4px 10px", alignItems: "center",
-        background: "rgba(255,255,255,0.85)", borderRadius: 8, backdropFilter: "blur(4px)",
-        border: "1px solid #e2e8f0" }}>
-        {cycle.map((s, i) => {
-          const isDot  = i === dotIdx;
-          const isRing = i === ringIdx;
-          const fill   = surfaceColor(s);
-          return (
-            <div key={s} style={{
-              position: "relative",
-              width:  isRing ? 12 : 8,
-              height: isRing ? 12 : 8,
-              borderRadius: "50%",
-              background: fill.background as string,
-              border: isRing ? "2.5px solid #0ea5e9" : "1.5px solid #cbd5e1",
-              transition: "all 80ms ease",
-              boxShadow: isDot && !isRing ? "0 0 0 3px rgba(14,165,233,0.25)" : "none",
-              flexShrink: 0,
-            }}>
-              {isDot && (
-                <div style={{ position: "absolute", inset: 2, borderRadius: "50%",
-                  background: "rgba(255,255,255,0.7)" }} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  })();
+  // Dot+Ring indicator REMOVED (Sprint 15) — was visually noisy.
 
   return (
     <>
-      {/* ── Dot+Ring Cycle Indicator ── */}
-      {hoveredVoxelEdge && (
-        <div style={{
-          position: "fixed", bottom: 16, left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 26, display: "flex", flexDirection: "column", alignItems: "center",
-          pointerEvents: "none",
-        }}>
-          {dotRingIndicator}
-        </div>
-      )}
-
       {/* ── Main Hotbar ── */}
       <div
         onMouseEnter={() => setHotbarHovered(true)}
-        onMouseLeave={() => { setHotbarHovered(false); setGhostSlot(null); }}
+        onMouseLeave={() => { setHotbarHovered(false); }}
         style={{
           position: "fixed", bottom: showHotbar ? 40 : 16, left: "50%",
           transform: showHotbar ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(10px)",
@@ -1145,18 +1077,23 @@ export default function SmartHotbar() {
           </div>
         )}
 
-        {/* Hover tooltip */}
+        {/* Hover tooltip — shows name + description */}
         {hoveredPreset && (
           <div style={{
-            fontSize: 12, fontWeight: 900, letterSpacing: 1.2, textTransform: "uppercase",
-            color: hoveredAccent ?? "#374151",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
             background: "#ffffff",
-            padding: "3px 18px", borderRadius: 5,
+            padding: "4px 18px", borderRadius: 6,
             border: `2px solid ${hoveredAccent}`,
             boxShadow: `0 2px 10px ${hoveredAccent}30`,
             whiteSpace: "nowrap",
           }}>
-            {hoveredPreset.label}
+            <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.2, textTransform: "uppercase",
+              color: hoveredAccent ?? "#374151" }}>
+              {hoveredPreset.label}
+            </span>
+            <span style={{ fontSize: 9, fontWeight: 500, color: "#64748b", letterSpacing: 0.3 }}>
+              {hoveredPreset.description}
+            </span>
           </div>
         )}
 
@@ -1212,34 +1149,7 @@ export default function SmartHotbar() {
             backdropFilter: "blur(16px) saturate(1.4)",
             WebkitBackdropFilter: "blur(16px) saturate(1.4)",
           }}
-          onWheel={(e: React.WheelEvent) => {
-            // Ghost scroll: only when not hovering a voxel face/tile
-            if (e.shiftKey) return;
-            if (useStore.getState().hoveredVoxelEdge) return;
-            if (useStore.getState().hoveredVoxel) return;
-            e.stopPropagation();
-            const base = ghostSlot ?? activeSlot ?? 0;
-            const next = Math.max(0, Math.min(FIXED_PRESETS.length - 1, base + (e.deltaY > 0 ? 1 : -1)));
-            setGhostSlot(next);
-          }}
         >
-          {/* Ghost scroll dashed preview frame */}
-          {ghostSlot !== null && ghostSlot !== activeSlot && (
-            <div style={{
-              position: 'absolute',
-              top: 7,
-              left: 10 + ghostSlot * 68,
-              width: 64,
-              height: 80,
-              border: '1.5px dashed rgba(21, 101, 192, 0.55)',
-              borderRadius: 8,
-              boxSizing: 'border-box',
-              pointerEvents: 'none',
-              zIndex: 10,
-              transition: 'left 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-            }} />
-          )}
-
           {/* Active slot frame — solid border box around active slot */}
           {activeSlot !== null && activeSlot < FIXED_PRESETS.length && (
             <div style={{

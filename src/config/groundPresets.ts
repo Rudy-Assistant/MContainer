@@ -14,6 +14,8 @@ export interface GroundPreset {
   folder: string;
   /** Fallback solid color (hex) when textures unavailable */
   color: number;
+  /** Optional tint multiplied with texture (default: 0xffffff = no tint) */
+  tint?: number;
   roughness: number;
   repeatX: number;
   repeatY: number;
@@ -27,13 +29,14 @@ export const GROUND_PRESETS: Record<GroundPresetId, GroundPreset> = {
     id: "grass",
     label: "Grass",
     folder: "Ground_Grass",
-    color: 0x3a6b22,
-    roughness: 0.9,
-    repeatX: 24,
-    repeatY: 24,
-    normalScale: 1.5,
-    envMapIntensity: 0.15,
-    displacementScale: 0.15,
+    color: 0x2d7a1e,            // Vivid green fallback (golf course tone)
+    tint: 0x88cc88,             // Light green tint — shifts texture toward lush lawn
+    roughness: 0.92,
+    repeatX: 40,                // Finer tiling — less visible repeat
+    repeatY: 40,
+    normalScale: 0.6,           // Subtle blade detail (was 1.5 — too harsh)
+    envMapIntensity: 0.25,      // Slight sheen from sunlight
+    displacementScale: 0.03,    // Nearly flat (was 0.15 — created bumpy terrain)
   },
   concrete: {
     id: "concrete",
