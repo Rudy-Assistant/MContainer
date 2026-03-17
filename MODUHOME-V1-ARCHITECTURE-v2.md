@@ -234,7 +234,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 
 ## §6 Feature Status
 
-18/18 features at PRODUCTION quality. See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
+26/26 features at PRODUCTION quality (Sprint 13). 39/39 Playwright gates PASS. See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
 
 | Feature | Rating |
 |---------|--------|
@@ -264,7 +264,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 These must never be violated:
 
 1. `npx tsc --noEmit` → 0 errors before any PR
-2. `npx vitest run` → all 243 tests pass before any PR
+2. `npx vitest run` → all 297 tests pass before any PR
 3. Browser/visual verification is a **hard gate** separate from the test suite
 4. Never split `useStore.ts` structure (only slice file content changes)
 5. Never use `useStore(s => s)` — subscribe to atomic selectors only
@@ -277,8 +277,10 @@ These must never be violated:
 ## §8 Known Limitations / Deferred Work
 
 - Furniture GLBs are mapped but room placement is manual (no auto-furnish algorithm)
-- FP walking cannot be automated in Playwright (pointer lock blocks automation) — manual verification required
-- Cross-container staircase void exists but is lightly tested
-- `stampStaircase` (hotbar macro) and `applyStairsFromFace` (smart path) now produce identical voxel metadata but visual parity should be manually verified
+- FP walking uses mock pointer lock in gates (G8); full manual FP verification recommended for stair climbing + door toggling
 - Ground uses solid color for grass (no PBR texture) — avoids tiling but loses surface detail at close range
-- Several legacy UI components exist (GameHUD, Palette, ViewToggle, etc.) but are dead code — deletion deferred until full inventory audit
+- `stairDir` field is DEPRECATED — `stairAscending` is canonical. Removal deferred to migration sprint
+- Dead code: all 11 legacy files confirmed deleted (DEAD-CODE-AUDIT.md). Codebase is clean
+- Stair system unified: `applyStairsFromFace` is single source of truth. BOM includes stair cost ($4,500/staircase)
+- Walkthrough auto-tour uses voxel stairs (not furniture) for level transitions
+- Camera: CameraTargetLerp uses settle-and-release pattern (see CLAUDE.md Camera Architecture)
