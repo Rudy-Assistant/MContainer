@@ -541,6 +541,11 @@ function useKeyboardShortcuts() {
         useFrameStore.getState().toggleBuild();
         return;
       }
+      // [ = Toggle sidebar collapse
+      if (e.code === "BracketLeft" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        store.toggleSidebar();
+        return;
+      }
       // Alt+3 = 3D view, Alt+4 = Blueprint view
       if (e.code === "Digit3" && e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();

@@ -882,8 +882,6 @@ export default function SmartHotbar() {
   const hoveredVoxel = useStore((s) => s.hoveredVoxel);
   const faceContext = useStore((s) => s.faceContext);
   const facePreview = useStore((s) => s.facePreview);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // Module preset state
   const activeModulePreset = useStore((s) => s.activeModulePreset);
   const setActiveModulePreset = useStore((s) => s.setActiveModulePreset);
@@ -893,10 +891,6 @@ export default function SmartHotbar() {
   const setActiveHotbarTab = useStore((s) => s.setActiveHotbarTab);
   const cycleHotbarTab = useStore((s) => s.cycleHotbarTab);
   const hotbarMode: 'rooms' | 'materials' | 'furniture' = activeHotbarTab === 0 ? 'rooms' : activeHotbarTab === 1 ? 'materials' : 'furniture';
-
-  // Scroll accumulation — avoids losing rapid multi-tick scrolls
-  const deltaAccumRef = useRef(0);
-  const lastEdgeKeyRef = useRef('');
 
   // Ghost scroll state — preview adjacent slot before committing
   const [ghostSlot, setGhostSlot] = useState<number | null>(null);
@@ -1017,75 +1011,9 @@ export default function SmartHotbar() {
     return () => window.removeEventListener("keydown", handler);
   }, [activeSlot, setActiveSlot]);
 
-  // Scroll handler: face preview, block preset cycle, Shift+slot cycle
-  useEffect(() => {
-    const wheelHandler = (e: WheelEvent) => {
-      const store = useStore.getState();
-      if (store.isPreviewMode) return;
-
-      if (!e.shiftKey) {
-        const edge = store.hoveredVoxelEdge;
-        if (edge) {
-          e.preventDefault();
-          const container = store.containers[edge.containerId];
-          const voxel = container?.voxelGrid?.[edge.voxelIndex];
-          if (!voxel) return;
-
-          const cycle = getCycleForFace(edge.face);
-
-          const edgeKey = `${edge.containerId}_${edge.voxelIndex}_${edge.face}`;
-          if (edgeKey !== lastEdgeKeyRef.current) {
-            lastEdgeKeyRef.current = edgeKey;
-            deltaAccumRef.current = 0;
-          }
-
-          deltaAccumRef.current += e.deltaY > 0 ? 1 : -1;
-          const committedSurface = voxel.faces[edge.face];
-          const baseIdx = cycle.indexOf(committedSurface as SurfaceType);
-          const previewIdx = baseIdx < 0 ? 0 : ((baseIdx + deltaAccumRef.current) % cycle.length + cycle.length) % cycle.length;
-          const nextSurface = cycle[previewIdx];
-
-          store.setFacePreview({ containerId: edge.containerId, voxelIndex: edge.voxelIndex, face: edge.face, surface: nextSurface });
-
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          debounceRef.current = setTimeout(() => {
-            const s2 = useStore.getState();
-            if (s2.facePreview?.containerId === edge.containerId
-              && s2.facePreview?.voxelIndex === edge.voxelIndex
-              && s2.facePreview?.face === edge.face) {
-              s2.setVoxelFace(edge.containerId, edge.voxelIndex, edge.face, s2.facePreview.surface);
-              s2.setFacePreview(null);
-              deltaAccumRef.current = 0;
-            }
-          }, 500);
-          return;
-        }
-
-        const hovered = store.hoveredVoxel;
-        if (hovered && !hovered.isExtension && !store.hoveredVoxelEdge) {
-          e.preventDefault();
-          const presetDir = e.deltaY > 0 ? 1 : -1;
-          store.cycleBlockPreset(hovered.containerId, hovered.index, presetDir);
-          return;
-        }
-
-        return;
-      }
-
-      // Shift+Scroll → cycle active hotbar slot through FIXED_PRESETS
-      e.preventDefault();
-      const len = FIXED_PRESETS.length;
-      const dir = e.deltaY > 0 ? 1 : -1;
-      const current = activeSlot ?? -1;
-      const next = ((current + dir) % len + len) % len;
-      setActiveSlot(next);
-    };
-    window.addEventListener("wheel", wheelHandler, { passive: false });
-    return () => {
-      window.removeEventListener("wheel", wheelHandler);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [activeSlot, setActiveSlot]);
+  // Scroll-wheel cycling REMOVED (Sprint 14) — scroll now always means camera zoom.
+  // Material cycling: use hotbar number keys (1-9) + click/E to apply.
+  // Block preset cycling: use hotbar presets + click to stamp.
 
   // Persistent equipped-tool hover hologram
   const setFacePreview = useStore((s) => s.setFacePreview);

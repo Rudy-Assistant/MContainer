@@ -246,11 +246,9 @@ function GhostCursor() {
       const { gx, gy, gz } = snappedCell.current;
       useFrameStore.getState().removeTile(gx, gy, gz);
     };
-    const onWheel = (e: WheelEvent) => {
-      if ((e.target as HTMLElement).tagName !== "CANVAS") return;
-      e.preventDefault();
-      useFrameStore.getState().cycleTool(e.deltaY > 0 ? 1 : -1);
-    };
+    // Scroll-wheel tool cycling REMOVED — scroll is now always camera zoom.
+    // Use number keys 1-4 to switch tools in Frame Builder.
+    const onWheel = (e: WheelEvent) => { void e; };
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
       if (e.code === "KeyR" && !e.ctrlKey && !e.metaKey) {

@@ -65,7 +65,7 @@ function CanvasHintOverlay() {
   const hint =
     viewMode === ViewMode.Blueprint    ? "Click=select · Drag=move · Right-click=menu · G=group · Ctrl+Z=undo"
     : viewMode === ViewMode.Walkthrough ? "WASD · Shift=sprint · Space=cycle face · V=exit"
-    :                                     "L-drag=orbit · R-drag=pan · Scroll=zoom · Shift+drag=move";
+    :                                     "L-drag=orbit · R-drag=pan · Scroll=zoom · 1-9=hotbar · E=apply";
   return (
     <div style={{
       position: 'absolute', bottom: 12, right: 16, zIndex: 30,
@@ -107,6 +107,7 @@ export default function Home() {
   const isWalkthrough = viewMode === ViewMode.Walkthrough;
   const isPreviewMode = useStore((s) => s.isPreviewMode);
   const hasHydrated = useStore((s) => s._hasHydrated);
+  const activeHotbarSlot = useStore((s) => s.activeHotbarSlot);
   useHydrationSeed();
 
   if (!hasHydrated) {
@@ -128,7 +129,7 @@ export default function Home() {
         {!isWalkthrough && !isPreviewMode && <Sidebar />}
 
         {/* Canvas Area — onContextMenu absolutely prevented */}
-        <div className="flex-1 relative" style={{ backgroundColor: "#f4f6f8" }} onContextMenu={(e) => e.preventDefault()}>
+        <div className="flex-1 relative" style={{ backgroundColor: "#f4f6f8", cursor: activeHotbarSlot !== null && !isWalkthrough ? 'crosshair' : 'default' }} onContextMenu={(e) => e.preventDefault()}>
           <SceneCanvas />
 
           {/* Canvas hint overlay — bottom-right, hidden in walkthrough (has its own instructions) */}

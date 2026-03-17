@@ -27,15 +27,15 @@ import {
   Package, Box, Warehouse, ArrowLeft,
   Armchair, CookingPot, Bed, Bath, Laptop, UtensilsCrossed, Archive, Footprints,
   BookmarkPlus,
-  Scan, Ruler, Palette, Mountain, Tag, ChevronDown,
+  ChevronDown,
   ChevronLeft, ChevronRight,
   Refrigerator, Flame, Droplets, Microwave,
   Lamp, Monitor, WashingMachine, TreePine, Sofa,
   Tv, BookOpen, Coffee, Shirt,
+  Palette, Scan,
 } from "lucide-react";
 import UserLibrary from "@/components/ui/UserLibrary";
-import { THEMES, THEME_IDS, type ThemeId } from "@/config/themes";
-import { GROUND_PRESET_IDS, GROUND_PRESETS, type GroundPresetId } from "@/config/groundPresets";
+// Theme/Ground imports removed — selectors moved to TopToolbar Appearance popover
 
 // ── BOM formatting ────────────────────────────────────────────
 
@@ -315,125 +315,9 @@ const SIZE_LABEL: Record<ContainerSize, string> = {
   [ContainerSize.HighCube40]: "40ft High-Cube",
 };
 
-// GlobalTools — always visible, viewport-level toggles ──────
-
-function GlobalTools() {
-  const dollhouseActive = useStore((s) => s.dollhouseActive);
-  const toggleDollhouse = useStore((s) => s.toggleDollhouse);
-  const tapeActive = useStore((s) => s.tapeActive);
-  const toggleTape = useStore((s) => s.toggleTape);
-  const showFurnitureLabels = useStore((s) => s.showFurnitureLabels);
-  const toggleFurnitureLabels = useStore((s) => s.toggleFurnitureLabels);
-  const currentTheme = useStore((s) => s.currentTheme);
-  const setTheme = useStore((s) => s.setTheme);
-  const groundPreset = useStore((s) => s.environment.groundPreset) as GroundPresetId | undefined;
-  const setGroundPreset = useStore((s) => s.setGroundPreset);
-  const setActivePalette = useStore((s) => s.setActivePalette);
-
-  const toolBtn = (active: boolean, accent: string): React.CSSProperties => ({
-    display: "flex", alignItems: "center", gap: "6px",
-    flex: 1, height: "32px", padding: "0 10px",
-    borderRadius: "6px", border: `1px solid ${active ? accent : BORDER}`,
-    cursor: "pointer", fontSize: "11px", fontWeight: 600,
-    color: active ? accent : TEXT_DIM,
-    background: active ? `${accent}12` : CARD,
-    transition: "all 150ms ease",
-  });
-
-  const THEME_COLORS: Record<ThemeId, string> = {
-    industrial: "#607d8b",
-    japanese:   "#5d4037",
-    desert:     "#d4a373",
-  };
-
-  const GROUND_COLORS: Record<GroundPresetId, string> = {
-    grass:    "#4a7a30",
-    concrete: "#8a8a88",
-    gravel:   "#7a7568",
-    dirt:     "#6b5b3e",
-  };
-
-  const activeGround = groundPreset && groundPreset in GROUND_PRESETS
-    ? groundPreset as GroundPresetId
-    : "grass";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "0 0 4px" }}>
-      {/* Tool toggles */}
-      <div style={{ display: "flex", gap: "6px" }}>
-        <button onClick={toggleDollhouse} style={toolBtn(dollhouseActive, "#2563eb")} title="Dollhouse Cutaway (X-Ray)">
-          <Scan size={13} /> Cutaway
-        </button>
-        <button onClick={toggleTape} style={toolBtn(tapeActive, "#d97706")} title="Tape Measure">
-          <Ruler size={13} /> Measure
-        </button>
-        <button onClick={toggleFurnitureLabels} style={toolBtn(showFurnitureLabels, "#059669")} title="Furniture Labels">
-          <Tag size={13} /> Labels
-        </button>
-      </div>
-      {/* Theme selector */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <Palette size={13} style={{ color: TEXT_DIM, flexShrink: 0 }} />
-        <div style={{
-          display: "flex", flex: 1, borderRadius: "6px",
-          border: `1px solid ${BORDER}`, overflow: "hidden",
-        }}>
-          {THEME_IDS.map((tid) => {
-            const active = currentTheme === tid;
-            return (
-              <button
-                key={tid}
-                data-testid={`theme-${tid}`}
-                onClick={() => { setTheme(tid); setActivePalette(tid); }}
-                style={{
-                  flex: 1, height: "28px", border: "none", cursor: "pointer",
-                  fontSize: "10px", fontWeight: active ? 700 : 500,
-                  color: active ? "#fff" : TEXT_DIM,
-                  background: active ? THEME_COLORS[tid] : CARD,
-                  borderRight: tid !== THEME_IDS[THEME_IDS.length - 1] ? `1px solid ${BORDER}` : "none",
-                  transition: "all 150ms ease",
-                }}
-                title={THEMES[tid].label}
-              >
-                {THEMES[tid].label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      {/* Ground preset selector */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <Mountain size={13} style={{ color: TEXT_DIM, flexShrink: 0 }} />
-        <div style={{
-          display: "flex", flex: 1, borderRadius: "6px",
-          border: `1px solid ${BORDER}`, overflow: "hidden",
-        }}>
-          {GROUND_PRESET_IDS.map((gid) => {
-            const active = activeGround === gid;
-            return (
-              <button
-                key={gid}
-                data-testid={`ground-${gid}`}
-                onClick={() => setGroundPreset(gid)}
-                style={{
-                  flex: 1, height: "28px", border: "none", cursor: "pointer",
-                  fontSize: "10px", fontWeight: active ? 700 : 500,
-                  color: active ? "#fff" : TEXT_DIM,
-                  background: active ? GROUND_COLORS[gid] : CARD,
-                  borderRight: gid !== GROUND_PRESET_IDS[GROUND_PRESET_IDS.length - 1] ? `1px solid ${BORDER}` : "none",
-                  transition: "all 150ms ease",
-                }}
-                title={GROUND_PRESETS[gid].label}
-              >
-                {GROUND_PRESETS[gid].label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
+// GlobalTools moved to TopToolbar (Appearance popover + Dev Tools dropdown) in Sprint 14.
+// Theme/Ground selectors → TopToolbar Appearance button
+// Cutaway/Measure/Labels → TopToolbar Dev Tools (Bug icon) dropdown
 
 // Inspector ─────────────────────────────────────────────────
 
@@ -700,7 +584,6 @@ function DesignModePanel() {
           </div>
         )}
       </div>
-      <GlobalTools />
     </div>
   );
 }
@@ -716,6 +599,8 @@ export default function Sidebar() {
   const selectContainer = useStore((s) => s.select);
   const selectedVoxel = useStore((s) => s.selectedVoxel);
   const viewMode      = useStore((s) => s.viewMode);
+  const collapsed     = useStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useStore((s) => s.toggleSidebar);
 
   // Primary selected container — from explicit selection OR from voxel selection (auto-switch)
   const selectionId = selection.length > 0 ? selection[selection.length - 1] : null;
@@ -736,8 +621,81 @@ export default function Sidebar() {
   // ★ Inspector auto-switch: show whenever a container is selected OR any voxel is selected
   const isInspecting = !!(container && selectedId);
 
+  // ── Collapsed state: thin strip with expand button ──
+  if (collapsed) {
+    return (
+      <div
+        data-testid="sidebar-collapsed"
+        style={{
+          width: "48px",
+          height: "100%",
+          background: "rgba(248, 250, 252, 0.82)",
+          backdropFilter: "blur(16px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+          borderRight: "1px solid rgba(255,255,255,0.35)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          flexShrink: 0,
+          boxShadow: "4px 0 24px rgba(0,0,0,0.08), 1px 0 2px rgba(0,0,0,0.04)",
+          paddingTop: "10px",
+          gap: "8px",
+        }}
+      >
+        <button
+          onClick={toggleSidebar}
+          title="Expand sidebar ( [ )"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 32, height: 32, borderRadius: 6,
+            background: "none", border: `1px solid ${BORDER}`,
+            cursor: "pointer", color: TEXT_DIM,
+            transition: "all 120ms ease",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}10`; e.currentTarget.style.color = ACCENT; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = TEXT_DIM; }}
+        >
+          <ChevronRight size={16} />
+        </button>
+        {/* Quick add container button */}
+        <button
+          onClick={() => {
+            const store = useStore.getState();
+            store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+          }}
+          title="Add 40' High Cube"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 32, height: 32, borderRadius: 6,
+            background: `${ACCENT}10`, border: `1px solid ${ACCENT}40`,
+            cursor: "pointer", color: ACCENT, fontSize: 16, fontWeight: 700,
+          }}
+        >
+          +
+        </button>
+        {/* Inspector indicator when container selected */}
+        {isInspecting && (
+          <button
+            onClick={toggleSidebar}
+            title="Open inspector"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 32, height: 32, borderRadius: 6,
+              background: "rgba(21, 101, 192, 0.12)", border: `1px solid ${ACCENT}40`,
+              cursor: "pointer", color: ACCENT,
+            }}
+          >
+            <Scan size={14} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ── Expanded state ──
   return (
     <div
+      data-testid="sidebar-expanded"
       style={{
         width: "384px",
         height: "100%",
@@ -823,6 +781,22 @@ export default function Sidebar() {
             <span style={{ fontSize: "10px", color: TEXT_DIM }}>Drag to canvas</span>
           </>
         )}
+        {/* Collapse button */}
+        <button
+          onClick={toggleSidebar}
+          title="Collapse sidebar ( [ )"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 24, height: 24, borderRadius: 4, marginLeft: 6,
+            background: "none", border: `1px solid ${BORDER}`,
+            cursor: "pointer", color: TEXT_DIM, flexShrink: 0,
+            transition: "all 120ms ease",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}10`; e.currentTarget.style.color = ACCENT; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = TEXT_DIM; }}
+        >
+          <ChevronLeft size={14} />
+        </button>
       </div>
 
       {/* ── Scrollable body ─────────────────────────────── */}
@@ -833,7 +807,6 @@ export default function Sidebar() {
       }}>
         {isInspecting && container ? (
           <>
-            <GlobalTools />
             <Inspector
               container={container}
               containerId={selectedId!}
@@ -844,7 +817,6 @@ export default function Sidebar() {
           <DesignModePanel />
         ) : (
           <>
-            <GlobalTools />
             <Library />
           </>
         )}

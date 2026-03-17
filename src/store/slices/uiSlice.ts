@@ -58,6 +58,11 @@ export interface UiSlice {
   // Debug wireframe overlay
   debugMode: boolean;
   toggleDebugMode: () => void;
+
+  // Collapsible sidebar
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -98,4 +103,8 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   debugMode: false,
   toggleDebugMode: () => set((s: any) => ({ debugMode: !s.debugMode })),
+
+  sidebarCollapsed: false,
+  toggleSidebar: () => set((s: any) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 });

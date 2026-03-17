@@ -217,14 +217,19 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 | Alt+click | Eyedropper — pick face material |
 | Space | Repeat last stamp (or cycle edges) |
 | C | Clear hovered face/block |
-| Scroll | Cycle face material / block preset |
+| E | Apply active hotbar stamp to hovered block |
+
+### UI
+| Key | Action |
+|-----|--------|
+| [ | Toggle sidebar collapse |
+| Scroll | Camera zoom (always — no material cycling) |
 
 ### Reserved (do not rebind)
 | Key | Reserved for |
 |-----|-------------|
 | W/A/S/D | FP movement |
 | Q/Z | FP fly up/down |
-| E | Apply hotbar to hovered block |
 | P | Toggle preview mode |
 | B | Toggle build mode (Frame Builder) |
 | Ctrl+Z/Y | Undo/Redo |

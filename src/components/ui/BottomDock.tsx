@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+/**
+ * BottomDock.tsx — Floating status bar (bottom-center)
+ *
+ * Sprint 14: Reworked from full-width bar to floating pill.
+ * Frees gizmo area (bottom-right). Gorgeous TOD slider with
+ * glassmorphic track and ambient glow.
+ */
+
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import ExportImport from "./ExportImport";
 import LiveBOM from "./LiveBOM";
@@ -19,12 +27,147 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+// ── Sky color interpolation for TOD glow ─────────────────────
+
+const SKY_STOPS: [number, string][] = [
+  [0, "#0f0a2e"], [4, "#1a1145"], [6, "#e8845c"], [8, "#87ceeb"],
+  [12, "#60b3e8"], [16, "#87ceeb"], [18, "#e8845c"], [20, "#4a2060"],
+  [24, "#0f0a2e"],
+];
+
+function getSkyColor(tod: number): string {
+  for (let i = 1; i < SKY_STOPS.length; i++) {
+    if (tod <= SKY_STOPS[i][0]) {
+      const [t0, c0] = SKY_STOPS[i - 1];
+      const [t1, c1] = SKY_STOPS[i];
+      const f = (tod - t0) / (t1 - t0);
+      return lerpColor(c0, c1, f);
+    }
+  }
+  return SKY_STOPS[0][1];
+}
+
+function lerpColor(a: string, b: string, t: number): string {
+  const pa = parseHex(a), pb = parseHex(b);
+  const r = Math.round(pa[0] + (pb[0] - pa[0]) * t);
+  const g = Math.round(pa[1] + (pb[1] - pa[1]) * t);
+  const bl = Math.round(pa[2] + (pb[2] - pa[2]) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
 const TIME_GRADIENT = 'linear-gradient(to right, #0f0a2e 0%, #1a1145 8%, #4a2060 16%, #e8845c 22%, #f4c96d 30%, #87ceeb 38%, #60b3e8 50%, #87ceeb 62%, #f4c96d 70%, #e8845c 78%, #4a2060 84%, #1a1145 92%, #0f0a2e 100%)';
 
-type DockPanel = "compass" | "pricing" | "project" | null;
+// ── Gorgeous Time of Day Slider ───────────────────────────────
 
-interface BottomDockProps {
-  onOpenBudget: () => void;
+function TimeOfDaySlider() {
+  const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const setTimeOfDay = useStore((s) => s.setTimeOfDay);
+  const pct = (timeOfDay / 24) * 100;
+  const isDaytime = timeOfDay >= 5.5 && timeOfDay <= 18.5;
+  const skyColor = useMemo(() => getSkyColor(timeOfDay), [timeOfDay]);
+
+  // Glow intensity: peaks at midday, dims at night
+  const glowIntensity = Math.max(0, Math.sin((timeOfDay / 24) * Math.PI));
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '10px',
+      padding: '6px 14px 6px 10px',
+      borderRadius: '20px',
+      background: 'rgba(15, 23, 42, 0.65)',
+      backdropFilter: 'blur(16px) saturate(160%)',
+      WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      boxShadow: `0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px ${skyColor}22`,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* Ambient glow behind slider */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: `radial-gradient(ellipse at ${pct}% 50%, ${skyColor}44, transparent 60%)`,
+        opacity: 0.4 + glowIntensity * 0.4,
+        transition: 'all 300ms ease',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Sun/Moon icon */}
+      <span style={{
+        fontSize: '14px', lineHeight: 1, position: 'relative', zIndex: 1,
+        filter: isDaytime ? 'drop-shadow(0 0 4px rgba(255,200,0,0.5))' : 'drop-shadow(0 0 4px rgba(150,180,255,0.4))',
+        transition: 'filter 500ms ease',
+      }}>
+        {isDaytime ? '\u2600\uFE0F' : '\uD83C\uDF19'}
+      </span>
+
+      {/* Track */}
+      <div style={{
+        position: 'relative', width: '150px', height: '10px',
+        borderRadius: '5px', zIndex: 1,
+      }}>
+        {/* Track background — gradient */}
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '5px',
+          background: TIME_GRADIENT,
+          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3), inset 0 -1px 1px rgba(255,255,255,0.05)',
+        }} />
+
+        {/* Filled portion — glowing accent */}
+        <div style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0,
+          width: `${pct}%`, borderRadius: '5px',
+          background: 'rgba(255,255,255,0.12)',
+          boxShadow: `0 0 8px ${skyColor}66`,
+          transition: 'box-shadow 300ms ease',
+        }} />
+
+        {/* Thumb — glowing orb */}
+        <div style={{
+          position: 'absolute', top: '50%',
+          left: `${pct}%`,
+          transform: 'translate(-50%, -50%)',
+          width: '16px', height: '16px', borderRadius: '50%',
+          background: isDaytime
+            ? 'radial-gradient(circle at 35% 35%, #fff, rgba(255,240,200,0.9) 40%, rgba(255,180,60,0.8))'
+            : 'radial-gradient(circle at 35% 35%, #e8eeff, rgba(180,200,255,0.9) 40%, rgba(100,130,200,0.8))',
+          border: '1px solid rgba(255,255,255,0.7)',
+          boxShadow: isDaytime
+            ? '0 0 12px rgba(255,180,0,0.5), 0 0 24px rgba(255,200,60,0.2), 0 2px 6px rgba(0,0,0,0.3)'
+            : '0 0 12px rgba(100,150,255,0.4), 0 0 24px rgba(130,160,255,0.15), 0 2px 6px rgba(0,0,0,0.3)',
+          transition: 'background 500ms ease, box-shadow 500ms ease',
+          zIndex: 2,
+        }} />
+
+        {/* Hidden range input for accessibility */}
+        <input type="range" min={0} max={24} step={0.25} value={timeOfDay}
+          data-testid="tod-slider"
+          onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            opacity: 0, cursor: 'pointer', zIndex: 3, margin: 0,
+          }}
+        />
+      </div>
+
+      {/* Time label */}
+      <span style={{
+        fontSize: '12px', fontFamily: '"SF Mono", "Cascadia Code", monospace',
+        fontWeight: 700, minWidth: '42px', textAlign: 'right',
+        color: isDaytime ? 'rgba(255,240,200,0.95)' : 'rgba(180,200,255,0.9)',
+        textShadow: isDaytime ? '0 0 8px rgba(255,180,0,0.3)' : '0 0 8px rgba(100,150,255,0.2)',
+        transition: 'color 500ms ease',
+        position: 'relative', zIndex: 1,
+        letterSpacing: '0.02em',
+      }}>
+        {formatTime(timeOfDay)}
+      </span>
+    </div>
+  );
 }
 
 // ── Draggable Compass Rose ───────────────────────────────────
@@ -105,14 +248,18 @@ function CompassRose({ northOffset, onDrag }: { northOffset: number; onDrag: (de
   );
 }
 
-// ── Main Component — Two-Row Layout ───────────────────────────
+type DockPanel = "compass" | "pricing" | "project" | null;
+
+interface BottomDockProps {
+  onOpenBudget: () => void;
+}
+
+// ── Main Component — Floating Pill ──────────────────────────
 
 export default function BottomDock({ onOpenBudget }: BottomDockProps) {
   const [activePanel, setActivePanel] = useState<DockPanel>(null);
 
-  const timeOfDay = useStore((s) => s.environment.timeOfDay);
   const northOffset = useStore((s) => s.environment.northOffset);
-  const setTimeOfDay = useStore((s) => s.setTimeOfDay);
   const setNorthOffset = useStore((s) => s.setNorthOffset);
   const getEstimate = useStore((s) => s.getEstimate);
   const containerCount = useStore((s) => Object.keys(s.containers).length);
@@ -123,12 +270,23 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
 
   const estimate = containerCount > 0 ? getEstimate() : null;
 
+  const pillBtn = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: '5px',
+    padding: '5px 8px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+    fontSize: '11px', fontFamily: 'monospace',
+    color: active ? '#93c5fd' : 'rgba(255,255,255,0.6)',
+    background: active ? 'rgba(147,197,253,0.12)' : 'transparent',
+    transition: 'all 150ms ease',
+  });
+
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col pointer-events-none">
+    <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center pointer-events-none"
+      style={{ paddingBottom: '10px' }}
+    >
       {/* ═══ Expanded Panel (floats above dock) ═══ */}
       {activePanel && (
         <div
-          className="self-center mb-2 rounded-2xl shadow-2xl pointer-events-auto"
+          className="mb-2 rounded-2xl shadow-2xl pointer-events-auto"
           style={{
             background: "rgba(255, 255, 255, 0.95)",
             backdropFilter: "blur(20px) saturate(180%)",
@@ -182,87 +340,58 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
         </div>
       )}
 
-      {/* ═══ Status Bar (Right-Aligned Controls) ═══ */}
+      {/* ═══ Floating Pill ═══ */}
       <div
         className="pointer-events-auto"
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: '6px',
-          padding: '6px 16px',
-          background: 'rgba(255, 255, 255, 0.88)',
+          gap: '4px',
+          padding: '4px 6px',
+          borderRadius: '20px',
+          background: 'rgba(15, 23, 42, 0.55)',
           backdropFilter: 'blur(16px) saturate(180%)',
-          borderTop: '1px solid rgba(0,0,0,0.06)',
+          WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)',
         }}
       >
-        {/* Left side: container count */}
-        <span style={{ fontSize: '11px', color: '#6b7280', marginRight: 'auto', fontFamily: 'monospace' }}>
+        {/* Container count */}
+        <span style={{
+          fontSize: '10px', color: 'rgba(255,255,255,0.5)',
+          fontFamily: 'monospace', padding: '0 8px',
+        }}>
           {containerCount} container{containerCount !== 1 ? 's' : ''}
           {estimate ? ` · ${formatCurrency(estimate.breakdown.total)}` : ''}
         </span>
 
-        {/* Persistent TOD pill */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          background: 'rgba(0,0,0,0.04)', borderRadius: '20px',
-          padding: '4px 12px 4px 8px', height: '32px',
-        }}>
-          <span style={{ fontSize: '13px', lineHeight: 1 }}>{timeOfDay >= 6 && timeOfDay <= 18 ? '\u2600\uFE0F' : '\uD83C\uDF19'}</span>
-          <div style={{ position: 'relative', width: '120px', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', inset: 0, background: TIME_GRADIENT, borderRadius: '4px' }} />
-            <div style={{
-              position: 'absolute', top: '50%', transform: 'translate(-50%, -50%)',
-              left: `${(timeOfDay / 24) * 100}%`,
-              width: '14px', height: '14px', borderRadius: '50%',
-              background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-              zIndex: 2,
-            }} />
-            <input type="range" min={0} max={24} step={0.25} value={timeOfDay}
-              data-testid="tod-slider"
-              onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 3, margin: 0 }}
-            />
-          </div>
-          <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#374151', fontWeight: 600, minWidth: '38px' }}>
-            {formatTime(timeOfDay)}
-          </span>
-        </div>
+        <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)' }} />
+
+        {/* Time of Day Slider */}
+        <TimeOfDaySlider />
+
+        <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)' }} />
 
         {/* Compass */}
         <button
           onClick={() => toggle("compass")}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '4px 10px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-            fontSize: '11px', fontFamily: 'monospace',
-            color: activePanel === "compass" ? '#1565c0' : '#6b7280',
-            background: activePanel === "compass" ? 'rgba(21,101,192,0.08)' : 'transparent',
-          }}
+          style={pillBtn(activePanel === "compass")}
           title="North Direction"
         >
-          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2}
+          <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2}
             style={{ transform: `rotate(${-northOffset}deg)`, transition: 'transform 200ms ease' }}>
             <circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88" fill="currentColor" />
           </svg>
           {Math.round(northOffset)}°
         </button>
 
-        <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)' }} />
-
         {/* Pricing */}
         <button
           onClick={() => toggle("pricing")}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '4px 10px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-            fontSize: '11px', fontFamily: 'monospace',
-            color: activePanel === "pricing" ? '#1565c0' : '#6b7280',
-            background: activePanel === "pricing" ? 'rgba(21,101,192,0.08)' : 'transparent',
-          }}
+          style={pillBtn(activePanel === "pricing")}
           title="Cost Estimate"
         >
-          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2}>
             <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
           </svg>
           $
@@ -271,16 +400,10 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
         {/* Project */}
         <button
           onClick={() => toggle("project")}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '4px 10px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-            fontSize: '11px',
-            color: activePanel === "project" ? '#1565c0' : '#6b7280',
-            background: activePanel === "project" ? 'rgba(21,101,192,0.08)' : 'transparent',
-          }}
+          style={pillBtn(activePanel === "project")}
           title="Export / Import"
         >
-          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
           </svg>
         </button>

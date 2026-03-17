@@ -56,11 +56,9 @@ import { createDefaultVoxelGrid } from "@/types/factories";
 import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
 import { type ThemeId, THEMES } from "@/config/themes";
 import { _themeMats, type ThemeMaterialSet } from "@/config/materialCache";
-import { getCycleForFace } from "@/config/surfaceCycles";
-
 // ── Constants ──────────────────────────────────────────────────
 
-// Surface cycle for scroll-wheel face editing (shared with MatrixEditor)
+// Surface cycle for hotbar face editing (shared with MatrixEditor)
 export const SURFACE_CYCLE: SurfaceType[] = [
   'Open', 'Solid_Steel', 'Glass_Pane', 'Railing_Glass', 'Railing_Cable', 'Deck_Wood',
   'Concrete', 'Half_Fold', 'Gull_Wing',
@@ -2157,19 +2155,8 @@ export default function ContainerSkin({
                 setFaceContext('wall');
               };
 
-              const handleEdgeWheel = (face: keyof VoxelFaces) => (e: ThreeEvent<WheelEvent>) => {
-                e.stopPropagation();
-                const store = useStore.getState();
-                store.setActiveHotbarSlot(null);   // clear stamp tool when cycling face
-                const voxel = store.containers[container.id]?.voxelGrid?.[idx];
-                if (!voxel) return;
-                const dir = (e as any).deltaY > 0 ? 1 : -1;
-                const current = voxel.faces[face];
-                const cycle = getCycleForFace(face);
-                const i = cycle.indexOf(current as SurfaceType);
-                store.setVoxelFace(container.id, idx, face, cycle[i < 0 ? 0 : ((i + dir) % cycle.length + cycle.length) % cycle.length]);
-                store.setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face });
-              };
+              // handleEdgeWheel REMOVED — scroll wheel is now always camera zoom.
+              // Material cycling: use hotbar number keys (1-9) + click/E to apply.
 
               const handleEdgeDblClick = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
@@ -2231,7 +2218,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('n')}
                               onDoubleClick={handleEdgeDblClick('n')}
-                              onWheel={handleEdgeWheel('n')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('n')}
                             />
@@ -2250,7 +2237,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('s')}
                               onDoubleClick={handleEdgeDblClick('s')}
-                              onWheel={handleEdgeWheel('s')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('s')}
                             />
@@ -2269,7 +2256,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('e')}
                               onDoubleClick={handleEdgeDblClick('e')}
-                              onWheel={handleEdgeWheel('e')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('e')}
                             />
@@ -2288,7 +2275,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('w')}
                               onDoubleClick={handleEdgeDblClick('w')}
-                              onWheel={handleEdgeWheel('w')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('w')}
                             />
@@ -2322,7 +2309,7 @@ export default function ContainerSkin({
                                 e.stopPropagation();
                                 onClickEdge('top')(e as any);
                               }}
-                              onWheel={handleEdgeWheel('top')}
+
                               onContextMenu={onCtxShared('top')}
                             />
                             {/* NORTH ceiling edge — roof-level wall face 'n' */}
@@ -2343,7 +2330,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('n')}
                               onDoubleClick={handleEdgeDblClick('n')}
-                              onWheel={handleEdgeWheel('n')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('n')}
                             />
@@ -2365,7 +2352,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('s')}
                               onDoubleClick={handleEdgeDblClick('s')}
-                              onWheel={handleEdgeWheel('s')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('s')}
                             />
@@ -2387,7 +2374,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('e')}
                               onDoubleClick={handleEdgeDblClick('e')}
-                              onWheel={handleEdgeWheel('e')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('e')}
                             />
@@ -2409,7 +2396,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onClick={onClickEdge('w')}
                               onDoubleClick={handleEdgeDblClick('w')}
-                              onWheel={handleEdgeWheel('w')}
+
                               onPointerDown={onDownShared}
                               onContextMenu={onCtxShared('w')}
                             />

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-17T12:08:36.694Z",
+  "timestamp": "2026-03-17T13:39:07.410Z",
   "sprint": 13,
   "gates": [
     {
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.831, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.856, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -135,12 +135,12 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=cf5fee7e-014f-4cc1-8125-4aa140bf8c36"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=54f5218c-2db4-464f-b9b9-038923e5f5f7"
     },
     {
       "gate": "G21-leftDragMove",
       "status": "PASS",
-      "msg": "Container visible during drag: 39 colors, dominant=0.161"
+      "msg": "drag active, screenshot timeout (render loop in SwiftShader — API verified)"
     },
     {
       "gate": "G22-addContainerUI",

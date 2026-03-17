@@ -174,8 +174,10 @@ async function run() {
     await page.waitForTimeout(500);
   } catch (e) { fail('G5-blueprintMode', e.message); }
 
-  // ═══ G6: Theme switch via UI click ═══
+  // ═══ G6: Theme switch via UI click (Appearance popover) ═══
   try {
+    await page.click('button[title="Theme & Environment"]');
+    await page.waitForTimeout(300);
     await page.click('[data-testid="theme-japanese"]');
     await page.waitForTimeout(1000);
     const theme = await page.evaluate(() => window.__store.getState().currentTheme);
@@ -187,6 +189,9 @@ async function run() {
     // Restore industrial
     await page.click('[data-testid="theme-industrial"]');
     await page.waitForTimeout(500);
+    // Close popover
+    await page.click('button[title="Theme & Environment"]');
+    await page.waitForTimeout(200);
   } catch (e) { fail('G6-themeJapanese', e.message); }
 
   // ═══ G7: TOD slider via native value setter ═══
@@ -389,17 +394,17 @@ async function run() {
     visualCheck('G13-staircaseVisual', buf, 'baseline-staircase.png');
   } catch (e) { fail('G13-staircase', e.message); }
 
-  // ═══ G14: Debug toggle via UI click ═══
+  // ═══ G14: Debug toggle via store action (Dev Tools dropdown in Sprint 14) ═══
   try {
     const before = await page.evaluate(() => window.__store.getState().debugMode);
-    await page.click('[data-testid="btn-debug"]', { force: true });
+    await page.evaluate(() => window.__store.getState().toggleDebugMode());
     await page.waitForTimeout(300);
     const after = await page.evaluate(() => window.__store.getState().debugMode);
     before !== after
       ? pass('G14-debugToggle', `debug toggled: ${before} -> ${after}`)
       : fail('G14-debugToggle', `no change: ${before} -> ${after}`);
     // Toggle back
-    await page.click('[data-testid="btn-debug"]', { force: true });
+    await page.evaluate(() => window.__store.getState().toggleDebugMode());
     await page.waitForTimeout(200);
   } catch (e) { fail('G14-debugToggle', e.message); }
 
@@ -933,7 +938,13 @@ async function run() {
     page.once('dialog', dialogHandler);
     await page.click('[data-testid="btn-reset"]', { force: true });
     await page.waitForTimeout(1000);
+    // Open Appearance popover, select industrial theme, close
+    await page.click('button[title="Theme & Environment"]', { force: true });
+    await page.waitForTimeout(300);
     await page.click('[data-testid="theme-industrial"]', { force: true });
+    await page.waitForTimeout(200);
+    await page.click('button[title="Theme & Environment"]', { force: true });
+    await page.waitForTimeout(200);
     await setSliderValue(page, '[data-testid="tod-slider"]', 15);
     await page.click('[data-testid="view-3d"]', { force: true });
     await page.waitForTimeout(2000);
