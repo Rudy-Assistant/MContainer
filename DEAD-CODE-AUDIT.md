@@ -18,34 +18,26 @@
 
 ---
 
-## Confirmed Dead Code (Existing but unused UI components)
+## Previously Dead Code (Now Deleted)
 
-These files exist in `src/components/ui/` but have no active imports. They are legacy code from pre-V1 development and can be safely deleted:
+All 11 dead files identified in prior audits have been confirmed **deleted from disk**.
+No orphaned UI or utility files remain. Verified via import graph analysis 2026-03-17.
 
-| File | Lines | Notes |
-|------|-------|-------|
-| `GameHUD.tsx` | 173 | Legacy game-style HUD — replaced by TopToolbar + SmartHotbar |
-| `MaterialPalette.tsx` | 147 | Old palette UI — replaced by MaterialPaletteModal.tsx |
-| `Palette.tsx` | 262 | Old palette component — replaced by MaterialPaletteModal.tsx |
-| `PricingWidget.tsx` | 77 | Old pricing display — replaced by BudgetModal.tsx |
-| `StyleSelector.tsx` | 88 | Old style picker — replaced by theme system in Sidebar |
-| `ViewModeToggle.tsx` | 38 | Old view toggle — replaced by TopToolbar view pill |
-| `ViewToggle.tsx` | 189 | Another old view toggle — replaced by TopToolbar view pill |
+| File | Status | Superseded By |
+|------|--------|--------------|
+| `GameHUD.tsx` | ✅ Deleted | TopToolbar + SmartHotbar |
+| `MaterialPalette.tsx` | ✅ Deleted | MaterialPaletteModal.tsx |
+| `Palette.tsx` | ✅ Deleted | MaterialPaletteModal.tsx |
+| `PricingWidget.tsx` | ✅ Deleted | BudgetModal.tsx |
+| `StyleSelector.tsx` | ✅ Deleted | Theme system in Sidebar |
+| `ViewModeToggle.tsx` | ✅ Deleted | TopToolbar view pill |
+| `ViewToggle.tsx` | ✅ Deleted | TopToolbar view pill |
+| `PhysicsUtils.ts` | ✅ Deleted | Rapier not installed |
+| `ProxyGeometry.ts` | ✅ Deleted | Not imported |
+| `SelectionManager.ts` | ✅ Deleted | selectionSlice |
+| `InputMap.ts` | ✅ Deleted | Not imported |
 
-**Recommendation:** Delete all 7 files. They are not imported anywhere and have been fully superseded.
-
----
-
-## Confirmed Dead Code (Utility files)
-
-| File | Lines | Notes |
-|------|-------|-------|
-| `src/utils/PhysicsUtils.ts` | 171 | Rapier physics utilities — Rapier is not installed |
-| `src/utils/ProxyGeometry.ts` | 164 | Proxy geometry builder — not imported |
-| `src/utils/SelectionManager.ts` | 190 | Old selection system — replaced by selectionSlice |
-| `src/systems/InputMap.ts` | 115 | Input mapping system — not imported |
-
-**Recommendation:** Delete all 4 files.
+**No action required.** Codebase is clean.
 
 ---
 

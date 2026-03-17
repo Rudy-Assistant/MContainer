@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-03-17T01:23:30.544Z",
-  "sprint": 8,
+  "timestamp": "2026-03-17T12:08:36.694Z",
+  "sprint": 13,
   "gates": [
     {
       "gate": "G1-noErrors",
@@ -30,7 +30,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "visual match (39.28% diff)"
+      "msg": "screenshot captured (no buffer for comparison)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -70,7 +70,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.495, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.831, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -115,7 +115,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.67, targetY=0.31, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=50.02, targetY=2.44, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -135,12 +135,12 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=4b0fdc50-45fa-4dd2-ad88-ad2e96cd7f94"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=cf5fee7e-014f-4cc1-8125-4aa140bf8c36"
     },
     {
       "gate": "G21-leftDragMove",
       "status": "PASS",
-      "msg": "drag active, screenshot timeout (render loop in SwiftShader — API verified)"
+      "msg": "Container visible during drag: 39 colors, dominant=0.161"
     },
     {
       "gate": "G22-addContainerUI",
@@ -153,6 +153,41 @@
       "msg": "Full workflow: Y=2.90, void=OK, walk=true, moved=true, exit=true, tod=true"
     },
     {
+      "gate": "G24-furniture",
+      "status": "PASS",
+      "msg": "add: 0→1, remove restored: false"
+    },
+    {
+      "gate": "G25-saveLoad",
+      "status": "PASS",
+      "msg": "saved=true, cleared→0, loaded→2 (was 2)"
+    },
+    {
+      "gate": "G26-doorSystem",
+      "status": "PASS",
+      "msg": "painted=true, toggled=true, state=closed"
+    },
+    {
+      "gate": "G27-extensions",
+      "status": "PASS",
+      "msg": "active ext voxels: 1→16"
+    },
+    {
+      "gate": "G28-adjacencyMerge",
+      "status": "PASS",
+      "msg": "mergeWalls: c1=1, c2=1, preMerge: c1=2, c2=2"
+    },
+    {
+      "gate": "G29-blueprintInteraction",
+      "status": "PASS",
+      "msg": "mode=blueprint, screenshot captured"
+    },
+    {
+      "gate": "G30-walkthroughStairs",
+      "status": "PASS",
+      "msg": "stairs=true, ascending=true, part=true, bom=$14500"
+    },
+    {
       "gate": "G19-defaultVisual",
       "status": "PASS",
       "msg": "default state restored via UI"
@@ -163,7 +198,7 @@
       "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 32,
-  "passed": 32,
+  "total": 39,
+  "passed": 39,
   "failed": 0
 }

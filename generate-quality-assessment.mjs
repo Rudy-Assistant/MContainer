@@ -26,17 +26,17 @@ const FEATURE_GATES = {
   'Drag-to-Move':        ['G21-leftDragMove'],
   'Add Container UI':    ['G22-addContainerUI'],
   'Two-Level Home':      ['G23-twoLevelHome'],
+  'Furniture':           ['G24-furniture'],
+  'Save/Load':           ['G25-saveLoad'],
+  'Door System':         ['G26-doorSystem'],
+  'Extension System':    ['G27-extensions'],
+  'Adjacency':           ['G28-adjacencyMerge'],
+  'Blueprint':           ['G5-blueprintMode', 'G29-blueprintInteraction'],
+  'Walkthrough':         ['G8-walkthrough', 'G8-fpWalking', 'G30-walkthroughStairs'],
 };
 
-const UNGATED_FEATURES = [
-  'Furniture',
-  'Walkthrough',
-  'Blueprint',
-  'Save/Load',
-  'Door System',
-  'Extension System',
-  'Adjacency',
-];
+// Previously ungated features — now gated as of Sprint 13.
+const UNGATED_FEATURES = [];
 
 let report;
 try {
