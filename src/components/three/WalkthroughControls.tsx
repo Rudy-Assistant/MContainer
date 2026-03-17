@@ -210,32 +210,62 @@ function generateInteriorTourWaypoints(): { waypoints: THREE.Vector3[]; center: 
       wp.push(new THREE.Vector3(ib.minX + INSET, floorY, ib.minZ + INSET));
     }
 
-    // 3. Find stairs to transition to the next level
+    // 3. Find voxel stairs to transition to the next level.
+    // Uses voxel grid (single source of truth) instead of furniture items.
+    // Finds the first 'lower' stair voxel on this level and generates 10
+    // ascending waypoints matching the actual tread geometry.
+    stairSearch:
     for (const c of containers) {
-      for (const item of c.furniture) {
-        if (item.type !== FurnitureType.Stairs) continue;
-        const cosR = Math.cos(c.rotation), sinR = Math.sin(c.rotation);
-        const wx = c.position.x + item.position.x * cosR - item.position.z * sinR;
-        const wz = c.position.z + item.position.x * sinR + item.position.z * cosR;
+      if (!c.voxelGrid) continue;
+      const dims = CONTAINER_DIMENSIONS[c.size];
+      const VOXEL_LEVELS = 2;
+      const vHeight = dims.height / VOXEL_LEVELS;
+      const colPitch = dims.length / 6;
+      const rowPitch = dims.width / (VOXEL_ROWS - 2);
+      const cosR = Math.cos(c.rotation), sinR = Math.sin(c.rotation);
+
+      for (let vi = 0; vi < c.voxelGrid.length; vi++) {
+        const voxel = c.voxelGrid[vi];
+        if (!voxel?.active || voxel.voxelType !== 'stairs') continue;
+        if (voxel.stairPart === 'upper') continue; // start from entry (lower/single)
+
+        const level = Math.floor(vi / (VOXEL_COLS * VOXEL_ROWS));
+        const rowLocal = Math.floor((vi % (VOXEL_COLS * VOXEL_ROWS)) / VOXEL_COLS);
+        const col = vi % VOXEL_COLS;
+
+        // Local position (same negated-X logic as ContainerSkin)
+        const lx = -(col - 3.5) * colPitch;
+        const lz = (rowLocal - 1.5) * rowPitch;
+        const baseY = c.position.y + level * vHeight;
+
+        // World position
+        const wx = c.position.x + lx * cosR - lz * sinR;
+        const wz = c.position.z + lx * sinR + lz * cosR;
 
         // Walk to staircase base
         wp.push(new THREE.Vector3(wx, floorY, wz));
 
+        // Ascending direction → world offset per step
+        const ascending = voxel.stairAscending ?? (voxel.stairDir === 'ns' ? 'n' : 'e');
+        // Delta in local space per full stair height
+        const dLocal = ascending === 'n' ? { x: 0, z: -rowPitch }
+                     : ascending === 's' ? { x: 0, z: rowPitch }
+                     : ascending === 'e' ? { x: colPitch, z: 0 }  // negated-X: e = +col = -local X... but ascending toward neighbor
+                     : /* 'w' */           { x: -colPitch, z: 0 };
+
         // Walk up stairs (10 intermediate waypoints)
-        const h = CONTAINER_DIMENSIONS[c.size].height;
-        const stairCat = FURNITURE_CATALOG.find(cat => cat.type === FurnitureType.Stairs)!;
-        const stairDir = new THREE.Vector2(Math.sin(item.rotation), Math.cos(item.rotation));
         for (let s = 1; s <= 10; s++) {
           const t = s / 10;
-          const dy = t * h;
-          const offset = t * stairCat.dims.width;
+          const dy = t * vHeight;
+          const dlx = t * dLocal.x;
+          const dlz = t * dLocal.z;
           wp.push(new THREE.Vector3(
-            wx + stairDir.x * offset,
-            floorY + dy,
-            wz + stairDir.y * offset
+            wx + dlx * cosR - dlz * sinR,
+            baseY + dy,
+            wz + dlx * sinR + dlz * cosR,
           ));
         }
-        break; // Use first staircase at this level
+        break stairSearch; // Use first staircase at this level
       }
     }
   }
@@ -533,7 +563,10 @@ export default function WalkthroughControls() {
           const pz = (rowLocal - 1.5) * rowPitch;
           const py = c.position.y + level * vHeight; // base of this voxel level
 
-          const isNS = voxel.stairDir !== 'ew';
+          // Use stairAscending (modern) with stairDir fallback (legacy persisted data).
+          // Direction within axis doesn't affect tread positions — treads tile the full voxel.
+          const ascending = voxel.stairAscending ?? (voxel.stairDir === 'ns' ? 'n' : 'e');
+          const isNS = ascending === 'n' || ascending === 's';
           const stepH = vHeight / STEPS;
           const treadLen = (isNS ? voxDLocal : voxWLocal) / STEPS;
 

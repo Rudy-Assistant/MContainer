@@ -72,6 +72,15 @@ let _useStoreRef: any = null;
 export function setVoxelStoreRef(ref: any) { _useStoreRef = ref; }
 
 // ── Shared staircase constants ──────────────────────────────
+// STAIR SYSTEM DESIGN (unified):
+// - applyStairsFromFace is the SINGLE SOURCE OF TRUTH for stair placement.
+// - All entry points (setVoxelFace('Stairs'), applyModule('stairs'), stampStaircase)
+//   delegate to applyStairsFromFace.
+// - stairAscending ('n'|'s'|'e'|'w') is the canonical direction field.
+// - stairDir ('ns'|'ew') is DEPRECATED — derived from stairAscending for backward
+//   compat with persisted data. Will be removed in a future migration sprint.
+// - stairPart ('lower'|'upper'|'single') identifies entry vs ascent voxel in 2-voxel pairs.
+//   BOM counts only 'lower'/'single' to avoid double-counting.
 const STAIR_FLIP: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
 const ASCEND_DELTA: Record<string, { dr: number; dc: number }> = {
   n: { dr: -1, dc: 0 }, s: { dr: 1, dc: 0 },

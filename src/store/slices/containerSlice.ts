@@ -1061,6 +1061,17 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           }
         }
       }
+
+      // ── Stair voxel cost ──────────────────────────────────
+      // Count once per staircase: only 'lower' or 'single' parts (not 'upper').
+      // Cost matches FURNITURE_CATALOG Stairs entry ($4500).
+      if (c.voxelGrid) {
+        for (const voxel of c.voxelGrid) {
+          if (voxel?.voxelType === 'stairs' && voxel.stairPart !== 'upper') {
+            modulesCost += 4500;
+          }
+        }
+      }
     }
 
     const total = containersCost + modulesCost + cutsCost;

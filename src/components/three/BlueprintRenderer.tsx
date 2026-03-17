@@ -241,10 +241,11 @@ function VoxelBlueprintGrid({
             })}
 
             {/* Stair direction arrow */}
-            {voxel.voxelType === 'stairs' && voxel.stairAscending && (
+            {/* Stair direction arrow — uses stairAscending (modern) with stairDir fallback (legacy saves) */}
+            {voxel.voxelType === 'stairs' && (voxel.stairAscending || voxel.stairDir) && (
               <StairArrow
                 px={px} pz={pz} voxW={voxW} voxD={voxD}
-                ascending={voxel.stairAscending}
+                ascending={voxel.stairAscending ?? (voxel.stairDir === 'ns' ? 'n' : 'e')}
               />
             )}
 
