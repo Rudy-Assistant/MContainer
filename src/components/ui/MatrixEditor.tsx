@@ -20,7 +20,7 @@ import {
   CONTAINER_DIMENSIONS,
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
-import VoxelPreview3D from "@/components/ui/VoxelPreview3D";
+import VoxelPreview3D, { GroupedVoxelPreview } from "@/components/ui/VoxelPreview3D";
 import { BookmarkPlus } from "lucide-react";
 import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
 
@@ -50,8 +50,8 @@ const SURFACE_COLORS: Record<SurfaceType, string> = {
 };
 
 /** Derive a single representative color from a voxel's faces */
-function cellColor(faces: { n: SurfaceType; s: SurfaceType; e: SurfaceType; w: SurfaceType; top: SurfaceType }): string {
-  for (const f of [faces.n, faces.s, faces.e, faces.w, faces.top]) {
+function cellColor(faces: { n: SurfaceType; s: SurfaceType; e: SurfaceType; w: SurfaceType; top: SurfaceType; bottom: SurfaceType }): string {
+  for (const f of [faces.n, faces.s, faces.e, faces.w, faces.top, faces.bottom]) {
     if (f !== "Open") return SURFACE_COLORS[f] ?? "#78909c";
   }
   return "transparent";
@@ -72,6 +72,8 @@ function GridCell({
   syncFace,
   isCore,
   isLocked,
+  gridColumn,
+  gridRow,
   onHover,
   onLeave,
   onEdgeHover,
@@ -93,6 +95,8 @@ function GridCell({
   syncFace: string | null; // face synced from Cell View hover or context menu
   isCore: boolean;
   isLocked: boolean;
+  gridColumn?: number;
+  gridRow?: number;
   onHover: () => void;
   onLeave: () => void;
   onEdgeHover: (face: string) => void;
@@ -109,7 +113,8 @@ function GridCell({
   // Determine effective edge highlight: direct 3D hover > Cell View sync > context menu
   const effectiveEdge = edgeFace || syncFace;
 
-  const borderStyle = isSelected && syncFace
+  // Always use longhand border properties to avoid React shorthand/longhand conflict warnings
+  const borderStyle: React.CSSProperties = isSelected && syncFace
     ? {
         borderTop:    syncFace === "n" ? "3px solid #06b6d4" : "2px solid #2563eb",
         borderBottom: syncFace === "s" ? "3px solid #06b6d4" : "2px solid #2563eb",
@@ -117,12 +122,12 @@ function GridCell({
         borderLeft:   syncFace === "w" ? "3px solid #06b6d4" : "2px solid #2563eb",
       }
     : isSelected
-      ? { border: "2px solid #2563eb" }
+      ? { borderTop: "2px solid #2563eb", borderBottom: "2px solid #2563eb", borderLeft: "2px solid #2563eb", borderRight: "2px solid #2563eb" }
     : isMultiSelected
-      ? { border: "2px solid #1565c0" }
+      ? { borderTop: "2px solid #1565c0", borderBottom: "2px solid #1565c0", borderLeft: "2px solid #1565c0", borderRight: "2px solid #1565c0" }
     : isHovered && effectiveEdge
       ? (effectiveEdge === "top" || effectiveEdge === "bottom")
-        ? { border: "2px solid #fde047", background: `rgba(253,224,71,0.25)` }
+        ? { borderTop: "2px solid #fde047", borderBottom: "2px solid #fde047", borderLeft: "2px solid #fde047", borderRight: "2px solid #fde047", background: `rgba(253,224,71,0.25)` }
         : {
             borderTop:    effectiveEdge === "n" ? "3px solid #fde047" : "1px solid #fef08a",
             borderBottom: effectiveEdge === "s" ? "3px solid #fde047" : "1px solid #fef08a",
@@ -130,10 +135,10 @@ function GridCell({
             borderLeft:   effectiveEdge === "w" ? "3px solid #fde047" : "1px solid #fef08a",
           }
       : isHovered
-        ? { border: "2px solid #fef08a" }
+        ? { borderTop: "2px solid #fef08a", borderBottom: "2px solid #fef08a", borderLeft: "2px solid #fef08a", borderRight: "2px solid #fef08a" }
         : isCore
-          ? { border: "2px solid #cbd5e1", borderRadius: 8 }
-          : { border: "2px solid #e5e7eb", borderRadius: 8 };
+          ? { borderTop: "2px solid var(--border, #cbd5e1)", borderBottom: "2px solid var(--border, #cbd5e1)", borderLeft: "2px solid var(--border, #cbd5e1)", borderRight: "2px solid var(--border, #cbd5e1)", borderRadius: 8 }
+          : { borderTop: "2px solid #e5e7eb", borderBottom: "2px solid #e5e7eb", borderLeft: "2px solid #e5e7eb", borderRight: "2px solid #e5e7eb", borderRadius: 8 };
 
   // ★ Fix 5: Edge hotspot base style
   const edgeHotBase: React.CSSProperties = {
@@ -158,8 +163,10 @@ function GridCell({
         overflow: "hidden",
         borderRadius: 8,
         cursor: "pointer",
+        ...(gridColumn ? { gridColumn } : {}),
+        ...(gridRow ? { gridRow } : {}),
         ...borderStyle,
-        background: active ? (color === "transparent" ? "#f8fafc" : color) : (isCore ? "#f1f5f9" : "#fafbfc"),
+        background: active ? (color === "transparent" ? "var(--surface-alt, #f8fafc)" : color) : (isCore ? "var(--input-bg, #f1f5f9)" : "var(--surface-alt, #fafbfc)"),
         boxShadow: active ? "inset 0 0 0 1px rgba(0,0,0,0.1)" : isHovered ? "0 0 0 1px #fef08a, 0 1px 4px rgba(254,240,138,0.3)" : "none",
         transition: "all 80ms ease",
       }}
@@ -280,8 +287,11 @@ function VoxelGrid({
   const coreDepth = dims.width / 2;          // Z per core row: 1.22m
   const foldDepth = dims.height;             // halo outward projection = container height
 
-  const gridCols = `${foldDepth}fr repeat(6, ${coreWidth}fr) ${foldDepth}fr`;
-  const gridRows = `${foldDepth}fr repeat(2, ${coreDepth}fr) ${foldDepth}fr`;
+  // Grid with spacer tracks between extension and body zones.
+  // Layout: ext | 2px spacer | 6×body | 2px spacer | ext  (10 columns)
+  //         ext | 2px spacer | 2×body | 2px spacer | ext  (6 rows)
+  const gridCols = `${foldDepth}fr 2px repeat(6, ${coreWidth}fr) 2px ${foldDepth}fr`;
+  const gridRows = `${foldDepth}fr 2px repeat(2, ${coreDepth}fr) 2px ${foldDepth}fr`;
   const totalW   = 2 * foldDepth + 6 * coreWidth;  // total physical width of 8-col grid
   const totalD   = 2 * foldDepth + 2 * coreDepth;  // total physical depth of 4-row grid
 
@@ -383,6 +393,22 @@ function VoxelGrid({
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, [containerId, marqueeCells, setSelectedVoxels]);
 
+  // Map data col (0-7) to CSS grid column (1-indexed, with spacer tracks at 2 and 9)
+  // Grid: ext(1) | spacer(2) | body×6(3-8) | spacer(9) | ext(10)
+  // Columns are REVERSED in render: col 7 renders first (leftmost), col 0 last (rightmost)
+  const colToGridCol = (col: number): number => {
+    if (col === 0) return 10;   // extension right
+    if (col === 7) return 1;    // extension left
+    return 9 - col;             // body cols 6→3, 5→4, 4→5, 3→6, 2→7, 1→8
+  };
+  // Map data row (0-3) to CSS grid row (1-indexed, with spacer tracks at 2 and 5)
+  // Grid: ext(1) | spacer(2) | body×2(3-4) | spacer(5) | ext(6)
+  const rowToGridRow = (row: number): number => {
+    if (row === 0) return 1;    // extension top
+    if (row === 3) return 6;    // extension bottom
+    return row + 2;             // body rows 1→3, 2→4
+  };
+
   // Build rows (0=north → 3=south), columns REVERSED so col 0 (+X, FRONT) is on RIGHT
   const rows = useMemo(() => {
     const r: { voxelIndex: number; col: number; row: number; active: boolean; color: string; floorColor: string; isCore: boolean; isLocked: boolean }[][] = [];
@@ -410,34 +436,8 @@ function VoxelGrid({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {/* Orientation labels — BACK on left (col 7, -X), FRONT on right (col 0, +X) */}
-      <div style={{ display: "flex", justifyContent: "space-between", padding: "0 14px 0 14px" }}>
-        <span style={{
-          fontSize: 8, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em",
-          textTransform: "uppercase",
-        }}>
-          BACK
-        </span>
-        <span style={{
-          fontSize: 8, fontWeight: 800, color: "#2563eb", letterSpacing: "0.08em",
-          textTransform: "uppercase",
-        }}>
-          FRONT
-        </span>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
-        {/* Left axis label */}
-        <div style={{
-          display: "flex", flexDirection: "column", justifyContent: "space-between",
-          padding: "2px 0", minWidth: 10,
-        }}>
-          <span style={{ fontSize: 7, fontWeight: 700, color: "#94a3b8", lineHeight: 1 }}>N</span>
-          <span style={{ fontSize: 7, fontWeight: 700, color: "#94a3b8", lineHeight: 1 }}>S</span>
-        </div>
-
-        {/* ★ Aspect-ratio wrapper — forces deterministic height from width so fr tracks distribute correctly */}
-        <div style={{ flex: 1, width: "100%", height: "auto", aspectRatio: `${totalW} / ${totalD}` }}>
+      {/* ★ Aspect-ratio wrapper — forces deterministic height from width so fr tracks distribute correctly */}
+      <div style={{ width: "100%", height: "auto", aspectRatio: `${totalW} / ${totalD}` }}>
           {/* Main 8×4 grid — parametric columns + rows matching physical container proportions */}
           <div style={{
             width: "100%",
@@ -449,10 +449,26 @@ function VoxelGrid({
             justifyItems: "stretch",
             gap: 2,
             padding: "4px",
-            background: "#f1f5f9",
+            background: "var(--input-bg, #f1f5f9)",
             borderRadius: 6,
-            border: "2px solid #1e293b",
+            position: "relative",
           }}>
+          {/* Body/Core outline — highlights the interior container cells.
+              position:absolute so it doesn't occupy grid cells and displace body voxels.
+              Offset places border at the grid-line between extension and body tracks,
+              creating equal padding on both sides (matching the grid gap). */}
+          {/* Body/core border — centered on the spacer tracks between extensions and body */}
+          <div style={{
+            position: "absolute",
+            top: `calc(${(foldDepth / totalD) * 100}% + 3px)`,
+            bottom: `calc(${(foldDepth / totalD) * 100}% + 3px)`,
+            left: `calc(${(foldDepth / totalW) * 100}% + 3px)`,
+            right: `calc(${(foldDepth / totalW) * 100}% + 3px)`,
+            border: "2px solid var(--text-main, #1e293b)",
+            borderRadius: 4,
+            pointerEvents: "none",
+            zIndex: 1,
+          }} />
           {rows.flat().map((cell) => {
             // ★ Strict union guard: extension → match col/row, real voxel → match index
             const isThisHovered = !!(
@@ -500,6 +516,8 @@ function VoxelGrid({
                 syncFace={syncFace}
                 isCore={cell.isCore}
                 isLocked={cell.isLocked}
+                gridColumn={colToGridCol(cell.col)}
+                gridRow={rowToGridRow(cell.row)}
                 onHover={() => handleHover(cell.voxelIndex)}
                 onLeave={handleLeave}
                 onEdgeHover={(face) => handleEdgeHover(cell.voxelIndex, face)}
@@ -512,7 +530,6 @@ function VoxelGrid({
             );
           })}
           </div>
-        </div>
       </div>
     </div>
   );
@@ -540,9 +557,9 @@ function LevelToggle({
             borderRadius: 4,
             fontSize: 9,
             fontWeight: activeLevel === l ? 700 : 500,
-            border: activeLevel === l ? "1px solid #2563eb" : "1px solid #e2e8f0",
-            background: activeLevel === l ? "#eff6ff" : "#fff",
-            color: activeLevel === l ? "#2563eb" : "#94a3b8",
+            border: activeLevel === l ? "1px solid var(--accent, #2563eb)" : "1px solid var(--border, #e2e8f0)",
+            background: activeLevel === l ? "var(--accent, #2563eb)" : "var(--btn-bg, #fff)",
+            color: activeLevel === l ? "#fff" : "var(--text-dim, #94a3b8)",
             cursor: "pointer",
             transition: "all 100ms ease",
           }}
@@ -570,8 +587,24 @@ function SimpleBayGrid({
   const setSelectedVoxel = useStore((s) => s.setSelectedVoxel);
   const setSelectedVoxels = useStore((s) => s.setSelectedVoxels);
   const activeBrush = useStore((s) => s.activeBrush);
+  const activeSlot = useStore((s) => s.activeHotbarSlot);
   const setVoxelFace = useStore((s) => s.setVoxelFace);
+  const setHoveredBayGroup = useStore((s) => s.setHoveredBayGroup);
+  const selectedVoxels = useStore((s) => s.selectedVoxels);
+  const selectedVoxel = useStore((s) => s.selectedVoxel);
+  const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
   const voxelGrid = container.voxelGrid ?? createDefaultVoxelGrid();
+  const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
+  const dims = CONTAINER_DIMENSIONS[container.size];
+
+  const hasTool = activeBrush !== null || activeSlot !== null;
+
+  // Proportional grid template matching actual container dimensions
+  const coreWidth = dims.length / 6;    // ~2.03m per body col
+  const coreDepth = dims.width / 2;     // 1.22m per body row
+  const foldDepth = dims.height;        // 2.90m extension projection
+  const gridCols = `${foldDepth}fr 2px repeat(6, ${coreWidth}fr) 2px ${foldDepth}fr`;
+  const gridRows = `${foldDepth}fr 2px repeat(2, ${coreDepth}fr) 2px ${foldDepth}fr`;
 
   const handleBayClick = useCallback((group: BayGroup) => {
     const indices = group.voxelIndices.map((i) => level * VOXEL_ROWS * VOXEL_COLS + i);
@@ -587,7 +620,7 @@ function SimpleBayGrid({
       return;
     }
 
-    // Select all voxels in group
+    // Select all voxels in group (store handles mutual exclusion)
     if (indices.length === 1) {
       setSelectedVoxel({ containerId, index: indices[0] });
     } else {
@@ -595,13 +628,27 @@ function SimpleBayGrid({
     }
   }, [level, containerId, activeBrush, setVoxelFace, setSelectedVoxel, setSelectedVoxels]);
 
+  const handleBayHover = useCallback((group: BayGroup) => {
+    setHoveredGroupId(group.id);
+    const indices = group.voxelIndices.map((i) => level * VOXEL_ROWS * VOXEL_COLS + i);
+    setHoveredBayGroup({ containerId, indices });
+  }, [level, containerId, setHoveredBayGroup]);
+
+  const handleBayLeave = useCallback(() => {
+    setHoveredGroupId(null);
+    setHoveredBayGroup(null);
+  }, [setHoveredBayGroup]);
+
+  // Brush preview color for ghost overlay
+  const brushPreviewColor = activeBrush ? (SURFACE_COLORS[activeBrush] ?? "#78909c") : null;
+
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "repeat(8, 1fr)",
-      gridTemplateRows: "repeat(4, 1fr)",
+      gridTemplateColumns: gridCols,
+      gridTemplateRows: gridRows,
       gap: "2px",
-      aspectRatio: "2 / 1",
+      aspectRatio: `${dims.length + 2 * dims.height} / ${dims.width + 2 * dims.height}`,
     }}>
       {BAY_GROUPS.map((group) => {
         // Compute dominant color from voxels in this group
@@ -611,35 +658,246 @@ function SimpleBayGrid({
           if (!v) return "transparent";
           return cellColor(v.faces);
         });
-        const dominantColor = colors.find((c) => c !== "transparent") ?? "#f1f5f9";
+        const dominantColor = colors.find((c) => c !== "transparent") ?? "var(--input-bg, #f1f5f9)";
+
+        // Check if this bay group is currently selected or hovered
+        const levelOffset = level * VOXEL_ROWS * VOXEL_COLS;
+        // Hover: local state (2D hover) OR store (3D hover reflected in 2D)
+        const isHoveredFrom3D = hoveredBayGroup && hoveredBayGroup.containerId === containerId &&
+          group.voxelIndices.some((i) => hoveredBayGroup.indices.includes(levelOffset + i));
+        const isHovered = hoveredGroupId === group.id || !!isHoveredFrom3D;
+        const groupIndicesAtLevel = group.voxelIndices.map((i) => levelOffset + i);
+        const isSelected = (() => {
+          // Multi-select: check if selectedVoxels matches this group
+          if (selectedVoxels && selectedVoxels.containerId === containerId) {
+            return groupIndicesAtLevel.every((idx) => selectedVoxels.indices.includes(idx));
+          }
+          // Single select: check if selectedVoxel is in this group (for 1-voxel groups)
+          if (selectedVoxel && selectedVoxel.containerId === containerId && !selectedVoxel.isExtension && selectedVoxel.index !== undefined) {
+            return groupIndicesAtLevel.includes(selectedVoxel.index);
+          }
+          return false;
+        })();
+
+        // Ghost preview: when hovering with a tool, show what the result would look like
+        const showBrushPreview = isHovered && hasTool && brushPreviewColor;
+        const bgColor = showBrushPreview
+          ? brushPreviewColor
+          : dominantColor === "transparent" ? "var(--surface-alt, #f8fafc)" : dominantColor;
+
+        // Adjust grid positions for spacer tracks (col 2 and col 9 are 2px spacers)
+        const adjCol = group.gridCol <= 1 ? group.gridCol : group.gridCol <= 7 ? group.gridCol + 1 : group.gridCol + 2;
+        const adjRow = group.gridRow <= 1 ? group.gridRow : group.gridRow <= 3 ? group.gridRow + 1 : group.gridRow + 2;
 
         return (
           <button
             key={group.id}
             onClick={() => handleBayClick(group)}
+            onMouseEnter={() => handleBayHover(group)}
+            onMouseLeave={handleBayLeave}
             style={{
-              gridRow: `${group.gridRow} / span ${group.rowSpan}`,
-              gridColumn: `${group.gridCol} / span ${group.colSpan}`,
-              background: dominantColor === "transparent" ? "#f8fafc" : dominantColor,
-              border: "1px solid #e2e8f0",
+              gridRow: `${adjRow} / span ${group.rowSpan}`,
+              gridColumn: `${adjCol} / span ${group.colSpan}`,
+              background: bgColor,
+              border: isSelected
+                ? "2px solid #3b82f6"  // blue selection ring
+                : isHovered
+                  ? hasTool
+                    ? "2px solid #fbbf24"  // amber ring when tool active
+                    : "2px solid #94a3b8"  // neutral hover
+                  : "2px solid var(--border, #e2e8f0)",  // default
               borderRadius: "6px",
-              cursor: "pointer",
+              cursor: hasTool ? "crosshair" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "8px",
+              fontSize: "7px",
               fontWeight: 600,
-              color: dominantColor === "transparent" || dominantColor === "#f1f5f9" ? "#94a3b8" : "#fff",
-              textShadow: dominantColor !== "transparent" && dominantColor !== "#f1f5f9" ? "0 1px 2px rgba(0,0,0,0.3)" : "none",
+              minWidth: 0,       // allow grid fr to control sizing
+              overflow: "hidden", // prevent text from forcing wider
+              color: (showBrushPreview || (dominantColor !== "transparent" && dominantColor !== "var(--input-bg, #f1f5f9)")) ? "#fff" : "#94a3b8",
+              textShadow: (showBrushPreview || (dominantColor !== "transparent" && dominantColor !== "var(--input-bg, #f1f5f9)")) ? "0 1px 2px rgba(0,0,0,0.3)" : "none",
               transition: "all 100ms ease",
               opacity: group.role === 'corner' ? 0.6 : 1,
+              boxShadow: isSelected
+                ? "0 0 8px rgba(59,130,246,0.4), inset 0 0 0 1px rgba(255,255,255,0.3)"
+                : isHovered && hasTool
+                  ? "0 0 8px rgba(251,191,36,0.5), inset 0 0 0 1px rgba(255,255,255,0.3)"
+                  : isHovered
+                    ? "0 0 6px rgba(148,163,184,0.3)"
+                    : "none",
+              position: "relative",
             }}
-            title={group.label}
+            title={`${group.label}${hasTool ? " — click to apply" : ""}`}
           >
             {group.label}
+            {/* Ghost preview overlay when hovering with tool */}
+            {showBrushPreview && (
+              <div style={{
+                position: "absolute", inset: 0, borderRadius: 4,
+                background: "linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 100%)",
+                pointerEvents: "none",
+              }} />
+            )}
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// ── Frame Grid Overlay ────────────────────────────────────────
+
+function FrameGridOverlay({ containerId, level }: { containerId: string; level: number }) {
+  const selectedFrameElement = useStore((s) => s.selectedFrameElement);
+  const setSelectedFrameElement = useStore((s) => s.setSelectedFrameElement);
+  const container = useStore((s) => s.containers[containerId]);
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+
+  const rows = VOXEL_ROWS; // 4
+  const cols = VOXEL_COLS; // 8
+
+  const padding = 12;
+  const cellW = 28;
+  const cellH = 28;
+  const svgW = cols * cellW + padding * 2;
+  const svgH = rows * cellH + padding * 2;
+
+  const HOVER_COLOR = '#ffcc00';
+  const SELECT_COLOR = '#00bcd4';
+  const GRID_COLOR = '#94a3b8';
+  const BG_COLOR = '#f8fafc';
+  const HIDDEN_DASH = '3,2';
+
+  const sel = selectedFrameElement;
+
+  const rails: React.ReactElement[] = [];
+  const poles: React.ReactElement[] = [];
+
+  // Horizontal rails: (rows+1) horizontal lines, each divided into `cols` segments
+  for (let vr = 0; vr <= rows; vr++) {
+    for (let c = 0; c < cols; c++) {
+      const key = `r${vr}c${c}_h`;
+      const isHovered = hoveredElement === key;
+      const isSelected = sel?.key === key && sel?.containerId === containerId;
+      const override = container?.railOverrides?.[key];
+      const isHidden = override?.visible === false;
+
+      const x1 = padding + c * cellW;
+      const x2 = padding + (c + 1) * cellW;
+      const y = padding + vr * cellH;
+
+      rails.push(
+        <line key={`line_${key}`}
+          x1={x1} y1={y} x2={x2} y2={y}
+          stroke={isSelected ? SELECT_COLOR : isHovered ? HOVER_COLOR : GRID_COLOR}
+          strokeWidth={isSelected ? 3 : isHovered ? 2.5 : 1}
+          strokeDasharray={isHidden ? HIDDEN_DASH : undefined}
+        />
+      );
+      rails.push(
+        <rect key={`hit_${key}`}
+          x={x1} y={y - 4} width={cellW} height={8}
+          fill="transparent"
+          style={{ cursor: 'pointer' }}
+          onMouseEnter={() => setHoveredElement(key)}
+          onMouseLeave={() => setHoveredElement(null)}
+          onClick={() => setSelectedFrameElement({ containerId, key, type: 'rail' })}
+        />
+      );
+    }
+  }
+
+  // Vertical rails: (cols+1) vertical lines, each divided into `rows` segments
+  for (let r = 0; r < rows; r++) {
+    for (let vc = 0; vc <= cols; vc++) {
+      const key = `r${r}c${vc}_v`;
+      const isHovered = hoveredElement === key;
+      const isSelected = sel?.key === key && sel?.containerId === containerId;
+      const override = container?.railOverrides?.[key];
+      const isHidden = override?.visible === false;
+
+      const x = padding + vc * cellW;
+      const y1 = padding + r * cellH;
+      const y2 = padding + (r + 1) * cellH;
+
+      rails.push(
+        <line key={`line_${key}`}
+          x1={x} y1={y1} x2={x} y2={y2}
+          stroke={isSelected ? SELECT_COLOR : isHovered ? HOVER_COLOR : GRID_COLOR}
+          strokeWidth={isSelected ? 3 : isHovered ? 2.5 : 1}
+          strokeDasharray={isHidden ? HIDDEN_DASH : undefined}
+        />
+      );
+      rails.push(
+        <rect key={`hit_${key}`}
+          x={x - 4} y={y1} width={8} height={cellH}
+          fill="transparent"
+          style={{ cursor: 'pointer' }}
+          onMouseEnter={() => setHoveredElement(key)}
+          onMouseLeave={() => setHoveredElement(null)}
+          onClick={() => setSelectedFrameElement({ containerId, key, type: 'rail' })}
+        />
+      );
+    }
+  }
+
+  // Poles at intersections: (rows+1) × (cols+1) vertices
+  for (let vr = 0; vr <= rows; vr++) {
+    for (let vc = 0; vc <= cols; vc++) {
+      const poleRow = Math.min(vr, rows - 1);
+      const poleCol = Math.min(vc, cols - 1);
+      const corner = `${vr === 0 ? 'n' : vr === rows ? 's' : vr <= poleRow ? 'n' : 's'}${vc === 0 ? 'w' : vc === cols ? 'e' : vc <= poleCol ? 'w' : 'e'}`;
+      const key = `l${level}r${poleRow}c${poleCol}_${corner}`;
+
+      const isHovered = hoveredElement === key;
+      const isSelected = sel?.key === key && sel?.containerId === containerId;
+      const override = container?.poleOverrides?.[key];
+      const isHidden = override?.visible === false;
+
+      const cx = padding + vc * cellW;
+      const cy = padding + vr * cellH;
+      const radius = isSelected ? 5 : isHovered ? 4.5 : 3;
+
+      poles.push(
+        <circle key={`pole_${key}`}
+          cx={cx} cy={cy} r={radius}
+          fill={isHidden ? 'transparent' : isSelected ? SELECT_COLOR : isHovered ? HOVER_COLOR : '#64748b'}
+          stroke={isHidden ? GRID_COLOR : 'none'}
+          strokeWidth={isHidden ? 1 : 0}
+          strokeDasharray={isHidden ? HIDDEN_DASH : undefined}
+          style={{ cursor: 'pointer' }}
+          onMouseEnter={() => setHoveredElement(key)}
+          onMouseLeave={() => setHoveredElement(null)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedFrameElement({ containerId, key, type: 'pole' });
+          }}
+        />
+      );
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg width={svgW} height={svgH} style={{ display: 'block', margin: '0 auto' }}>
+        <rect x={padding} y={padding} width={cols * cellW} height={rows * cellH}
+          fill={BG_COLOR} rx={2} />
+        {Array.from({ length: rows }).map((_, r) =>
+          Array.from({ length: cols }).map((_, c) => (
+            <rect key={`cell_${r}_${c}`}
+              x={padding + c * cellW + 1} y={padding + r * cellH + 1}
+              width={cellW - 2} height={cellH - 2}
+              fill="#f1f5f9" rx={1}
+            />
+          ))
+        )}
+        {rails}
+        {poles}
+      </svg>
+      <div style={{ textAlign: 'center', fontSize: 8, color: '#94a3b8', marginTop: 2 }}>
+        Frame Grid — {rows}×{cols}
+      </div>
     </div>
   );
 }
@@ -662,13 +920,18 @@ export default function MatrixEditor({
   const voxelGrid = container.voxelGrid ?? createDefaultVoxelGrid();
 
   const isVoxelSelected = selectedVoxel?.containerId === containerId;
+  // Bay group selection — use first index as representative voxel
+  const isBaySelected = selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 0;
   // ★ Guard: extension tiles have no grid index — skip grid lookup
   const isRealVoxel = isVoxelSelected && selectedVoxel && !selectedVoxel.isExtension;
   const isExtVoxel  = isVoxelSelected && selectedVoxel && !!selectedVoxel.isExtension;
-  const selVoxel = isRealVoxel ? voxelGrid[selectedVoxel.index] : null;
+  const selVoxel = isRealVoxel ? voxelGrid[selectedVoxel.index]
+    : isBaySelected ? voxelGrid[selectedVoxels!.indices[0]]
+    : null;
   // Compute a grid index for VoxelPreview3D — real voxels use .index, extensions derive from col/row
   const selIdx   = isRealVoxel ? selectedVoxel.index
     : isExtVoxel ? (selectedVoxel.row * VOXEL_COLS + selectedVoxel.col)
+    : isBaySelected ? selectedVoxels!.indices[0]
     : -1;
 
   const selCol = isExtVoxel ? selectedVoxel.col
@@ -712,56 +975,34 @@ export default function MatrixEditor({
     return Object.keys(override).length > 0 ? override : undefined;
   }, [selVoxel, selIdx, selCol, selRow, containerId, voxelGrid, globalCullSet]);
 
-  const [gridLevel, setGridLevel] = React.useState(0);
-
-  // Follow selected voxel's level
-  React.useEffect(() => {
-    if (isVoxelSelected && selLevel >= 0 && selLevel < VOXEL_LEVELS) {
-      setGridLevel(selLevel);
-    }
-  }, [isVoxelSelected, selLevel]);
+  const inspectorView = useStore((s) => s.inspectorView);
+  const setInspectorView = useStore((s) => s.setInspectorView);
+  const gridLevel = inspectorView === 'ceiling' ? 1 : 0;
 
   const designComplexity = useStore((s) => s.designComplexity);
   const setDesignComplexity = useStore((s) => s.setDesignComplexity);
 
+  const frameMode = useStore((s) => s.frameMode);
+  const selectedFrameElement = useStore((s) => s.selectedFrameElement);
+  const setSelectedFrameElement = useStore((s) => s.setSelectedFrameElement);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
 
-      {/* ── Section Header + Simple/Detail Toggle ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{
-          fontSize: "10px", fontWeight: 700, color: "#64748b",
-          textTransform: "uppercase", letterSpacing: "0.08em",
-        }}>
-          Block Grid
-        </div>
-        <div style={{
-          display: "flex", borderRadius: "6px", overflow: "hidden",
-          border: "1px solid #e2e8f0",
-        }}>
-          {(['simple', 'detailed'] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setDesignComplexity(mode)}
-              style={{
-                padding: "2px 8px", fontSize: "9px", fontWeight: 600,
-                border: "none", cursor: "pointer",
-                background: designComplexity === mode ? "#2563eb" : "#fff",
-                color: designComplexity === mode ? "#fff" : "#64748b",
-                transition: "all 100ms ease",
-              }}
-            >
-              {mode === 'simple' ? 'Simple' : 'Detail'}
-            </button>
-          ))}
-        </div>
+      {/* ── Section Header ── */}
+      <div style={{
+        fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #64748b)",
+        textTransform: "uppercase", letterSpacing: "0.08em",
+      }}>
+        Container Grid
       </div>
 
-      {/* ── Level Selector ── */}
-      <LevelToggle activeLevel={gridLevel} onChange={setGridLevel} />
+      {/* Level selector moved to TopToolbar (inspectorView: floor/ceiling) */}
 
-      {/* ── Bay Grid or Voxel Grid ── */}
-      {designComplexity === 'simple' ? (
+      {/* ── Frame Grid, Bay Grid, or Voxel Grid ── */}
+      {frameMode ? (
+        <FrameGridOverlay containerId={containerId} level={gridLevel} />
+      ) : designComplexity === 'simple' ? (
         <SimpleBayGrid container={container} containerId={containerId} level={gridLevel} />
       ) : (
         <VoxelGrid container={container} containerId={containerId} level={gridLevel} />
@@ -783,7 +1024,7 @@ export default function MatrixEditor({
       </div>
 
       {/* ── CubeInspector — Interactive 3D Block Preview ──── */}
-      {isVoxelSelected && selIdx >= 0 && (
+      {(isVoxelSelected || isBaySelected) && selIdx >= 0 && (
         <>
           <div style={{ height: "1px", background: "#e2e8f0" }} />
           <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
@@ -791,10 +1032,13 @@ export default function MatrixEditor({
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{
-                fontSize: "10px", fontWeight: 700, color: "#334155",
+                fontSize: "10px", fontWeight: 700, color: "var(--text-main, #334155)",
                 textTransform: "uppercase", letterSpacing: "0.06em",
               }}>
-                Block [C{selCol}, R{selRow}]{selVoxel ? ` — ${selVoxel.type}` : " — Empty"}
+                {selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1
+                  ? `${selectedVoxels.indices.length} Tiles`
+                  : `Tile Detail`
+                }
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 {selVoxel && (
@@ -805,20 +1049,20 @@ export default function MatrixEditor({
                       saveBlockToLibrary(label, f);
                     }}
                     style={{
-                      background: "none", border: "1px solid #e2e8f0", borderRadius: "4px",
+                      background: "none", border: "1px solid var(--border, #e2e8f0)", borderRadius: "4px",
                       cursor: "pointer", padding: "2px 4px",
-                      color: "#64748b", display: "flex", alignItems: "center",
+                      color: "var(--text-muted, #64748b)", display: "flex", alignItems: "center",
                       transition: "all 100ms ease",
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#f59e0b"; e.currentTarget.style.borderColor = "#f59e0b"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; e.currentTarget.style.borderColor = "#e2e8f0"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; }}
                     title="Save block to library"
                   >
                     <BookmarkPlus size={11} />
                   </button>
                 )}
                 <button
-                  onClick={() => { setSelectedVoxel(null); }}
+                  onClick={() => { setSelectedVoxel(null); useStore.getState().setSelectedVoxels(null); }}
                   style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: "#94a3b8", padding: "0 2px" }}
                   title="Deselect block"
                 >
@@ -830,16 +1074,21 @@ export default function MatrixEditor({
             {/* Room Tag */}
             {selVoxel && (
               <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0" }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "#64748b" }}>Room:</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted, #64748b)" }}>Room:</span>
                 <select
                   value={selVoxel.roomTag ?? ""}
                   onChange={(e) => {
                     const tag = e.target.value || undefined;
-                    useStore.getState().setVoxelRoomTag(containerId, selIdx, tag);
+                    // Bay group: apply room tag to all voxels in group
+                    if (isBaySelected) {
+                      for (const bi of selectedVoxels!.indices) useStore.getState().setVoxelRoomTag(containerId, bi, tag);
+                    } else {
+                      useStore.getState().setVoxelRoomTag(containerId, selIdx, tag);
+                    }
                   }}
                   style={{
                     flex: 1, fontSize: 10, padding: "2px 4px", borderRadius: 4,
-                    border: "1px solid #e2e8f0", background: "#fff", color: "#374151",
+                    border: "1px solid var(--border, #e2e8f0)", background: "var(--btn-bg, #fff)", color: "var(--text-main, #374151)",
                     cursor: "pointer",
                   }}
                 >
@@ -865,6 +1114,7 @@ export default function MatrixEditor({
               if (doorFaces.length === 0) return null;
               const doorFace = doorFaces[0];
               const cfg = selVoxel.doorConfig![doorFace]!;
+              const constraints = useStore.getState().getDoorConstraints(containerId, selIdx, doorFace);
               return (
                 <div style={{
                   marginTop: 4, padding: '8px 10px', background: 'rgba(0,0,0,0.04)',
@@ -875,71 +1125,62 @@ export default function MatrixEditor({
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
-                      { label: 'Hinge', options: ['left', 'right'] as const, value: cfg.hingeEdge, key: 'hingeEdge' },
-                      { label: 'Swing', options: ['in', 'out'] as const, value: cfg.swingDirection, key: 'swingDirection' },
-                      { label: 'Type', options: ['swing', 'slide'] as const, value: cfg.type, key: 'type' },
-                    ] as const).map(({ label, options, value, key }) => (
+                      { label: 'Hinge', options: ['left', 'right'] as const, value: cfg.hingeEdge, key: 'hingeEdge', disabled: (_: string) => false, tooltip: (_: string) => '' },
+                      { label: 'Swing', options: ['in', 'out'] as const, value: cfg.swingDirection, key: 'swingDirection', disabled: (_: string) => cfg.type !== 'swing', tooltip: (_: string) => cfg.type !== 'swing' ? 'Only for swing doors' : '' },
+                      { label: 'Type', options: ['swing', 'slide'] as const, value: cfg.type, key: 'type',
+                        disabled: (opt: string) => (opt === 'swing' && !constraints.canSwing) || (opt === 'slide' && !constraints.canSlide),
+                        tooltip: (opt: string) => opt === 'swing' && !constraints.canSwing ? (constraints.swingBlockReason ?? '') : opt === 'slide' && !constraints.canSlide ? (constraints.slideBlockReason ?? '') : '',
+                      },
+                    ] as const).map(({ label, options, value, key, disabled, tooltip }) => (
                       <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span style={{ fontSize: 9, color: '#9ca3af' }}>{label}</span>
                         <div style={{ display: 'flex', gap: 1 }}>
-                          {options.map(opt => (
-                            <button
-                              key={opt}
-                              onClick={() => useStore.getState().setDoorConfig(containerId, selIdx, doorFace, { [key]: opt } as any)}
-                              style={{
-                                padding: '2px 6px', fontSize: 10, borderRadius: 4,
-                                background: value === opt ? '#3b82f6' : 'rgba(0,0,0,0.06)',
-                                color: value === opt ? 'white' : '#374151',
-                                border: 'none', cursor: 'pointer', fontWeight: 500,
-                              }}
-                            >
-                              {opt}
-                            </button>
-                          ))}
+                          {options.map(opt => {
+                            const isDisabled = disabled(opt);
+                            const tip = tooltip(opt);
+                            return (
+                              <button
+                                key={opt}
+                                onClick={() => !isDisabled && useStore.getState().setDoorConfig(containerId, selIdx, doorFace, { [key]: opt } as any)}
+                                title={tip || undefined}
+                                style={{
+                                  padding: '2px 6px', fontSize: 10, borderRadius: 4,
+                                  background: value === opt ? '#3b82f6' : isDisabled ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.06)',
+                                  color: value === opt ? 'white' : isDisabled ? '#d1d5db' : '#374151',
+                                  border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', fontWeight: 500,
+                                  opacity: isDisabled ? 0.5 : 1,
+                                }}
+                              >
+                                {opt}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
                   </div>
+                  {(!constraints.canSwing || !constraints.canSlide) && (
+                    <span style={{ fontSize: 9, color: '#f59e0b', fontStyle: 'italic' }}>
+                      {constraints.swingBlockReason || constraints.slideBlockReason}
+                    </span>
+                  )}
                 </div>
               );
             })()}
 
-            {/* Interactive 3D Cube Inspector — or multi-select placeholder */}
-            {selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1 ? (
-              <div style={{
-                width: "100%", maxWidth: "200px", aspectRatio: "1.35 / 1",
-                borderRadius: "8px", background: "#f1f5f9",
-                border: "1px solid #e2e8f0", margin: "0 auto",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <div style={{ color: '#6b7280', fontSize: 11, textAlign: 'center', padding: 16, lineHeight: 1.6 }}>
-                  <div style={{ fontSize: 22, marginBottom: 4 }}>⬛⬛</div>
-                  <strong>{selectedVoxels.indices.length} voxels selected</strong>
-                  <br />
-                  <span style={{ color: '#9ca3af', fontSize: 10 }}>Stamp applies to all</span>
-                </div>
-              </div>
-            ) : (
-              <VoxelPreview3D
-                containerId={containerId}
-                voxelIndex={selIdx}
-                overrideFaces={effectiveFaces}
-              />
-            )}
+            {/* Interactive 3D Cube Inspector */}
+            <VoxelPreview3D
+              containerId={containerId}
+              voxelIndex={selIdx}
+              overrideFaces={effectiveFaces}
+              bayGroupIndices={isBaySelected ? selectedVoxels!.indices : undefined}
+            />
 
           </div>
         </>
       )}
 
-      {/* ── Empty state ── */}
-      {!isVoxelSelected && (
-        <>
-          <div style={{ height: "1px", background: "#e2e8f0" }} />
-          <div style={{ fontSize: "10px", color: "#94a3b8", textAlign: "center", padding: "4px 0" }}>
-            Click a block above or in the 3D view to inspect
-          </div>
-        </>
-      )}
+      {/* Empty state hint removed — unhelpful */}
     </div>
   );
 }
