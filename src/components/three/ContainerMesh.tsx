@@ -2110,21 +2110,19 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           </group>
         );
       })}
-      {/* Wall face overlay for bay group hover — still shows individual face highlight */}
+      {/* Wall face overlay for bay group hover — spans full bay group width via merged AABB */}
       {hoveredFace && hoveredFaceIdx >= 0 && mergedHoverBox && (() => {
-        const row = Math.floor(hoveredFaceIdx / VOXEL_COLS);
-        const col = hoveredFaceIdx % VOXEL_COLS;
-        const layout = getVoxelLayout(col, row, dims);
-        const halfW = layout.voxW / 2;
-        const halfD = layout.voxD / 2;
+        const mBox = mergedHoverBox;
+        const halfW = mBox.w / 2;
+        const halfD = mBox.d / 2;
         let wallPos: [number, number, number] | null = null;
         let wallSize: [number, number] | null = null;
         let wallRotY = 0;
         switch (hoveredFace) {
-          case 'n': wallPos = [layout.px, vOffset, layout.pz - halfD]; wallSize = [layout.voxW, vHeight]; break;
-          case 's': wallPos = [layout.px, vOffset, layout.pz + halfD]; wallSize = [layout.voxW, vHeight]; break;
-          case 'e': wallPos = [layout.px + halfW, vOffset, layout.pz]; wallSize = [layout.voxD, vHeight]; wallRotY = Math.PI / 2; break;
-          case 'w': wallPos = [layout.px - halfW, vOffset, layout.pz]; wallSize = [layout.voxD, vHeight]; wallRotY = Math.PI / 2; break;
+          case 'n': wallPos = [mBox.cx, vOffset, mBox.cz - halfD]; wallSize = [mBox.w, vHeight]; break;
+          case 's': wallPos = [mBox.cx, vOffset, mBox.cz + halfD]; wallSize = [mBox.w, vHeight]; break;
+          case 'e': wallPos = [mBox.cx + halfW, vOffset, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
+          case 'w': wallPos = [mBox.cx - halfW, vOffset, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
         }
         if (!wallPos || !wallSize) return null;
         return (

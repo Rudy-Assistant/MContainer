@@ -1954,7 +1954,18 @@ export default function ContainerSkin({
       }
 
       // ★ Active brush from Materials tab: paint immediately on click (like bucket mode)
+      // In Simple mode, paint the entire bay group's wall face
       if (activeBrush) {
+        const isSimple = useStore.getState().designComplexity === 'simple';
+        if (isSimple && (faceName === 'n' || faceName === 's' || faceName === 'e' || faceName === 'w')) {
+          const bayIndices = getBayIndicesForVoxel(voxelIndex, VOXEL_ROWS * VOXEL_COLS);
+          if (bayIndices) {
+            for (const idx of bayIndices) {
+              setVoxelFace(container.id, idx, faceName, activeBrush);
+            }
+            return;
+          }
+        }
         setVoxelFace(container.id, voxelIndex, faceName, activeBrush);
         return;
       }
