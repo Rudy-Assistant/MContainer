@@ -40,6 +40,7 @@ import { useFrameStore } from "@/store/frameStore";
 import FrameBuilder from "./FrameBuilder";
 import TapeMeasure from "./TapeMeasure";
 import { validateDesign } from "@/utils/designValidation";
+import WarningOverlay from "./WarningOverlay";
 import { DevSceneExpose } from "./DevSceneExpose";
 // postprocessing DISABLED: importing @react-three/postprocessing causes
 // "THREE.WebGLRenderer: Context Lost" in real browsers (module-level GL init).
@@ -1261,6 +1262,9 @@ function RealisticScene() {
 
       {/* Debug wireframe overlay */}
       {debugMode && <DebugOverlay />}
+
+      {/* Warning overlay — highlights voxels from hovered sidebar warning */}
+      <WarningOverlay />
 
       {/* Phase 9: Tape measure tool */}
       <TapeMeasure />
