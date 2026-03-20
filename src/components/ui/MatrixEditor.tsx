@@ -845,9 +845,10 @@ function FrameGridOverlay({ containerId, level }: { containerId: string; level: 
   // Poles at intersections: (rows+1) × (cols+1) vertices
   for (let vr = 0; vr <= rows; vr++) {
     for (let vc = 0; vc <= cols; vc++) {
+      // Map vertex (vr, vc) to cell + corner: use the cell to the south-east of the vertex
       const poleRow = Math.min(vr, rows - 1);
       const poleCol = Math.min(vc, cols - 1);
-      const corner = `${vr === 0 ? 'n' : vr === rows ? 's' : vr <= poleRow ? 'n' : 's'}${vc === 0 ? 'w' : vc === cols ? 'e' : vc <= poleCol ? 'w' : 'e'}`;
+      const corner = `${vr === 0 ? 'n' : 's'}${vc === 0 ? 'w' : 'e'}`;
       const key = `l${level}r${poleRow}c${poleCol}_${corner}`;
 
       const isHovered = hoveredElement === key;
@@ -983,8 +984,6 @@ export default function MatrixEditor({
   const setDesignComplexity = useStore((s) => s.setDesignComplexity);
 
   const frameMode = useStore((s) => s.frameMode);
-  const selectedFrameElement = useStore((s) => s.selectedFrameElement);
-  const setSelectedFrameElement = useStore((s) => s.setSelectedFrameElement);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

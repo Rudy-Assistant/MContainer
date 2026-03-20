@@ -52,6 +52,7 @@ import defaultPricing from "@/config/pricing_config.json";
 import { getContainerRole, CONTAINER_ROLES } from "@/config/containerRoles";
 import type { ExtensionConfig } from "@/types/container";
 import { type HotbarSlot, BLOCK_PRESETS, autoStairDir, autoStairAscending } from "../useStore";
+import { isPoleKey } from "@/config/frameMaterials";
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
@@ -2284,7 +2285,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
-      const isPole = key.startsWith('l');
+      const isPole = isPoleKey(key);
       if (isPole) {
         return {
           containers: {
@@ -2313,7 +2314,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
-      const isPole = key.startsWith('l');
+      const isPole = isPoleKey(key);
       if (isPole) {
         const { [key]: _, ...rest } = c.poleOverrides ?? {};
         return {
@@ -2347,7 +2348,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       const newPoleOverrides = { ...c.poleOverrides };
       const newRailOverrides = { ...c.railOverrides };
       for (const key of keys) {
-        if (key.startsWith('l')) {
+        if (isPoleKey(key)) {
           newPoleOverrides[key] = config;
         } else {
           newRailOverrides[key] = config;

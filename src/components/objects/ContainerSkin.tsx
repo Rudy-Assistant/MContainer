@@ -59,7 +59,7 @@ import { _themeMats, type ThemeMaterialSet } from "@/config/materialCache";
 import { getNextPhase, PHASE_DAMP_SPEED } from "@/config/unpackAnimations";
 import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
 import { computePolePositions } from "@/utils/smartPoles";
-import { getViewOpacity } from "@/utils/viewIsolation";
+// getViewOpacity deferred — will wire up when full opacity-based view isolation is implemented
 // ── Constants ──────────────────────────────────────────────────
 
 // Surface cycle for hotbar face editing (shared with MatrixEditor)

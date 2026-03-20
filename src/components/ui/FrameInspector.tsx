@@ -1,6 +1,24 @@
 'use client';
 import { useStore } from '@/store/useStore';
-import { POLE_MATERIALS, POLE_SHAPES, RAIL_MATERIALS, RAIL_SHAPES, DEFAULT_FRAME_CONFIG } from '@/config/frameMaterials';
+import {
+  POLE_MATERIALS, POLE_SHAPES, RAIL_MATERIALS, RAIL_SHAPES,
+  resolveFrameProperty,
+} from '@/config/frameMaterials';
+
+/** Labeled select dropdown — shared across element and defaults views */
+function FieldRow({ label, value, options, onChange }: {
+  label: string; value: string; options: readonly string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <label style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: '100%', padding: 4 }}>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
 
 /** Frame element detail view + container-level defaults */
 export function FrameInspector({ containerId }: { containerId: string }) {
@@ -12,7 +30,7 @@ export function FrameInspector({ containerId }: { containerId: string }) {
 
   if (!container) return null;
 
-  const defaults = container.frameDefaults ?? {};
+  const defaults = container.frameDefaults;
   const sel = selectedFrameElement?.containerId === containerId ? selectedFrameElement : null;
 
   const override = sel
@@ -24,13 +42,8 @@ export function FrameInspector({ containerId }: { containerId: string }) {
   const materials = sel?.type === 'pole' ? POLE_MATERIALS : RAIL_MATERIALS;
   const shapes = sel?.type === 'pole' ? POLE_SHAPES : RAIL_SHAPES;
 
-  const currentMaterial = override?.material
-    ?? (sel?.type === 'pole' ? defaults.poleMaterial : defaults.railMaterial)
-    ?? (sel?.type === 'pole' ? DEFAULT_FRAME_CONFIG.poleMaterial : DEFAULT_FRAME_CONFIG.railMaterial);
-
-  const currentShape = override?.shape
-    ?? (sel?.type === 'pole' ? defaults.poleShape : defaults.railShape)
-    ?? (sel?.type === 'pole' ? DEFAULT_FRAME_CONFIG.poleShape : DEFAULT_FRAME_CONFIG.railShape);
+  const currentMaterial = sel ? resolveFrameProperty(override ?? undefined, defaults, sel.type, 'material') : '';
+  const currentShape = sel ? resolveFrameProperty(override ?? undefined, defaults, sel.type, 'shape') : '';
 
   const isVisible = override?.visible !== false;
 
@@ -56,29 +69,10 @@ export function FrameInspector({ containerId }: { containerId: string }) {
             Visible
           </label>
 
-          {/* Material dropdown */}
-          <div style={{ marginBottom: 6 }}>
-            <label style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>Material</label>
-            <select
-              value={currentMaterial}
-              onChange={(e) => setFrameElementOverride(containerId, sel.key, { ...override, material: e.target.value })}
-              style={{ width: '100%', padding: 4 }}
-            >
-              {materials.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-
-          {/* Shape dropdown */}
-          <div style={{ marginBottom: 8 }}>
-            <label style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>Shape</label>
-            <select
-              value={currentShape}
-              onChange={(e) => setFrameElementOverride(containerId, sel.key, { ...override, shape: e.target.value })}
-              style={{ width: '100%', padding: 4 }}
-            >
-              {shapes.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          <FieldRow label="Material" value={currentMaterial} options={materials}
+            onChange={(v) => setFrameElementOverride(containerId, sel.key, { ...override, material: v })} />
+          <FieldRow label="Shape" value={currentShape} options={shapes}
+            onChange={(v) => setFrameElementOverride(containerId, sel.key, { ...override, shape: v })} />
 
           {/* Reset button */}
           <button
@@ -93,49 +87,22 @@ export function FrameInspector({ containerId }: { containerId: string }) {
           {/* Container-level frame defaults */}
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Frame Defaults</div>
 
-          <div style={{ marginBottom: 6 }}>
-            <label style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>Pole Material</label>
-            <select
-              value={defaults.poleMaterial ?? DEFAULT_FRAME_CONFIG.poleMaterial}
-              onChange={(e) => setFrameDefaults(containerId, { poleMaterial: e.target.value })}
-              style={{ width: '100%', padding: 4 }}
-            >
-              {POLE_MATERIALS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 6 }}>
-            <label style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>Pole Shape</label>
-            <select
-              value={defaults.poleShape ?? DEFAULT_FRAME_CONFIG.poleShape}
-              onChange={(e) => setFrameDefaults(containerId, { poleShape: e.target.value })}
-              style={{ width: '100%', padding: 4 }}
-            >
-              {POLE_SHAPES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 6 }}>
-            <label style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>Rail Material</label>
-            <select
-              value={defaults.railMaterial ?? DEFAULT_FRAME_CONFIG.railMaterial}
-              onChange={(e) => setFrameDefaults(containerId, { railMaterial: e.target.value })}
-              style={{ width: '100%', padding: 4 }}
-            >
-              {RAIL_MATERIALS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 6 }}>
-            <label style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>Rail Shape</label>
-            <select
-              value={defaults.railShape ?? DEFAULT_FRAME_CONFIG.railShape}
-              onChange={(e) => setFrameDefaults(containerId, { railShape: e.target.value })}
-              style={{ width: '100%', padding: 4 }}
-            >
-              {RAIL_SHAPES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          <FieldRow label="Pole Material"
+            value={resolveFrameProperty(undefined, defaults, 'pole', 'material')}
+            options={POLE_MATERIALS}
+            onChange={(v) => setFrameDefaults(containerId, { poleMaterial: v })} />
+          <FieldRow label="Pole Shape"
+            value={resolveFrameProperty(undefined, defaults, 'pole', 'shape')}
+            options={POLE_SHAPES}
+            onChange={(v) => setFrameDefaults(containerId, { poleShape: v })} />
+          <FieldRow label="Rail Material"
+            value={resolveFrameProperty(undefined, defaults, 'rail', 'material')}
+            options={RAIL_MATERIALS}
+            onChange={(v) => setFrameDefaults(containerId, { railMaterial: v })} />
+          <FieldRow label="Rail Shape"
+            value={resolveFrameProperty(undefined, defaults, 'rail', 'shape')}
+            options={RAIL_SHAPES}
+            onChange={(v) => setFrameDefaults(containerId, { railShape: v })} />
         </>
       )}
     </div>

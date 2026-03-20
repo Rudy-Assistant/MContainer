@@ -152,7 +152,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   })),
   setFrameMode: (on) => set({
     frameMode: on,
-    ...(!on ? { selectedFrameElement: null } : {}), // clear selection when turning off
+    selectedFrameElement: null, // always clear selection on mode change
   }),
 
   selectedFrameElement: null,

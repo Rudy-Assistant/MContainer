@@ -18,6 +18,11 @@ export const DEFAULT_FRAME_CONFIG = {
   railShape: 'Round' as RailShape,
 } as const;
 
+/** Pole keys start with 'l' (e.g. "l0r1c2_ne"), rail keys start with 'r' (e.g. "r1c2_h") */
+export function isPoleKey(key: string): boolean {
+  return key.startsWith('l');
+}
+
 /** Resolve a frame property through the override cascade: element > frameDefaults > theme */
 export function resolveFrameProperty(
   override: { material?: string; shape?: string } | undefined,
