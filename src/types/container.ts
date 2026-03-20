@@ -180,6 +180,23 @@ export interface Container {
   _preMergeWalls?: Record<string, SurfaceType>;
   /** Original body wall faces saved before extension auto-door (key: "voxelIndex:face") */
   _preExtensionDoors?: Record<string, SurfaceType>;
+  /** Original face surfaces saved before smart auto-railing (key: "voxelIndex:face").
+   *  Auto-railings are placed on fall-hazard edges (open-air + exposed).
+   *  Excluded from persist (recomputed on hydration), included in temporal (undo). */
+  _smartRailingChanges?: Record<string, SurfaceType>;
+
+  // ── Smart Frame Configuration ────────────────────────────
+  /** Container-level default style for all frame elements (poles + rails) */
+  frameDefaults?: {
+    poleMaterial?: string;
+    poleShape?: string;
+    railMaterial?: string;
+    railShape?: string;
+  };
+  /** Per-pole overrides keyed by "l{level}r{row}c{col}_{corner}" */
+  poleOverrides?: Record<string, PoleConfig>;
+  /** Per-rail overrides keyed by "r{row}c{col}_{h|v}" */
+  railOverrides?: Record<string, ElementConfig>;
 
   // ── Interior / Furniture ──────────────────────────────────
   /** Furniture items placed inside this container */
@@ -201,6 +218,12 @@ export interface Container {
 
   /** Interior finish level for this container */
   interiorFinish?: 'raw' | 'plywood' | 'drywall' | 'painted';
+
+  /** Subterranean container (pool) — placed below ground level */
+  subterranean?: boolean;
+
+  /** Roof locked when another container is stacked on top — prevents editing L1 roof faces */
+  roofLocked?: boolean;
 }
 
 // ── Voxel Skin System ────────────────────────────────────────
@@ -278,7 +301,53 @@ export interface Voxel {
   moduleOrientation?: ModuleOrientation;
   /** User-assigned room label (e.g. 'Kitchen', 'Bedroom') — informational only */
   roomTag?: string;
+  /** Faces explicitly set by the user (not auto-generated). Smart system preserves these.
+   *  Only set to true; absent/false = auto-generated (eligible for Smart auto-removal). */
+  userPaintedFaces?: Partial<Record<keyof VoxelFaces, boolean>>;
+  /** Smart stair change tracking — stored on the LOWER stair voxel.
+   *  Records all auto-modified faces so removeStairs can restore originals. */
+  _smartStairChanges?: SmartStairChanges;
+  /** Ephemeral animation phase for extension "unpacking" — cleared after animation completes.
+   *  NOT persisted. Set by setAllExtensions, consumed by ExtensionUnpack component.
+   *  - wall_to_floor: container wall swivels down on bottom hinge to become floor
+   *  - wall_to_ceiling: container wall swivels up on top hinge to become ceiling
+   *  - floor_slide: floor panel slides outward from container body
+   *  - walls_deploy: side walls swivel outward from floor center
+   *  - reverse: plays the entry animation in reverse (wall swivels back up/down) */
+  unpackPhase?: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy' | 'reverse';
 }
+
+/** Tracks faces auto-modified by smart stair placement, keyed by "voxelIndex:face".
+ *  Values are the original SurfaceType before the smart change.
+ *  Stored on the lower stair voxel so removeStairs can restore originals. */
+/** Per-pole configuration override for smart corner poles */
+export interface PoleConfig {
+  /** Whether this pole is visible (default: true, inherits from container) */
+  visible?: boolean;
+  /** Material override (default: inherit from frameDefaults.poleMaterial) */
+  material?: string;
+  /** Shape/model override (default: inherit from frameDefaults.poleShape) */
+  shape?: string;
+}
+
+/** Configuration for a rail element (visibility, material, shape) */
+export interface ElementConfig {
+  visible?: boolean;
+  material?: string;
+  shape?: string;
+}
+
+export interface SmartStairChanges {
+  /** Map of "voxelIndex:face" → original SurfaceType before smart modification */
+  changedFaces: Record<string, SurfaceType>;
+  /** Index of the upper stair voxel in the pair (for reverting both voxels) */
+  upperVoxelIdx?: number;
+  /** Ascending direction used when stairs were placed */
+  ascending: 'n' | 's' | 'e' | 'w';
+}
+
+/** Union type for extension unpacking animation phases */
+export type UnpackPhase = NonNullable<Voxel['unpackPhase']>;
 
 export type ModuleOrientation = 'n' | 's' | 'e' | 'w';
 
@@ -299,7 +368,7 @@ export interface ModulePreset {
   description?: string;
 }
 
-export type ExtensionConfig = 'none' | 'all_deck' | 'all_interior' | 'north_deck' | 'south_deck' | 'east_deck' | 'west_deck';
+export type ExtensionConfig = 'none' | 'all_deck' | 'all_interior' | 'all_glass_interior' | 'north_deck' | 'south_deck' | 'east_deck' | 'west_deck';
 
 export interface ContainerRole {
   id: string;
