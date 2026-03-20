@@ -244,14 +244,6 @@ When switching manual → smart:
 2. If warnings exist, sonner toast: "Smart mode active — N design warnings found"
 3. Warning panel auto-expands in sidebar
 
-### 3d. Stack Button in Context Menu (Bug #1)
-
-Extend existing `ContainerContextMenu.tsx`:
-- New "Stack Container" menu item
-- Only shown when a suitable base container exists (position overlap with `findContainerBelow`)
-- Calls `stackContainer(selectedId, targetId)`
-- Sonner toast on success
-
 ---
 
 ## Stream 4: 3D Rendering
