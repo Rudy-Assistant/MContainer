@@ -3,16 +3,7 @@
  *
  * Tests for addContainer auto-offset when position overlaps.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-vi.mock('idb-keyval', () => {
-  const store = new Map<string, unknown>();
-  return {
-    get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
-    set: vi.fn((key: string, val: unknown) => { store.set(key, val); return Promise.resolve(); }),
-    del: vi.fn((key: string) => { store.delete(key); return Promise.resolve(); }),
-  };
-});
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize } from '@/types/container';
@@ -55,16 +46,16 @@ describe('Smart Placement Auto-Offset', () => {
   });
 
   it('PLACE-4: all directions blocked → stacks vertically', () => {
-    // Place containers in all 4 cardinal offset positions
-    // Offsets must match smart placement: dims.length + dims.height + 0.05
-    // For HC40: 12.19 + 2.90 + 0.05 = 15.14 (X), 2.44 + 2.90 + 0.05 = 5.39 (Z)
-    useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
-    useStore.getState().addContainer(ContainerSize.HighCube40, { x: 15.14, y: 0, z: 0 });
-    useStore.getState().addContainer(ContainerSize.HighCube40, { x: -15.14, y: 0, z: 0 });
-    useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 5.39 });
-    useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: -5.39 });
+    // Smart placement offset: dims.length + dims.height + 0.1
+    // HC40: 12.19 + 2.90 + 0.1 = 15.19 (X), 2.44 + 2.90 + 0.1 = 5.44 (Z)
+    const HC = ContainerSize.HighCube40;
+    useStore.getState().addContainer(HC, { x: 0, y: 0, z: 0 }, 0, true);
+    useStore.getState().addContainer(HC, { x: 15.19, y: 0, z: 0 }, 0, true);
+    useStore.getState().addContainer(HC, { x: -15.19, y: 0, z: 0 }, 0, true);
+    useStore.getState().addContainer(HC, { x: 0, y: 0, z: 5.44 }, 0, true);
+    useStore.getState().addContainer(HC, { x: 0, y: 0, z: -5.44 }, 0, true);
     // Now try to place at origin — all 4 directions should be blocked
-    const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    const id = useStore.getState().addContainer(HC, { x: 0, y: 0, z: 0 });
     const c = useStore.getState().containers[id];
     // Should have been stacked vertically (y > 0)
     expect(c.position.y).toBeGreaterThan(0);
@@ -76,5 +67,16 @@ describe('Smart Placement Auto-Offset', () => {
     const c2 = useStore.getState().containers[id2];
     expect(c2.position.x).toBe(20);
     expect(c2.position.z).toBe(0);
+  });
+
+  it('PLACE-6: smart placement snaps flush via findEdgeSnap', () => {
+    // Place first container at origin
+    useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 }, 0, true);
+    // Add second at same position — should be offset + snapped flush
+    const id2 = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    const c2 = useStore.getState().containers[id2];
+    // Should be placed adjacent (not at origin, not stacked)
+    expect(c2.position.y).toBe(0); // ground level
+    expect(c2.position.x !== 0 || c2.position.z !== 0).toBe(true); // moved away
   });
 });

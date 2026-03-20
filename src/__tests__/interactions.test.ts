@@ -4,16 +4,7 @@
  * End-to-end behavioral tests for the core stacking + stairs + view mode workflow.
  * Mocks: idb-keyval (no IndexedDB in Node).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-vi.mock('idb-keyval', () => {
-  const store = new Map<string, unknown>();
-  return {
-    get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
-    set: vi.fn((key: string, val: unknown) => { store.set(key, val); return Promise.resolve(); }),
-    del: vi.fn((key: string) => { store.delete(key); return Promise.resolve(); }),
-  };
-});
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize, CONTAINER_DIMENSIONS, ViewMode, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
@@ -192,8 +183,9 @@ describe('Sprint 5 camera configuration', () => {
     expect(CAMERA_MIN_POLAR_ANGLE).toBeGreaterThan(0);
   });
 
-  it('camera Y floor guard is 0.5m', () => {
-    expect(CAMERA_FLOOR_Y).toBe(0.5);
+  it('camera Y floor guard allows near-ground views', () => {
+    expect(CAMERA_FLOOR_Y).toBeLessThanOrEqual(0.1);
+    expect(CAMERA_FLOOR_Y).toBeGreaterThan(0);
   });
 
   it('right mouse button is ACTION.TRUCK (pan)', () => {

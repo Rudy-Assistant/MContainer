@@ -27,6 +27,7 @@ import {
   VOXEL_COLS,
 } from "@/types/container";
 import { useStore } from "@/store/useStore";
+import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER } from "@/config/highlightColors";
 
 // ── Raycast nuke helper ─────────────────────────────────────
 const nullRaycast = () => {};
@@ -82,19 +83,19 @@ corrugationNormal.repeat.set(3, 1);
 
 // Phase 8: Corrugated steel — High metalness catches HDRI highlights
 const steelExterior = new THREE.MeshStandardMaterial({
-  color: 0x8a9199,
-  metalness: 0.85,
-  roughness: 0.30,
+  color: 0xb8c0c8,
+  metalness: 0.45,
+  roughness: 0.60,
   normalMap: corrugationNormal,
   normalScale: new THREE.Vector2(1.0, 1.0),
-  envMapIntensity: 0.6,
+  envMapIntensity: 1.0,
 });
 
 const steelDark = new THREE.MeshStandardMaterial({
-  color: 0x6b7580,
-  metalness: 0.85,
-  roughness: 0.35,
-  envMapIntensity: 0.5,
+  color: 0x9aa2aa,
+  metalness: 0.45,
+  roughness: 0.55,
+  envMapIntensity: 0.9,
 });
 
 // Interior: Warm plywood
@@ -140,7 +141,7 @@ const frameMat = new THREE.MeshStandardMaterial({
 });
 // Ghost material for hidden frame elements — cyan transparent, always clickable
 const frameGhostMat = new THREE.MeshBasicMaterial({
-  color: 0x00bcd4, transparent: true, opacity: 0,
+  color: HIGHLIGHT_HEX_SELECT, transparent: true, opacity: 0,
   side: THREE.DoubleSide, depthWrite: false,
 });
 // Permanent hitbox for hidden frame elements — invisible but raycastable
@@ -1759,6 +1760,14 @@ const PROXY_SIZE = 0.4;
 /** 4 corner posts — individually hoverable + right-click to toggle visibility */
 function FramePosts({ container, dims, hoveredElement, setHoveredElement }: FrameProps) {
   const toggleStructuralElement = useStore((s) => s.toggleStructuralElement);
+  const wallCutMode = useStore((s) => s.wallCutMode);
+  const cutScale = wallCutMode === 'full' ? 1.0 : wallCutMode === 'half' ? 0.2 : wallCutMode === 'down' ? 0.05 : 1.0;
+  const postH = dims.height * cutScale;
+  const postY = cutScale < 1 ? postH / 2 - (dims.height - postH) / 2 + dims.height / 2 : dims.height / 2;
+  // Simpler: bottom-aligned post
+  const effectivePostH = postH;
+  const effectivePostY = effectivePostH / 2; // bottom at Y=0
+
   const h = container.structureConfig?.hiddenElements ?? [];
   const posts: [string, number, number, number][] = [
     ["post_front_right", dims.length / 2, 0, dims.width / 2],
@@ -1774,16 +1783,18 @@ function FramePosts({ container, dims, hoveredElement, setHoveredElement }: Fram
           <group key={key}>
             {/* Visual geometry: full material when visible, cyan ghost when hidden — raycast nuked */}
             <mesh
-              position={[px, dims.height / 2, pz]}
+              key={`${key}_vis_${cutScale}`}
+              position={[px, effectivePostY, pz]}
               castShadow={!isHidden}
               material={isHidden ? frameGhostMat : frameMat}
               raycast={nullRaycast}
             >
-              <boxGeometry args={[0.1, dims.height, 0.1]} />
+              <boxGeometry args={[0.1, effectivePostH, 0.1]} />
             </mesh>
             {/* ★ PERMANENT proxy hitbox — never unmounts, even when element is hidden */}
             <mesh
-              position={[px, dims.height / 2, pz]}
+              key={`${key}_hit_${cutScale}`}
+              position={[px, effectivePostY, pz]}
               visible={false}
               userData={{ isStructural: true, elementKey: key, containerId: container.id }}
               onPointerOver={(e) => { e.stopPropagation(); setHoveredElement(key); document.body.style.cursor = 'pointer'; }}
@@ -1794,7 +1805,7 @@ function FramePosts({ container, dims, hoveredElement, setHoveredElement }: Fram
                 toggleStructuralElement(container.id, key);
               }}
             >
-              <boxGeometry args={[PROXY_SIZE, dims.height, PROXY_SIZE]} />
+              <boxGeometry args={[PROXY_SIZE, effectivePostH, PROXY_SIZE]} />
             </mesh>
           </group>
         );
@@ -1806,11 +1817,12 @@ function FramePosts({ container, dims, hoveredElement, setHoveredElement }: Fram
 /** 8 edge beams (4 top + 4 bottom) — individually hoverable + right-click to toggle visibility */
 function FrameBeams({ container, dims, hoveredElement, setHoveredElement }: FrameProps) {
   const toggleStructuralElement = useStore((s) => s.toggleStructuralElement);
+  const wallCutMode = useStore((s) => s.wallCutMode);
+  const hideTopBeams = wallCutMode !== 'full';
   const h = container.structureConfig?.hiddenElements ?? [];
-  const levels: [string, number][] = [
-    ["bottom", 0.03],
-    ["top", dims.height + 0.01],
-  ];
+  const levels: [string, number][] = hideTopBeams
+    ? [["bottom", 0.03]]
+    : [["bottom", 0.03], ["top", dims.height + 0.01]];
   const beamDefs: [string, [number, number, number], [number, number, number]][] = [];
   for (const [prefix, y] of levels) {
     beamDefs.push(
@@ -1897,7 +1909,7 @@ function getHlEdges(w: number, h: number, d: number): THREE.BufferGeometry {
   return _hlEdgeCache.get(k)!;
 }
 
-const hlHoverMat = new THREE.LineBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, depthTest: false });
+const hlHoverMat = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.5, depthTest: false });
 
 // Cached box geometries for hover highlights (avoids dispose+recreate per render)
 const _hlBoxCache = new Map<string, THREE.BoxGeometry>();
@@ -1909,50 +1921,83 @@ function getHlBox(w: number, h: number, d: number): THREE.BoxGeometry {
 
 // §7.1 Hover wall face overlay (amber)
 const hlWallMat = new THREE.MeshBasicMaterial({
-  color: 0xffcc00, transparent: true, opacity: 0.25,
+  color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.25,
   depthWrite: false, depthTest: false, side: THREE.DoubleSide,
 });
 // Selection: wireframe outline instead of floor glow (eliminates teal artifact)
 const hlSelectEdgeMat = new THREE.LineBasicMaterial({
-  color: 0x3b82f6, transparent: true, opacity: 0.6,
+  color: 0x3b82f6, transparent: true, opacity: 0.8,
   depthTest: false,
 });
+// Bay group (multi-select) uses amber for high visibility
+const hlBayGroupMat = new THREE.LineBasicMaterial({
+  color: 0xf59e0b, transparent: true, opacity: 0.9,
+  depthTest: false,
+});
+
+/** Compute merged AABB for a set of voxel indices. Returns center + dimensions. */
+function computeMergedAABB(indices: number[], dims: { length: number; width: number; height: number }) {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const idx of indices) {
+    const row = Math.floor(idx / VOXEL_COLS);
+    const col = idx % VOXEL_COLS;
+    const layout = getVoxelLayout(col, row, dims);
+    const halfW = layout.voxW / 2;
+    const halfD = layout.voxD / 2;
+    minX = Math.min(minX, layout.px - halfW);
+    maxX = Math.max(maxX, layout.px + halfW);
+    minZ = Math.min(minZ, layout.pz - halfD);
+    maxZ = Math.max(maxZ, layout.pz + halfD);
+  }
+  return {
+    cx: (minX + maxX) / 2,
+    cz: (minZ + maxZ) / 2,
+    w: maxX - minX,
+    d: maxZ - minZ,
+  };
+}
 
 function VoxelHoverHighlight({ container }: { container: Container }) {
   const hoveredVoxel = useStore((s) => s.hoveredVoxel);
   const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
+  const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
   const selectedVoxel = useStore((s) => s.selectedVoxel);
   const selectedVoxels = useStore((s) => s.selectedVoxels);
   const dims = CONTAINER_DIMENSIONS[container.size];
   const vHeight = dims.height;
   const vOffset = vHeight / 2;
 
-  // Collect all voxel indices that need a highlight, tracking hover+select independently
-  const highlights = useMemo(() => {
+  // Collect highlights: individual entries + merged AABB boxes for bay groups
+  const { individualHighlights, mergedHoverBox, mergedSelectBox } = useMemo(() => {
     const result: { idx: number; isHover: boolean; isSelect: boolean }[] = [];
-    const map = new Map<number, { idx: number; isHover: boolean; isSelect: boolean }>();
+    // Track which voxels are part of bay groups (skip their individual wireframes)
+    const bayGroupIndices = new Set<number>();
 
-    // Hovered voxel (from hoveredVoxel OR hoveredVoxelEdge as fallback)
+    // Collect bay group indices
+    if (selectedVoxels && selectedVoxels.containerId === container.id) {
+      for (const idx of selectedVoxels.indices) bayGroupIndices.add(idx);
+    }
+    if (hoveredBayGroup && hoveredBayGroup.containerId === container.id) {
+      for (const idx of hoveredBayGroup.indices) bayGroupIndices.add(idx);
+    }
+
+    // Hovered voxel — only add individual highlight if NOT part of a bay group
     let hoverIdx = -1;
     if (hoveredVoxel && hoveredVoxel.containerId === container.id) {
       if (!hoveredVoxel.isExtension && hoveredVoxel.index !== undefined) {
         hoverIdx = hoveredVoxel.index;
       } else if (hoveredVoxel.isExtension) {
-        // Extension voxels store col/row instead of index — compute index
         hoverIdx = (hoveredVoxel as any).row * VOXEL_COLS + (hoveredVoxel as any).col;
       }
     }
-    // Fallback to hoveredVoxelEdge if hoveredVoxel didn't resolve
     if (hoverIdx < 0 && hoveredVoxelEdge && hoveredVoxelEdge.containerId === container.id) {
       hoverIdx = hoveredVoxelEdge.voxelIndex;
     }
-    if (hoverIdx >= 0) {
-      const entry = { idx: hoverIdx, isHover: true, isSelect: false };
-      map.set(hoverIdx, entry);
-      result.push(entry);
+    if (hoverIdx >= 0 && !bayGroupIndices.has(hoverIdx)) {
+      result.push({ idx: hoverIdx, isHover: true, isSelect: false });
     }
 
-    // Selected voxel
+    // Selected voxel — only add individual highlight if NOT part of a bay group
     let selIdx = -1;
     if (selectedVoxel && selectedVoxel.containerId === container.id) {
       if (!selectedVoxel.isExtension && selectedVoxel.index !== undefined) {
@@ -1961,40 +2006,58 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         selIdx = (selectedVoxel as any).row * VOXEL_COLS + (selectedVoxel as any).col;
       }
     }
-    if (selIdx >= 0) {
-      const idx = selIdx;
-      const existing = map.get(idx);
+    if (selIdx >= 0 && !bayGroupIndices.has(selIdx)) {
+      const existing = result.find(e => e.idx === selIdx);
       if (existing) { existing.isSelect = true; }
-      else { const entry = { idx, isHover: false, isSelect: true }; map.set(idx, entry); result.push(entry); }
+      else { result.push({ idx: selIdx, isHover: false, isSelect: true }); }
     }
 
-    // Multi-selected voxels
-    if (selectedVoxels && selectedVoxels.containerId === container.id) {
-      for (const idx of selectedVoxels.indices) {
-        const existing = map.get(idx);
-        if (existing) { existing.isSelect = true; }
-        else { const entry = { idx, isHover: false, isSelect: true }; map.set(idx, entry); result.push(entry); }
-      }
+    // Compute merged AABBs for bay groups
+    let mHover: ReturnType<typeof computeMergedAABB> | null = null;
+    let mSelect: ReturnType<typeof computeMergedAABB> | null = null;
+    if (hoveredBayGroup && hoveredBayGroup.containerId === container.id && hoveredBayGroup.indices.length > 0) {
+      mHover = computeMergedAABB(hoveredBayGroup.indices, dims);
+    }
+    if (selectedVoxels && selectedVoxels.containerId === container.id && selectedVoxels.indices.length > 0) {
+      mSelect = computeMergedAABB(selectedVoxels.indices, dims);
     }
 
-    return result;
-  }, [hoveredVoxel, hoveredVoxelEdge, selectedVoxel, selectedVoxels, container.id]);
+    return { individualHighlights: result, mergedHoverBox: mHover, mergedSelectBox: mSelect };
+  }, [hoveredVoxel, hoveredVoxelEdge, hoveredBayGroup, selectedVoxel, selectedVoxels, container.id, dims]);
 
   // Determine which wall face is hovered (for orange wall overlay)
   const hoveredFace = (hoveredVoxelEdge && hoveredVoxelEdge.containerId === container.id)
     ? hoveredVoxelEdge.face : null;
   const hoveredFaceIdx = hoveredFace ? hoveredVoxelEdge!.voxelIndex : -1;
 
-  if (highlights.length === 0) return null;
-
-  const grid = container.voxelGrid;
+  if (individualHighlights.length === 0 && !mergedHoverBox && !mergedSelectBox) return null;
 
   return (
     <>
-      {highlights.map(({ idx, isHover, isSelect }) => {
+      {/* Merged bay group selection wireframe (single box covering all group voxels) */}
+      {mergedSelectBox && (
+        <lineSegments
+          position={[mergedSelectBox.cx, vOffset, mergedSelectBox.cz]}
+          geometry={getHlEdges(mergedSelectBox.w * 0.98, vHeight * 0.98, mergedSelectBox.d * 0.98)}
+          material={hlBayGroupMat}
+          renderOrder={10}
+          raycast={nullRaycast}
+        />
+      )}
+      {/* Merged bay group hover wireframe */}
+      {mergedHoverBox && (
+        <lineSegments
+          position={[mergedHoverBox.cx, vOffset, mergedHoverBox.cz]}
+          geometry={getHlEdges(mergedHoverBox.w, vHeight, mergedHoverBox.d)}
+          material={hlHoverMat}
+          renderOrder={21}
+          raycast={nullRaycast}
+        />
+      )}
+      {/* Individual voxel highlights (Detail mode or non-bay-group voxels) */}
+      {individualHighlights.map(({ idx, isHover, isSelect }) => {
         const row = Math.floor(idx / VOXEL_COLS);
         const col = idx % VOXEL_COLS;
-        // Use actual voxel position — no remapping for extensions
         const layout = getVoxelLayout(col, row, dims);
 
         // Wall face overlay position + rotation for hovered edge
@@ -2014,7 +2077,6 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
 
         return (
           <group key={`hl_${idx}`}>
-            {/* Selection: wireframe outline around selected voxel */}
             {isSelect && (
               <lineSegments
                 position={[layout.px, vOffset, layout.pz]}
@@ -2024,7 +2086,6 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                 raycast={nullRaycast}
               />
             )}
-            {/* Hover: wireframe outline only (single voxel) */}
             {isHover && (
               <lineSegments
                 position={[layout.px, vOffset, layout.pz]}
@@ -2049,6 +2110,35 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           </group>
         );
       })}
+      {/* Wall face overlay for bay group hover — still shows individual face highlight */}
+      {hoveredFace && hoveredFaceIdx >= 0 && mergedHoverBox && (() => {
+        const row = Math.floor(hoveredFaceIdx / VOXEL_COLS);
+        const col = hoveredFaceIdx % VOXEL_COLS;
+        const layout = getVoxelLayout(col, row, dims);
+        const halfW = layout.voxW / 2;
+        const halfD = layout.voxD / 2;
+        let wallPos: [number, number, number] | null = null;
+        let wallSize: [number, number] | null = null;
+        let wallRotY = 0;
+        switch (hoveredFace) {
+          case 'n': wallPos = [layout.px, vOffset, layout.pz - halfD]; wallSize = [layout.voxW, vHeight]; break;
+          case 's': wallPos = [layout.px, vOffset, layout.pz + halfD]; wallSize = [layout.voxW, vHeight]; break;
+          case 'e': wallPos = [layout.px + halfW, vOffset, layout.pz]; wallSize = [layout.voxD, vHeight]; wallRotY = Math.PI / 2; break;
+          case 'w': wallPos = [layout.px - halfW, vOffset, layout.pz]; wallSize = [layout.voxD, vHeight]; wallRotY = Math.PI / 2; break;
+        }
+        if (!wallPos || !wallSize) return null;
+        return (
+          <mesh
+            position={wallPos}
+            rotation={[0, wallRotY, 0]}
+            geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
+            material={hlWallMat}
+            renderOrder={11}
+            raycast={nullRaycast}
+            frustumCulled={false}
+          />
+        );
+      })()}
     </>
   );
 }
@@ -2201,11 +2291,10 @@ export default function ContainerMesh({ container }: { container: Container }) {
       rotation={[0, container.rotation, 0]}
       visible={true}
       onPointerDown={(e) => {
+        if (e.nativeEvent.button !== 0) return; // left-click only — let right-click through to camera
         e.stopPropagation();
-        if (e.nativeEvent.button !== 0) return; // left-click only
-        if (isSelected) {
-          // Drag-to-move: any left-click-drag on a selected container initiates move.
-          // The original container stays visible (dimmed) during drag, so no disappearing.
+        if (isSelected && e.nativeEvent.shiftKey) {
+          // Shift+drag on selected container initiates move (distinct from camera orbit).
           dragPendingRef.current = {
             id: container.id,
             clientX: e.nativeEvent.clientX,

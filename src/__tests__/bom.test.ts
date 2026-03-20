@@ -4,16 +4,7 @@
  * Real store actions, real state assertions. No source scanning.
  * Mocks: idb-keyval (no IndexedDB in Node).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-vi.mock('idb-keyval', () => {
-  const store = new Map<string, unknown>();
-  return {
-    get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
-    set: vi.fn((key: string, val: unknown) => { store.set(key, val); return Promise.resolve(); }),
-    del: vi.fn((key: string) => { store.delete(key); return Promise.resolve(); }),
-  };
-});
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize } from '@/types/container';
@@ -39,14 +30,16 @@ describe('BOM / Pricing', () => {
   it('BOM-2: single 40ft HC container has correct base cost', () => {
     useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
     const estimate = useStore.getState().getEstimate();
-    expect(estimate.breakdown.containers).toBe(5000);
+    // Base $5000 + 4 deck corner poles × $150 = $5600
+    expect(estimate.breakdown.containers).toBe(5600);
   });
 
   it('BOM-3: two containers double the base cost', () => {
     useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
     useStore.getState().addContainer(ContainerSize.HighCube40, { x: 15, y: 0, z: 0 });
     const estimate = useStore.getState().getEstimate();
-    expect(estimate.breakdown.containers).toBe(10000);
+    // 2 × ($5000 + 4 poles × $150) = $11200
+    expect(estimate.breakdown.containers).toBe(11200);
   });
 
   it('BOM-4: estimate provides low/high range (±15%)', () => {
@@ -68,7 +61,7 @@ describe('BOM / Pricing', () => {
 
   it('BOM-6: removeContainer reduces cost to zero', () => {
     const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
-    expect(useStore.getState().getEstimate().breakdown.containers).toBe(5000);
+    expect(useStore.getState().getEstimate().breakdown.containers).toBe(5600);
     useStore.getState().removeContainer(id);
     expect(useStore.getState().getEstimate().breakdown.total).toBe(0);
   });

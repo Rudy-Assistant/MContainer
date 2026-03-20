@@ -10,15 +10,7 @@
  * - Legacy stairDir is derived from stairAscending
  * - Cross-container void works through unified path
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-vi.mock('idb-keyval', () => ({
-  get: vi.fn().mockResolvedValue(undefined),
-  set: vi.fn().mockResolvedValue(undefined),
-  del: vi.fn().mockResolvedValue(undefined),
-  keys: vi.fn().mockResolvedValue([]),
-  createStore: vi.fn(() => ({})),
-}));
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize } from '@/types/container';

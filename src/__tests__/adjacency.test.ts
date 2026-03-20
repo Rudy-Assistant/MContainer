@@ -4,17 +4,7 @@
  * Real store actions, real state assertions. No source scanning.
  * Mocks: idb-keyval (no IndexedDB in Node).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-// Mock idb-keyval before any store imports
-vi.mock('idb-keyval', () => {
-  const store = new Map<string, unknown>();
-  return {
-    get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
-    set: vi.fn((key: string, val: unknown) => { store.set(key, val); return Promise.resolve(); }),
-    del: vi.fn((key: string) => { store.delete(key); return Promise.resolve(); }),
-  };
-});
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize, CONTAINER_DIMENSIONS, WallSide, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
@@ -218,5 +208,59 @@ describe('Adjacency Auto-Merge', () => {
     expect(afterUndo.containers[idB].position.z).toBe(100);
     expect(afterUndo.containers[idA].mergedWalls.length).toBe(0);
     expect(afterUndo.globalCullSet.size).toBe(0);
+  });
+
+  it('ADJ-8: Flush short-side adjacency with large X offset → no voxel merge in non-overlapping zone', () => {
+    const store = useStore.getState();
+    const dims = CONTAINER_DIMENSIONS[ContainerSize.HighCube40];
+
+    // Place two containers flush along Z (short side) with large X offset
+    // Body cols have X positions from -5.08 to +5.08 (cols 1-6)
+    // With X offset of 8m, only some of A's cols overlap with B's grid extent
+    const idA = store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 }, 0, true);
+    const idB = store.addContainer(ContainerSize.HighCube40, { x: 8, y: 0, z: dims.width }, 0, true);
+    useStore.getState().refreshAdjacency();
+
+    const containers = useStore.getState().containers;
+    const aGrid = containers[idA].voxelGrid;
+    if (!aGrid) throw new Error('No voxel grid');
+
+    // A's right boundary (row 2, face 's') — the boundary facing B along Z
+    const aBound = wallSideToBoundary(WallSide.Right);
+    let mergedCount = 0;
+    let totalActive = 0;
+    for (let col = 0; col < VOXEL_COLS; col++) {
+      const idx = aBound.index * VOXEL_COLS + col;
+      const voxel = aGrid[idx];
+      if (!voxel?.active) continue;
+      totalActive++;
+      const key = `${idx}:${aBound.face}`;
+      if (containers[idA]._preMergeWalls?.[key]) {
+        mergedCount++;
+      }
+    }
+
+    // With 8m X offset, some active cols should NOT overlap with B's grid
+    // (B's grid half-extent = 4*2.032 = 8.13, centered at X=8, so B's X range = [-0.13, 16.13])
+    // A's col 1 at X=+5.08 is inside B's range → merged
+    // A's col 6 at X=-5.08 is inside B's range? -5.08 > -0.13? No → NOT merged
+    // So not ALL active cols should be merged
+    expect(totalActive).toBeGreaterThan(0);
+    expect(mergedCount).toBeLessThan(totalActive);
+  });
+
+  it('ADJ-9: stackContainer via context menu action pattern', () => {
+    const store = useStore.getState();
+    const dims = CONTAINER_DIMENSIONS[ContainerSize.HighCube40];
+
+    const idA = store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 }, 0, true);
+    const pos = { x: 0, y: dims.height, z: 0 };
+    const idB = store.addContainer(ContainerSize.HighCube40, pos, 1, true);
+    store.stackContainer(idB, idA);
+
+    const containers = useStore.getState().containers;
+    expect(containers[idB].level).toBe(1);
+    expect(containers[idB].stackedOn).toBe(idA);
+    expect(containers[idB].position.y).toBeCloseTo(dims.height, 1);
   });
 });

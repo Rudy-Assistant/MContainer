@@ -8,16 +8,7 @@
  * Note: Only level 0 body voxels have Solid_Steel wall faces by default.
  * Level 1 body voxels have Open walls (only top/bottom are steel).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-vi.mock('idb-keyval', () => {
-  const store = new Map<string, unknown>();
-  return {
-    get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
-    set: vi.fn((key: string, val: unknown) => { store.set(key, val); return Promise.resolve(); }),
-    del: vi.fn((key: string) => { store.delete(key); return Promise.resolve(); }),
-  };
-});
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';

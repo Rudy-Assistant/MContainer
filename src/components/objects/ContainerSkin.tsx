@@ -59,7 +59,8 @@ import { _themeMats, type ThemeMaterialSet } from "@/config/materialCache";
 import { getNextPhase, PHASE_DAMP_SPEED } from "@/config/unpackAnimations";
 import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
 import { computePolePositions } from "@/utils/smartPoles";
-// getViewOpacity deferred — will wire up when full opacity-based view isolation is implemented
+import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
+import { makePoleKey } from "@/config/frameMaterials";
 // ── Constants ──────────────────────────────────────────────────
 
 // Surface cycle for hotbar face editing (shared with MatrixEditor)
@@ -145,19 +146,19 @@ const mHit = new THREE.MeshBasicMaterial({
   transparent: true, opacity: 0.001, side: THREE.DoubleSide, depthWrite: false,
   colorWrite: false,
 });
-const mSelect = new THREE.LineBasicMaterial({ color: "#00bcd4", depthTest: false });
+const mSelect = new THREE.LineBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, depthTest: false });
 // Yellow emissive hover — always visible "E-cycle" indicator
-const mHoverWire = new THREE.LineBasicMaterial({ color: "#ffcc00", depthTest: false, linewidth: 2 });
+const mHoverWire = new THREE.LineBasicMaterial({ color: HIGHLIGHT_COLOR_HOVER, depthTest: false, linewidth: 2 });
 // Voxel-level edge outlines — hover=yellow, selected=blue. No solid fill.
-const mVoxelHoverLine  = new THREE.LineBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.55, depthTest: false });
-const mVoxelSelectLine = new THREE.LineBasicMaterial({ color: 0x00bcd4, transparent: true, opacity: 0.75, depthTest: false });
+const mVoxelHoverLine  = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.55, depthTest: false });
+const mVoxelSelectLine = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_SELECT, transparent: true, opacity: 0.75, depthTest: false });
 const mHoverGlow = new THREE.MeshStandardMaterial({
-  color: 0xffcc00, emissive: new THREE.Color(0xffcc00), emissiveIntensity: 0.3,
+  color: HIGHLIGHT_HEX_HOVER, emissive: new THREE.Color(HIGHLIGHT_HEX_HOVER), emissiveIntensity: 0.3,
   transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false,
 });
 // Edge-specific glow for Smart Edge hover
 const mEdgeGlow = new THREE.MeshStandardMaterial({
-  color: 0xffcc00, emissive: new THREE.Color(0xffcc00), emissiveIntensity: 0.3,
+  color: HIGHLIGHT_HEX_HOVER, emissive: new THREE.Color(HIGHLIGHT_HEX_HOVER), emissiveIntensity: 0.3,
   transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false,
 });
 // ★ Phase 2 WYSIWYC: Cyan highlight for structural edge beams on hover
@@ -201,10 +202,10 @@ const nullRaycast = () => {};
 
 // ── Frame mode highlight materials ────────────────────────────
 const frameHoverMat = new THREE.MeshStandardMaterial({
-  color: 0xffcc00, metalness: 0.85, roughness: 0.2, envMapIntensity: 0.8,
+  color: HIGHLIGHT_HEX_HOVER, metalness: 0.85, roughness: 0.2, envMapIntensity: 0.8,
 });
 const frameSelectMat = new THREE.MeshStandardMaterial({
-  color: 0x00bcd4, metalness: 0.85, roughness: 0.2, envMapIntensity: 0.8,
+  color: HIGHLIGHT_HEX_SELECT, metalness: 0.85, roughness: 0.2, envMapIntensity: 0.8,
 });
 
 // ── Geometry caches ────────────────────────────────────────────
@@ -3004,7 +3005,7 @@ export default function ContainerSkin({
         const poleYShift = vOffset - containerY / 2;
         const legacyKey = `deck_pole_${i}`;
         if (container.structureConfig?.hiddenElements?.includes(legacyKey)) return null;
-        const poleKey = `l0r${row}c${col}_${corner}`;
+        const poleKey = makePoleKey(container.level, row, col, corner);
         const poleOverride = container.poleOverrides?.[poleKey];
         if (poleOverride?.visible === false) return null;
         const isSelectedPole = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === poleKey;

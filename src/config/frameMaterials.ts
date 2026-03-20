@@ -23,6 +23,16 @@ export function isPoleKey(key: string): boolean {
   return key.startsWith('l');
 }
 
+/** Build a canonical pole key: "l{level}r{row}c{col}_{corner}" */
+export function makePoleKey(level: number, row: number, col: number, corner: string): string {
+  return `l${level}r${row}c${col}_${corner}`;
+}
+
+/** Build a canonical rail key: "r{row}c{col}_{orientation}" where orientation is 'h' or 'v' */
+export function makeRailKey(row: number, col: number, orientation: 'h' | 'v'): string {
+  return `r${row}c${col}_${orientation}`;
+}
+
 /** Resolve a frame property through the override cascade: element > frameDefaults > theme */
 export function resolveFrameProperty(
   override: { material?: string; shape?: string } | undefined,

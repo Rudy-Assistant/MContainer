@@ -23,6 +23,8 @@ import { createDefaultVoxelGrid } from "@/types/factories";
 import VoxelPreview3D, { GroupedVoxelPreview } from "@/components/ui/VoxelPreview3D";
 import { BookmarkPlus } from "lucide-react";
 import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
+import { HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
+import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
 
 // ── Face-color mapping for grid cells ────────────────────────
 
@@ -763,8 +765,8 @@ function FrameGridOverlay({ containerId, level }: { containerId: string; level: 
   const svgW = cols * cellW + padding * 2;
   const svgH = rows * cellH + padding * 2;
 
-  const HOVER_COLOR = '#ffcc00';
-  const SELECT_COLOR = '#00bcd4';
+  const HOVER_COLOR = HIGHLIGHT_COLOR_HOVER;
+  const SELECT_COLOR = HIGHLIGHT_COLOR_SELECT;
   const GRID_COLOR = '#94a3b8';
   const BG_COLOR = '#f8fafc';
   const HIDDEN_DASH = '3,2';
@@ -777,7 +779,7 @@ function FrameGridOverlay({ containerId, level }: { containerId: string; level: 
   // Horizontal rails: (rows+1) horizontal lines, each divided into `cols` segments
   for (let vr = 0; vr <= rows; vr++) {
     for (let c = 0; c < cols; c++) {
-      const key = `r${vr}c${c}_h`;
+      const key = makeRailKey(vr, c, 'h');
       const isHovered = hoveredElement === key;
       const isSelected = sel?.key === key && sel?.containerId === containerId;
       const override = container?.railOverrides?.[key];
@@ -811,7 +813,7 @@ function FrameGridOverlay({ containerId, level }: { containerId: string; level: 
   // Vertical rails: (cols+1) vertical lines, each divided into `rows` segments
   for (let r = 0; r < rows; r++) {
     for (let vc = 0; vc <= cols; vc++) {
-      const key = `r${r}c${vc}_v`;
+      const key = makeRailKey(r, vc, 'v');
       const isHovered = hoveredElement === key;
       const isSelected = sel?.key === key && sel?.containerId === containerId;
       const override = container?.railOverrides?.[key];
@@ -849,7 +851,7 @@ function FrameGridOverlay({ containerId, level }: { containerId: string; level: 
       const poleRow = Math.min(vr, rows - 1);
       const poleCol = Math.min(vc, cols - 1);
       const corner = `${vr === 0 ? 'n' : 's'}${vc === 0 ? 'w' : 'e'}`;
-      const key = `l${level}r${poleRow}c${poleCol}_${corner}`;
+      const key = makePoleKey(level, poleRow, poleCol, corner);
 
       const isHovered = hoveredElement === key;
       const isSelected = sel?.key === key && sel?.containerId === containerId;

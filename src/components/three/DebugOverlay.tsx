@@ -11,10 +11,11 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { useStore } from "@/store/useStore";
 import { CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS, type Container } from "@/types/container";
+import { HIGHLIGHT_HEX_HOVER } from "@/config/highlightColors";
 
 // Shared materials (module-level singletons)
 const debugBodyMat = new THREE.LineBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.6, depthTest: false });
-const debugExtMat = new THREE.LineBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, depthTest: false });
+const debugExtMat = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.5, depthTest: false });
 
 // Cache edge geometries by dimension key
 const _edgeCache = new Map<string, THREE.EdgesGeometry>();

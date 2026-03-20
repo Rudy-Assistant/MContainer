@@ -60,6 +60,7 @@ import DebugOverlay from "./DebugOverlay";
 // FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats } from "@/config/materialCache";
 import { type ThemeId } from "@/config/themes";
+import { HIGHLIGHT_COLOR_SELECT } from "@/config/highlightColors";
 import { applyPalette } from "@/utils/applyPalette";
 import type { MaterialPalette } from "@/store/slices/librarySlice";
 // ── N8AO config (shared between Design + Walkthrough scenes) ─
@@ -1354,12 +1355,12 @@ function BlueprintScene() {
 // Grid snapping — imported from gridSystem for consistency
 import { gridSnap, GRID_STEP } from "@/utils/gridSystem";
 
-const ghostSolid = new THREE.MeshBasicMaterial({ color: "#00bcd4", transparent: true, opacity: 0.35 }); // Cyan ghost
-const ghostEdge = new THREE.MeshBasicMaterial({ color: "#00bcd4", transparent: true, opacity: 0.7, wireframe: true });
+const ghostSolid = new THREE.MeshBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, transparent: true, opacity: 0.35 }); // Cyan ghost
+const ghostEdge = new THREE.MeshBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, transparent: true, opacity: 0.7, wireframe: true });
 const ghostInvalidEdge = new THREE.MeshBasicMaterial({ color: "#c62828", transparent: true, opacity: 0.7, wireframe: true });
 const ghostStackSolid = new THREE.MeshBasicMaterial({ color: "#2e7d32", transparent: true, opacity: 0.25 });
 const ghostStackEdge = new THREE.MeshBasicMaterial({ color: "#2e7d32", transparent: true, opacity: 0.7, wireframe: true });
-const ghostSnapSolid = new THREE.MeshBasicMaterial({ color: "#00bcd4", transparent: true, opacity: 0.4 });
+const ghostSnapSolid = new THREE.MeshBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, transparent: true, opacity: 0.4 });
 const ghostSnapEdge = new THREE.MeshBasicMaterial({ color: "#42a5f5", transparent: true, opacity: 0.8, wireframe: true });
 // Shared material-clone cache for all ghost renderers (DragGhost + MoveGhostVisual)
 const _ghostOverlayMats = new Map<THREE.Material, THREE.Material>();
