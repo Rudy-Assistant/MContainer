@@ -4,8 +4,8 @@
  * WarningOverlay.tsx — 3D wireframe highlight for hovered validation warnings
  *
  * When hoveredWarning is set (from WarningPanel hover), this component
- * renders yellow/red wireframe boxes around the warned voxels.
- * Uses the same voxel positioning math as DebugOverlay.
+ * renders severity-colored wireframe boxes around the warned voxels.
+ * Only mounts inner geometry when a warning is actually hovered.
  */
 
 import { useMemo } from "react";
@@ -13,19 +13,18 @@ import * as THREE from "three";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/react/shallow";
 import { CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS } from "@/types/container";
+import type { WarningSeverity } from "@/types/validation";
+import { getVoxelLayout } from "@/components/objects/ContainerSkin";
+import { SEVERITY_HEX } from "@/config/severityColors";
 
 // Severity-colored materials (module-level singletons, depthTest false for always-visible)
-const matError = new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.9, depthTest: false, linewidth: 2 });
-const matWarning = new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85, depthTest: false, linewidth: 2 });
-const matInfo = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.7, depthTest: false, linewidth: 2 });
-
-const SEVERITY_MAT: Record<string, THREE.LineBasicMaterial> = {
-  error: matError,
-  warning: matWarning,
-  info: matInfo,
+const SEVERITY_MAT: Record<WarningSeverity, THREE.LineBasicMaterial> = {
+  error: new THREE.LineBasicMaterial({ color: SEVERITY_HEX.error, transparent: true, opacity: 0.9, depthTest: false, linewidth: 2 }),
+  warning: new THREE.LineBasicMaterial({ color: SEVERITY_HEX.warning, transparent: true, opacity: 0.85, depthTest: false, linewidth: 2 }),
+  info: new THREE.LineBasicMaterial({ color: SEVERITY_HEX.info, transparent: true, opacity: 0.7, depthTest: false, linewidth: 2 }),
 };
 
-// Cache edge geometries by dimension key (shared with DebugOverlay pattern)
+// Cache edge geometries by dimension key
 const _edgeCache = new Map<string, THREE.EdgesGeometry>();
 function getEdges(w: number, h: number, d: number): THREE.EdgesGeometry {
   const k = `${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}`;
@@ -37,14 +36,20 @@ function getEdges(w: number, h: number, d: number): THREE.EdgesGeometry {
 
 const nullRaycast = () => {};
 
+/** Gate component — only subscribes to containers when a warning is hovered */
 export default function WarningOverlay() {
   const hoveredWarning = useStore((s) => s.hoveredWarning);
+  if (!hoveredWarning) return null;
+  return <WarningOverlayInner hoveredWarningId={hoveredWarning} />;
+}
+
+function WarningOverlayInner({ hoveredWarningId }: { hoveredWarningId: string }) {
   const warnings = useStore(useShallow((s) => s.warnings));
   const containers = useStore((s) => s.containers);
 
   const warning = useMemo(
-    () => (hoveredWarning ? warnings.find((w) => w.id === hoveredWarning) : null),
-    [hoveredWarning, warnings],
+    () => warnings.find((w) => w.id === hoveredWarningId) ?? null,
+    [hoveredWarningId, warnings],
   );
 
   const voxelPositions = useMemo(() => {
@@ -54,13 +59,10 @@ export default function WarningOverlay() {
 
     const dims = CONTAINER_DIMENSIONS[container.size];
     const vHeight = dims.height;
-    const coreW = dims.length / 6;
-    const coreD = dims.width / 2;
-    const foldDepth = dims.height;
 
     const result: { px: number; py: number; pz: number; w: number; h: number; d: number }[] = [];
 
-    // If no specific voxels, highlight entire container
+    // If no specific voxels, highlight all active voxels in the container
     const indices = warning.voxelIndices.length > 0
       ? warning.voxelIndices
       : container.voxelGrid.map((_, i) => i).filter((i) => container.voxelGrid![i].active);
@@ -71,25 +73,13 @@ export default function WarningOverlay() {
       const row = Math.floor(remainder / VOXEL_COLS);
       const col = remainder % VOXEL_COLS;
 
-      const isHaloCol = col === 0 || col === VOXEL_COLS - 1;
-      const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
-
-      const vW = isHaloCol ? foldDepth : coreW;
-      const vD = isHaloRow ? foldDepth : coreD;
-
-      let px: number;
-      if (col === 0) px = dims.length / 2 + foldDepth / 2;
-      else if (col === VOXEL_COLS - 1) px = -(dims.length / 2 + foldDepth / 2);
-      else px = -(col - 3.5) * coreW;
-
-      let pz: number;
-      if (row === 0) pz = -(dims.width / 2 + foldDepth / 2);
-      else if (row === VOXEL_ROWS - 1) pz = dims.width / 2 + foldDepth / 2;
-      else pz = (row - 1.5) * coreD;
-
+      const layout = getVoxelLayout(col, row, dims);
       const py = level * vHeight + vHeight / 2;
 
-      result.push({ px, py, pz, w: vW + 0.02, h: vHeight + 0.02, d: vD + 0.02 });
+      result.push({
+        px: layout.px, py, pz: layout.pz,
+        w: layout.voxW + 0.02, h: vHeight + 0.02, d: layout.voxD + 0.02,
+      });
     }
     return result;
   }, [warning, containers]);
@@ -99,7 +89,7 @@ export default function WarningOverlay() {
   const container = containers[warning.containerId];
   if (!container) return null;
 
-  const mat = SEVERITY_MAT[warning.severity] ?? matWarning;
+  const mat = SEVERITY_MAT[warning.severity];
 
   return (
     <group position={[container.position.x, container.position.y, container.position.z]}>

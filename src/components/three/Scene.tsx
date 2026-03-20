@@ -383,13 +383,20 @@ function ValidationSubscriber() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     let prevContainers = useStore.getState().containers;
+    let prevWarningIds: string | null = null;
     const unsub = useStore.subscribe((state) => {
       if (state.containers === prevContainers) return;
       prevContainers = state.containers;
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const warnings = validateDesign(state.containers);
-        useStore.getState().setWarnings(warnings);
+        const containers = useStore.getState().containers;
+        const warnings = validateDesign(containers);
+        // Shallow compare by warning IDs to avoid no-op re-renders
+        const ids = warnings.map((w) => w.id).join(',');
+        if (ids !== prevWarningIds) {
+          prevWarningIds = ids;
+          useStore.getState().setWarnings(warnings);
+        }
       }, 300);
     });
     return () => { unsub(); clearTimeout(timer); };

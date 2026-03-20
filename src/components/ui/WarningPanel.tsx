@@ -10,8 +10,9 @@
 import { useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/react/shallow";
-import type { DesignWarning, WarningCategory } from "@/types/validation";
+import type { DesignWarning, WarningCategory, WarningSeverity } from "@/types/validation";
 import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
+import { SEVERITY_COLORS } from "@/config/severityColors";
 
 const CATEGORY_ORDER: WarningCategory[] = ['safety', 'accessibility', 'weather', 'structural', 'budget'];
 const CATEGORY_LABELS: Record<WarningCategory, string> = {
@@ -19,12 +20,8 @@ const CATEGORY_LABELS: Record<WarningCategory, string> = {
   structural: 'Structural', budget: 'Budget',
 };
 
-const SEVERITY_COLORS: Record<string, string> = {
-  error: '#ef4444', warning: '#f59e0b', info: '#3b82f6',
-};
-
-function WarningIcon({ severity }: { severity: string }) {
-  const color = SEVERITY_COLORS[severity] ?? '#6b7280';
+function WarningIcon({ severity }: { severity: WarningSeverity }) {
+  const color = SEVERITY_COLORS[severity];
   if (severity === 'error') return <ShieldAlert size={14} color={color} />;
   if (severity === 'warning') return <AlertTriangle size={14} color={color} />;
   return <Info size={14} color={color} />;
