@@ -11,8 +11,6 @@ import {
   Environment,
   Stars,
   ContactShadows,
-  Clouds,
-  Cloud,
   Html,
   GizmoHelper,
   GizmoViewport,
@@ -42,8 +40,15 @@ import { useFrameStore } from "@/store/frameStore";
 import FrameBuilder from "./FrameBuilder";
 import TapeMeasure from "./TapeMeasure";
 import { DevSceneExpose } from "./DevSceneExpose";
-import { EffectComposer, N8AO, Bloom, ToneMapping } from "@react-three/postprocessing";
-import { ToneMappingMode } from "postprocessing";
+// postprocessing DISABLED: importing @react-three/postprocessing causes
+// "THREE.WebGLRenderer: Context Lost" in real browsers (module-level GL init).
+// Stub the types so SafeEffectComposer compiles without the real import.
+type _EC = React.FC<{ children?: React.ReactNode; enableNormalPass?: boolean }>;
+const EffectComposer: _EC = () => null;
+const N8AO = null as any;
+const Bloom = null as any;
+const ToneMapping = null as any;
+const ToneMappingMode = { NEUTRAL: 0 } as any;
 import {
   loadAllTextures,
   getSteelTextures,
@@ -52,7 +57,7 @@ import {
 } from "@/config/pbrTextures";
 import GroundManager from "./GroundManager";
 import DebugOverlay from "./DebugOverlay";
-import { FaceContextWidget } from "./FaceContextWidget";
+// FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats } from "@/config/materialCache";
 import { type ThemeId } from "@/config/themes";
 import { applyPalette } from "@/utils/applyPalette";
@@ -72,11 +77,14 @@ const BLOOM_CONFIG = {
   mipmapBlur: true,
 } as const;
 
-/** Wraps EffectComposer with a renderer-readiness guard to prevent null-GL crashes. */
-function SafeEffectComposer({ children, ...props }: React.ComponentProps<typeof EffectComposer>) {
-  const { gl } = useThree();
-  if (!gl?.domElement) return null;
-  return <EffectComposer {...props}>{children}</EffectComposer>;
+/** Wraps EffectComposer with a renderer-readiness guard to prevent null-GL crashes.
+ *  postprocessing v6.38 + @react-three/postprocessing v3.0.4 crash on EffectComposer.addPass
+ *  because gl.getContext() returns null during R3F's initial reconciler commit.
+ *  WORKAROUND: Disabled until postprocessing version is upgraded. */
+function SafeEffectComposer({ children: _children, ...props }: React.ComponentProps<typeof EffectComposer>) {
+  void props;
+  // TODO: Re-enable after upgrading postprocessing to a version that handles null context
+  return null;
 }
 
 // ── Sun Position Calculator ─────────────────────────────────
@@ -143,7 +151,7 @@ function SunLight() {
         castShadow
         color={color}
         position={timeOfDay >= 5 && timeOfDay <= 21 ? [Math.max(sunPos.x, -80), Math.max(sunPos.y, 2.0), sunPos.z] : [20, 40, 20]}
-        intensity={Math.min(Math.max(intensity * 1.2, 0.3), 3.0)}
+        intensity={Math.min(Math.max(intensity * 0.8, 0.25), 2.0)}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0005}
         shadow-normalBias={0.002}
@@ -155,11 +163,11 @@ function SunLight() {
         shadow-camera-far={120}
       />
       <ambientLight
-        intensity={Math.max(intensity * 0.2, 0.08)}
+        intensity={Math.max(intensity * 0.45, 0.25)}
         color={timeOfDay > 5 && timeOfDay < 21 ? 0xd0e0f8 : 0x080818}
       />
       <hemisphereLight
-        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.25, 0.05)]}
+        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.40, 0.20)]}
       />
     </>
   );
@@ -328,9 +336,11 @@ function PBRTextureLoader() {
       const steel = getSteelTextures();
       if (steel) {
         applyTexturesToMaterial(_themeMats.industrial.steel, steel, 1.2);
-        // Brighten the dark corrugated texture — moderate tint to avoid washed-out roof
-        _themeMats.industrial.steel.color.setHex(0x9aabb8);
-        _themeMats.industrial.steel.envMapIntensity = 0.8;
+        // Brighten steel with PBR textures — lighter base for visibility from all angles
+        _themeMats.industrial.steel.color.setHex(0xc0c8d0);
+        _themeMats.industrial.steel.envMapIntensity = 1.0;
+        _themeMats.industrial.steel.metalness = 0.40;
+        _themeMats.industrial.steel.roughness = 0.60;
         _themeMats.industrial.steel.needsUpdate = true;
       }
 
@@ -348,6 +358,14 @@ function PBRTextureLoader() {
 }
 
 // Ground plane is now managed by GroundManager.tsx
+
+function FrameModeInvalidator() {
+  const { invalidate } = useThree();
+  const frameMode = useStore((s) => s.frameMode);
+  const selectedFrameElement = useStore((s) => s.selectedFrameElement);
+  useEffect(() => { invalidate(); }, [frameMode, selectedFrameElement, invalidate]);
+  return null;
+}
 
 // ── Time-of-Day Phase Helpers ──────────────────────────────
 
@@ -383,10 +401,10 @@ export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
   return {
-    rayleigh: deepTwilight ? 4 : goldenHour ? 2.5 : 2.5,     // 2.5 midday = richer blue
-    turbidity: deepTwilight ? 15 : goldenHour ? 6 : 1.8,    // 1.8 = clearer atmosphere
-    mieCoefficient: goldenHour ? 0.008 : 0.003,              // 0.003 = less haze
-    mieDirectionalG: goldenHour ? 0.95 : 0.85,
+    rayleigh: deepTwilight ? 4 : goldenHour ? 3.0 : 4.0,    // 4.0 midday = vivid saturated blue
+    turbidity: deepTwilight ? 15 : goldenHour ? 8 : 0.8,    // 0.8 = ultra-clear; 8 = dramatic golden hour haze
+    mieCoefficient: goldenHour ? 0.012 : 0.001,             // 0.001 = minimal haze → cleaner sky
+    mieDirectionalG: goldenHour ? 0.97 : 0.75,              // 0.75 = tight sun disc, less bloom
   };
 }
 
@@ -415,15 +433,18 @@ function SkyDome() {
     : isDeepTwilightTime(timeOfDay)
       ? 0x1a1a3e
       : isGoldenHourTime(timeOfDay)
-        ? 0xd4a060
-        : 0x5b8fbf;
+        ? 0xc48040
+        : 0x4a8ac0;  // Richer blue background for clearer sky
 
   // Set scene.background synchronously during render — idempotent, no attach/detach.
   _skyBgColor.set(bgHex);
   scene.background = _skyBgColor;
 
-  if (isNightTime(timeOfDay)) {
-    return <Stars radius={300} depth={60} count={4000} factor={4} saturation={0} fade speed={1} />;
+  const isNight = isNightTime(timeOfDay);
+  const isTwilight = isTwilightTime(timeOfDay);
+
+  if (isNight) {
+    return <Stars radius={300} depth={60} count={6000} factor={5} saturation={0.1} fade speed={0.8} />;
   }
 
   const skyParams = getSkyParams(timeOfDay);
@@ -438,7 +459,13 @@ function SkyDome() {
         mieCoefficient={skyParams.mieCoefficient}
         mieDirectionalG={skyParams.mieDirectionalG}
       />
-      {isTwilightTime(timeOfDay) && <Stars radius={300} depth={60} count={2000} factor={3} saturation={0} fade speed={1} />}
+
+      {/* Clouds REMOVED: drei's <Cloud> creates hundreds of alpha-blended billboards
+         + noise textures, exhausting GPU in constrained environments (headless, Intel Xe).
+         Causes THREE.WebGLRenderer: Context Lost. Defer to future sprint with LOD check. */}
+
+      {/* Stars fade in during twilight — visible from 7pm, full by 9pm */}
+      {isTwilight && <Stars radius={300} depth={60} count={3000} factor={4} saturation={0.1} fade speed={0.8} />}
     </>
   );
 }
@@ -1057,7 +1084,7 @@ function FollowLight() {
       lightRef.current.position.copy(camera.position);
     }
   });
-  return <pointLight ref={lightRef} intensity={1.2} distance={12} decay={2} color={0xfff8e7} />;
+  return <pointLight ref={lightRef} intensity={0.4} distance={10} decay={2} color={0xfff8e7} />;
 }
 
 // ── 3D Realistic Scene ──────────────────────────────────────
@@ -1069,12 +1096,33 @@ function RealisticScene() {
   const viewLevel = useStore((s) => s.viewLevel);
   const clearSelection = useStore((s) => s.clearSelection);
   const debugMode = useStore((s) => s.debugMode);
-  const dragMovingId = useStore((s) => s.dragMovingId);
   const selectedVoxel = useStore((s) => s.selectedVoxel);
+  const frameMode = useStore((s) => s.frameMode);
   const isPreviewMode = useStore((s) => s.isPreviewMode);
   const activePaletteId = useStore((s) => s.activePaletteId);
   const currentTheme = useStore((s) => s.currentTheme);
   const cameraControlsRef = useRef<CameraControlsImpl>(null);
+  const isShiftHeldRef = useRef(false);
+
+  // Disable camera controls when Shift is held — prevents conflict with container Shift+drag.
+  // Uses ref + imperative mutation (sole owner of .enabled) to avoid useState in R3F reconciler.
+  useEffect(() => {
+    const sync = () => {
+      if (cameraControlsRef.current) {
+        const s = useStore.getState();
+        cameraControlsRef.current.enabled = !s.dragMovingId && !s.isPaintDragging && !isShiftHeldRef.current;
+      }
+    };
+    const down = (e: KeyboardEvent) => { if (e.key === 'Shift') { isShiftHeldRef.current = true; sync(); } };
+    const up = (e: KeyboardEvent) => { if (e.key === 'Shift') { isShiftHeldRef.current = false; sync(); } };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    // Also sync when dragMovingId or isPaintDragging change
+    const unsub = useStore.subscribe((s, prev) => {
+      if (s.dragMovingId !== prev.dragMovingId || s.isPaintDragging !== prev.isPaintDragging) sync();
+    });
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); unsub(); };
+  }, []);
 
   // Expose camera controls ref for Playwright gates — update via useFrame to ensure ref is populated
   useFrame(() => {
@@ -1143,9 +1191,10 @@ function RealisticScene() {
       <FollowLight />
       <GroundManager />
       <PBRTextureLoader />
+      <FrameModeInvalidator />
 
       {/* Phase 8: HDRI environment for PBR reflections (visible corrugation reflections) */}
-      <TimeOfDayEnvironment intensity={0.65} />
+      <TimeOfDayEnvironment intensity={0.8} />
 
       {/* Distance fog — softens horizon edge */}
       <SceneFog />
@@ -1164,19 +1213,7 @@ function RealisticScene() {
         raycast={() => {}}
       />
 
-      {/* Atmospheric clouds */}
-      {/* Atmospheric clouds — wrapped in Suspense because drei's Cloud
-           uses useTexture internally which suspends until the cloud texture loads.
-           Without this wrapper, slow texture fetch blocks the entire scene. */}
-      <Suspense fallback={null}>
-        <Clouds material={THREE.MeshBasicMaterial}>
-          <Cloud position={[-20, 22, -40]} speed={0.2} opacity={0.5} bounds={[20, 3, 8]} segments={20} />
-          <Cloud position={[30, 25, -60]} speed={0.15} opacity={0.4} bounds={[15, 2, 6]} segments={15} />
-          <Cloud position={[10, 28, -80]} speed={0.1} opacity={0.35} bounds={[25, 4, 10]} segments={18} />
-          <Cloud position={[-40, 24, -50]} speed={0.12} opacity={0.35} bounds={[18, 3, 7]} segments={16} />
-          <Cloud position={[50, 26, -70]} speed={0.18} opacity={0.3} bounds={[22, 3, 9]} segments={17} />
-        </Clouds>
-      </Suspense>
+      {/* Clouds REMOVED — see SkyDome comment above */}
 
       {/* Active level containers — 100% opacity, fully interactive */}
       {activeContainers.map((container) => (
@@ -1207,7 +1244,7 @@ function RealisticScene() {
       <CameraControls
         ref={cameraControlsRef}
         makeDefault
-        enabled={!dragMovingId}
+        /* enabled is managed imperatively by Shift-key effect — do not set here */
         minPolarAngle={CAMERA_MIN_POLAR_ANGLE}
         maxPolarAngle={CAMERA_MAX_POLAR_ANGLE}
         minDistance={CAMERA_MIN_DISTANCE}
@@ -1226,10 +1263,12 @@ function RealisticScene() {
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.02, 0]}
         onPointerDown={(e) => {
+          if (e.nativeEvent.button !== 0) return; // let right-click through to camera
           e.stopPropagation();
           clearSelection();
           useStore.getState().setSelectedVoxel(null);
           useStore.getState().closeBayContextMenu();
+          if (frameMode) useStore.getState().setSelectedFrameElement(null);
         }}
       >
         <planeGeometry args={[200, 200]} />
@@ -1257,8 +1296,7 @@ function RealisticScene() {
         </mesh>
       )}
 
-      {/* Floating face context widget — appears near selected face in 3D */}
-      <FaceContextWidget />
+      {/* FaceContextWidget removed — Materials hotbar replaces it */}
 
       {/* Phase 8: Post-processing — AO + Bloom */}
       <SafeEffectComposer enableNormalPass>
@@ -1268,8 +1306,14 @@ function RealisticScene() {
       </SafeEffectComposer>
 
       {/* 3D orientation gizmo */}
-      <GizmoHelper alignment="bottom-right" margin={[60, 60]}>
-        <GizmoViewport />
+      <GizmoHelper alignment="top-right" margin={[50, 50]}>
+        <GizmoViewport
+          axisColors={['#94a3b8', '#94a3b8', '#94a3b8']}
+          labelColor="#64748b"
+          axisHeadScale={0.8}
+          hideNegativeAxes
+          font="11px system-ui"
+        />
       </GizmoHelper>
     </>
   );
@@ -1770,7 +1814,7 @@ function WalkthroughScene() {
       <GroundManager />
 
       {/* Phase 8: HDRI environment for PBR reflections */}
-      <TimeOfDayEnvironment intensity={0.4} />
+      <TimeOfDayEnvironment intensity={0.8} />
 
       {visibleContainers.map((container) => (
         <ContainerMesh key={container.id} container={container} />

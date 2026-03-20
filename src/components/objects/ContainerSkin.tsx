@@ -56,6 +56,10 @@ import { createDefaultVoxelGrid } from "@/types/factories";
 import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
 import { type ThemeId, THEMES } from "@/config/themes";
 import { _themeMats, type ThemeMaterialSet } from "@/config/materialCache";
+import { getNextPhase, PHASE_DAMP_SPEED } from "@/config/unpackAnimations";
+import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
+import { computePolePositions } from "@/utils/smartPoles";
+import { getViewOpacity } from "@/utils/viewIsolation";
 // ── Constants ──────────────────────────────────────────────────
 
 // Surface cycle for hotbar face editing (shared with MatrixEditor)
@@ -194,6 +198,14 @@ const mBaseplateWire = new THREE.LineBasicMaterial({
 
 // ── nullRaycast — disables raycasting on a single mesh ────────
 const nullRaycast = () => {};
+
+// ── Frame mode highlight materials ────────────────────────────
+const frameHoverMat = new THREE.MeshStandardMaterial({
+  color: 0xffcc00, metalness: 0.85, roughness: 0.2, envMapIntensity: 0.8,
+});
+const frameSelectMat = new THREE.MeshStandardMaterial({
+  color: 0x00bcd4, metalness: 0.85, roughness: 0.2, envMapIntensity: 0.8,
+});
 
 // ── Geometry caches ────────────────────────────────────────────
 
@@ -848,7 +860,7 @@ function adjIsMelting(
 
   // Case 3: Solid surfaces against any active neighbor → melt (internal walls in assemblies)
   const SOLID: SurfaceType[] = ['Solid_Steel', 'Concrete', 'Glass_Pane', 'Wood_Hinoki', 'Wall_Washi', 'Glass_Shoji'];
-  if (SOLID.includes(surface) && neighbor.active) return true;
+  if (SOLID.includes(surface) && SOLID.includes(neighborFace)) return true;
 
   return false;
 }
@@ -890,7 +902,7 @@ interface FaceProps {
   connectedEnd?: boolean;
   onEnter:    () => void;
   onLeave:    () => void;
-  onClick:    () => void;
+  onClick:    (e?: any) => void;
   onDoubleClick?: () => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
   /** Whether this face's door/shoji is open */
@@ -899,22 +911,32 @@ interface FaceProps {
   doorState?: string;
   /** Door configuration (hinge, swing, type) */
   doorConfig?: import('@/types/container').DoorConfig;
+  /** Wall cut scale: 1.0=full, 0.5=half, 0.05=down. Only affects wall faces (n/s/e/w). */
+  wallCutScale?: number;
 }
 
 function SingleFace({
   dir, surface, colPitch, rowPitch, vHeight, vOffset,
   activeBrush, isHovered, isVoxelSelected, connectedStart, connectedEnd,
   onEnter, onLeave, onClick, onDoubleClick, onContextMenu, isOpen, doorState, doorConfig,
+  wallCutScale = 1.0,
 }: FaceProps) {
   const halfCol = colPitch / 2;
   const halfRow = rowPitch / 2;
 
+  // Wall cut: scale wall height and shift Y downward so bottom edge stays at floor
+  const isWall = dir === 'n' || dir === 's' || dir === 'e' || dir === 'w';
+  const cutActive = isWall && wallCutScale < 1.0;
+  const effectiveVHeight = cutActive ? vHeight * wallCutScale : vHeight;
+  const cutYShift = cutActive ? -(vHeight - effectiveVHeight) / 2 : 0;
+
   // Face-group position relative to voxel-group centre
+  // Wall cut shifts wall faces down so bottom edge stays at floor
   const pos: [number, number, number] =
-    dir === "n" ? [0, 0, -halfRow] :
-    dir === "s" ? [0, 0, +halfRow] :
-    dir === "e" ? [+halfCol, 0, 0] :
-    dir === "w" ? [-halfCol, 0, 0] :
+    dir === "n" ? [0, cutYShift, -halfRow] :
+    dir === "s" ? [0, cutYShift, +halfRow] :
+    dir === "e" ? [+halfCol, cutYShift, 0] :
+    dir === "w" ? [-halfCol, cutYShift, 0] :
     dir === "top"    ? [0, +vOffset, 0] :
                        [0, -vOffset, 0];   // bottom
 
@@ -922,10 +944,10 @@ function SingleFace({
   const isEW    = dir === "e" || dir === "w";
   const isHoriz = dir === "top" || dir === "bottom";
 
-  // Box dims matching the face opening — NO rotation needed
+  // Box dims matching the face opening — wall cut scales wall height
   const [bW, bH, bD]: [number, number, number] =
-    isNS ? [colPitch, vHeight, PANEL_THICK] :
-    isEW ? [PANEL_THICK, vHeight, rowPitch] :
+    isNS ? [colPitch, effectiveVHeight, PANEL_THICK] :
+    isEW ? [PANEL_THICK, effectiveVHeight, rowPitch] :
            [colPitch, PANEL_THICK, rowPitch];        // top / bottom
 
   // spanW for railing: width of the face opening (not the thin dimension)
@@ -1058,8 +1080,9 @@ function SingleFace({
       if (s === "Floor_Tatami") return <mesh geometry={getBox(colPitch, 0.04, rowPitch)} material={mTatami} castShadow receiveShadow raycast={nullRaycast} />;
       if (s === "Wood_Hinoki")  return <mesh geometry={getBox(colPitch, 0.04, rowPitch)} material={mHinoki} castShadow receiveShadow raycast={nullRaycast} />;
       const ROOF_THICK = 0.08;
-      // Ceiling panels (top) get warm emissive glow; floor panels (bottom) stay steel
-      const panelMat = dir === "top" ? mCeilingLight : mSteel;
+      // Both roof (top) and floor (bottom) use steel — emissive ceiling glow removed
+      // (mCeilingLight was causing white-out on roof when viewed from above)
+      const panelMat = mSteel;
       return (
         <mesh
           geometry={getBox(colPitch, ROOF_THICK, rowPitch)}
@@ -1176,6 +1199,241 @@ function VoxelEdgeStrip({
   );
 }
 
+// ── ExtensionUnpack — cinematic "unpacking" animation for halo voxels ────
+// Replaces VoxelPopIn for extension voxels. Animates the whole voxel group
+// through the configured unpackPhase using pivot-point rotations/translations.
+//
+// ANIMATION TYPES:
+//   wall_to_floor:   Wall swivels down on bottom hinge → becomes floor
+//   wall_to_ceiling: Wall swivels up on top hinge → becomes ceiling
+//   floor_slide:     Floor slides outward from container body
+//   walls_deploy:    Side walls swivel outward from floor center
+//   reverse:         Plays entry animation in reverse, then voxel deactivates
+
+/** Compute the outward direction for an extension voxel based on its grid position */
+function getExtensionOutward(col: number, row: number): 'n' | 's' | 'e' | 'w' | null {
+  // Corner voxels: row takes priority (N/S before E/W)
+  if (row === 0) return 'n';
+  if (row === VOXEL_ROWS - 1) return 's';
+  if (col === 0) return 'e';  // col 0 = +X in world (negated axis)
+  if (col === VOXEL_COLS - 1) return 'w'; // col 7 = -X in world
+  return null; // not an extension
+}
+
+interface ExtensionUnpackProps {
+  children: ReactNode;
+  phase: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy' | 'reverse' | undefined;
+  col: number;
+  row: number;
+  colPitch: number;  // voxW (foldDepth for halo cols, coreWidth for halo rows)
+  rowPitch: number;  // voxD (foldDepth for halo rows, coreDepth for halo cols)
+  vHeight: number;
+  containerId: string;
+  voxelIndex: number;
+}
+
+function ExtensionUnpack({
+  children, phase, col, row, colPitch, rowPitch, vHeight, containerId, voxelIndex,
+}: ExtensionUnpackProps) {
+  const outerRef = useRef<THREE.Group>(null);
+  const innerRef = useRef<THREE.Group>(null);
+  const progressRef = useRef(0); // 0 = folded/start, 1 = rest/complete
+  const phaseRef = useRef(phase);
+  const doneRef = useRef(false);
+  const clearUnpackPhase = useStore((s) => s.clearUnpackPhase);
+
+  const outward = getExtensionOutward(col, row);
+
+  // Determine pivot offset and rotation axis based on outward direction + phase
+  // The pivot is at the body-touching edge of the extension voxel
+  const pivotInfo = useMemo(() => {
+    if (!outward) return null;
+
+    // Body-touching edge offset from voxel center
+    // N extension (row 0): body edge at +Z (toward row 1) → pivotZ = +rowPitch/2
+    // S extension (row 3): body edge at -Z (toward row 2) → pivotZ = -rowPitch/2
+    // E extension (col 0): body edge at -X (toward col 1, +X is col 0 due to negation) → pivotX = -colPitch/2
+    // W extension (col 7): body edge at +X (toward col 6) → pivotX = +colPitch/2
+    let pivotX = 0, pivotZ = 0;
+    if (outward === 'n') pivotZ = rowPitch / 2;
+    if (outward === 's') pivotZ = -rowPitch / 2;
+    if (outward === 'e') pivotX = -colPitch / 2;
+    if (outward === 'w') pivotX = colPitch / 2;
+
+    return { pivotX, pivotZ, outward };
+  }, [outward, colPitch, rowPitch]);
+
+  // Initialize animation state on mount or phase change
+  useEffect(() => {
+    if (phase === phaseRef.current && progressRef.current > 0) return;
+    phaseRef.current = phase;
+    doneRef.current = false;
+
+    if (!phase) {
+      // No animation — snap to rest
+      progressRef.current = 1;
+      doneRef.current = true;
+      if (outerRef.current) {
+        outerRef.current.rotation.set(0, 0, 0);
+        outerRef.current.position.set(0, 0, 0);
+        outerRef.current.scale.set(1, 1, 1);
+      }
+      return;
+    }
+
+    if (phase === 'reverse') {
+      progressRef.current = 1; // start from rest, animate toward folded
+    } else {
+      progressRef.current = 0; // start folded, animate toward rest
+    }
+  }, [phase]);
+
+  useFrame((state, dt) => {
+    if (doneRef.current || !outerRef.current || !innerRef.current || !pivotInfo) return;
+    const currentPhase = phaseRef.current;
+    if (!currentPhase) { doneRef.current = true; return; }
+
+    const { pivotX, pivotZ, outward: dir } = pivotInfo;
+    const dampSpeed = PHASE_DAMP_SPEED[currentPhase] ?? 5;
+
+    /** Advance to next phase in sequence, or clear if sequence is complete */
+    const finishPhase = () => {
+      const next = getNextPhase(currentPhase);
+      if (next) {
+        // Chain to next phase — reset progress and update local phase ref
+        phaseRef.current = next;
+        progressRef.current = 0;
+        // Snap transforms to rest before starting next phase
+        outerRef.current!.rotation.set(0, 0, 0);
+        outerRef.current!.position.set(0, 0, 0);
+        outerRef.current!.scale.set(1, 1, 1);
+        innerRef.current!.position.set(0, 0, 0);
+      } else {
+        doneRef.current = true;
+        clearUnpackPhase(containerId, voxelIndex);
+      }
+    };
+
+    if (currentPhase === 'wall_to_floor') {
+      // Animate progress 0→1: wall swivels down on bottom hinge to become floor
+      progressRef.current = THREE.MathUtils.damp(progressRef.current, 1, dampSpeed, dt);
+
+      // Rotation angle: 0 (wall upright) → -PI/2 (lying flat as floor)
+      const angle = -progressRef.current * (Math.PI / 2);
+
+      // Set inner group offset so pivot is at body-touching bottom edge
+      innerRef.current.position.set(-pivotX, vHeight / 2, -pivotZ);
+
+      // Rotate outer group around the appropriate axis at the bottom hinge
+      if (dir === 'n' || dir === 's') {
+        const sign = dir === 'n' ? 1 : -1;
+        outerRef.current.rotation.set(sign * angle, 0, 0);
+      } else {
+        const sign = dir === 'e' ? -1 : 1;
+        outerRef.current.rotation.set(0, 0, sign * angle);
+      }
+      outerRef.current.position.set(pivotX, -vHeight / 2, pivotZ);
+
+      if (progressRef.current > 0.995) { progressRef.current = 1; finishPhase(); }
+      state.invalidate();
+
+    } else if (currentPhase === 'wall_to_ceiling') {
+      // Animate progress 0→1: wall swivels up on top hinge to become ceiling
+      progressRef.current = THREE.MathUtils.damp(progressRef.current, 1, dampSpeed, dt);
+
+      const angle = progressRef.current * (Math.PI / 2);
+
+      // Pivot at body-touching TOP edge
+      innerRef.current.position.set(-pivotX, -vHeight / 2, -pivotZ);
+
+      if (dir === 'n' || dir === 's') {
+        const sign = dir === 'n' ? -1 : 1;
+        outerRef.current.rotation.set(sign * angle, 0, 0);
+      } else {
+        const sign = dir === 'e' ? 1 : -1;
+        outerRef.current.rotation.set(0, 0, sign * angle);
+      }
+      outerRef.current.position.set(pivotX, vHeight / 2, pivotZ);
+
+      if (progressRef.current > 0.995) { progressRef.current = 1; finishPhase(); }
+      state.invalidate();
+
+    } else if (currentPhase === 'floor_slide') {
+      // Animate progress 0→1: floor slides outward from body
+      progressRef.current = THREE.MathUtils.damp(progressRef.current, 1, dampSpeed, dt);
+
+      const slideOffset = (1 - progressRef.current);
+      if (dir === 'n') outerRef.current.position.set(0, 0, slideOffset * rowPitch);
+      else if (dir === 's') outerRef.current.position.set(0, 0, -slideOffset * rowPitch);
+      else if (dir === 'e') outerRef.current.position.set(-slideOffset * colPitch, 0, 0);
+      else outerRef.current.position.set(slideOffset * colPitch, 0, 0);
+
+      outerRef.current.rotation.set(0, 0, 0);
+      innerRef.current.position.set(0, 0, 0);
+
+      if (progressRef.current > 0.995) { progressRef.current = 1; finishPhase(); }
+      state.invalidate();
+
+    } else if (currentPhase === 'walls_deploy') {
+      // Animate progress 0→1: walls unfold upward from floor
+      progressRef.current = THREE.MathUtils.damp(progressRef.current, 1, dampSpeed, dt);
+
+      outerRef.current.scale.set(1, progressRef.current, 1);
+      outerRef.current.position.set(0, vHeight * (progressRef.current - 1) / 2, 0);
+      outerRef.current.rotation.set(0, 0, 0);
+      innerRef.current.position.set(0, 0, 0);
+
+      if (progressRef.current > 0.995) {
+        progressRef.current = 1;
+        outerRef.current.scale.set(1, 1, 1);
+        outerRef.current.position.set(0, 0, 0);
+        finishPhase();
+      }
+      state.invalidate();
+
+    } else if (currentPhase === 'reverse') {
+      // Animate progress 1→0: reverse of wall_to_floor (swivels back up)
+      progressRef.current = THREE.MathUtils.damp(progressRef.current, 0, dampSpeed, dt);
+
+      const angle = -progressRef.current * (Math.PI / 2);
+
+      innerRef.current.position.set(-pivotX, vHeight / 2, -pivotZ);
+
+      if (dir === 'n' || dir === 's') {
+        const sign = dir === 'n' ? 1 : -1;
+        outerRef.current.rotation.set(sign * angle, 0, 0);
+      } else {
+        const sign = dir === 'e' ? -1 : 1;
+        outerRef.current.rotation.set(0, 0, sign * angle);
+      }
+      outerRef.current.position.set(pivotX, -vHeight / 2, pivotZ);
+
+      if (progressRef.current < 0.005) {
+        progressRef.current = 0;
+        doneRef.current = true;
+        clearUnpackPhase(containerId, voxelIndex);
+      }
+
+      state.invalidate();
+    }
+  });
+
+  // If no phase, render children directly at rest
+  if (!phase && progressRef.current >= 1) {
+    return <group>{children}</group>;
+  }
+
+  return (
+    <group ref={outerRef}>
+      <group ref={innerRef}>
+        {children}
+      </group>
+    </group>
+  );
+}
+
+// AutoSupportPoles removed — replaced by WU-10 pillarPositions (convex outer corner poles per container)
+
 // ── VoxelPopIn — directional "unpacking" animation on mount ────
 // Floors/ceilings extrude horizontally (XZ); walls fold up vertically (Y)
 
@@ -1198,6 +1456,41 @@ function VoxelPopIn({ children, vHeight }: { children: ReactNode; vHeight: numbe
   return <group ref={ref} scale={[0.01, 0.01, 0.01]} position={[0, -vHeight / 2, 0]}>{children}</group>;
 }
 
+// ── StairBuildUp — treads rise sequentially from floor ────────
+// Stair voxels get a special animation: the group slides up from below
+// with a slight forward lean that corrects as it reaches full height,
+// giving a "construction" feel distinct from the standard pop-in.
+
+function StairBuildUp({ children, vHeight }: { children: ReactNode; vHeight: number }) {
+  const ref = useRef<THREE.Group>(null);
+  const t = useRef(0);
+
+  useFrame((_, dt) => {
+    if (t.current >= 1) return;
+    // Slower than VoxelPopIn (0.4s vs 0.25s) for dramatic stair construction feel
+    t.current = Math.min(t.current + dt / 0.4, 1);
+    // Ease-out with slight overshoot: cubic ease-out
+    const ease = 1 - Math.pow(1 - t.current, 3);
+    if (ref.current) {
+      // Scale up from floor, Y-axis leads
+      ref.current.scale.set(
+        0.3 + 0.7 * ease,  // X/Z expand from 30% to 100%
+        ease,               // Y: 0 → 1
+        0.3 + 0.7 * ease,
+      );
+      // Keep bottom at floor level
+      ref.current.position.y = vHeight * (ease - 1) / 2;
+      // Slight forward lean that corrects (rotation around X)
+      ref.current.rotation.x = (1 - ease) * 0.15;
+    }
+  });
+
+  return (
+    <group ref={ref} scale={[0.3, 0.01, 0.3]} position={[0, -vHeight / 2, 0]}>
+      {children}
+    </group>
+  );
+}
 
 // Module-scope WeakMaps — key: original material, value: cloned ghost material
 //                         key: mesh instance,     value: original material (before swap)
@@ -1294,7 +1587,7 @@ function BaseplateCell({
   isValid: boolean;
   isLocked: boolean;
   isHovered: boolean;
-  onEnter: () => void; onLeave: () => void; onClick: () => void;
+  onEnter: () => void; onLeave: () => void; onClick: (e?: any) => void;
   onPointerDown?: () => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
 }) {
@@ -1312,7 +1605,7 @@ function BaseplateCell({
     useStore.getState().setHoveredVoxelEdge(null);
     document.body.style.cursor = 'auto';
   };
-  const onClickFace = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onClick(); };
+  const onClickFace = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onClick(e); };
   const onDownFace = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     // WHY no startContainerDrag here: ContainerMesh handles drag with a 5px threshold.
@@ -1468,6 +1761,14 @@ export default function ContainerSkin({
   const viewMode             = useStore((s) => s.viewMode);
   const isWalkthrough        = viewMode === ViewMode.Walkthrough;
   const isPreviewMode        = useStore((s) => s.isPreviewMode);
+  const wallCutMode          = useStore((s) => s.wallCutMode);
+  const frameMode            = useStore((s) => s.frameMode);
+  const selectedFrameElement = useStore((s) => s.selectedFrameElement);
+  const setSelectedFrameElement = useStore((s) => s.setSelectedFrameElement);
+  // Wall cut scale: full=1.0, half=0.2 (low wainscot), down=0.05 (baseboard), custom reads wallCutHeight
+  const wallCutScale = wallCutMode === 'full' ? 1.0 : wallCutMode === 'half' ? 0.2 : wallCutMode === 'down' ? 0.05 : useStore.getState().wallCutHeight;
+  // Hide ceiling (top faces) when walls are cut — improves interior visibility
+  const hideCeiling = wallCutMode !== 'full';
   // facePreview hover removed (Sprint 15) — no longer swaps materials on hover
 
   // Sync module-scope material aliases whenever theme changes
@@ -1482,6 +1783,12 @@ export default function ContainerSkin({
   const [hovered, setHovered] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<{ idx: number; face: string } | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Frame mode: track hovered pole index for highlight
+  const [hoveredPoleIdx, setHoveredPoleIdx] = useState<number | null>(null);
+
+  // Ctrl+drag painting — tracks active drag state and painted faces to prevent double-painting
+  const paintDragging = useRef(false);
+  const paintedFaces = useRef(new Set<string>());
 
   // ── Multi-Tile Footprint ─────────────────────────────────
   /** Hovered baseplate origin for footprint preview (null when not hovering baseplate) */
@@ -1587,34 +1894,54 @@ export default function ContainerSkin({
 
   const grid = container.voxelGrid ?? createDefaultVoxelGrid();
 
-  // WU-10: Pre-compute unique pillar positions for all convex outer corners of active voxels.
-  // A corner (sx, sz) of voxel (col, row) is convex if BOTH lateral neighbors are inactive.
-  // Due to E/W inversion: X-direction neighbor is at col-sx (not col+sx).
+  // Simple mode flag — hoisted above allLevel0.map() to avoid 32x getState() calls
+  const isSimpleMode = useStore.getState().designComplexity === 'simple';
+
+  // Smart pole positions: computed via smartPoles.ts algorithm.
+  // Uses vertex-counting approach: pole at vertex with exactly 1 or 3 roofed neighbors
+  // (captures convex AND concave 90° corners). Layout-aware resolver handles variable voxel sizes.
+  const containerY = container.position.y;
   const pillarPositions = useMemo(() => {
-    const positions: Array<{ px: number; pz: number }> = [];
-    const posSet = new Set<string>();
-    for (let row = 0; row < VOXEL_ROWS; row++) {
-      for (let col = 0; col < VOXEL_COLS; col++) {
-        const voxel = grid[row * VOXEL_COLS + col];
-        if (!voxel?.active || voxel.faces.top === 'Open') continue;
-        const { voxW, voxD, px, pz } = getVoxelLayout(col, row);
-        for (const sx of [-1, 1] as const) {
-          for (const sz of [-1, 1] as const) {
-            const xc = col - sx; // E/W inversion: +X direction = lower col
-            const xActive = xc >= 0 && xc < VOXEL_COLS ? (grid[row * VOXEL_COLS + xc]?.active ?? false) : false;
-            const zr = row + sz;
-            const zActive = zr >= 0 && zr < VOXEL_ROWS ? (grid[zr * VOXEL_COLS + col]?.active ?? false) : false;
-            if (!xActive && !zActive) {
-              const cpx = px + sx * voxW / 2;
-              const cpz = pz + sz * voxD / 2;
-              const key = `${cpx.toFixed(3)}_${cpz.toFixed(3)}`;
-              if (!posSet.has(key)) { posSet.add(key); positions.push({ px: cpx, pz: cpz }); }
-            }
-          }
-        }
+    // Build vertex position resolver using getVoxelLayout for variable voxel sizes.
+    // Vertex (vr, vc) sits at the boundary between voxels. We compute its world position
+    // by averaging the edges of adjacent voxels.
+    const resolver = (vr: number, vc: number): { px: number; pz: number } => {
+      // Get the edge position by computing where two adjacent voxels meet.
+      // For X: vertex vc sits between col vc-1 (right edge) and col vc (left edge).
+      // For Z: vertex vr sits between row vr-1 (bottom edge) and row vr (top edge).
+      let px: number;
+      if (vc <= 0) {
+        // Left boundary: left edge of col 0
+        const { px: vPx, voxW } = getVoxelLayout(0, 0);
+        px = vPx + voxW / 2;
+      } else if (vc >= VOXEL_COLS) {
+        // Right boundary: right edge of last col
+        const { px: vPx, voxW } = getVoxelLayout(VOXEL_COLS - 1, 0);
+        px = vPx - voxW / 2;
+      } else {
+        // Interior: boundary between col vc-1 and col vc
+        const left = getVoxelLayout(vc - 1, 0);
+        const right = getVoxelLayout(vc, 0);
+        px = (left.px - left.voxW / 2 + right.px + right.voxW / 2) / 2;
       }
-    }
-    return positions;
+      let pz: number;
+      if (vr <= 0) {
+        // Top boundary: top edge of row 0
+        const { pz: vPz, voxD } = getVoxelLayout(0, 0);
+        pz = vPz - voxD / 2;
+      } else if (vr >= VOXEL_ROWS) {
+        // Bottom boundary: bottom edge of last row
+        const { pz: vPz, voxD } = getVoxelLayout(0, VOXEL_ROWS - 1);
+        pz = vPz + voxD / 2;
+      } else {
+        // Interior: boundary between row vr-1 and row vr
+        const top = getVoxelLayout(0, vr - 1);
+        const bottom = getVoxelLayout(0, vr);
+        pz = (top.pz + top.voxD / 2 + bottom.pz - bottom.voxD / 2) / 2;
+      }
+      return { px, pz };
+    };
+    return computePolePositions(grid, 0, 0, 0, 0, resolver);
   }, [grid, getVoxelLayout]);
 
   const handleClick = useCallback(
@@ -1625,13 +1952,31 @@ export default function ContainerSkin({
         return;
       }
 
-      const alreadySelected =
-        selectedVoxel?.containerId === container.id &&
+      // ★ Active brush from Materials tab: paint immediately on click (like bucket mode)
+      if (activeBrush) {
+        setVoxelFace(container.id, voxelIndex, faceName, activeBrush);
+        return;
+      }
+
+      // Simple mode: compute bay group for this voxel at click time
+      const isSimple = useStore.getState().designComplexity === 'simple';
+      const bayIndices = isSimple ? getBayIndicesForVoxel(voxelIndex, VOXEL_ROWS * VOXEL_COLS) : null;
+
+      // Check if already selected (individual OR bay group)
+      const svs = useStore.getState().selectedVoxels;
+      const isBaySelected = bayIndices && svs && svs.containerId === container.id &&
+        bayIndices.every((i: number) => svs.indices.includes(i));
+      const alreadySelected = isBaySelected ||
+        (selectedVoxel?.containerId === container.id &&
         !selectedVoxel?.isExtension &&
-        selectedVoxel?.index === voxelIndex;
+        selectedVoxel?.index === voxelIndex);
 
       if (!alreadySelected) {
-        setSelectedVoxel({ containerId: container.id, index: voxelIndex });
+        if (bayIndices) {
+          useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+        } else {
+          setSelectedVoxel({ containerId: container.id, index: voxelIndex });
+        }
         return;
       }
 
@@ -1669,6 +2014,46 @@ export default function ContainerSkin({
     },
     [container.id, container.voxelGrid, setSelectedVoxel, openVoxelContextMenu, setFaceContextMenuCtx]
   );
+
+  // ── Ctrl+Drag Paint — paint faces by dragging across them with Ctrl held ──
+  const handlePaintDragStart = useCallback(
+    (voxelIndex: number, faceName: keyof VoxelFaces, ctrlKey: boolean) => {
+      if (!ctrlKey || !activeBrush) return false;
+      paintDragging.current = true;
+      paintedFaces.current.clear();
+      const key = `${voxelIndex}:${faceName}`;
+      paintedFaces.current.add(key);
+      setVoxelFace(container.id, voxelIndex, faceName, activeBrush);
+      // Signal to disable camera controls
+      useStore.getState().setIsPaintDragging?.(true);
+      return true; // consumed — skip normal click logic
+    },
+    [container.id, activeBrush, setVoxelFace]
+  );
+
+  const handlePaintDragMove = useCallback(
+    (voxelIndex: number, faceName: keyof VoxelFaces) => {
+      if (!paintDragging.current || !activeBrush) return;
+      const key = `${voxelIndex}:${faceName}`;
+      if (paintedFaces.current.has(key)) return; // already painted
+      paintedFaces.current.add(key);
+      setVoxelFace(container.id, voxelIndex, faceName, activeBrush);
+    },
+    [container.id, activeBrush, setVoxelFace]
+  );
+
+  // Global pointerup listener to end drag paint
+  useEffect(() => {
+    const handleUp = () => {
+      if (paintDragging.current) {
+        paintDragging.current = false;
+        paintedFaces.current.clear();
+        useStore.getState().setIsPaintDragging?.(false);
+      }
+    };
+    window.addEventListener('pointerup', handleUp);
+    return () => window.removeEventListener('pointerup', handleUp);
+  }, []);
 
   // ★ Phase 1: ALL 32 level-0 voxel positions — active AND inactive.
   // This is a STATIC grid (no deps). Every cell always renders its hitbox geometry.
@@ -1767,6 +2152,9 @@ export default function ContainerSkin({
 
         const isActive = voxel.active;
 
+        // Simple mode: pre-compute bay group for ALL handlers in this voxel scope
+        const bayIndicesForVoxel = isSimpleMode ? getBayIndicesForVoxel(idx, VOXEL_ROWS * VOXEL_COLS) : null;
+
         // ── INACTIVE VOXEL → Phase 2 Baseplate + Phase 1 permanent face hitboxes ──
         if (!isActive) {
           const baseKey = `base_${idx}`;
@@ -1792,6 +2180,8 @@ export default function ContainerSkin({
                   setFootprintOrigin({ col, row });
                   // Use non-extension form so MatrixEditor grid sync works via index match
                   setHoveredVoxel({ containerId: container.id, index: idx });
+                  // Simple mode: set bay group hover for merged wireframe
+                  if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
                 }}
                 onLeave={() => {
                   setHovered((k) => (k === baseKey ? null : k));
@@ -1799,6 +2189,8 @@ export default function ContainerSkin({
                     prev?.col === col && prev?.row === row ? null : prev
                   );
                   setFaceContext(null);
+                  // Simple mode: clear bay group hover
+                  if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup(null);
                   // Debounce clearing hoveredVoxel — matches body voxel pattern
                   if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
                   leaveTimerRef.current = setTimeout(() => {
@@ -1807,7 +2199,11 @@ export default function ContainerSkin({
                   }, 250);
                 }}
                 onContextMenu={(e: ThreeEvent<MouseEvent>) => {
-                  setSelectedVoxel({ containerId: container.id, isExtension: true, col, row });
+                  if (bayIndicesForVoxel) {
+                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndicesForVoxel });
+                  } else {
+                    setSelectedVoxel({ containerId: container.id, isExtension: true, col, row });
+                  }
                   openVoxelContextMenu(
                     (e.nativeEvent as MouseEvent).clientX,
                     (e.nativeEvent as MouseEvent).clientY,
@@ -1841,17 +2237,32 @@ export default function ContainerSkin({
                   } else {
                     // ★ Phase 2 WYSIWYC: Empty tiles are 1st-class citizens.
                     // Always select. On second click cycle block preset (continues infinite loop through Empty).
-                    const isAlreadySel = selectedVoxel?.containerId === container.id
-                      && selectedVoxel?.isExtension && selectedVoxel.col === col && selectedVoxel.row === row;
+                    const svs = useStore.getState().selectedVoxels;
+                    const isBayAlreadySel = bayIndicesForVoxel && svs && svs.containerId === container.id &&
+                      bayIndicesForVoxel.every((i: number) => svs.indices.includes(i));
+                    const isAlreadySel = isBayAlreadySel || (selectedVoxel?.containerId === container.id
+                      && selectedVoxel?.isExtension && selectedVoxel.col === col && selectedVoxel.row === row);
                     if (isAlreadySel) {
                       // Cycle to next preset (Empty → Default Steel → etc.)
-                      cycleBlockPreset(container.id, idx);
-                      // Switch to non-extension selectedVoxel so active hitbox recognizes next click
-                      setSelectedVoxel({ containerId: container.id, index: idx });
+                      // Simple mode: cycle ALL voxels in bay group together
+                      if (bayIndicesForVoxel) {
+                        for (const bi of bayIndicesForVoxel) cycleBlockPreset(container.id, bi);
+                      } else {
+                        cycleBlockPreset(container.id, idx);
+                      }
+                      // Keep bay group selected (don't switch to single voxel in Simple mode)
+                      if (!bayIndicesForVoxel) {
+                        setSelectedVoxel({ containerId: container.id, index: idx });
+                      }
                       return;
                     }
-                    // ★ Synthetic extension payload — NO index (prevents grid lookups)
-                    setSelectedVoxel({ containerId: container.id, isExtension: true, col, row });
+                    // Simple mode: select entire bay group instead of individual extension voxel
+                    if (bayIndicesForVoxel) {
+                      useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndicesForVoxel });
+                    } else {
+                      // ★ Synthetic extension payload — NO index (prevents grid lookups)
+                      setSelectedVoxel({ containerId: container.id, isExtension: true, col, row });
+                    }
                   }
                 }}
               />
@@ -1890,6 +2301,16 @@ export default function ContainerSkin({
 
           // ★ Phase 4: Global adjacency culling — hide face if touching active voxel in adjacent container
           if (globalCullSet.has(`${container.id}:${idx}:${dir}`)) return null;
+
+          // ★ Wall cut: hide ceiling when walls are cut (improves interior visibility)
+          // Exception: keep ceiling if voxel has railings (platform/deck ceiling stays for context)
+          if (hideCeiling && dir === 'top') {
+            const hasRailing = ['n','s','e','w'].some(d => {
+              const f = voxel.faces[d as keyof VoxelFaces];
+              return f === 'Railing_Cable' || f === 'Railing_Glass';
+            });
+            if (!hasRailing) return null;
+          }
 
           // ★ Phase 9: Dollhouse cutaway — hide walls facing the camera
           if (fadedDirs.has(dir)) return null;
@@ -1930,11 +2351,16 @@ export default function ContainerSkin({
               isOpen={isFaceOpen}
               doorState={voxel.doorStates?.[dir]}
               doorConfig={voxel.doorConfig?.[dir]}
-              onEnter={() => { setHovered(faceKey); setHoveredVoxel({ containerId: container.id, index: idx }); }}
-              onLeave={() => { setHovered((k) => (k === faceKey ? null : k)); setHoveredVoxel(null); }}
-              onClick={() => handleClick(idx, dir)}
+              onEnter={() => { setHovered(faceKey); setHoveredVoxel({ containerId: container.id, index: idx }); if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel }); handlePaintDragMove(idx, dir); }}
+              onLeave={() => { setHovered((k) => (k === faceKey ? null : k)); setHoveredVoxel(null); if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup(null); }}
+              onClick={(e?: any) => {
+                // Ctrl+click starts drag-paint mode
+                if (e?.ctrlKey && handlePaintDragStart(idx, dir, true)) return;
+                handleClick(idx, dir);
+              }}
               onDoubleClick={undefined}
               onContextMenu={(e: any) => handleContextMenu(idx, dir, e.nativeEvent ?? e)}
+              wallCutScale={wallCutScale}
             />
           );
         });
@@ -1945,21 +2371,55 @@ export default function ContainerSkin({
         return (
           <group key={idx} position={[px, py, pz]}>
             {/* animated=true → pop-in from scale 0; animated=false → instant full scale (IsoEditor) */}
-            {animated
-              ? <VoxelPopIn vHeight={vHeight}>{faceNodes}</VoxelPopIn>
-              : <group>{faceNodes}</group>
+            {/* Extension voxels use ExtensionUnpack for cinematic "unpacking"; core voxels use VoxelPopIn */}
+            {animated && isHaloVoxel && voxel.unpackPhase
+              ? <ExtensionUnpack
+                  phase={voxel.unpackPhase}
+                  col={col} row={row}
+                  colPitch={voxW} rowPitch={voxD}
+                  vHeight={vHeight}
+                  containerId={container.id}
+                  voxelIndex={idx}
+                >{faceNodes}</ExtensionUnpack>
+              : animated
+                ? <VoxelPopIn vHeight={vHeight}>{faceNodes}</VoxelPopIn>
+                : <group>{faceNodes}</group>
             }
+            {/* Pillars now rendered via pre-computed pillarPositions below the voxel loop (WU-10) */}
 
             {/* Volumetric stair geometry — rendered when voxelType === 'stairs' */}
             {voxel.voxelType === 'stairs' && (
-              <StairMesh
-                voxW={voxW}
-                voxD={voxD}
-                voxH={vHeight}
-                ascending={voxel.stairAscending ?? (voxel.stairDir === 'ew' ? 'e' : 'n')}
-                faces={voxel.faces}
-                stairPart={voxel.stairPart}
-              />
+              <>
+                {animated
+                  ? <StairBuildUp vHeight={vHeight}>
+                      <StairMesh
+                        voxW={voxW}
+                        voxD={voxD}
+                        voxH={vHeight}
+                        ascending={voxel.stairAscending ?? (voxel.stairDir === 'ew' ? 'e' : 'n')}
+                        faces={voxel.faces}
+                        stairPart={voxel.stairPart}
+                      />
+                    </StairBuildUp>
+                  : <StairMesh
+                      voxW={voxW}
+                      voxD={voxD}
+                      voxH={vHeight}
+                      ascending={voxel.stairAscending ?? (voxel.stairDir === 'ew' ? 'e' : 'n')}
+                      faces={voxel.faces}
+                      stairPart={voxel.stairPart}
+                    />
+                }
+                {/* Invisible click target for stair voxels (Open faces → no visible panels to click) */}
+                <mesh
+                  geometry={getBox(voxW, vHeight, voxD)}
+                  onClick={(e) => { e.stopPropagation(); handleClick(idx, 'top'); }}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoveredVoxel({ containerId: container.id, index: idx }); }}
+                  onPointerOut={() => setHoveredVoxel(null)}
+                >
+                  <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                </mesh>
+              </>
             )}
 
             {/* Lego-style 3D edge strips — on all active voxels */}
@@ -1993,16 +2453,25 @@ export default function ContainerSkin({
 
               const isAlreadySelected = selectedVoxel?.containerId === container.id && !selectedVoxel?.isExtension && selectedVoxel?.index === idx;
 
+              // Simple mode: use pre-computed bay group from voxel scope
+              const bayIndices = bayIndicesForVoxel;
+
               // Shared hover enter for center + edge hitboxes
               const onEnterShared = (e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
                 setHoveredVoxel({ containerId: container.id, index: idx });
+                if (bayIndices) {
+                  useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndices });
+                }
                 document.body.style.cursor = 'pointer';
               };
               const onLeaveShared = (e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
                 setHoveredVoxelEdge(null);
                 setFaceContext(null);
+                if (bayIndices) {
+                  useStore.getState().setHoveredBayGroup(null);
+                }
                 document.body.style.cursor = 'auto';
                 // Debounce clearing hoveredVoxel — gives cursor 250ms to travel between hitboxes or to SmartHotbar
                 if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
@@ -2016,6 +2485,9 @@ export default function ContainerSkin({
                 setHoveredEdge(null);
                 setHoveredVoxelEdge(null);
                 setFaceContext(null);
+                if (bayIndices) {
+                  useStore.getState().setHoveredBayGroup(null);
+                }
                 document.body.style.cursor = 'auto';
                 if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
                 leaveTimerRef.current = setTimeout(() => {
@@ -2088,20 +2560,29 @@ export default function ContainerSkin({
                 }
                 // Focus gate: first click always focuses — never stamp or cycle on first contact
                 // ★ STALE CLOSURE FIX: read selectedVoxel fresh at click time
-                const { selectedVoxel: sv } = useStore.getState();
+                const { selectedVoxel: sv, selectedVoxels: svs } = useStore.getState();
                 const isSelected =
-                  sv?.containerId === container.id &&
-                  !sv?.isExtension &&
-                  sv?.index === idx;
+                  (sv?.containerId === container.id && !sv?.isExtension && sv?.index === idx) ||
+                  (bayIndices && svs && svs.containerId === container.id &&
+                   bayIndices.every((i: number) => svs.indices.includes(i)));
                 if (!isSelected) {
-                  setSelectedVoxel({ containerId: container.id, index: idx });
+                  if (bayIndices) {
+                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+                  } else {
+                    setSelectedVoxel({ containerId: container.id, index: idx });
+                  }
                   return;
                 }
                 // Already focused: stamp or cycle preset
                 if (facesNow) {
                   doStamp();
                 } else {
-                  cycleBlockPreset(container.id, idx);
+                  // Simple mode: cycle ALL voxels in bay group together
+                  if (bayIndices && bayIndices.length > 1) {
+                    for (const bi of bayIndices) cycleBlockPreset(container.id, bi);
+                  } else {
+                    cycleBlockPreset(container.id, idx);
+                  }
                 }
               };
               const onClickEdge = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
@@ -2115,10 +2596,16 @@ export default function ContainerSkin({
                 select(container.id);
                 const ctx = face === 'top' ? 'roof' : face === 'bottom' ? 'floor' : 'wall';
                 setFaceContext(ctx);
+                // Auto-switch hotbar to Materials tab when clicking a wall face
+                if (ctx === 'wall') useStore.getState().setActiveHotbarTab(2);
                 // Implicit paint: when activeBrush is set, paint immediately (skip focus gate)
                 if (activeBrush) {
                   select(container.id);
-                  setSelectedVoxel({ containerId: container.id, index: idx });
+                  if (bayIndices) {
+                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+                  } else {
+                    setSelectedVoxel({ containerId: container.id, index: idx });
+                  }
                   setVoxelFace(container.id, idx, face, activeBrush);
                   return;
                 }
@@ -2130,8 +2617,15 @@ export default function ContainerSkin({
                   return;
                 }
                 // Single-click selection: select voxel + face in one step
-                if (!isAlreadySelected) {
-                  setSelectedVoxel({ containerId: container.id, index: idx });
+                // Check both selectedVoxel (detail mode) and selectedVoxels (simple bay group mode)
+                const isBayAlreadySelected = bayIndices && multiSel && multiSel.containerId === container.id &&
+                  bayIndices.every((i: number) => multiSel.indices.includes(i));
+                if (!isAlreadySelected && !isBayAlreadySelected) {
+                  if (bayIndices) {
+                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+                  } else {
+                    setSelectedVoxel({ containerId: container.id, index: idx });
+                  }
                   useStore.getState().setSelectedFace(face);
                   return;
                 }
@@ -2155,6 +2649,11 @@ export default function ContainerSkin({
 
               const handleEdgeDblClick = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
+                // Simple mode: cycle bay group preset instead of individual face
+                if (isSimpleMode && bayIndices && bayIndices.length > 1) {
+                  for (const bi of bayIndices) cycleBlockPreset(container.id, bi);
+                  return;
+                }
                 cycleVoxelFace(container.id, idx, face);
               };
 
@@ -2162,8 +2661,8 @@ export default function ContainerSkin({
               const halfZ = voxD / 2;
               return (
                 <>
-                  {/* ── All hitboxes — disabled in preview/ghost mode ── */}
-                  {!isPreviewMode && !ghostMode && (
+                  {/* ── All hitboxes — disabled in preview/ghost mode or frame mode ── */}
+                  {!isPreviewMode && !ghostMode && !frameMode && (
                     <>
                       {/* Floor-edge hitbox paradigm — all 5 hitboxes live at floor level (y=-vOffset+0.05).
                           Center handles floor/block cycling; 4 edge strips handle individual wall faces.
@@ -2184,6 +2683,7 @@ export default function ContainerSkin({
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'bottom' });
+                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
                                 setFaceContext('floor');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2193,7 +2693,12 @@ export default function ContainerSkin({
                               }}
                               onDoubleClick={(e: ThreeEvent<MouseEvent>) => {
                                 e.stopPropagation();
-                                cycleBlockPreset(container.id, idx);
+                                // Simple mode: cycle ALL voxels in bay group together
+                                if (bayIndices && bayIndices.length > 1) {
+                                  for (const bi of bayIndices) cycleBlockPreset(container.id, bi);
+                                } else {
+                                  cycleBlockPreset(container.id, idx);
+                                }
                               }}
                               onPointerLeave={onLeaveEdge}
                               onContextMenu={onCtxShared()}
@@ -2296,6 +2801,7 @@ export default function ContainerSkin({
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'top' });
+                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2319,6 +2825,7 @@ export default function ContainerSkin({
                                 setHoveredEdge({ idx, face: 'n' });
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'n' });
+                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2341,6 +2848,7 @@ export default function ContainerSkin({
                                 setHoveredEdge({ idx, face: 's' });
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 's' });
+                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2363,6 +2871,7 @@ export default function ContainerSkin({
                                 setHoveredEdge({ idx, face: 'e' });
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'e' });
+                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2385,6 +2894,7 @@ export default function ContainerSkin({
                                 setHoveredEdge({ idx, face: 'w' });
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'w' });
+                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2486,17 +2996,34 @@ export default function ContainerSkin({
         );
       })}
 
-      {/* WU-10: Structural pillars at convex outer corners of active voxels */}
-      {pillarPositions.map(({ px, pz }, i) => (
-        <mesh
-          key={`pillar_${i}`}
-          position={[px, vOffset, pz]}
-          geometry={getCyl(PILLAR_R, vHeight)}
-          material={mFrame}
-          castShadow
-          raycast={nullRaycast}
-        />
-      ))}
+      {/* WU-10: Structural pillars at convex outer corners of active voxels.
+          For L1+ containers, poles extend to ground (containerY below voxel origin).
+          Suppress poles on topmost elevated container (no structural purpose — poles would extend upward into air). */}
+      {!(container.supporting?.length === 0 && containerY > 0) && pillarPositions.map(({ px, pz, row, col, corner }, i) => {
+        const poleH = vHeight + containerY;
+        const poleYShift = vOffset - containerY / 2;
+        const legacyKey = `deck_pole_${i}`;
+        if (container.structureConfig?.hiddenElements?.includes(legacyKey)) return null;
+        const poleKey = `l0r${row}c${col}_${corner}`;
+        const poleOverride = container.poleOverrides?.[poleKey];
+        if (poleOverride?.visible === false) return null;
+        const isSelectedPole = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === poleKey;
+        const isHoveredPole = hoveredPoleIdx === i;
+        const poleMat = isSelectedPole ? frameSelectMat : isHoveredPole ? frameHoverMat : mFrame;
+        return (
+          <mesh
+            key={`pillar_${i}`}
+            position={[px, poleYShift, pz]}
+            geometry={getCyl(PILLAR_R, poleH)}
+            material={poleMat}
+            castShadow
+            raycast={frameMode ? undefined : nullRaycast}
+            onPointerOver={frameMode ? (e) => { e.stopPropagation(); setHoveredPoleIdx(i); } : undefined}
+            onPointerOut={frameMode ? () => { setHoveredPoleIdx(null); } : undefined}
+            onClick={frameMode ? (e) => { e.stopPropagation(); setSelectedFrameElement({ containerId: container.id, key: poleKey, type: 'pole' }); } : undefined}
+          />
+        );
+      })}
 
       {/* Pool water plane — rendered when container has pool voxel grid pattern */}
       {(() => {
