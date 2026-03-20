@@ -149,7 +149,9 @@ export const checkNoExit: ValidationRule = (containers: Record<string, Container
     for (let i = 0; i < c.voxelGrid.length; i++) {
       const v = c.voxelGrid[i];
       if (!v.active) continue;
-      const { row, col } = decodeIndex(i);
+      const { level, row, col } = decodeIndex(i);
+      // Only check level 0 body voxels (rows 1-2, cols 1-6)
+      if (level !== 0) continue;
       if (row <= 0 || row >= VOXEL_ROWS - 1 || col <= 0 || col >= VOXEL_COLS - 1) continue;
       for (const face of WALL_FACES) {
         if (PASSABLE.includes(v.faces[face])) { hasExit = true; break; }
