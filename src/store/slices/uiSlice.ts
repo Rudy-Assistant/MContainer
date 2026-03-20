@@ -6,6 +6,7 @@
  */
 
 import type { SurfaceType, VoxelFaces } from '@/types/container';
+import type { DesignWarning } from '@/types/validation';
 import type { VoxelPayload } from '../useStore';
 
 type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
@@ -77,6 +78,18 @@ export interface UiSlice {
   wallCutHeight: number; // 0.0 (down) to 1.0 (full)
   setWallCutMode: (mode: 'full' | 'half' | 'down' | 'custom') => void;
   setWallCutHeight: (h: number) => void;
+
+  // Design mode: 'smart' = auto-consequences fire, 'manual' = user has full control
+  // Orthogonal to designComplexity (simple/detailed controls bay grouping)
+  designMode: 'smart' | 'manual';
+  setDesignMode: (mode: 'smart' | 'manual') => void;
+  toggleDesignMode: () => void;
+
+  // Validation warnings (ephemeral, recomputed from container state)
+  warnings: DesignWarning[];
+  setWarnings: (warnings: DesignWarning[]) => void;
+  hoveredWarning: string | null;
+  setHoveredWarning: (id: string | null) => void;
 
   // Debug wireframe overlay
   debugMode: boolean;
@@ -162,6 +175,15 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   wallCutHeight: 1.0,
   setWallCutMode: (mode: 'full' | 'half' | 'down' | 'custom') => set({ wallCutMode: mode }),
   setWallCutHeight: (h: number) => set({ wallCutHeight: h, wallCutMode: 'custom' }),
+
+  designMode: 'smart' as 'smart' | 'manual',
+  setDesignMode: (mode) => set({ designMode: mode }),
+  toggleDesignMode: () => set((s: any) => ({ designMode: s.designMode === 'smart' ? 'manual' : 'smart' })),
+
+  warnings: [] as DesignWarning[],
+  setWarnings: (warnings) => set({ warnings }),
+  hoveredWarning: null as string | null,
+  setHoveredWarning: (id) => set({ hoveredWarning: id }),
 
   debugMode: false,
   toggleDebugMode: () => set((s: any) => ({ debugMode: !s.debugMode })),
