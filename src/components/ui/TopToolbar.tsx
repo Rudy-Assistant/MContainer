@@ -86,6 +86,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
   const setInspectorView = useStore((s) => s.setInspectorView);
   const frameMode = useStore((s) => s.frameMode);
   const toggleFrameMode = useStore((s) => s.toggleFrameMode);
+  const designMode = useStore((s) => s.designMode);
   const wallCutMode = useStore((s) => s.wallCutMode);
   const setWallCutMode = useStore((s) => s.setWallCutMode);
   const undo = useStore((s) => s.undo);
@@ -262,6 +263,23 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
 
       {/* ═══ ZONE C: Right — Floor/Roof + Wall Vis + Overflow ═══ */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+
+        {/* ── Smart/Manual pill ── */}
+        <div style={{
+          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 6, overflow: "hidden",
+          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 11, fontWeight: 600,
+        }}>
+          {(['smart', 'manual'] as const).map((m) => (
+            <button key={m} onClick={() => useStore.getState().setDesignMode(m)} style={{
+              padding: "5px 10px", border: "none", cursor: "pointer",
+              background: designMode === m ? "var(--accent, #2563eb)" : "transparent",
+              color: designMode === m ? "#fff" : "var(--text-muted, #6b7280)",
+              transition: "all 100ms",
+            }}>
+              {m === 'smart' ? 'Smart' : 'Manual'}
+            </button>
+          ))}
+        </div>
 
         {/* ── Floor/Roof pill ── */}
         <div style={{
