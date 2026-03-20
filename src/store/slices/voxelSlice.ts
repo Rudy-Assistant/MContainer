@@ -13,6 +13,7 @@ import {
   type SurfaceType,
   type VoxelFaces,
   type Voxel,
+  type SmartStairChanges,
   type ModuleOrientation,
   type DoorConfig,
   VOXEL_COLS,
@@ -49,8 +50,10 @@ export interface VoxelSlice {
   stampAreaSmart: (containerId: string, voxelIndices: number[], faces: VoxelFaces) => void;
   stampArea: (containerId: string, voxelIndices: number[], faces: VoxelFaces) => void;
   stampStaircase: (containerId: string, voxelIndex: number) => void;
-  applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w') => void;
+  applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w' | 'top') => void;
+  applyVerticalStairs: (containerId: string, voxelIndex: number, facing: 'n' | 's' | 'e' | 'w') => void;
   applySmartRailing: (containerId: string, voxelIndex: number) => void;
+  removeStairs: (containerId: string, voxelIndex: number) => void;
   convertToPool: (containerId: string) => void;
   resetVoxelGrid: (containerId: string) => void;
   toggleVoxelLock: (containerId: string, voxelIndex: number) => void;
@@ -65,6 +68,16 @@ export interface VoxelSlice {
   isStaircaseMacro: () => boolean;
   setVoxelRoomTag: (containerId: string, voxelIndex: number, tag: string | undefined) => void;
   setDoorConfig: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, config: Partial<DoorConfig>) => void;
+  applyDoorModule: (containerId: string, voxelIndex: number, orientation: ModuleOrientation) => void;
+  getDoorConstraints: (containerId: string, voxelIndex: number, face: keyof VoxelFaces) => DoorConstraints;
+}
+
+export interface DoorConstraints {
+  canSwing: boolean;
+  canSlide: boolean;
+  swingBlockReason?: string;
+  slideBlockReason?: string;
+  recommendedType: 'swing' | 'slide';
 }
 
 // Reference to useStore — injected after store creation to avoid circular import.
@@ -121,13 +134,171 @@ function _computeSmartDoorConfig(
     rightHasObstacle ? 'left'  :
     'right'; // default convention
 
+  // Smart slide direction: slide toward an active neighbor, not into void
+  const leftActive  = leftVoxel?.active ?? false;
+  const rightActive = rightVoxel?.active ?? false;
+  const slideDirection: 'positive' | 'negative' =
+    !rightActive && leftActive ? 'negative' :
+    !leftActive && rightActive ? 'positive' :
+    'positive'; // default
+
   return {
     state: 'closed',
     hingeEdge,
     swingDirection: 'in',
-    slideDirection: 'positive',
+    slideDirection,
     type: 'swing',
   };
+}
+
+/**
+ * Compute door constraints: can this door swing/slide given neighbors?
+ * - Swing blocked if neighbor in swing direction has stairs
+ * - Slide blocked if neighbor in slide direction is inactive (empty void)
+ */
+function _getDoorConstraints(
+  grid: Voxel[],
+  voxelIndex: number,
+  face: keyof VoxelFaces,
+): DoorConstraints {
+  if (face === 'top' || face === 'bottom') {
+    return { canSwing: true, canSlide: true, recommendedType: 'swing' };
+  }
+  const wallFace = face as 'n' | 's' | 'e' | 'w';
+
+  // For N/S faces: left/right neighbors are cols. For E/W: left/right are rows.
+  const leftIdx  = (wallFace === 'n' || wallFace === 's') ? voxelIndex - 1 : voxelIndex - VOXEL_COLS;
+  const rightIdx = (wallFace === 'n' || wallFace === 's') ? voxelIndex + 1 : voxelIndex + VOXEL_COLS;
+
+  const leftVoxel  = grid[leftIdx];
+  const rightVoxel = grid[rightIdx];
+
+  // The voxel the door swings INTO is across the face (inward by default)
+  // For 'in' swing: the voxel at voxelIndex itself. For 'out': the neighbor across the face.
+  // We check the voxel ACROSS the face for outward swing obstacles
+  const ACROSS: Record<'n' | 's' | 'e' | 'w', number> = {
+    n: -VOXEL_COLS, s: VOXEL_COLS, e: 1, w: -1,
+  };
+  const acrossIdx = voxelIndex + ACROSS[wallFace];
+  const acrossVoxel = grid[acrossIdx];
+
+  // Swing constraints: blocked if the voxel the door swings into has stairs
+  const selfHasStairs = grid[voxelIndex]?.voxelType === 'stairs';
+  const acrossHasStairs = acrossVoxel?.voxelType === 'stairs';
+  // Door swings inward by default — blocked if self voxel has stairs
+  // Door can swing outward — blocked if across voxel has stairs
+  const canSwingIn = !selfHasStairs;
+  const canSwingOut = !acrossHasStairs;
+  const canSwing = canSwingIn || canSwingOut;
+
+  // Slide constraints: needs an active neighbor to slide into
+  const leftActive  = leftVoxel?.active ?? false;
+  const rightActive = rightVoxel?.active ?? false;
+  const canSlide = leftActive || rightActive;
+
+  let swingBlockReason: string | undefined;
+  if (!canSwing) swingBlockReason = 'Stairs block door swing on both sides';
+  else if (!canSwingIn && canSwingOut) swingBlockReason = undefined; // can still swing out
+
+  let slideBlockReason: string | undefined;
+  if (!canSlide) slideBlockReason = 'No adjacent wall to slide into';
+
+  const recommendedType: 'swing' | 'slide' =
+    !canSwing && canSlide ? 'slide' :
+    !canSlide && canSwing ? 'swing' :
+    'swing'; // default
+
+  return { canSwing, canSlide, swingBlockReason, slideBlockReason, recommendedType };
+}
+
+// ── Smart Auto-Railing ─────────────────────────────────────────
+// Scans a container's voxel grid for fall-hazard faces and auto-places
+// Railing_Cable on exposed edges of open-air voxels. Tracks originals
+// in container._smartRailingChanges for reversal.
+// Skips stair voxels (owned by stair system) and user-painted faces.
+
+const WALL_FACES = ['n', 's', 'e', 'w'] as const;
+const FACE_NEIGHBOR_DELTA: Record<string, { dr: number; dc: number }> = {
+  n: { dr: -1, dc: 0 }, s: { dr: 1, dc: 0 },
+  e: { dr: 0, dc: -1 }, w: { dr: 0, dc: 1 },
+};
+
+/**
+ * Recompute smart auto-railings for a container's voxel grid.
+ * Mutates grid and container._smartRailingChanges in place (call inside Immer draft or spread).
+ * Exported for hydration rebuild in useStore.ts.
+ */
+export function recomputeSmartRailings(
+  grid: Voxel[],
+  container: any, // Container draft (Immer or spread)
+): void {
+  const tracking: Record<string, SurfaceType> = container._smartRailingChanges ?? {};
+  const newTracking: Record<string, SurfaceType> = {};
+
+  // Pass 1: Determine which faces SHOULD have auto-railing
+  const shouldHaveRailing = new Set<string>();
+  for (let row = 0; row < VOXEL_ROWS; row++) {
+    for (let col = 0; col < VOXEL_COLS; col++) {
+      const idx = row * VOXEL_COLS + col;
+      const v = grid[idx];
+      if (!v?.active) continue;
+      if (v.faces.top !== 'Open') continue;       // must be open-air
+      if (v.voxelType === 'stairs') continue;       // owned by stair system
+
+      for (const face of WALL_FACES) {
+        if (v.userPaintedFaces?.[face]) continue;   // user override
+        const delta = FACE_NEIGHBOR_DELTA[face];
+        const nr = row + delta.dr;
+        const nc = col + delta.dc;
+        // Fall hazard: neighbor out-of-bounds or inactive
+        const neighborInBounds = nr >= 0 && nr < VOXEL_ROWS && nc >= 0 && nc < VOXEL_COLS;
+        const neighborActive = neighborInBounds && (grid[nr * VOXEL_COLS + nc]?.active ?? false);
+        if (!neighborActive) {
+          shouldHaveRailing.add(`${idx}:${face}`);
+        }
+      }
+    }
+  }
+
+  // Pass 2: Add new auto-railings
+  for (const key of shouldHaveRailing) {
+    const [idxStr, face] = key.split(':');
+    const idx = parseInt(idxStr, 10);
+    const v = grid[idx];
+    if (v.faces[face as keyof VoxelFaces] !== 'Railing_Cable') {
+      // Record original before changing
+      const original = tracking[key] ?? v.faces[face as keyof VoxelFaces];
+      newTracking[key] = original;
+      grid[idx] = {
+        ...v,
+        faces: { ...v.faces, [face]: 'Railing_Cable' },
+      };
+    } else {
+      // Already has railing — keep tracking if it was auto-set
+      if (tracking[key] !== undefined) {
+        newTracking[key] = tracking[key];
+      }
+    }
+  }
+
+  // Pass 3: Remove stale auto-railings (tracked but no longer needed)
+  for (const [key, originalSurface] of Object.entries(tracking)) {
+    if (shouldHaveRailing.has(key)) continue; // still needed
+    const [idxStr, face] = key.split(':');
+    const idx = parseInt(idxStr, 10);
+    const v = grid[idx];
+    if (!v) continue;
+    // Check if user has painted this face since (don't revert user changes)
+    if (v.userPaintedFaces?.[face as keyof VoxelFaces]) continue;
+    // Restore original
+    grid[idx] = {
+      ...v,
+      faces: { ...v.faces, [face]: originalSurface },
+    };
+    // Don't add to newTracking (removed)
+  }
+
+  container._smartRailingChanges = Object.keys(newTracking).length > 0 ? newTracking : undefined;
 }
 
 /**
@@ -218,6 +389,12 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     if (moduleId === 'stairs') {
       // Map orientation to face: inward direction = the face stairs ascend from
       get().applyStairsFromFace(containerId, voxelIndex, orientation);
+      return;
+    }
+
+    // Entry door: paint Door on outward face with auto-config
+    if (moduleId === 'entry_door') {
+      get().applyDoorModule(containerId, voxelIndex, orientation);
       return;
     }
 
@@ -377,103 +554,36 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     const slot = hotbar[activeHotbarSlot];
     if (!slot?.faces || slot.macro !== 'staircase') return;
 
-    set((s: any) => {
-      const c = s.containers[containerId];
-      if (!c?.voxelGrid) return {};
+    // Infer ascending direction from active neighbors, then delegate to applyStairsFromFace
+    const c = containers[containerId];
+    if (!c?.voxelGrid) return;
+    const grid = c.voxelGrid;
+    const col = voxelIndex % VOXEL_COLS;
+    const rowLocal = Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
+    const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
+    const base = level * VOXEL_COLS * VOXEL_ROWS;
 
-      const grid = [...c.voxelGrid];
-      const voxel = grid[voxelIndex];
-      if (!voxel) return {};
+    let ascending: 'n' | 's' | 'e' | 'w' = 'n';
+    if (rowLocal > 0 && grid[base + (rowLocal - 1) * VOXEL_COLS + col]?.active) ascending = 'n';
+    else if (rowLocal < VOXEL_ROWS - 1 && grid[base + (rowLocal + 1) * VOXEL_COLS + col]?.active) ascending = 's';
+    else if (col > 0 && grid[base + rowLocal * VOXEL_COLS + (col - 1)]?.active) ascending = 'e';
+    else if (col < VOXEL_COLS - 1 && grid[base + rowLocal * VOXEL_COLS + (col + 1)]?.active) ascending = 'w';
 
-      // 1. Compute stair ascending direction from active neighbors
-      const col = voxelIndex % VOXEL_COLS;
-      const rowLocal = Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
-      const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
-      const base = level * VOXEL_COLS * VOXEL_ROWS;
-      let ascending: 'n' | 's' | 'e' | 'w' = 'n';
-      if (rowLocal > 0 && grid[base + (rowLocal - 1) * VOXEL_COLS + col]?.active) ascending = 'n';
-      else if (rowLocal < VOXEL_ROWS - 1 && grid[base + (rowLocal + 1) * VOXEL_COLS + col]?.active) ascending = 's';
-      else if (col > 0 && grid[base + rowLocal * VOXEL_COLS + (col - 1)]?.active) ascending = 'e';
-      else if (col < VOXEL_COLS - 1 && grid[base + rowLocal * VOXEL_COLS + (col + 1)]?.active) ascending = 'w';
-
-      const isNS = ascending === 'n' || ascending === 's';
-      const stairDir: 'ns' | 'ew' = isNS ? 'ns' : 'ew';
-      const stairPart: 'lower' | 'single' = (() => {
-        const { dr, dc } = ASCEND_DELTA[ascending];
-        const ur = rowLocal + dr, uc = col + dc;
-        return ur >= 0 && ur < VOXEL_ROWS && uc >= 0 && uc < VOXEL_COLS ? 'lower' : 'single';
-      })();
-
-      // Apply staircase with proper stair metadata
-      grid[voxelIndex] = {
-        ...voxel,
-        active: true,
-        voxelType: 'stairs',
-        stairDir,
-        stairAscending: ascending,
-        stairPart,
-        faces: buildStairFaces(isNS, stairPart),
-      };
-
-      // Set upper voxel as stair upper half if in bounds
-      if (stairPart === 'lower') {
-        const { dr, dc } = ASCEND_DELTA[ascending];
-        const upperIdx = base + (rowLocal + dr) * VOXEL_COLS + (col + dc);
-        const upperVoxel = grid[upperIdx] ?? createDefaultVoxelGrid()[upperIdx];
-        grid[upperIdx] = {
-          ...upperVoxel,
-          active: true,
-          voxelType: 'stairs',
-          stairDir,
-          stairAscending: ascending,
-          stairPart: 'upper',
-          faces: buildStairFaces(isNS, 'upper'),
-        };
-      }
-
-      // 2. Auto-punch: open the floor of the voxel directly above (same col/row, level+1)
-      const localIdx = voxelIndex % (VOXEL_ROWS * VOXEL_COLS);
-      const aboveLevelIdx = (level + 1) * (VOXEL_ROWS * VOXEL_COLS) + localIdx;
-      if (aboveLevelIdx < grid.length && grid[aboveLevelIdx]?.active) {
-        grid[aboveLevelIdx] = {
-          ...grid[aboveLevelIdx],
-          faces: { ...grid[aboveLevelIdx].faces, bottom: 'Open' },
-        };
-      }
-
-      // 3. Cross-container void: force floor of container above to Open
-      let updatedContainers = { ...s.containers, [containerId]: { ...c, voxelGrid: grid } };
-
-      for (const supId of c.supporting) {
-        const supC = updatedContainers[supId];
-        if (!supC || supC.level !== c.level + 1) continue;
-        if (!supC.voxelGrid) continue;
-
-        const upperContainerIdx = rowLocal * VOXEL_COLS + col;
-        const upperGrid = [...supC.voxelGrid];
-        const targetVoxel = upperGrid[upperContainerIdx];
-        if (targetVoxel) {
-          upperGrid[upperContainerIdx] = {
-            ...targetVoxel,
-            active: true,
-            faces: { ...targetVoxel.faces, bottom: 'Open' },
-          };
-          updatedContainers = {
-            ...updatedContainers,
-            [supId]: { ...supC, voxelGrid: upperGrid },
-          };
-        }
-      }
-
-      return {
-        containers: updatedContainers,
-        selectedVoxel: { containerId, index: voxelIndex },
-      };
-    });
+    // Entry face = opposite of ascending direction
+    const entryFace = STAIR_FLIP[ascending] as 'n' | 's' | 'e' | 'w';
+    get().applyStairsFromFace(containerId, voxelIndex, entryFace);
   },
 
   applyStairsFromFace: (containerId, voxelIndex, face) => {
     if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
+    // Vertical stairs: clicking the top face of a level-0 voxel creates stairs between levels
+    if (face === 'top') {
+      const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
+      if (level === 0) {
+        get().applyVerticalStairs(containerId, voxelIndex, 's'); // default facing south
+      }
+      return;
+    }
     set((s: any) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
@@ -493,8 +603,15 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       const upperIdx = upperRow * VOXEL_COLS + upperCol;
       const upperInBounds = upperRow >= 0 && upperRow < VOXEL_ROWS && upperCol >= 0 && upperCol < VOXEL_COLS;
 
+      // ── Smart change tracking: record all auto-modifications for reversal ──
+      const changedFaces: Record<string, SurfaceType> = {};
+
       // Lower voxel (entry side — bottom half of stair run)
       const lowerPart = upperInBounds ? 'lower' : 'single';
+      // Save original faces of lower voxel for reversal
+      for (const f of ['top', 'bottom', 'n', 's', 'e', 'w'] as const) {
+        changedFaces[`${voxelIndex}:${f}`] = voxel.faces[f];
+      }
       grid[voxelIndex] = {
         ...voxel,
         active: true,
@@ -506,8 +623,14 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       };
 
       // Upper voxel (ascent side — top half geometry + solid landing)
+      let actualUpperIdx: number | undefined;
       if (upperInBounds) {
+        actualUpperIdx = upperIdx;
         const upperVoxel = grid[upperIdx] ?? createDefaultVoxelGrid()[upperIdx];
+        // Save original faces of upper stair voxel
+        for (const f of ['top', 'bottom', 'n', 's', 'e', 'w'] as const) {
+          changedFaces[`${upperIdx}:${f}`] = upperVoxel.faces[f];
+        }
         grid[upperIdx] = {
           ...upperVoxel,
           active: true,
@@ -524,15 +647,100 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       const localIdx = voxelIndex % (VOXEL_ROWS * VOXEL_COLS);
       const aboveIdx = (level + 1) * (VOXEL_ROWS * VOXEL_COLS) + localIdx;
       if (aboveIdx < grid.length && grid[aboveIdx]?.active) {
-        grid[aboveIdx] = { ...grid[aboveIdx], faces: { ...grid[aboveIdx].faces, bottom: 'Open' } };
+        const aboveVoxel = grid[aboveIdx];
+        const aboveFaces = { ...aboveVoxel.faces };
+
+        // Track original bottom face
+        changedFaces[`${aboveIdx}:bottom`] = aboveVoxel.faces.bottom;
+        aboveFaces.bottom = 'Open';
+
+        // ── Smart Consequence: Railing around upper hole ──
+        const exitFace = ascending;
+        for (const wallFace of ['n', 's', 'e', 'w'] as const) {
+          if (!aboveVoxel.userPaintedFaces?.[wallFace]) {
+            changedFaces[`${aboveIdx}:${wallFace}`] = aboveVoxel.faces[wallFace];
+            aboveFaces[wallFace] = wallFace === exitFace ? 'Open' : 'Railing_Cable';
+          }
+        }
+
+        grid[aboveIdx] = { ...aboveVoxel, faces: aboveFaces };
+      }
+
+      // ── Smart Consequence: Clear entry wall on neighbor voxel ──
+      const entryFace = face as 'n' | 's' | 'e' | 'w';
+      const entryDelta = ASCEND_DELTA[entryFace];
+      if (entryDelta) {
+        const entryRow = row + entryDelta.dr;
+        const entryCol = col + entryDelta.dc;
+        if (entryRow >= 0 && entryRow < VOXEL_ROWS && entryCol >= 0 && entryCol < VOXEL_COLS) {
+          const entryNeighborIdx = level * (VOXEL_ROWS * VOXEL_COLS) + entryRow * VOXEL_COLS + entryCol;
+          const entryNeighbor = grid[entryNeighborIdx];
+          if (entryNeighbor?.active) {
+            const neighborFace = STAIR_FLIP[entryFace] as keyof VoxelFaces;
+            if (!entryNeighbor.userPaintedFaces?.[neighborFace]) {
+              changedFaces[`${entryNeighborIdx}:${neighborFace}`] = entryNeighbor.faces[neighborFace];
+              grid[entryNeighborIdx] = {
+                ...entryNeighbor,
+                faces: { ...entryNeighbor.faces, [neighborFace]: 'Open' },
+              };
+            }
+          }
+        }
+      }
+
+      // ── Smart lateral railings on exposed stair sides ──
+      // Check the two faces perpendicular to ascending direction.
+      // If the lateral neighbor is inactive or out-of-bounds → fall hazard → add railing.
+      const lateralFaces: ('n' | 's' | 'e' | 'w')[] =
+        (ascending === 'n' || ascending === 's') ? ['e', 'w'] : ['n', 's'];
+      const stairVoxelIndices = [voxelIndex];
+      if (actualUpperIdx !== undefined) stairVoxelIndices.push(actualUpperIdx);
+      for (const stairIdx of stairVoxelIndices) {
+        const stairVoxel = grid[stairIdx];
+        if (!stairVoxel) continue;
+        const sRow = Math.floor((stairIdx % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
+        const sCol = stairIdx % VOXEL_COLS;
+        for (const latFace of lateralFaces) {
+          if (stairVoxel.userPaintedFaces?.[latFace]) continue;
+          const delta = ASCEND_DELTA[latFace];
+          if (!delta) continue;
+          const nRow = sRow + delta.dr;
+          const nCol = sCol + delta.dc;
+          const inBounds = nRow >= 0 && nRow < VOXEL_ROWS && nCol >= 0 && nCol < VOXEL_COLS;
+          const nIdx = level * (VOXEL_ROWS * VOXEL_COLS) + nRow * VOXEL_COLS + nCol;
+          const neighborActive = inBounds && (grid[nIdx]?.active ?? false);
+          if (!neighborActive) {
+            // Exposed lateral → add railing
+            changedFaces[`${stairIdx}:${latFace}`] = stairVoxel.faces[latFace];
+            grid[stairIdx] = {
+              ...grid[stairIdx],
+              faces: { ...grid[stairIdx].faces, [latFace]: 'Railing_Cable' },
+            };
+          }
+        }
+      }
+
+      // Store smart changes on the lower stair voxel for removal reversal
+      grid[voxelIndex] = {
+        ...grid[voxelIndex],
+        _smartStairChanges: {
+          changedFaces,
+          upperVoxelIdx: actualUpperIdx,
+          ascending,
+        },
+      };
+
+      // Recompute smart railings (stair placement may affect neighboring open-air voxels)
+      const railingContainer: any = { ...c, _smartRailingChanges: c._smartRailingChanges };
+      if (get().designMode !== 'manual') {
+        recomputeSmartRailings(grid, railingContainer);
       }
 
       // Cross-container void: if stairs reach the top level, void floor of container above.
-      // This triggers when stairs are placed AT the top level, OR when auto-punch reaches the top level.
       const reachesTopLevel = level === VOXEL_LEVELS - 1 ||
         (aboveIdx < grid.length && Math.floor(aboveIdx / (VOXEL_ROWS * VOXEL_COLS)) === VOXEL_LEVELS - 1);
       if (reachesTopLevel && c.supporting.length > 0) {
-        let updatedContainers = { ...s.containers, [containerId]: { ...c, voxelGrid: grid } };
+        let updatedContainers = { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges } };
         for (const aboveId of c.supporting) {
           const above = s.containers[aboveId];
           if (!above?.voxelGrid) continue;
@@ -564,7 +772,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
             return {
               containers: {
                 ...s.containers,
-                [containerId]: { ...c, voxelGrid: grid },
+                [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges },
                 [c.stackedOn]: { ...below, voxelGrid: belowGrid },
               },
             };
@@ -572,8 +780,73 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         }
       }
 
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges } } };
+    });
+  },
+
+  applyVerticalStairs: (containerId, voxelIndex, facing) => {
+    if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+
+      const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
+      if (level !== 0) return {}; // vertical stairs must start at level 0
+
+      const localIdx = voxelIndex % (VOXEL_ROWS * VOXEL_COLS);
+      const upperIdx = (1) * (VOXEL_ROWS * VOXEL_COLS) + localIdx;
+      if (upperIdx >= grid.length) return {};
+
+      const isNS = facing === 'n' || facing === 's';
+      const lowerVoxel = grid[voxelIndex];
+      const upperVoxel = grid[upperIdx] ?? createDefaultVoxelGrid()[upperIdx];
+
+      // Lower voxel (level 0): bottom half of vertical staircase
+      grid[voxelIndex] = {
+        ...lowerVoxel,
+        active: true,
+        voxelType: 'stairs',
+        stairDir: isNS ? 'ns' : 'ew',
+        stairPart: 'lower',
+        stairAscending: facing,
+        faces: { ...buildStairFaces(isNS, 'lower'), top: 'Open' },
+      };
+
+      // Upper voxel (level 1): top half of vertical staircase
+      grid[upperIdx] = {
+        ...upperVoxel,
+        active: true,
+        voxelType: 'stairs',
+        stairDir: isNS ? 'ns' : 'ew',
+        stairPart: 'upper',
+        stairAscending: facing,
+        faces: { ...buildStairFaces(isNS, 'upper'), bottom: 'Open' },
+      };
+
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
     });
+
+    // Auto-railing: apply smart railing to adjacent deck voxels
+    const afterGrid = get().containers[containerId]?.voxelGrid;
+    if (afterGrid) {
+      const row = Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
+      const col = voxelIndex % VOXEL_COLS;
+      const neighbors = [
+        { r: row - 1, c: col },     // north
+        { r: row + 1, c: col },     // south
+        { r: row, c: col - 1 },     // west
+        { r: row, c: col + 1 },     // east
+      ];
+      for (const nb of neighbors) {
+        if (nb.r < 0 || nb.r >= VOXEL_ROWS || nb.c < 0 || nb.c >= VOXEL_COLS) continue;
+        const nbIdx = nb.r * VOXEL_COLS + nb.c;
+        const nbVoxel = afterGrid[nbIdx];
+        if (nbVoxel?.active && nbVoxel.faces.top === 'Deck_Wood') {
+          get().applySmartRailing(containerId, nbIdx);
+        }
+      }
+    }
   },
 
   applySmartRailing: (containerId, voxelIndex) => {
@@ -604,7 +877,8 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         // 1) Same-level neighbor in this grid
         if (nc >= 0 && nc < VOXEL_COLS && nr >= 0 && nr < VOXEL_ROWS) {
           const neighbor = grid[base + nr * VOXEL_COLS + nc];
-          if (neighbor?.active && WALKABLE.includes(neighbor.faces.bottom)) {
+          // Stair voxels are drop-offs — always need railing even if technically "active"
+          if (neighbor?.active && neighbor.voxelType !== 'stairs' && WALKABLE.includes(neighbor.faces.bottom)) {
             newFaces[face] = 'Open';
             return;
           }
@@ -653,6 +927,97 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     });
   },
 
+  removeStairs: (containerId, voxelIndex) => {
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      let voxel = grid[voxelIndex];
+      if (!voxel || voxel.voxelType !== 'stairs') return {};
+
+      // If this is the upper voxel, redirect to the lower voxel (which has _smartStairChanges)
+      if (voxel.stairPart === 'upper' && voxel.stairAscending) {
+        const ascending = voxel.stairAscending;
+        const { dr, dc } = ASCEND_DELTA[ascending];
+        const col = voxelIndex % VOXEL_COLS;
+        const row = Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
+        const lowerRow = row - dr;
+        const lowerCol = col - dc;
+        if (lowerRow >= 0 && lowerRow < VOXEL_ROWS && lowerCol >= 0 && lowerCol < VOXEL_COLS) {
+          const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
+          const lowerIdx = level * (VOXEL_ROWS * VOXEL_COLS) + lowerRow * VOXEL_COLS + lowerCol;
+          if (grid[lowerIdx]?.voxelType === 'stairs') {
+            voxelIndex = lowerIdx;
+            voxel = grid[voxelIndex];
+          } else {
+            return {};
+          }
+        } else {
+          return {};
+        }
+      }
+
+      const smartChanges = grid[voxelIndex]._smartStairChanges;
+      if (!smartChanges) {
+        // No smart tracking — just revert stair voxels to default
+        const defaults = createDefaultVoxelGrid();
+        grid[voxelIndex] = { ...defaults[voxelIndex] };
+        const rc: any = { ...c, _smartRailingChanges: c._smartRailingChanges };
+        if (get().designMode !== 'manual') {
+          recomputeSmartRailings(grid, rc);
+        }
+        return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: rc._smartRailingChanges } } };
+      }
+
+      // Restore all tracked face changes
+      for (const [key, originalFace] of Object.entries(smartChanges.changedFaces)) {
+        const [idxStr, faceKey] = key.split(':');
+        const idx = parseInt(idxStr, 10);
+        if (idx >= 0 && idx < grid.length && grid[idx]) {
+          grid[idx] = {
+            ...grid[idx],
+            faces: { ...grid[idx].faces, [faceKey]: originalFace },
+          };
+        }
+      }
+
+      // Revert lower stair voxel to standard
+      const defaults = createDefaultVoxelGrid();
+      grid[voxelIndex] = {
+        ...defaults[voxelIndex],
+        active: grid[voxelIndex].active,
+      };
+      delete grid[voxelIndex]._smartStairChanges;
+      delete grid[voxelIndex].voxelType;
+      delete grid[voxelIndex].stairDir;
+      delete grid[voxelIndex].stairAscending;
+      delete grid[voxelIndex].stairPart;
+
+      // Revert upper stair voxel if it exists
+      if (smartChanges.upperVoxelIdx !== undefined) {
+        const uIdx = smartChanges.upperVoxelIdx;
+        if (uIdx >= 0 && uIdx < grid.length) {
+          grid[uIdx] = {
+            ...defaults[uIdx],
+            active: grid[uIdx].active,
+          };
+          delete grid[uIdx].voxelType;
+          delete grid[uIdx].stairDir;
+          delete grid[uIdx].stairAscending;
+          delete grid[uIdx].stairPart;
+        }
+      }
+
+      // Recompute smart railings after stair removal (voxels may need auto-railings now)
+      const railingContainer: any = { ...c, _smartRailingChanges: c._smartRailingChanges };
+      if (get().designMode !== 'manual') {
+        recomputeSmartRailings(grid, railingContainer);
+      }
+
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges } } };
+    });
+  },
+
   convertToPool: (containerId) => {
 
     set((s: any) => {
@@ -672,7 +1037,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     set((s: any) => {
       const c = s.containers[containerId];
       if (!c) return {};
-      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: createDefaultVoxelGrid() } } };
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: createDefaultVoxelGrid(), _smartRailingChanges: undefined } } };
     });
   },
 
@@ -732,6 +1097,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       grid[voxelIndex] = {
         ...voxel,
         faces: { ...voxel.faces, [face]: cycle[nextIdx] },
+        userPaintedFaces: { ...voxel.userPaintedFaces, [face]: true },
       };
       return {
         containers: {
@@ -791,11 +1157,14 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       let updatedWalls = c.walls;
       if (active && voxel.type === 'deck') {
         // When activating a deck voxel, default Open side faces to Railing_Cable
+        // (only in smart mode — manual mode leaves faces as-is)
         const faces = { ...voxel.faces };
-        if (faces.n === 'Open') faces.n = 'Railing_Cable';
-        if (faces.s === 'Open') faces.s = 'Railing_Cable';
-        if (faces.e === 'Open') faces.e = 'Railing_Cable';
-        if (faces.w === 'Open') faces.w = 'Railing_Cable';
+        if (get().designMode !== 'manual') {
+          if (faces.n === 'Open') faces.n = 'Railing_Cable';
+          if (faces.s === 'Open') faces.s = 'Railing_Cable';
+          if (faces.e === 'Open') faces.e = 'Railing_Cable';
+          if (faces.w === 'Open') faces.w = 'Railing_Cable';
+        }
 
         // ── Smart Wall: auto-open the shared face between halo and adjacent core ──
         // Halo cols: 0 (West end) and VOXEL_COLS-1 (East end)
@@ -876,7 +1245,11 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       } else {
         grid[voxelIndex] = { ...voxel, active };
       }
-      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid, walls: updatedWalls } } };
+      const updatedContainer = { ...c, voxelGrid: grid, walls: updatedWalls };
+      if (get().designMode !== 'manual') {
+        recomputeSmartRailings(grid, updatedContainer);
+      }
+      return { containers: { ...s.containers, [containerId]: updatedContainer } };
     });
   },
 
@@ -902,6 +1275,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       const updatedVoxel = {
         ...grid[voxelIndex],
         faces: { ...grid[voxelIndex].faces, [face]: mat },
+        userPaintedFaces: { ...grid[voxelIndex].userPaintedFaces, [face]: true },
       };
       // Auto-create doorConfig when painting Door face
       if (mat === 'Door' && (face === 'n' || face === 's' || face === 'e' || face === 'w')) {
@@ -914,8 +1288,12 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         }
       }
       grid[voxelIndex] = updatedVoxel;
+      const updatedContainer = { ...c, voxelGrid: grid };
+      if (get().designMode !== 'manual') {
+        recomputeSmartRailings(grid, updatedContainer);
+      }
       return {
-        containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
+        containers: { ...s.containers, [containerId]: updatedContainer },
         lastStamp: { containerId, voxelIndex, face, surfaceType: mat },
       };
     });
@@ -966,12 +1344,87 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         state: 'closed' as const, hingeEdge: 'right' as const,
         swingDirection: 'in' as const, slideDirection: 'positive' as const, type: 'swing' as const,
       };
+      const merged = { ...existing, ...config };
+
+      // Enforce collision constraints
+      const constraints = _getDoorConstraints(grid, voxelIndex, face);
+      if (merged.type === 'swing' && !constraints.canSwing && constraints.canSlide) {
+        merged.type = 'slide'; // auto-correct: can't swing, fall back to slide
+      } else if (merged.type === 'slide' && !constraints.canSlide && constraints.canSwing) {
+        merged.type = 'swing'; // auto-correct: can't slide, fall back to swing
+      }
+
+      // For swing doors, ensure swingDirection avoids stairs
+      if (merged.type === 'swing' && face !== 'top' && face !== 'bottom') {
+        const wallFace = face as 'n' | 's' | 'e' | 'w';
+        const ACROSS: Record<'n' | 's' | 'e' | 'w', number> = {
+          n: -VOXEL_COLS, s: VOXEL_COLS, e: 1, w: -1,
+        };
+        const selfHasStairs = grid[voxelIndex]?.voxelType === 'stairs';
+        const acrossVoxel = grid[voxelIndex + ACROSS[wallFace]];
+        const acrossHasStairs = acrossVoxel?.voxelType === 'stairs';
+        if (merged.swingDirection === 'in' && selfHasStairs && !acrossHasStairs) {
+          merged.swingDirection = 'out';
+        } else if (merged.swingDirection === 'out' && acrossHasStairs && !selfHasStairs) {
+          merged.swingDirection = 'in';
+        }
+      }
+
+      // Smart slide direction: when switching to slide, validate direction
+      if (merged.type === 'slide' && face !== 'top' && face !== 'bottom') {
+        const smart = _computeSmartDoorConfig(grid, voxelIndex, face as 'n' | 's' | 'e' | 'w');
+        // Only override if the caller didn't explicitly set slideDirection
+        if (!config.slideDirection) {
+          merged.slideDirection = smart.slideDirection;
+        }
+      }
+
       grid[voxelIndex] = {
         ...voxel,
-        doorConfig: { ...voxel.doorConfig, [face]: { ...existing, ...config } },
+        doorConfig: { ...voxel.doorConfig, [face]: merged },
       };
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
     });
+  },
+
+  applyDoorModule: (containerId, voxelIndex, orientation) => {
+    // orientation maps to the outward face where the door is placed
+    // In ORIENT_MAP: outward is the opposite of orientation
+    const OUTWARD: Record<ModuleOrientation, 'n' | 's' | 'e' | 'w'> = {
+      n: 's', s: 'n', e: 'w', w: 'e',
+    };
+    const doorFace = OUTWARD[orientation];
+
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      const voxel = grid[voxelIndex];
+      if (!voxel) return {};
+
+      const smartConfig = _computeSmartDoorConfig(grid, voxelIndex, doorFace);
+      // Check constraints to pick best default type
+      const constraints = _getDoorConstraints(grid, voxelIndex, doorFace);
+      if (!constraints.canSwing && constraints.canSlide) {
+        smartConfig.type = 'slide';
+      }
+
+      grid[voxelIndex] = {
+        ...voxel,
+        active: true,
+        faces: { ...voxel.faces, [doorFace]: 'Door' as SurfaceType },
+        doorConfig: { ...voxel.doorConfig, [doorFace]: smartConfig },
+        moduleId: 'entry_door',
+        moduleOrientation: orientation,
+      };
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+    });
+  },
+
+  getDoorConstraints: (containerId, voxelIndex, face) => {
+    const c = get().containers[containerId] as Container | undefined;
+    if (!c?.voxelGrid) return { canSwing: true, canSlide: true, recommendedType: 'swing' };
+    return _getDoorConstraints(c.voxelGrid, voxelIndex, face);
   },
 
   paintFace: (containerId, voxelIndex, face, surface) => {
@@ -986,6 +1439,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       grid[voxelIndex] = {
         ...voxel,
         faces: { ...voxel.faces, [face]: surface },
+        userPaintedFaces: { ...voxel.userPaintedFaces, [face]: true },
       };
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },

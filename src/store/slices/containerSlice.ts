@@ -1414,6 +1414,11 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       }
 
       // ── Step 3: Mutate Solid_Steel boundary faces → Open for new adjacencies ──
+      // Skip auto-merge in manual mode — user controls wall states directly
+      if (get().designMode === 'manual') {
+        if (changed) set({ containers: updated });
+        return;
+      }
       for (const pair of pairs) {
         const a = updated[pair.containerA];
         const b = updated[pair.containerB];
@@ -1455,27 +1460,39 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             const bVox = bGrid[bIdx];
             if (!aVox?.active || !bVox?.active) continue;
 
-            // Geometric overlap check: skip voxels whose world positions don't overlap
-            // with the other container's extent on the perpendicular axis
+            // Geometric overlap check: each side independently checked
+            // A's voxel must fall within B's extent, and vice versa
+            let aOverlaps = false;
+            let bOverlaps = false;
             if (!aBound.isRowBoundary) {
               // Col boundary (Front/Back) — check Z overlap of this row
               const aWorldZ = a.position.z + (iter - 1.5) * aRowPitch;
+              const bWorldZ = b.position.z + (iter - 1.5) * bRowPitch;
               const bHalfZ = (VOXEL_ROWS / 2) * bRowPitch;
-              const tol = aRowPitch / 2;
-              if (aWorldZ < b.position.z - bHalfZ - tol || aWorldZ > b.position.z + bHalfZ + tol) continue;
+              const aHalfZ = (VOXEL_ROWS / 2) * aRowPitch;
+              const aTol = aRowPitch / 2;
+              const bTol = bRowPitch / 2;
+              aOverlaps = aWorldZ >= b.position.z - bHalfZ - aTol && aWorldZ <= b.position.z + bHalfZ + aTol;
+              bOverlaps = bWorldZ >= a.position.z - aHalfZ - bTol && bWorldZ <= a.position.z + aHalfZ + bTol;
             } else {
               // Row boundary (Left/Right) — check X overlap of this col
               const aWorldX = a.position.x + -(iter - 3.5) * aColPitch;
+              const bWorldX = b.position.x + -(iter - 3.5) * bColPitch;
               const bHalfX = (VOXEL_COLS / 2) * bColPitch;
-              const tol = aColPitch / 2;
-              if (aWorldX < b.position.x - bHalfX - tol || aWorldX > b.position.x + bHalfX + tol) continue;
+              const aHalfX = (VOXEL_COLS / 2) * aColPitch;
+              const aTol = aColPitch / 2;
+              const bTol = bColPitch / 2;
+              aOverlaps = aWorldX >= b.position.x - bHalfX - aTol && aWorldX <= b.position.x + bHalfX + aTol;
+              bOverlaps = bWorldX >= a.position.x - aHalfX - bTol && bWorldX <= a.position.x + aHalfX + bTol;
             }
+
+            if (!aOverlaps && !bOverlaps) continue;
 
             const aFace = aVox.faces[aBound.face];
             const bFace = bVox.faces[bBound.face];
 
-            // Only auto-merge Solid_Steel faces
-            if (aFace === 'Solid_Steel') {
+            // Only auto-merge Solid_Steel faces — each side checked independently
+            if (aOverlaps && aFace === 'Solid_Steel') {
               if (!aCopied) { aGrid = [...aGrid]; aCopied = true; }
               const key = `${aIdx}:${aBound.face}`;
               aPreMerge[key] = 'Solid_Steel';
@@ -1485,7 +1502,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
               };
             }
 
-            if (bFace === 'Solid_Steel') {
+            if (bOverlaps && bFace === 'Solid_Steel') {
               if (!bCopied) { bGrid = [...bGrid]; bCopied = true; }
               const key = `${bIdx}:${bBound.face}`;
               bPreMerge[key] = 'Solid_Steel';
