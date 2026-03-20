@@ -8,13 +8,12 @@
  * - View pill always visible, center tools shrink/wrap gracefully
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { ContainerSize, ViewMode } from "@/types/container";
 import {
   Trash2,
   Group,
-  DollarSign,
   Download,
   Grid2x2,
   Box,
@@ -26,12 +25,18 @@ import {
   Share2,
   RotateCcw,
   RotateCw,
+  Undo2,
+  Redo2,
   Paintbrush,
   Scan,
   Ruler,
   Tag,
   Mountain,
   Bug,
+  SlidersHorizontal,
+  Moon,
+  Sun,
+  Wand2,
 } from "lucide-react";
 import { THEMES, THEME_IDS, type ThemeId } from "@/config/themes";
 import { GROUND_PRESET_IDS, GROUND_PRESETS, type GroundPresetId } from "@/config/groundPresets";
@@ -69,10 +74,36 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
   const showFurnitureLabels = useStore((s) => s.showFurnitureLabels);
   const toggleFurnitureLabels = useStore((s) => s.toggleFurnitureLabels);
   const currentTheme = useStore((s) => s.currentTheme);
+  const darkMode = useStore((s) => s.darkMode);
+  const toggleDarkMode = useStore((s) => s.toggleDarkMode);
   const setTheme = useStore((s) => s.setTheme);
   const groundPreset = useStore((s) => s.environment.groundPreset) as GroundPresetId | undefined;
   const setGroundPreset = useStore((s) => s.setGroundPreset);
   const setActivePalette = useStore((s) => s.setActivePalette);
+  const designComplexity = useStore((s) => s.designComplexity);
+  const setDesignComplexity = useStore((s) => s.setDesignComplexity);
+  const inspectorView = useStore((s) => s.inspectorView);
+  const setInspectorView = useStore((s) => s.setInspectorView);
+  const frameMode = useStore((s) => s.frameMode);
+  const toggleFrameMode = useStore((s) => s.toggleFrameMode);
+  const wallCutMode = useStore((s) => s.wallCutMode);
+  const setWallCutMode = useStore((s) => s.setWallCutMode);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  const openWizard = useStore((s) => s.openWizard);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const t = useStore.temporal.getState();
+      setCanUndo(t.pastStates.length > 0);
+      setCanRedo(t.futureStates.length > 0);
+    };
+    check();
+    // Poll temporal state on a reasonable interval (store subscribe doesn't cover temporal)
+    const id = setInterval(check, 500);
+    return () => clearInterval(id);
+  }, []);
   const [wallMenuOpen, setWallMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -140,12 +171,12 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
     height: "40px",
     padding: "0 12px",
     borderRadius: "8px",
-    border: "1px solid #e5e7eb",
+    border: `1px solid var(--btn-border, #e5e7eb)`,
     cursor: enabled ? "pointer" : "not-allowed",
     fontSize: "13px",
     fontWeight: 500,
-    color: enabled ? "#374151" : "#9ca3af",
-    background: enabled ? "#fff" : "#f9fafb",
+    color: enabled ? "var(--text-main, #374151)" : "var(--text-dim, #9ca3af)",
+    background: enabled ? "var(--btn-bg, #fff)" : "var(--surface-alt, #f9fafb)",
     transition: "all 150ms ease",
     whiteSpace: "nowrap",
     flexShrink: 0,
@@ -160,9 +191,9 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
         maxWidth: "100vw",
         height: "56px",
         padding: "0 12px",
-        background: "rgba(255, 255, 255, 0.78)",
-        borderBottom: "1px solid rgba(255,255,255,0.3)",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+        background: "var(--panel-bg)",
+        borderBottom: "1px solid var(--border)",
+        boxShadow: "var(--panel-shadow)",
         backdropFilter: "blur(16px) saturate(1.4)",
         WebkitBackdropFilter: "blur(16px) saturate(1.4)",
         overflow: "visible",
@@ -173,199 +204,144 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
     >
       {/* ═══ ZONE A: Logo ═══ */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-        <span style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>ModuHome</span>
-        <span style={{ fontSize: "9px", fontWeight: 600, padding: "2px 6px", borderRadius: "9999px", background: "#dbeafe", color: "#2563eb" }}>
+        <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-main, #111827)" }}>ModuHome</span>
+        <span style={{ fontSize: "9px", fontWeight: 600, padding: "2px 6px", borderRadius: "9999px", background: "var(--accent, #2563eb)", color: "#fff" }}>
           PRO
         </span>
       </div>
 
-      {/* ═══ ZONE B: Center Tools (flex-wrap, shrink gracefully) ═══ */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", margin: "0 auto", flexWrap: "wrap", justifyContent: "center", overflow: "hidden", maxHeight: "56px" }}>
-        <button onClick={handleDelete} style={btn(hasSelection && !isWalkthrough)} disabled={!hasSelection || isWalkthrough} title="Delete (Del)">
-          <Trash2 size={15} />
-          <span className="hidden lg:inline">Delete</span>
+      {/* ═══ ZONE B: Undo/Redo + View Mode (center, prominent) ═══ */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "0 auto" }}>
+        {/* Undo / Redo */}
+        <button onClick={undo} style={btn(canUndo)} disabled={!canUndo} title="Undo (Ctrl+Z)">
+          <Undo2 size={15} />
+        </button>
+        <button onClick={redo} style={btn(canRedo)} disabled={!canRedo} title="Redo (Ctrl+Y)">
+          <Redo2 size={15} />
         </button>
 
-        <button onClick={() => {
-          selection.forEach((id) => {
-            const c = containers[id];
-            if (c) updateContainerRotation(id, (c.rotation ?? 0) + Math.PI / 2);
-          });
-        }} style={btn(hasSelection && !isWalkthrough)} disabled={!hasSelection || isWalkthrough} title="Rotate 90° (R)">
-          <RotateCw size={15} />
-          <span className="hidden lg:inline">Rotate</span>
+        <button onClick={openWizard} style={btn(true)} title="Quick Setup">
+          <Wand2 size={15} />
         </button>
 
-        <button onClick={() => selection.forEach((id) => toggleRoof(id))} style={btn(hasSelection && !isWalkthrough)} disabled={!hasSelection || isWalkthrough} title="Toggle Roof">
-          <Layers size={15} />
-          <span className="hidden lg:inline">Roof</span>
-        </button>
+        <div style={{ width: "1px", height: "20px", background: "var(--border, #e5e7eb)", flexShrink: 0 }} />
 
-        <button data-testid="btn-reset" onClick={() => {
-          if (confirm('Reset to empty canvas?')) {
-            const ids = Object.keys(containers);
-            ids.forEach((id) => removeContainer(id));
-            clearSelection();
-            addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
-          }
-        }} style={btn(Object.keys(containers).length > 0)} disabled={Object.keys(containers).length === 0} title="Reset Canvas">
-          <RotateCcw size={15} />
-        </button>
-
-        {/* Group/Ungroup — contextual single button */}
-        {hasSelection && !isWalkthrough && (
-          hasGrouped ? (
-            <button onClick={handleUngroup} style={btn(true)} title="Ungroup (U)">
-              <Group size={15} style={{ transform: "rotate(180deg)" }} />
-              <span className="hidden lg:inline">Ungroup</span>
-            </button>
-          ) : selection.length >= 2 ? (
-            <button onClick={handleGroup} style={btn(true)} title="Group (G)">
-              <Group size={15} />
-              <span className="hidden lg:inline">Group</span>
-            </button>
-          ) : null
-        )}
-
-        <div style={{ width: "1px", height: "20px", background: "#e5e7eb", flexShrink: 0 }} />
-
-        {/* Outer Walls dropdown */}
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          <button onClick={() => setWallMenuOpen(!wallMenuOpen)} style={btn(hasSelection && !isWalkthrough)} disabled={!hasSelection || isWalkthrough} title="Outer Walls">
-            <PanelTop size={15} />
-            <span className="hidden lg:inline">Walls</span>
-            <ChevronDown size={12} style={{ transform: wallMenuOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
-          </button>
-
-          {wallMenuOpen && hasSelection && !isWalkthrough && (
-            <div style={{
-              position: "absolute", top: "100%", left: 0, marginTop: "4px",
-              background: "#fff", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              border: "1px solid #e5e7eb", padding: "4px 0", minWidth: "160px", zIndex: 50,
-            }}>
-              {[
-                { label: "All Solid", value: "solid" as const },
-                { label: "All Glass", value: "glass" as const },
-                { label: "Fold Down", value: "fold_down" as const },
-                { label: "Fold Up", value: "fold_up" as const },
-                { label: "Gull Wing", value: "gull" as const },
-                { label: "All Open", value: "open" as const },
-              ].map((p) => (
-                <button
-                  key={p.value}
-                  onClick={() => { setAllOuterWalls(p.value); setWallMenuOpen(false); }}
-                  style={{ display: "block", width: "100%", padding: "6px 12px", textAlign: "left", fontSize: "12px", color: "#374151", background: "transparent", border: "none", cursor: "pointer" }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#eff6ff"; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
-                >
-                  {p.label}
-                </button>
-              ))}
-              <div style={{ height: "1px", background: "#e5e7eb", margin: "4px 0" }} />
+        {/* ── View Mode Tabs (prominent, Sims-style) ── */}
+        <div style={{
+          display: "flex", alignItems: "center",
+          background: "var(--input-bg, #f3f4f6)", borderRadius: "10px", padding: "3px",
+          border: "1px solid var(--btn-border, #e5e7eb)", flexShrink: 0,
+        }}>
+          {([
+            { mode: ViewMode.Blueprint, label: "Blueprint", kbd: "Alt+4", icon: <Grid2x2 size={14} /> },
+            { mode: ViewMode.Realistic3D, label: "Design", kbd: "Alt+3", icon: <Box size={14} /> },
+            { mode: ViewMode.Walkthrough, label: "Walk", kbd: "F", icon: <Footprints size={14} /> },
+          ] as const).map(({ mode, label, kbd, icon }) => {
+            const active = viewMode === mode;
+            return (
               <button
-                onClick={() => { selection.forEach((id) => toggleRoof(id)); setWallMenuOpen(false); }}
-                style={{ display: "flex", alignItems: "center", gap: "6px", width: "100%", padding: "6px 12px", textAlign: "left", fontSize: "12px", color: "#374151", background: "transparent", border: "none", cursor: "pointer" }}
-                onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#eff6ff"; }}
-                onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
+                key={mode}
+                data-testid={`view-${mode}`}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                  padding: "6px 10px", borderRadius: "8px", border: "none", cursor: "pointer",
+                  color: active ? "#fff" : "var(--text-muted, #6b7280)",
+                  background: active ? "var(--accent, #2563eb)" : "transparent",
+                  boxShadow: active ? "0 1px 3px rgba(37,99,235,0.3)" : "none",
+                  transition: "all 150ms ease", fontSize: "12px", fontWeight: active ? 600 : 500,
+                }}
+                title={`${label} (${kbd})`}
               >
-                <Layers size={13} /> Toggle Roof
+                {icon}
               </button>
-              <button
-                onClick={() => { selection.forEach((id) => generateRooftopDeck(id)); setWallMenuOpen(false); }}
-                style={{ display: "flex", alignItems: "center", gap: "6px", width: "100%", padding: "6px 12px", textAlign: "left", fontSize: "12px", color: "#374151", background: "transparent", border: "none", cursor: "pointer" }}
-                onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#eff6ff"; }}
-                onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
-              >
-                <Layers size={13} /> Rooftop Deck
-              </button>
-            </div>
-          )}
+            );
+          })}
         </div>
       </div>
 
-      {/* ═══ ZONE C: Right — Actions + View Pill ═══ */}
+      {/* ═══ ZONE C: Right — Floor/Roof + Wall Vis + Overflow ═══ */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-        <button onClick={onOpenBudget} style={btn(true)} title="Budget">
-          <DollarSign size={15} />
-          <span className="hidden xl:inline">Budget</span>
-        </button>
 
-        {/* Share button */}
-        <button
-          onClick={() => {
-            const url = buildShareUrl(containers);
-            navigator.clipboard.writeText(url).then(() => {
-              alert('Share URL copied to clipboard!');
-            });
-          }}
-          style={btn(Object.keys(containers).length > 0)}
-          disabled={Object.keys(containers).length === 0}
-          title="Copy Share URL"
-        >
-          <Share2 size={15} />
-          <span className="hidden xl:inline">Share</span>
-        </button>
-
-        {/* Export dropdown */}
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          <button data-testid="btn-export" onClick={() => setExportMenuOpen(!exportMenuOpen)} style={btn(true)} title="Export">
-            <Download size={15} />
-            <span className="hidden xl:inline">Export</span>
-            <ChevronDown size={12} style={{ transform: exportMenuOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
-          </button>
-          {exportMenuOpen && (
-            <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: "4px",
-              background: "#fff", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              border: "1px solid #e5e7eb", padding: "4px 0", minWidth: "140px", zIndex: 50,
+        {/* ── Floor/Roof pill ── */}
+        <div style={{
+          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 6, overflow: "hidden",
+          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 11, fontWeight: 600,
+        }}>
+          {(['floor', 'ceiling'] as const).map((v) => (
+            <button key={v} onClick={() => setInspectorView(v)} style={{
+              padding: "5px 10px", border: "none", cursor: "pointer",
+              background: inspectorView === v ? "var(--accent, #2563eb)" : "transparent",
+              color: inspectorView === v ? "#fff" : "var(--text-muted, #6b7280)",
+              transition: "all 100ms",
             }}>
-              <button
-                onClick={() => { handleExport(); setExportMenuOpen(false); }}
-                style={{ display: "block", width: "100%", padding: "6px 12px", textAlign: "left", fontSize: "12px", color: "#374151", background: "transparent", border: "none", cursor: "pointer" }}
-                onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#eff6ff"; }}
-                onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
-              >
-                Export JSON
-              </button>
-              <button
-                onClick={() => { exportSceneToGLB(); setExportMenuOpen(false); }}
-                style={{ display: "block", width: "100%", padding: "6px 12px", textAlign: "left", fontSize: "12px", color: "#374151", background: "transparent", border: "none", cursor: "pointer" }}
-                onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#eff6ff"; }}
-                onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
-              >
-                Export GLB
-              </button>
-            </div>
-          )}
+              {v === 'floor' ? 'Floor' : 'Roof'}
+            </button>
+          ))}
         </div>
 
-        <button data-testid="btn-palette" onClick={onOpenPalette} style={btn(true)} title="Material Palette">
-          <Palette size={15} />
+        {/* ── Frame toggle ── */}
+        <button
+          onClick={toggleFrameMode}
+          title="Toggle Frame Mode"
+          style={{
+            padding: "5px 10px",
+            border: `1px solid ${frameMode ? 'var(--accent, #2563eb)' : 'var(--btn-border, #e5e7eb)'}`,
+            borderRadius: 6,
+            cursor: "pointer",
+            background: frameMode ? "var(--accent, #2563eb)" : "transparent",
+            color: frameMode ? "#fff" : "var(--text-muted, #6b7280)",
+            fontSize: 11,
+            fontWeight: 600,
+            marginLeft: 4,
+            transition: "all 100ms",
+          }}
+        >
+          Frame
         </button>
 
-        <div style={{ width: "1px", height: "20px", background: "#e5e7eb", flexShrink: 0 }} />
+        {/* ── Wall Visibility ── */}
+        <div style={{
+          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 6, overflow: "hidden",
+          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 11, fontWeight: 600,
+        }}>
+          {([
+            { mode: 'full' as const, label: '▮', title: 'Full Walls' },
+            { mode: 'half' as const, label: '▄', title: 'Half Walls' },
+            { mode: 'down' as const, label: '▁', title: 'Walls Down' },
+          ]).map(({ mode, label, title }) => (
+            <button key={mode} onClick={() => setWallCutMode(mode)} title={title} style={{
+              padding: "5px 8px", border: "none", cursor: "pointer",
+              background: wallCutMode === mode ? "var(--accent, #2563eb)" : "transparent",
+              color: wallCutMode === mode ? "#fff" : "var(--text-muted, #6b7280)",
+              transition: "all 100ms",
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
 
-        {/* Appearance Menu */}
+        {/* Theme & Environment button (first) */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           <button
+            data-testid="btn-palette"
             onClick={() => { setAppearanceOpen(!appearanceOpen); setDevToolsOpen(false); }}
             style={{
               ...btn(true),
-              borderColor: appearanceOpen ? "#2563eb" : "#e5e7eb",
-              color: appearanceOpen ? "#2563eb" : "#374151",
-              background: appearanceOpen ? "#eff6ff" : "#fff",
+              borderColor: appearanceOpen ? "var(--accent)" : undefined,
+              color: appearanceOpen ? "var(--accent)" : undefined,
             }}
             title="Theme & Environment"
           >
-            <Paintbrush size={15} />
+            <Paintbrush size={14} />
           </button>
           {appearanceOpen && (
             <div style={{
               position: "absolute", top: "100%", right: 0, marginTop: "4px",
-              background: "#fff", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-              border: "1px solid #e5e7eb", padding: "12px", minWidth: "220px", zIndex: 50,
+              background: "var(--modal-bg, #fff)", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+              border: "1px solid var(--btn-border, #e5e7eb)", padding: "12px", minWidth: "220px", zIndex: 50,
             }}>
-              <div style={{ fontSize: "10px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
+              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #6b7280)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
                 Theme
               </div>
               <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
@@ -391,7 +367,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                   );
                 })}
               </div>
-              <div style={{ fontSize: "10px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
+              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #6b7280)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
                 Ground
               </div>
               <div style={{ display: "flex", gap: "4px" }}>
@@ -421,92 +397,102 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           )}
         </div>
 
-        <div style={{ width: "1px", height: "20px", background: "#e5e7eb", flexShrink: 0 }} />
-
-        {/* View Pill — Icon-only with tooltips */}
-        <div style={{
-          display: "flex", alignItems: "center",
-          background: "#f3f4f6", borderRadius: "9999px", padding: "3px",
-          border: "1px solid #e5e7eb", flexShrink: 0,
-        }}>
-          {([
-            { mode: ViewMode.Blueprint, label: "Build", kbd: "Alt+4", icon: <Grid2x2 size={14} /> },
-            { mode: ViewMode.Realistic3D, label: "Design", kbd: "Alt+3", icon: <Box size={14} /> },
-            { mode: ViewMode.Walkthrough, label: "Walk", kbd: "F", icon: <Footprints size={14} /> },
-          ] as const).map(({ mode, label, kbd, icon }) => {
-            const active = viewMode === mode;
-            return (
-              <button
-                key={mode}
-                data-testid={`view-${mode}`}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: "32px", height: "32px", borderRadius: "9999px", border: "none", cursor: "pointer",
-                  color: active ? "#fff" : "#6b7280",
-                  background: active ? "#2563eb" : "transparent",
-                  boxShadow: active ? "0 1px 3px rgba(37,99,235,0.3)" : "none",
-                  transition: "all 150ms ease",
-                }}
-                title={`${label} (${kbd})`}
-              >
-                {icon}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Dev Tools Dropdown */}
+        {/* Settings menu (second) */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           <button
-            data-testid="btn-debug"
+            data-testid="btn-more"
             onClick={() => { setDevToolsOpen(!devToolsOpen); setAppearanceOpen(false); }}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: "32px", height: "32px", borderRadius: "6px", border: "1px solid",
-              borderColor: (debugMode || dollhouseActive || tapeActive) ? "#ef4444" : devToolsOpen ? "#2563eb" : "#e5e7eb",
-              background: (debugMode || dollhouseActive || tapeActive) ? "#fef2f2" : devToolsOpen ? "#eff6ff" : "transparent",
-              color: (debugMode || dollhouseActive || tapeActive) ? "#ef4444" : devToolsOpen ? "#2563eb" : "#9ca3af",
-              cursor: "pointer", flexShrink: 0,
-            }}
-            title="Dev Tools"
+            style={btn(true)}
+            title="Settings"
           >
-            <Bug size={14} />
+            <SlidersHorizontal size={14} />
           </button>
           {devToolsOpen && (
             <div style={{
               position: "absolute", top: "100%", right: 0, marginTop: "4px",
-              background: "#fff", borderRadius: "10px", boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-              border: "1px solid #e5e7eb", padding: "6px", minWidth: "170px", zIndex: 50,
+              background: "var(--modal-bg, #fff)", borderRadius: "10px",
+              boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
+              border: "1px solid var(--border, #e5e7eb)", padding: "6px", minWidth: "220px", zIndex: 50,
+              color: "var(--text-main)",
             }}>
+              {/* Dark Mode */}
+              <button onClick={toggleDarkMode} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, marginBottom: 4,
+                color: darkMode ? "#60a5fa" : "var(--text-main)",
+                background: darkMode ? "rgba(59,130,246,0.12)" : "transparent",
+                transition: "all 100ms", borderBottom: "1px solid var(--border-subtle, #f3f4f6)",
+              }}>
+                {darkMode ? <Moon size={13} /> : <Sun size={13} />}
+                {darkMode ? "Dark Mode" : "Light Mode"}
+                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{darkMode ? "ON" : "OFF"}</span>
+              </button>
+
+              {/* Grid */}
+              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "6px 10px 2px" }}>Grid</div>
+              <div style={{ display: "flex", gap: 2, padding: "2px 6px 6px" }}>
+                {(['simple', 'detailed'] as const).map((m) => (
+                  <button key={m} onClick={() => setDesignComplexity(m)} style={{
+                    flex: 1, padding: "5px 0", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                    background: designComplexity === m ? "var(--accent)" : "var(--input-bg, #f3f4f6)",
+                    color: designComplexity === m ? "#fff" : "var(--text-muted)", transition: "all 100ms",
+                  }}>
+                    {m === 'simple' ? 'Simple' : 'Detail'}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ height: 1, background: "var(--border-subtle)", margin: "4px 0" }} />
+
+              {/* Container Actions */}
+              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 10px 2px" }}>Actions</div>
               {[
-                { label: "Wireframe", active: debugMode, toggle: toggleDebugMode, Icon: Bug },
-                { label: "Cutaway", active: dollhouseActive, toggle: toggleDollhouse, Icon: Scan },
-                { label: "Measure", active: tapeActive, toggle: toggleTape, Icon: Ruler },
-                { label: "Labels", active: showFurnitureLabels, toggle: toggleFurnitureLabels, Icon: Tag },
-              ].map(({ label, active, toggle, Icon }) => (
-                <button
-                  key={label}
-                  onClick={toggle}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "8px", width: "100%",
-                    padding: "7px 10px", borderRadius: "6px", border: "none", cursor: "pointer",
-                    fontSize: "12px", fontWeight: active ? 600 : 500,
-                    color: active ? "#2563eb" : "#374151",
-                    background: active ? "#eff6ff" : "transparent",
-                    transition: "all 100ms ease",
-                  }}
-                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
-                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                { label: "Delete Selected", action: handleDelete, enabled: hasSelection && !isWalkthrough, Icon: Trash2 },
+                { label: "Rotate 90°", action: () => selection.forEach((id) => { const c = containers[id]; if (c) updateContainerRotation(id, (c.rotation ?? 0) + Math.PI / 2); }), enabled: hasSelection && !isWalkthrough, Icon: RotateCw },
+                { label: "Share URL", action: () => { const url = buildShareUrl(containers); navigator.clipboard.writeText(url).then(() => alert('Copied!')); }, enabled: Object.keys(containers).length > 0, Icon: Share2 },
+                { label: "Export JSON", action: () => { handleExport(); setDevToolsOpen(false); }, enabled: true, Icon: Download, testId: "btn-export" },
+              ].map(({ label, action, enabled, Icon, testId }) => (
+                <button key={label} data-testid={testId} onClick={() => { if (enabled) action(); }} disabled={!enabled} style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  padding: "6px 10px", borderRadius: 6, border: "none", cursor: enabled ? "pointer" : "not-allowed",
+                  fontSize: 11, fontWeight: 500, color: enabled ? "var(--text-main)" : "var(--text-dim)",
+                  background: "transparent", transition: "all 100ms", opacity: enabled ? 1 : 0.5,
+                }}
+                  onMouseEnter={(e) => { if (enabled) e.currentTarget.style.background = "var(--btn-hover, #f9fafb)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 >
-                  <Icon size={13} />
-                  {label}
-                  {active && <span style={{ marginLeft: "auto", fontSize: "10px", color: "#2563eb" }}>ON</span>}
+                  <Icon size={12} /> {label}
                 </button>
               ))}
+
+              <div style={{ height: 1, background: "var(--border-subtle)", margin: "4px 0" }} />
+
+              {/* Danger Zone */}
+              <button data-testid="btn-reset" onClick={() => {
+                if (confirm('Reset to empty canvas?')) {
+                  Object.keys(containers).forEach((id) => removeContainer(id));
+                  clearSelection();
+                  addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+                  setDevToolsOpen(false);
+                }
+              }} disabled={Object.keys(containers).length === 0} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                fontSize: 11, fontWeight: 500, color: "#ef4444", background: "transparent", transition: "all 100ms",
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <RotateCcw size={12} /> Reset Canvas
+              </button>
             </div>
           )}
         </div>
+
+        {/* Old View Pill removed — now prominent tabs in ZONE B center */}
+
+        {/* Old Settings dropdown removed — functionality merged into overflow ⋯ menu */}
       </div>
     </header>
   );
