@@ -36,6 +36,7 @@ import {
   Palette, Scan,
 } from "lucide-react";
 import UserLibrary from "@/components/ui/UserLibrary";
+import WarningPanel from "@/components/ui/WarningPanel";
 // Theme/Ground imports removed — selectors moved to TopToolbar Appearance popover
 
 // ── BOM formatting ────────────────────────────────────────────
@@ -874,6 +875,9 @@ export default function Sidebar() {
           </>
         )}
       </div>
+
+      {/* ── Warning Panel ──────────────────────────────── */}
+      <WarningPanel />
 
       {/* ── BOM Footer ──────────────────────────────────── */}
       <SidebarBOMFooter />

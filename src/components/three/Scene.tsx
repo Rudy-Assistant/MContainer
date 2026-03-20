@@ -39,6 +39,7 @@ import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
 import { useFrameStore } from "@/store/frameStore";
 import FrameBuilder from "./FrameBuilder";
 import TapeMeasure from "./TapeMeasure";
+import { validateDesign } from "@/utils/designValidation";
 import { DevSceneExpose } from "./DevSceneExpose";
 // postprocessing DISABLED: importing @react-three/postprocessing causes
 // "THREE.WebGLRenderer: Context Lost" in real browsers (module-level GL init).
@@ -365,6 +366,34 @@ function FrameModeInvalidator() {
   const frameMode = useStore((s) => s.frameMode);
   const selectedFrameElement = useStore((s) => s.selectedFrameElement);
   useEffect(() => { invalidate(); }, [frameMode, selectedFrameElement, invalidate]);
+  return null;
+}
+
+/** Debounced validation subscriber — recomputes warnings when containers change */
+function ValidationSubscriber() {
+  const { invalidate } = useThree();
+  const designMode = useStore((s) => s.designMode);
+  const hoveredWarning = useStore((s) => s.hoveredWarning);
+
+  // Invalidate on designMode/hoveredWarning changes (demand-mode rendering)
+  useEffect(() => { invalidate(); }, [designMode, hoveredWarning, invalidate]);
+
+  // Debounced validation recomputation
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let prevContainers = useStore.getState().containers;
+    const unsub = useStore.subscribe((state) => {
+      if (state.containers === prevContainers) return;
+      prevContainers = state.containers;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const warnings = validateDesign(state.containers);
+        useStore.getState().setWarnings(warnings);
+      }, 300);
+    });
+    return () => { unsub(); clearTimeout(timer); };
+  }, []);
+
   return null;
 }
 
@@ -1193,6 +1222,7 @@ function RealisticScene() {
       <GroundManager />
       <PBRTextureLoader />
       <FrameModeInvalidator />
+      <ValidationSubscriber />
 
       {/* Phase 8: HDRI environment for PBR reflections (visible corrugation reflections) */}
       <TimeOfDayEnvironment intensity={0.8} />
