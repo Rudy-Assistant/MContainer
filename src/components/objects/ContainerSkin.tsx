@@ -1782,10 +1782,10 @@ export default function ContainerSkin({
   }
 
   const [hovered, setHovered] = useState<string | null>(null);
-  const [hoveredEdge, setHoveredEdge] = useState<{ idx: number; face: string } | null>(null);
+  // hoveredEdge removed — was set in 9 places but never read (dead state causing needless re-renders)
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Frame mode: track hovered pole index for highlight
-  const [hoveredPoleIdx, setHoveredPoleIdx] = useState<number | null>(null);
+  // Frame mode: track hovered pole via ref (avoids full re-render on hover)
+  const hoveredPoleRef = useRef<THREE.Mesh | null>(null);
 
   // Ctrl+drag painting — tracks active drag state and painted faces to prevent double-painting
   const paintDragging = useRef(false);
@@ -2075,6 +2075,7 @@ export default function ContainerSkin({
 
   // ★ Phase 7: Belt-and-suspenders layer isolation. Primary fix is in SingleFace
   // (handlers on hitbox mesh only), but this ensures custom raycasters also skip visual meshes.
+  // Deps: grid changes when voxels activate/deactivate → new mesh children may appear.
   const skinRef = useRef<THREE.Group>(null);
   useEffect(() => {
     if (!skinRef.current) return;
@@ -2087,22 +2088,25 @@ export default function ContainerSkin({
         }
       }
     });
-  });
+  }, [grid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Dollhouse Cutaway (Phase 9) ───────────────────────────
+  // Uses ref instead of useState to avoid full ContainerSkin re-render from useFrame.
+  // A lightweight counter triggers re-render only when the faded set actually changes.
   const fadedKeyRef = useRef('');
-  const [fadedDirs, setFadedDirs] = useState<Set<string>>(new Set());
+  const fadedDirsRef = useRef<Set<string>>(new Set());
+  const [, forceRender] = useState(0);
 
   useFrame(({ camera }) => {
     if (!dollhouseActive) {
       if (fadedKeyRef.current !== '') {
         fadedKeyRef.current = '';
-        setFadedDirs(new Set());
+        fadedDirsRef.current = new Set();
+        forceRender(c => c + 1);
       }
       return;
     }
     const cx = container.position.x;
-    const cy = container.position.y;
     const cz = container.position.z;
     const vx = camera.position.x - cx;
     const vz = camera.position.z - cz;
@@ -2110,25 +2114,22 @@ export default function ContainerSkin({
     const dx = vx / len, dz = vz / len;
     const rot = container.rotation || 0;
     const cosR = Math.cos(rot), sinR = Math.sin(rot);
-    // Face normals in world space (Y-rotation applied)
-    // n: local [0,0,-1] → [sinR, 0, -cosR]
-    // s: local [0,0,+1] → [-sinR, 0, cosR]
-    // e: local [+1,0,0] → [cosR, 0, sinR]
-    // w: local [-1,0,0] → [-cosR, 0, -sinR]
-    const dots: [string, number][] = [
-      ['n', dx * sinR + dz * (-cosR)],
-      ['s', dx * (-sinR) + dz * cosR],
-      ['e', dx * cosR + dz * sinR],
-      ['w', dx * (-cosR) + dz * (-sinR)],
-    ];
-    const faded = new Set<string>();
-    for (const [dir, dot] of dots) {
-      if (dot > 0.15) faded.add(dir);
-    }
-    const key = Array.from(faded).sort().join(',');
+    // Compute dot products for each face normal (Y-rotation applied)
+    const dotN = dx * sinR + dz * (-cosR);
+    const dotS = dx * (-sinR) + dz * cosR;
+    const dotE = dx * cosR + dz * sinR;
+    const dotW = dx * (-cosR) + dz * (-sinR);
+    // Build key directly without allocating a Set or Array each frame
+    const parts: string[] = [];
+    if (dotE > 0.15) parts.push('e');
+    if (dotN > 0.15) parts.push('n');
+    if (dotS > 0.15) parts.push('s');
+    if (dotW > 0.15) parts.push('w');
+    const key = parts.join(',');
     if (key !== fadedKeyRef.current) {
       fadedKeyRef.current = key;
-      setFadedDirs(faded);
+      fadedDirsRef.current = new Set(parts);
+      forceRender(c => c + 1);
     }
   });
 
@@ -2314,7 +2315,7 @@ export default function ContainerSkin({
           }
 
           // ★ Phase 9: Dollhouse cutaway — hide walls facing the camera
-          if (fadedDirs.has(dir)) return null;
+          if (fadedDirsRef.current.has(dir)) return null;
 
           // ★ Phase 4 railing autotiling: compute connectivity for seamless railing runs
           const isRailing = surface === 'Railing_Cable' || surface === 'Railing_Glass';
@@ -2483,7 +2484,7 @@ export default function ContainerSkin({
               };
               // Debounced leave for edge strips / ceiling hitboxes — same pattern as onLeaveShared
               const onLeaveEdge = () => {
-                setHoveredEdge(null);
+                // hoveredEdge removed
                 setHoveredVoxelEdge(null);
                 setFaceContext(null);
                 if (bayIndices) {
@@ -2713,7 +2714,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 'n' });
+                                // (hoveredEdge removed — dead state)
                                 onEnterEdge('n')(e);
                               }}
                               onPointerLeave={onLeaveEdge}
@@ -2732,7 +2733,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 's' });
+                                // (hoveredEdge removed — dead state)
                                 onEnterEdge('s')(e);
                               }}
                               onPointerLeave={onLeaveEdge}
@@ -2751,7 +2752,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 'e' });
+                                // (hoveredEdge removed — dead state)
                                 onEnterEdge('e')(e);
                               }}
                               onPointerLeave={onLeaveEdge}
@@ -2770,7 +2771,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 'w' });
+                                // (hoveredEdge removed — dead state)
                                 onEnterEdge('w')(e);
                               }}
                               onPointerLeave={onLeaveEdge}
@@ -2823,7 +2824,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 'n' });
+                                // (hoveredEdge removed — dead state)
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'n' });
                                 if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
@@ -2846,7 +2847,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 's' });
+                                // (hoveredEdge removed — dead state)
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 's' });
                                 if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
@@ -2869,7 +2870,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 'e' });
+                                // (hoveredEdge removed — dead state)
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'e' });
                                 if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
@@ -2892,7 +2893,7 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredEdge({ idx, face: 'w' });
+                                // (hoveredEdge removed — dead state)
                                 setHoveredVoxel({ containerId: container.id, index: idx });
                                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'w' });
                                 if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
@@ -3009,8 +3010,7 @@ export default function ContainerSkin({
         const poleOverride = container.poleOverrides?.[poleKey];
         if (poleOverride?.visible === false) return null;
         const isSelectedPole = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === poleKey;
-        const isHoveredPole = hoveredPoleIdx === i;
-        const poleMat = isSelectedPole ? frameSelectMat : isHoveredPole ? frameHoverMat : mFrame;
+        const poleMat = isSelectedPole ? frameSelectMat : mFrame;
         return (
           <mesh
             key={`pillar_${i}`}
@@ -3019,8 +3019,20 @@ export default function ContainerSkin({
             material={poleMat}
             castShadow
             raycast={frameMode ? undefined : nullRaycast}
-            onPointerOver={frameMode ? (e) => { e.stopPropagation(); setHoveredPoleIdx(i); } : undefined}
-            onPointerOut={frameMode ? () => { setHoveredPoleIdx(null); } : undefined}
+            onPointerOver={frameMode ? (e) => {
+              e.stopPropagation();
+              const mesh = e.object as THREE.Mesh;
+              if (hoveredPoleRef.current && hoveredPoleRef.current !== mesh) {
+                hoveredPoleRef.current.material = mFrame;
+              }
+              hoveredPoleRef.current = mesh;
+              if (!isSelectedPole) mesh.material = frameHoverMat;
+            } : undefined}
+            onPointerOut={frameMode ? (e) => {
+              const mesh = e.object as THREE.Mesh;
+              if (hoveredPoleRef.current === mesh) hoveredPoleRef.current = null;
+              if (!isSelectedPole) mesh.material = mFrame;
+            } : undefined}
             onClick={frameMode ? (e) => { e.stopPropagation(); setSelectedFrameElement({ containerId: container.id, key: poleKey, type: 'pole' }); } : undefined}
           />
         );
