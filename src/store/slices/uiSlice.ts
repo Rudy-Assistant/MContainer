@@ -55,6 +55,29 @@ export interface UiSlice {
   designComplexity: 'simple' | 'detailed';
   setDesignComplexity: (c: 'simple' | 'detailed') => void;
 
+  // Bay group hover (Simple mode 2D grid → 3D highlight bridge)
+  hoveredBayGroup: { containerId: string; indices: number[] } | null;
+  setHoveredBayGroup: (g: { containerId: string; indices: number[] } | null) => void;
+
+  // Inspector view: floor shows bottom faces, ceiling shows top faces
+  inspectorView: 'floor' | 'ceiling';
+  setInspectorView: (v: 'floor' | 'ceiling') => void;
+
+  // Frame Mode: shows structural skeleton, enables frame element interaction
+  frameMode: boolean;
+  toggleFrameMode: () => void;
+  setFrameMode: (on: boolean) => void;
+
+  // Selected frame element (pole or rail) in Frame Mode
+  selectedFrameElement: { containerId: string; key: string; type: 'pole' | 'rail' } | null;
+  setSelectedFrameElement: (el: { containerId: string; key: string; type: 'pole' | 'rail' } | null) => void;
+
+  // Wall cut mode (Sims-style wall visibility)
+  wallCutMode: 'full' | 'half' | 'down' | 'custom';
+  wallCutHeight: number; // 0.0 (down) to 1.0 (full)
+  setWallCutMode: (mode: 'full' | 'half' | 'down' | 'custom') => void;
+  setWallCutHeight: (h: number) => void;
+
   // Debug wireframe overlay
   debugMode: boolean;
   toggleDebugMode: () => void;
@@ -63,6 +86,21 @@ export interface UiSlice {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+
+  // Paint drag mode — disables camera controls during Ctrl+drag paint
+  isPaintDragging: boolean;
+  setIsPaintDragging: (v: boolean) => void;
+
+  // Dark mode
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+
+  // Quick Setup Wizard
+  wizardOpen: boolean;
+  wizardPresetId: string | null;
+  openWizard: () => void;
+  closeWizard: () => void;
+  setWizardPresetId: (id: string | null) => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -84,9 +122,9 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   toggleDollhouse: () => set((s: any) => ({ dollhouseActive: !s.dollhouseActive })),
   toggleFurnitureLabels: () => set((s: any) => ({ showFurnitureLabels: !s.showFurnitureLabels })),
 
-  activeHotbarTab: 0,
+  activeHotbarTab: 1, // Default: Surfaces (was Rooms)
   setActiveHotbarTab: (tab) => set({ activeHotbarTab: tab }),
-  cycleHotbarTab: (dir) => set((s: any) => ({ activeHotbarTab: ((s.activeHotbarTab + dir) % 3 + 3) % 3 })),
+  cycleHotbarTab: (dir) => set((s: any) => ({ activeHotbarTab: ((s.activeHotbarTab + dir) % 4 + 4) % 4 })),
 
   activeFurniturePreset: null,
   setActiveFurniturePreset: (type) => set({ activeFurniturePreset: type, activeHotbarSlot: null, activeBrush: null } as any),
@@ -98,8 +136,32 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   setGrabMode: (mode) => set({ grabMode: mode }),
   clearGrabMode: () => set({ grabMode: { active: false, containerId: null, origin: null } }),
 
-  designComplexity: 'detailed',
-  setDesignComplexity: (c) => set({ designComplexity: c }),
+  designComplexity: 'simple',
+  setDesignComplexity: (c) => set({ designComplexity: c, selectedVoxel: null, selectedVoxels: null, hoveredBayGroup: null }),
+
+  hoveredBayGroup: null,
+  setHoveredBayGroup: (g) => set({ hoveredBayGroup: g }),
+
+  inspectorView: 'floor' as 'floor' | 'ceiling',
+  setInspectorView: (v: 'floor' | 'ceiling') => set({ inspectorView: v }),
+
+  frameMode: false,
+  toggleFrameMode: () => set((s: any) => ({
+    frameMode: !s.frameMode,
+    selectedFrameElement: null, // clear selection on toggle
+  })),
+  setFrameMode: (on) => set({
+    frameMode: on,
+    ...(!on ? { selectedFrameElement: null } : {}), // clear selection when turning off
+  }),
+
+  selectedFrameElement: null,
+  setSelectedFrameElement: (el) => set({ selectedFrameElement: el }),
+
+  wallCutMode: 'full' as 'full' | 'half' | 'down' | 'custom',
+  wallCutHeight: 1.0,
+  setWallCutMode: (mode: 'full' | 'half' | 'down' | 'custom') => set({ wallCutMode: mode }),
+  setWallCutHeight: (h: number) => set({ wallCutHeight: h, wallCutMode: 'custom' }),
 
   debugMode: false,
   toggleDebugMode: () => set((s: any) => ({ debugMode: !s.debugMode })),
@@ -107,4 +169,24 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   sidebarCollapsed: false,
   toggleSidebar: () => set((s: any) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+  isPaintDragging: false,
+  setIsPaintDragging: (v) => set({ isPaintDragging: v }),
+
+  darkMode: false,
+  toggleDarkMode: () => {
+    const next = !(_get() as any).darkMode;
+    set({ darkMode: next });
+    // Apply data-theme attribute to HTML element
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
+    }
+  },
+
+  // Quick Setup Wizard
+  wizardOpen: false,
+  wizardPresetId: null,
+  openWizard: () => set({ wizardOpen: true, wizardPresetId: null }),
+  closeWizard: () => set({ wizardOpen: false, wizardPresetId: null }),
+  setWizardPresetId: (id) => set({ wizardPresetId: id }),
 });
