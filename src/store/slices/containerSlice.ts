@@ -35,6 +35,8 @@ import {
   VOXEL_COUNT,
   LONG_WALL_BAYS,
   SHORT_WALL_BAYS,
+  type ElementConfig,
+  type PoleConfig,
 } from "@/types/container";
 import {
   createContainer,
@@ -45,7 +47,7 @@ import {
   createDefaultVoxelGrid,
   createPoolVoxelGrid,
 } from "@/types/factories";
-import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverlap, getFootprintAt, getFullFootprint } from "@/store/spatialEngine";
+import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverlap, getFootprintAt, getFullFootprint, findEdgeSnap } from "@/store/spatialEngine";
 import defaultPricing from "@/config/pricing_config.json";
 import { getContainerRole, CONTAINER_ROLES } from "@/config/containerRoles";
 import type { ExtensionConfig } from "@/types/container";
@@ -68,6 +70,21 @@ function getTemporalApi() {
   if (!_getTemporalApi) throw new Error('containerSlice: temporal API not injected');
   return _getTemporalApi();
 }
+
+/** Nesting-safe temporal pause/resume. Inner calls are no-ops. */
+let _temporalPauseDepth = 0;
+function temporalPause() {
+  if (_temporalPauseDepth === 0) getTemporalApi().pause();
+  _temporalPauseDepth++;
+}
+function temporalResume() {
+  _temporalPauseDepth--;
+  if (_temporalPauseDepth === 0) getTemporalApi().resume();
+}
+
+// Pre-allocated ranges for refreshAdjacency iteration (avoids per-pair allocation)
+const _ROW_RANGE = Array.from({ length: VOXEL_ROWS }, (_, i) => i);
+const _COL_RANGE = Array.from({ length: VOXEL_COLS }, (_, i) => i);
 
 // ── Structural Configuration Templates ──────────────────────
 function _brushToTemplate(brush: SurfaceType): VoxelFaces {
@@ -108,6 +125,7 @@ export interface ContainerSlice {
 
   // ── Container CRUD ────────────────────────────────────────
   addContainer: (size?: ContainerSize, position?: ContainerPosition, level?: number, skipSmartPlacement?: boolean) => string;
+  addPoolContainer: () => string;
   applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
   setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
   removeContainer: (id: string) => void;
@@ -119,6 +137,8 @@ export interface ContainerSlice {
   toggleFloor: (id: string) => void;
   _applyExtensionDoors: (containerId: string, config: ExtensionConfig) => void;
   _restoreExtensionDoors: (containerId: string) => void;
+  /** Clear the ephemeral unpackPhase on a voxel after animation completes */
+  clearUnpackPhase: (containerId: string, voxelIndex: number) => void;
 
   // ── Vertical Stacking ─────────────────────────────────────
   stackContainer: (topId: string, bottomId: string) => boolean;
@@ -175,6 +195,9 @@ export interface ContainerSlice {
   closeFloorDetail: () => void;
   setCornerConfig: (containerId: string, cornerName: string, config: Partial<import("@/types/container").CornerConfig>) => void;
 
+  // ── Quick Setup Wizard ───────────────────────────────────
+  applyWizardPreset: (containerId: string, presetId: string) => void;
+
   // ── Camera ────────────────────────────────────────────────
   saveWalkthroughPos: (position: [number, number, number], yaw: number) => void;
 
@@ -203,9 +226,16 @@ export interface ContainerSlice {
 
   // ── Rooftop Deck ────────────────────────────────────────
   generateRooftopDeck: (containerId: string) => void;
+  removeRooftopDeck: (containerId: string) => void;
 
   // ── Shared Design Import ────────────────────────────────
   importSharedDesign: (design: any) => void;
+
+  // ── Frame Configuration ────────────────────────────────────
+  setFrameDefaults: (containerId: string, defaults: Partial<NonNullable<Container['frameDefaults']>>) => void;
+  setFrameElementOverride: (containerId: string, key: string, config: ElementConfig | PoleConfig) => void;
+  clearFrameElementOverride: (containerId: string, key: string) => void;
+  batchSetFrameOverrides: (containerId: string, keys: string[], config: ElementConfig | PoleConfig) => void;
 
   // ── Debug ─────────────────────────────────────────────────
   __debugTwoStoryStack: () => void;
@@ -235,20 +265,29 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
     // Smart Placement: auto-offset if position overlaps existing container
     if (!skipSmartPlacement && checkOverlap(containers, null, foot)) {
-      // Offset must clear body + potential extensions (haloExt = container height)
-      const haloExt = dims.height;
+      // Offset by body dims + extension halo (= container height, matching getFullFootprint)
+      const halo = dims.height;
       const offsets = [
-        { x: dims.length + haloExt + 0.05, z: 0 },
-        { x: -(dims.length + haloExt + 0.05), z: 0 },
-        { x: 0, z: dims.width + haloExt + 0.05 },
-        { x: 0, z: -(dims.width + haloExt + 0.05) },
+        { x: dims.length + halo + 0.1, z: 0 },
+        { x: -(dims.length + halo + 0.1), z: 0 },
+        { x: 0, z: dims.width + halo + 0.1 },
+        { x: 0, z: -(dims.width + halo + 0.1) },
       ];
       let placed = false;
       for (const off of offsets) {
-        const newX = c.position.x + off.x;
-        const newZ = c.position.z + off.z;
+        let newX = c.position.x + off.x;
+        let newZ = c.position.z + off.z;
         const newFoot = getFootprintAt(newX, newZ, c.size, c.rotation ?? 0);
         if (!checkOverlap(containers, null, newFoot)) {
+          // Try snapping flush — only use snap if it doesn't create overlap
+          const snap = findEdgeSnap(containers, null, newX, newZ, c.size, c.rotation ?? 0);
+          if (snap.snapped) {
+            const snapFoot = getFootprintAt(snap.x, snap.z, c.size, c.rotation ?? 0);
+            if (!checkOverlap(containers, null, snapFoot)) {
+              newX = snap.x;
+              newZ = snap.z;
+            }
+          }
           c.position = { ...c.position, x: newX, z: newZ };
           placed = true;
           break;
@@ -272,6 +311,29 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     return c.id;
   },
 
+  addPoolContainer: () => {
+    const dims = CONTAINER_DIMENSIONS[ContainerSize.HighCube40];
+    // Place below ground: Y = -height so top of container is at Y=0
+    const id = get().addContainer(
+      ContainerSize.HighCube40,
+      { x: 0, y: -dims.height, z: 0 },
+      0,
+      false,
+    );
+    // Mark as subterranean and apply pool voxel grid (concrete walls + open top)
+    set((s) => {
+      const c = s.containers[id];
+      if (!c) return {};
+      return {
+        containers: {
+          ...s.containers,
+          [id]: { ...c, subterranean: true, voxelGrid: createPoolVoxelGrid(), name: 'Pool Container' },
+        },
+      };
+    });
+    return id;
+  },
+
   // applyContainerPreset — moved to voxelSlice
   // addContainerWithPreset — moved to voxelSlice
 
@@ -281,8 +343,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     const c = get().containers[containerId];
     if (!c) return;
 
-    const t = getTemporalApi();
-    t.pause();
+    temporalPause();
 
     // Reset to default grid first
     set((s) => {
@@ -353,7 +414,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       });
     }
 
-    t.resume();
+    temporalResume();
   },
 
   /**
@@ -479,7 +540,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         if (dir === 'north') { simFoot.minZ -= haloExt * cosA; simFoot.minX -= haloExt * sinA; }
         if (dir === 'south') { simFoot.maxZ += haloExt * cosA; simFoot.maxX += haloExt * sinA; }
       };
-      if (config === 'all_deck' || config === 'all_interior') {
+      if (config === 'all_deck' || config === 'all_interior' || config === 'all_glass_interior') {
         expandDir('north'); expandDir('south'); expandDir('east'); expandDir('west');
       } else if (config === 'north_deck') { expandDir('north'); }
       else if (config === 'south_deck') { expandDir('south'); }
@@ -492,8 +553,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       }
     }
 
-    const t = getTemporalApi();
-    t.pause();
+    temporalPause();
 
     // Restore any previous auto-doors before re-applying
     get()._restoreExtensionDoors(containerId);
@@ -530,6 +590,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
                 active: false,
                 moduleId: undefined,
                 moduleOrientation: undefined,
+                unpackPhase: undefined,
                 faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
               };
             }
@@ -559,11 +620,22 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
               return { containers: { ...s.containers, [containerId]: { ...container, voxelGrid: grid } } };
             });
             get().applyModule(containerId, idx, 'deck_open', 'n');
+            // Set unpack animation phase for cinematic extension deployment
+            set((s: any) => {
+              const container = s.containers[containerId];
+              if (!container?.voxelGrid) return {};
+              const grid = [...container.voxelGrid];
+              if (grid[idx]) {
+                grid[idx] = { ...grid[idx], unpackPhase: 'wall_to_floor' as const };
+              }
+              return { containers: { ...s.containers, [containerId]: { ...container, voxelGrid: grid } } };
+            });
           }
         }
       }
-    } else if (config === 'all_interior') {
+    } else if (config === 'all_interior' || config === 'all_glass_interior') {
       // Expand floor area: activate extensions with interior-matching faces
+      const outerWall: SurfaceType = config === 'all_glass_interior' ? 'Glass_Pane' : 'Solid_Steel';
       set((s) => {
         const container = s.containers[containerId];
         if (!container?.voxelGrid) return {};
@@ -573,16 +645,16 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             for (let col = 0; col < VOXEL_COLS; col++) {
               if (!isExtension(row, col)) continue;
               const idx = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col;
-              // Interior expansion: wood floor, open inward walls, steel outward walls
+              // Interior expansion: wood floor, open inward walls, configurable outward walls
               const faces: VoxelFaces = {
                 top: 'Solid_Steel',
                 bottom: 'Deck_Wood',
-                n: row === 0 ? 'Solid_Steel' : 'Open',
-                s: row === 3 ? 'Solid_Steel' : 'Open',
-                e: col === 7 ? 'Solid_Steel' : 'Open',
-                w: col === 0 ? 'Solid_Steel' : 'Open',
+                n: row === 0 ? outerWall : 'Open',
+                s: row === 3 ? outerWall : 'Open',
+                e: col === 7 ? outerWall : 'Open',
+                w: col === 0 ? outerWall : 'Open',
               };
-              grid[idx] = { ...grid[idx], active: true, faces, moduleId: undefined, moduleOrientation: undefined };
+              grid[idx] = { ...grid[idx], active: true, faces, moduleId: undefined, moduleOrientation: undefined, unpackPhase: 'wall_to_ceiling' as const };
             }
           }
         }
@@ -600,7 +672,19 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       get()._applyExtensionDoors(containerId, config);
     }
 
-    t.resume();
+    temporalResume();
+  },
+
+  clearUnpackPhase: (containerId, voxelIndex) => {
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      const voxel = grid[voxelIndex];
+      if (!voxel) return {};
+      grid[voxelIndex] = { ...voxel, unpackPhase: undefined };
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+    });
   },
 
   removeContainer: (id) => {
@@ -648,6 +732,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         zones,
         furnitureIndex,
         selection: s.selection.filter((sid: string) => sid !== id),
+        ...(s.selectedFrameElement?.containerId === id ? { selectedFrameElement: null } : {}),
         };
     });
     // Refresh adjacency after removal so remaining containers recalculate shared walls
@@ -1071,6 +1156,29 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             modulesCost += 4500;
           }
         }
+
+        // ── Deck pole cost (WU-10 convex outer corners) ─────────
+        // Each pole = structural steel support. $150 per pole.
+        const POLE_COST = 150;
+        const poleSet = new Set<string>();
+        for (let row = 0; row < VOXEL_ROWS; row++) {
+          for (let col = 0; col < VOXEL_COLS; col++) {
+            const voxel = c.voxelGrid[row * VOXEL_COLS + col];
+            if (!voxel?.active) continue;
+            if (voxel.faces.top === 'Open' && voxel.faces.bottom === 'Open') continue;
+            for (const sx of [-1, 1]) {
+              for (const sz of [-1, 1]) {
+                const xc = col - sx;
+                const xActive = xc >= 0 && xc < VOXEL_COLS ? (c.voxelGrid[row * VOXEL_COLS + xc]?.active ?? false) : false;
+                const zr = row + sz;
+                const zActive = zr >= 0 && zr < VOXEL_ROWS ? (c.voxelGrid[zr * VOXEL_COLS + col]?.active ?? false) : false;
+                if (!xActive && !zActive) poleSet.add(`${col + sx * 0.5}_${row + sz * 0.5}`);
+              }
+            }
+          }
+        }
+        const hiddenPoles = c.structureConfig?.hiddenElements?.filter((k: string) => k.startsWith('deck_pole_')).length ?? 0;
+        containersCost += Math.max(0, poleSet.size - hiddenPoles) * POLE_COST;
       }
     }
 
@@ -1151,8 +1259,56 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     console.log(
       `Stacked: "${top.name}" (L${newLevel}) on "${bottom.name}" (L${bottom.level}) at Y=${newY.toFixed(2)}m`
     );
-    // Auto-generate rooftop deck on the newly stacked top container
+    // Auto-generate rooftop deck on the newly stacked top container FIRST
     get().generateRooftopDeck(topId);
+
+    // THEN apply roof → floor inheritance: copy L1's roof config to L2's floor
+    const updatedState = get();
+    const bottomGrid = updatedState.containers[bottomId]?.voxelGrid;
+    const topGrid = updatedState.containers[topId]?.voxelGrid;
+    if (bottomGrid && topGrid) {
+      const newTopGrid = [...topGrid];
+      for (let i = 0; i < Math.min(bottomGrid.length, topGrid.length); i++) {
+        const bottomVoxel = bottomGrid[i];
+        const topVoxel = topGrid[i];
+        if (!bottomVoxel || !topVoxel) continue;
+        // Copy bottom container's ceiling (top face) → top container's floor (bottom face)
+        if (bottomVoxel.faces.top !== 'Open') {
+          newTopGrid[i] = {
+            ...topVoxel,
+            faces: { ...topVoxel.faces, bottom: bottomVoxel.faces.top },
+          };
+        }
+        // Copy wall faces from L1 roof extensions → L2 floor extensions
+        const col = i % VOXEL_COLS;
+        const row = Math.floor(i / VOXEL_COLS) % VOXEL_ROWS;
+        const isHalo = col === 0 || col === VOXEL_COLS - 1 || row === 0 || row === VOXEL_ROWS - 1;
+        if (isHalo && bottomVoxel.active) {
+          // Inherit wall configuration for extension voxels (railings, glass, etc.)
+          newTopGrid[i] = {
+            ...newTopGrid[i],
+            active: true,
+            faces: {
+              ...newTopGrid[i].faces,
+              n: bottomVoxel.faces.n !== 'Open' ? bottomVoxel.faces.n : newTopGrid[i].faces.n,
+              s: bottomVoxel.faces.s !== 'Open' ? bottomVoxel.faces.s : newTopGrid[i].faces.s,
+              e: bottomVoxel.faces.e !== 'Open' ? bottomVoxel.faces.e : newTopGrid[i].faces.e,
+              w: bottomVoxel.faces.w !== 'Open' ? bottomVoxel.faces.w : newTopGrid[i].faces.w,
+            },
+          };
+        }
+      }
+      set((state) => ({
+        containers: {
+          ...state.containers,
+          [topId]: { ...state.containers[topId], voxelGrid: newTopGrid },
+          // Lock bottom container's roof while top is stacked
+          [bottomId]: { ...state.containers[bottomId], roofLocked: true },
+        },
+      }));
+    }
+
+    // generateRooftopDeck already called above (before inheritance)
     requestAnimationFrame(() => get().refreshAdjacency());
     return true;
   },
@@ -1180,6 +1336,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         containers[bottomId] = {
           ...bottom,
           supporting: bottom.supporting.filter((sid: string) => sid !== id),
+          roofLocked: bottom.supporting.filter((sid: string) => sid !== id).length > 0,
         };
       }
 
@@ -1243,6 +1400,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
       // ── Step 2: Update mergedWalls metadata ──
       for (const c of Object.values(updated) as Container[]) {
+        if (!c?.mergedWalls) continue;
         const newMerged = mergedMap[c.id] ?? [];
         const oldMerged = c.mergedWalls;
         if (
@@ -1271,12 +1429,18 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         let aCopied = false;
         let bCopied = false;
 
+        // Compute perpendicular-axis overlap to avoid merging non-overlapping voxels
+        const aDims = CONTAINER_DIMENSIONS[a.size as ContainerSize];
+        const bDims = CONTAINER_DIMENSIONS[b.size as ContainerSize];
+        const aColPitch = aDims.length / 6;
+        const aRowPitch = aDims.width / 2;
+        const bColPitch = bDims.length / 6;
+        const bRowPitch = bDims.width / 2;
+
         for (let level = 0; level < VOXEL_LEVELS; level++) {
           const lvlOff = level * VOXEL_ROWS * VOXEL_COLS;
 
-          const iterateRange = !aBound.isRowBoundary
-            ? Array.from({ length: VOXEL_ROWS }, (_, i) => i)
-            : Array.from({ length: VOXEL_COLS }, (_, i) => i);
+          const iterateRange = !aBound.isRowBoundary ? _ROW_RANGE : _COL_RANGE;
 
           for (const iter of iterateRange) {
             const aIdx = !aBound.isRowBoundary
@@ -1289,6 +1453,22 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             const aVox = aGrid[aIdx];
             const bVox = bGrid[bIdx];
             if (!aVox?.active || !bVox?.active) continue;
+
+            // Geometric overlap check: skip voxels whose world positions don't overlap
+            // with the other container's extent on the perpendicular axis
+            if (!aBound.isRowBoundary) {
+              // Col boundary (Front/Back) — check Z overlap of this row
+              const aWorldZ = a.position.z + (iter - 1.5) * aRowPitch;
+              const bHalfZ = (VOXEL_ROWS / 2) * bRowPitch;
+              const tol = aRowPitch / 2;
+              if (aWorldZ < b.position.z - bHalfZ - tol || aWorldZ > b.position.z + bHalfZ + tol) continue;
+            } else {
+              // Row boundary (Left/Right) — check X overlap of this col
+              const aWorldX = a.position.x + -(iter - 3.5) * aColPitch;
+              const bHalfX = (VOXEL_COLS / 2) * bColPitch;
+              const tol = aColPitch / 2;
+              if (aWorldX < b.position.x - bHalfX - tol || aWorldX > b.position.x + bHalfX + tol) continue;
+            }
 
             const aFace = aVox.faces[aBound.face];
             const bFace = bVox.faces[bBound.face];
@@ -1403,6 +1583,47 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
     // Expand extensions as deck
     get().setAllExtensions(containerId, 'all_deck', true);
+  },
+
+  removeRooftopDeck: (containerId) => {
+    const c = get().containers[containerId] as Container | undefined;
+    if (!c?.voxelGrid) return;
+
+    // Restore body voxel top faces and perimeter railings
+    set((state) => {
+      const container = state.containers[containerId];
+      if (!container?.voxelGrid) return {};
+      const grid = [...container.voxelGrid];
+
+      for (let row = 0; row < VOXEL_ROWS; row++) {
+        for (let col = 0; col < VOXEL_COLS; col++) {
+          const idx = row * VOXEL_COLS + col;
+          const isBody = row >= 1 && row <= 2 && col >= 1 && col <= 6;
+          if (!isBody) continue;
+
+          const voxel = grid[idx];
+          if (!voxel) continue;
+
+          // Restore top face to Solid_Steel (default ceiling)
+          const newFaces = { ...voxel.faces, top: 'Solid_Steel' as SurfaceType };
+
+          // Remove perimeter railings (restore to Open for internal body faces)
+          if (row === 1 && newFaces.n === ('Railing_Cable' as SurfaceType)) newFaces.n = 'Open' as SurfaceType;
+          if (row === 2 && newFaces.s === ('Railing_Cable' as SurfaceType)) newFaces.s = 'Open' as SurfaceType;
+          if (col === 1 && newFaces.w === ('Railing_Cable' as SurfaceType)) newFaces.w = 'Open' as SurfaceType;
+          if (col === 6 && newFaces.e === ('Railing_Cable' as SurfaceType)) newFaces.e = 'Open' as SurfaceType;
+
+          grid[idx] = { ...voxel, faces: newFaces };
+        }
+      }
+
+      return {
+        containers: { ...state.containers, [containerId]: { ...container, voxelGrid: grid } },
+      };
+    });
+
+    // Retract deck extensions
+    get().setAllExtensions(containerId, 'none');
   },
 
   // ── Shared Design Import ────────────────────────────────
@@ -1755,27 +1976,85 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
   undo: () => {
     const t = getTemporalApi();
     if (!t.pastStates.length) return;
-    t.pause();
+    temporalPause();
     t.undo();
     set({ selection: [] });
     get().refreshAdjacency();
-    t.resume();
+    temporalResume();
   },
 
   redo: () => {
     const t = getTemporalApi();
     if (!t.futureStates.length) return;
-    t.pause();
+    temporalPause();
     t.redo();
     set({ selection: [] });
     get().refreshAdjacency();
-    t.resume();
+    temporalResume();
   },
 
   // ── Voxel Skin Actions ──────────────────────────────────
 
   // ── Camera Sync (main scene → IsoEditor) ───────────────
   saveWalkthroughPos: (position, yaw) => set({ savedWalkthroughPos: { position, yaw } }),
+
+  applyWizardPreset: (containerId, presetId) => {
+    const { WIZARD_PRESETS } = require('@/config/wizardPresets');
+    const preset = (WIZARD_PRESETS as any[]).find((p: any) => p.id === presetId);
+    if (!preset) return;
+
+    // Force a tracked set() to snapshot current state as the undo baseline,
+    // then pause so all wizard changes are invisible to undo history.
+    set((s) => ({
+      containers: {
+        ...s.containers,
+        [containerId]: { ...(s.containers as any)[containerId], appliedPreset: presetId },
+      },
+    }));
+    temporalPause();
+
+    for (const step of preset.steps) {
+      // Re-read state each iteration (prior steps mutate it)
+      const s = get();
+      switch (step.action) {
+        case 'extensions':
+          s.setAllExtensions(containerId, step.config ?? 'all_interior');
+          break;
+        case 'rooftop_deck':
+          s.generateRooftopDeck(containerId);
+          break;
+        case 'vertical_stairs':
+          if (step.stairVoxelIndex != null && step.stairFacing) {
+            s.applyVerticalStairs(containerId, step.stairVoxelIndex, step.stairFacing);
+          }
+          break;
+        case 'paint_outer_walls':
+          if (step.wallMaterial) {
+            const c = s.containers[containerId];
+            if (!c?.voxelGrid) break;
+            for (let i = 0; i < c.voxelGrid.length; i++) {
+              const v = c.voxelGrid[i];
+              if (!v?.active) continue;
+              const col = i % 8;
+              const row = Math.floor((i % 32) / 8);
+              const isExt = row === 0 || row === 3 || col === 0 || col === 7;
+              if (!isExt) continue;
+              const dirs: Array<'n' | 's' | 'e' | 'w'> = [];
+              if (row === 0) dirs.push('n');
+              if (row === 3) dirs.push('s');
+              if (col === 0) dirs.push('w');
+              if (col === 7) dirs.push('e');
+              for (const d of dirs) {
+                s.paintFace(containerId, i, d, step.wallMaterial);
+              }
+            }
+          }
+          break;
+      }
+    }
+
+    temporalResume();
+  },
 
   // applyModule — moved to voxelSlice
 
@@ -1811,7 +2090,10 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       const grid = [...c.voxelGrid];
       const voxel = grid[voxelIndex];
       if (!voxel) return {};
-      grid[voxelIndex] = { ...voxel, active: true, faces: { ...faces } };
+      // Mark all faces as user-painted (user explicitly stamped this voxel)
+      const painted: Partial<Record<string, boolean>> = {};
+      for (const k of Object.keys(faces)) painted[k] = true;
+      grid[voxelIndex] = { ...voxel, active: true, faces: { ...faces }, userPaintedFaces: painted as any };
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
         };
@@ -1922,6 +2204,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       grid[voxelIndex] = {
         ...voxel,
         faces: { ...voxel.faces, [face]: styleBrush[face] },
+        userPaintedFaces: { ...voxel.userPaintedFaces, [face]: true },
       };
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
@@ -1976,6 +2259,110 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
         selectedVoxel: { containerId, index: voxelIndex },
         };
+    });
+  },
+
+  // ── Frame Configuration ────────────────────────────────────
+
+  setFrameDefaults: (containerId, defaults) => {
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c) return {};
+      return {
+        containers: {
+          ...s.containers,
+          [containerId]: {
+            ...c,
+            frameDefaults: { ...c.frameDefaults, ...defaults },
+          },
+        },
+      };
+    });
+  },
+
+  setFrameElementOverride: (containerId, key, config) => {
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c) return {};
+      const isPole = key.startsWith('l');
+      if (isPole) {
+        return {
+          containers: {
+            ...s.containers,
+            [containerId]: {
+              ...c,
+              poleOverrides: { ...c.poleOverrides, [key]: config },
+            },
+          },
+        };
+      } else {
+        return {
+          containers: {
+            ...s.containers,
+            [containerId]: {
+              ...c,
+              railOverrides: { ...c.railOverrides, [key]: config },
+            },
+          },
+        };
+      }
+    });
+  },
+
+  clearFrameElementOverride: (containerId, key) => {
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c) return {};
+      const isPole = key.startsWith('l');
+      if (isPole) {
+        const { [key]: _, ...rest } = c.poleOverrides ?? {};
+        return {
+          containers: {
+            ...s.containers,
+            [containerId]: {
+              ...c,
+              poleOverrides: Object.keys(rest).length > 0 ? rest : undefined,
+            },
+          },
+        };
+      } else {
+        const { [key]: _, ...rest } = c.railOverrides ?? {};
+        return {
+          containers: {
+            ...s.containers,
+            [containerId]: {
+              ...c,
+              railOverrides: Object.keys(rest).length > 0 ? rest : undefined,
+            },
+          },
+        };
+      }
+    });
+  },
+
+  batchSetFrameOverrides: (containerId, keys, config) => {
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c) return {};
+      const newPoleOverrides = { ...c.poleOverrides };
+      const newRailOverrides = { ...c.railOverrides };
+      for (const key of keys) {
+        if (key.startsWith('l')) {
+          newPoleOverrides[key] = config;
+        } else {
+          newRailOverrides[key] = config;
+        }
+      }
+      return {
+        containers: {
+          ...s.containers,
+          [containerId]: {
+            ...c,
+            poleOverrides: Object.keys(newPoleOverrides).length > 0 ? newPoleOverrides : undefined,
+            railOverrides: Object.keys(newRailOverrides).length > 0 ? newRailOverrides : undefined,
+          },
+        },
+      };
     });
   },
 });

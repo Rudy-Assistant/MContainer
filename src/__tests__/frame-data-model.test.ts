@@ -12,6 +12,7 @@ vi.mock('idb-keyval', () => {
 import { useStore } from '@/store/useStore';
 import { ContainerSize } from '@/types/container';
 import type { ElementConfig } from '@/types/container';
+import { resolveFrameProperty } from '@/config/frameMaterials';
 
 function resetStore() {
   useStore.setState(useStore.getInitialState(), true);
@@ -48,5 +49,86 @@ describe('Frame Data Model', () => {
     const id = addContainer();
     const c = useStore.getState().containers[id];
     expect(c.poleOverrides).toBeUndefined();
+  });
+});
+
+describe('Frame Store Actions', () => {
+  beforeEach(() => resetStore());
+
+  it('FSA-1: setFrameDefaults sets container-level defaults', () => {
+    const id = addContainer();
+    useStore.getState().setFrameDefaults(id, { poleMaterial: 'Wood', railShape: 'Channel' });
+    const c = useStore.getState().containers[id];
+    expect(c.frameDefaults?.poleMaterial).toBe('Wood');
+    expect(c.frameDefaults?.railShape).toBe('Channel');
+    expect(c.frameDefaults?.poleShape).toBeUndefined();
+  });
+
+  it('FSA-2: setFrameElementOverride sets a pole override (key starts with l)', () => {
+    const id = addContainer();
+    useStore.getState().setFrameElementOverride(id, 'l0r1c2_ne', { visible: false, material: 'Concrete' });
+    const c = useStore.getState().containers[id];
+    expect(c.poleOverrides?.['l0r1c2_ne']).toEqual({ visible: false, material: 'Concrete' });
+  });
+
+  it('FSA-3: setFrameElementOverride sets a rail override (key starts with r)', () => {
+    const id = addContainer();
+    useStore.getState().setFrameElementOverride(id, 'r1c2_h', { material: 'Wood' });
+    const c = useStore.getState().containers[id];
+    expect(c.railOverrides?.['r1c2_h']).toEqual({ material: 'Wood' });
+  });
+
+  it('FSA-4: clearFrameElementOverride removes a pole override', () => {
+    const id = addContainer();
+    useStore.getState().setFrameElementOverride(id, 'l0r1c2_ne', { visible: false });
+    useStore.getState().clearFrameElementOverride(id, 'l0r1c2_ne');
+    const c = useStore.getState().containers[id];
+    expect(c.poleOverrides?.['l0r1c2_ne']).toBeUndefined();
+  });
+
+  it('FSA-5: clearFrameElementOverride removes a rail override', () => {
+    const id = addContainer();
+    useStore.getState().setFrameElementOverride(id, 'r1c2_h', { material: 'Wood' });
+    useStore.getState().clearFrameElementOverride(id, 'r1c2_h');
+    const c = useStore.getState().containers[id];
+    expect(c.railOverrides?.['r1c2_h']).toBeUndefined();
+  });
+
+  it('FSA-6: batchSetFrameOverrides applies config to multiple elements', () => {
+    const id = addContainer();
+    useStore.getState().batchSetFrameOverrides(id, ['r0c0_h', 'r0c1_h', 'r0c2_h'], { material: 'Aluminum' });
+    const c = useStore.getState().containers[id];
+    expect(c.railOverrides?.['r0c0_h']?.material).toBe('Aluminum');
+    expect(c.railOverrides?.['r0c1_h']?.material).toBe('Aluminum');
+    expect(c.railOverrides?.['r0c2_h']?.material).toBe('Aluminum');
+  });
+
+  it('FSA-7: Override resolution: element override > frameDefaults > theme', () => {
+    const id = addContainer();
+    useStore.getState().setFrameDefaults(id, { poleMaterial: 'Wood' });
+    useStore.getState().setFrameElementOverride(id, 'l0r1c2_ne', { material: 'Concrete' });
+    const c = useStore.getState().containers[id];
+    expect(c.poleOverrides?.['l0r1c2_ne']?.material).toBe('Concrete');
+    expect(c.frameDefaults?.poleMaterial).toBe('Wood');
+  });
+});
+
+describe('Override Resolution (pure function)', () => {
+  beforeEach(() => resetStore());
+
+  it('FSA-8: resolveFrameProperty cascades element > frameDefaults > theme', () => {
+    // resolveFrameProperty imported at top level
+    const defaults = { poleMaterial: 'Wood', poleShape: 'Square' };
+    const override = { material: 'Concrete' };
+    expect(resolveFrameProperty(override, defaults, 'pole', 'material')).toBe('Concrete');
+    expect(resolveFrameProperty(override, defaults, 'pole', 'shape')).toBe('Square');
+    expect(resolveFrameProperty(undefined, undefined, 'pole', 'material')).toBe('Steel');
+  });
+
+  it('FSA-9: resolveFrameProperty works for rails', () => {
+    // resolveFrameProperty imported at top level
+    const defaults = { railMaterial: 'Aluminum' };
+    expect(resolveFrameProperty(undefined, defaults, 'rail', 'material')).toBe('Aluminum');
+    expect(resolveFrameProperty(undefined, undefined, 'rail', 'shape')).toBe('Round');
   });
 });
