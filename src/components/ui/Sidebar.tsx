@@ -21,6 +21,7 @@ import {
 } from "@/types/container";
 import IsoEditor from "@/components/ui/IsoEditor";
 import MatrixEditor from "@/components/ui/MatrixEditor";
+import { FrameInspector } from "@/components/ui/FrameInspector";
 import { CONTAINER_PRESETS } from "@/config/containerPresets";
 import { CONTAINER_ROLES } from "@/config/containerRoles";
 import {
@@ -47,12 +48,13 @@ function fmtUSD(n: number): string {
 
 // ── Constants ────────────────────────────────────────────────
 
-const BG      = "#f8fafc";           // slate-50 — light background
-const CARD    = "#ffffff";           // white cards
-const BORDER  = "#e2e8f0";          // slate-200
-const ACCENT  = "#1565c0";
-const TEXT    = "#1e293b";          // slate-800
-const TEXT_DIM = "#64748b";         // slate-500
+// Theme-adaptive via CSS variables (set in globals.css :root / [data-theme="dark"])
+const BG       = "var(--surface-alt, #f8fafc)";
+const CARD     = "var(--btn-bg, #ffffff)";
+const BORDER   = "var(--border, #e2e8f0)";
+const ACCENT   = "var(--accent, #2563eb)";
+const TEXT     = "var(--text-main, #1e293b)";
+const TEXT_DIM  = "var(--text-muted, #64748b)";
 
 // ── Section header ───────────────────────────────────────────
 
@@ -332,6 +334,7 @@ function Inspector({
 }) {
   const saveContainerToLibrary = useStore((s) => s.saveContainerToLibrary);
   const renameContainer = useStore((s) => s.renameContainer);
+  const frameMode = useStore((s) => s.frameMode);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(container.name || "");
 
@@ -407,7 +410,7 @@ function Inspector({
             transition: "all 100ms ease",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "#f59e0b"; e.currentTarget.style.borderColor = "#f59e0b"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; e.currentTarget.style.borderColor = "#e2e8f0"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; }}
         >
           <BookmarkPlus size={13} />
         </button>
@@ -462,15 +465,46 @@ function Inspector({
         </select>
       </div>
 
+      {/* Rooftop Deck toggle */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_DIM }}>Rooftop Deck:</span>
+        <button
+          data-testid="btn-toggle-deck"
+          onClick={() => {
+            const s = useStore.getState();
+            const c = s.containers[containerId];
+            // Detect if deck is already applied by checking body voxel top faces
+            const bodyIdx = 1 * 8 + 1; // row=1, col=1
+            const hasDeck = c?.voxelGrid?.[bodyIdx]?.faces?.top === 'Deck_Wood';
+            if (hasDeck) {
+              s.removeRooftopDeck(containerId);
+            } else {
+              s.generateRooftopDeck(containerId);
+            }
+          }}
+          style={{
+            flex: 1, fontSize: 10, padding: "4px 8px", borderRadius: 4,
+            border: `1px solid ${BORDER}`, background: CARD, color: TEXT,
+            cursor: "pointer", fontWeight: 600, transition: "all 100ms ease",
+          }}
+        >
+          {container.voxelGrid?.[1 * 8 + 1]?.faces?.top === 'Deck_Wood' ? '✓ Remove Deck' : '+ Add Deck'}
+        </button>
+      </div>
+
       {/* IsoEditor — interactive 3D mini-view (reads from store for live sync) */}
       <IsoEditor containerId={container.id} />
 
       <Divider />
 
-      {/* MatrixEditor — Voxel Cube Inspector */}
-      <div>
-        <MatrixEditor container={container} containerId={containerId} />
-      </div>
+      {/* MatrixEditor / FrameInspector — toggled by frameMode */}
+      {frameMode ? (
+        <FrameInspector containerId={containerId} />
+      ) : (
+        <div>
+          <MatrixEditor container={container} containerId={containerId} />
+        </div>
+      )}
 
     </div>
   );
@@ -571,7 +605,7 @@ function DesignModePanel() {
                 onClick={() => handleAdd(item.size)}
                 style={{
                   display: "block", width: "100%", padding: "8px 14px", textAlign: "left",
-                  border: "none", borderBottom: `1px solid #f3f4f6`,
+                  border: "none", borderBottom: `1px solid ${BORDER}`,
                   background: "none", cursor: "pointer", fontSize: 12,
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
@@ -581,6 +615,24 @@ function DesignModePanel() {
                 <div style={{ fontSize: 10, color: TEXT_DIM, marginTop: 2 }}>{item.dims}</div>
               </button>
             ))}
+            {/* Pool container — subterranean HighCube40 */}
+            <button
+              data-testid="add-pool-container"
+              onClick={() => {
+                useStore.getState().addPoolContainer();
+                setSizeMenuOpen(false);
+              }}
+              style={{
+                display: "block", width: "100%", padding: "8px 14px", textAlign: "left",
+                border: "none", borderTop: `1px solid #e2e8f0`,
+                background: "none", cursor: "pointer", fontSize: 12,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+            >
+              <div style={{ fontWeight: 600, color: "#2563eb" }}>Pool Container</div>
+              <div style={{ fontSize: 10, color: TEXT_DIM, marginTop: 2 }}>Subterranean 40' HC — concrete basin</div>
+            </button>
           </div>
         )}
       </div>
@@ -629,10 +681,10 @@ export default function Sidebar() {
         style={{
           width: "48px",
           height: "100%",
-          background: "rgba(248, 250, 252, 0.82)",
+          background: "var(--panel-bg)",
           backdropFilter: "blur(16px) saturate(1.4)",
           WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-          borderRight: "1px solid rgba(255,255,255,0.35)",
+          borderRight: `1px solid ${BORDER}`,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -699,23 +751,24 @@ export default function Sidebar() {
       style={{
         width: "384px",
         height: "100%",
-        background: "rgba(248, 250, 252, 0.82)",
+        background: "var(--panel-bg, rgba(248,250,252,0.82))",
         backdropFilter: "blur(16px) saturate(1.4)",
         WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-        borderRight: "1px solid rgba(255,255,255,0.35)",
+        borderRight: "1px solid var(--border, rgba(255,255,255,0.35))",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
         overflow: "hidden",
-        boxShadow: "4px 0 24px rgba(0,0,0,0.08), 1px 0 2px rgba(0,0,0,0.04)",
+        boxShadow: "var(--panel-shadow, 4px 0 24px rgba(0,0,0,0.08))",
+        color: "var(--text-main, #374151)",
       }}
     >
       {/* ── Header ──────────────────────────────────────── */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "14px 16px 10px",
-        borderBottom: "1px solid rgba(0,0,0,0.06)",
-        background: "rgba(255,255,255,0.5)",
+        borderBottom: `1px solid ${BORDER}`,
+        background: "var(--surface-alt, rgba(255,255,255,0.5))",
         flexShrink: 0,
       }}>
         {isInspecting ? (
