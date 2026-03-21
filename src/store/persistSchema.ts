@@ -23,6 +23,7 @@ export const persistedStateSchema = z.object({
     groundPreset: z.string().optional(),
   }).passthrough().optional(),
   viewMode: z.string().optional(),
+  qualityPreset: z.string().optional(),
   pricing: z.any().optional(),
   libraryBlocks: z.array(z.any()).optional().default([]),
   libraryContainers: z.array(z.any()).optional().default([]),

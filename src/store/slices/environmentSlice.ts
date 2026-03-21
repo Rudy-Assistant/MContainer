@@ -6,7 +6,8 @@
  */
 
 import { ViewMode } from '@/types/container';
-import type { ThemeId } from '@/config/themes';
+import { type ThemeId, THEMES } from '@/config/themes';
+import { type QualityPresetId } from '@/config/qualityPresets';
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
@@ -40,6 +41,10 @@ export interface EnvironmentSlice {
   // Camera restore flag (ephemeral)
   cameraRestoring: boolean;
   setCameraRestoring: (v: boolean) => void;
+
+  // Quality preset (persisted)
+  qualityPreset: QualityPresetId;
+  setQualityPreset: (preset: QualityPresetId) => void;
 }
 
 export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => ({
@@ -51,6 +56,7 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
   cameraElevation: Math.PI / 4,
   savedCamera3D: null,
   cameraRestoring: false,
+  qualityPreset: 'medium' as QualityPresetId,
 
   // ── Actions ────────────────────────────────────────────
   setTimeOfDay: (time) =>
@@ -81,9 +87,16 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
     }
   },
 
-  setTheme: (theme) => set({ currentTheme: theme }),
+  setTheme: (theme) => {
+    const themeConfig = THEMES[theme];
+    set((s: any) => ({
+      currentTheme: theme,
+      environment: { ...s.environment, groundPreset: themeConfig.groundPreset },
+    }));
+  },
 
   setCameraAngles: (azimuth, elevation) => set({ cameraAzimuth: azimuth, cameraElevation: elevation }),
   saveCamera3D: (position, target) => set({ savedCamera3D: { position, target } }),
   setCameraRestoring: (v) => set({ cameraRestoring: v }),
+  setQualityPreset: (preset) => set({ qualityPreset: preset }),
 });
