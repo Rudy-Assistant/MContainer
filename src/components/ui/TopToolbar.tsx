@@ -8,7 +8,7 @@
  * - View pill always visible, center tools shrink/wrap gracefully
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { ContainerSize, ViewMode } from "@/types/container";
 import {
@@ -113,6 +113,31 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
+
+  const appearanceRef = useRef<HTMLDivElement>(null);
+  const devToolsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!appearanceOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (appearanceRef.current && !appearanceRef.current.contains(e.target as Node)) {
+        setAppearanceOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [appearanceOpen]);
+
+  useEffect(() => {
+    if (!devToolsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (devToolsRef.current && !devToolsRef.current.contains(e.target as Node)) {
+        setDevToolsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [devToolsOpen]);
 
   const activeGround = groundPreset && groundPreset in GROUND_PRESETS
     ? groundPreset as GroundPresetId : "grass";
@@ -347,7 +372,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
         <WarningBadge />
 
         {/* Theme & Environment button (first) */}
-        <div style={{ position: "relative", flexShrink: 0 }}>
+        <div ref={appearanceRef} style={{ position: "relative", flexShrink: 0 }}>
           <button
             data-testid="btn-palette"
             onClick={() => { setAppearanceOpen(!appearanceOpen); setDevToolsOpen(false); }}
@@ -450,7 +475,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
         </div>
 
         {/* Settings menu (second) */}
-        <div style={{ position: "relative", flexShrink: 0 }}>
+        <div ref={devToolsRef} style={{ position: "relative", flexShrink: 0 }}>
           <button
             data-testid="btn-more"
             onClick={() => { setDevToolsOpen(!devToolsOpen); setAppearanceOpen(false); }}

@@ -8,7 +8,7 @@
  * glassmorphic track and ambient glow.
  */
 
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import ExportImport from "./ExportImport";
 import LiveBOM from "./LiveBOM";
@@ -172,6 +172,12 @@ function TimeOfDaySlider() {
 
 // ── Draggable Compass Rose ───────────────────────────────────
 
+/** Compass direction label from degrees */
+function getCompassDir(deg: number): string {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return dirs[Math.round(((deg % 360 + 360) % 360) / 45) % 8];
+}
+
 function CompassRose({ northOffset, onDrag }: { northOffset: number; onDrag: (deg: number) => void }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
@@ -208,42 +214,69 @@ function CompassRose({ northOffset, onDrag }: { northOffset: number; onDrag: (de
   return (
     <svg
       ref={svgRef}
-      viewBox="0 0 100 100"
-      width={80}
-      height={80}
+      viewBox="0 0 120 120"
+      width={120}
+      height={120}
       className="cursor-pointer select-none"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
-      <circle cx="50" cy="50" r="46" fill="none" stroke="#475569" strokeWidth="1.5" />
-      <circle cx="50" cy="50" r="40" fill="none" stroke="#334155" strokeWidth="0.5" />
-      {[
-        { angle: 0, label: "N", color: "#ef4444" },
-        { angle: 90, label: "E", color: "#94a3b8" },
-        { angle: 180, label: "S", color: "#94a3b8" },
-        { angle: 270, label: "W", color: "#94a3b8" },
-      ].map(({ angle, label, color }) => {
-        const rad = ((angle + rot) * Math.PI) / 180;
-        const tx = 50 + Math.sin(rad) * 38;
-        const ty = 50 - Math.cos(rad) * 38;
-        const lx = 50 + Math.sin(rad) * 28;
-        const ly = 50 - Math.cos(rad) * 28;
+      {/* Outer ring */}
+      <circle cx="60" cy="60" r="54" fill="none" stroke="#e2e8f0" strokeWidth="2" />
+      <circle cx="60" cy="60" r="50" fill="none" stroke="#cbd5e1" strokeWidth="0.5" />
+
+      {/* Degree tick marks */}
+      {Array.from({ length: 36 }).map((_, i) => {
+        const angle = i * 10;
+        const rad = (angle * Math.PI) / 180;
+        const isMajor = angle % 90 === 0;
+        const isMinor = angle % 30 === 0;
+        const r1 = isMajor ? 44 : isMinor ? 46 : 48;
+        const r2 = 50;
         return (
-          <g key={label}>
-            <circle cx={tx} cy={ty} r={2} fill={color} />
-            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="central"
-              fill={color} fontSize="10" fontWeight="700" fontFamily="system-ui">
-              {label}
-            </text>
-          </g>
+          <line key={i}
+            x1={60 + Math.sin(rad) * r1} y1={60 - Math.cos(rad) * r1}
+            x2={60 + Math.sin(rad) * r2} y2={60 - Math.cos(rad) * r2}
+            stroke={isMajor ? "#64748b" : "#cbd5e1"}
+            strokeWidth={isMajor ? 1.5 : 0.5}
+          />
         );
       })}
-      <g transform={`rotate(${rot}, 50, 50)`}>
-        <polygon points="50,14 46,50 54,50" fill="#ef4444" opacity="0.8" />
-        <polygon points="50,86 46,50 54,50" fill="#475569" opacity="0.5" />
+
+      {/* Cardinal + intercardinal labels */}
+      {[
+        { angle: 0, label: "N", color: "#dc2626", bold: true },
+        { angle: 45, label: "NE", color: "#94a3b8", bold: false },
+        { angle: 90, label: "E", color: "#475569", bold: true },
+        { angle: 135, label: "SE", color: "#94a3b8", bold: false },
+        { angle: 180, label: "S", color: "#475569", bold: true },
+        { angle: 225, label: "SW", color: "#94a3b8", bold: false },
+        { angle: 270, label: "W", color: "#475569", bold: true },
+        { angle: 315, label: "NW", color: "#94a3b8", bold: false },
+      ].map(({ angle, label, color, bold }) => {
+        const rad = ((angle + rot) * Math.PI) / 180;
+        const r = bold ? 36 : 38;
+        const x = 60 + Math.sin(rad) * r;
+        const y = 60 - Math.cos(rad) * r;
+        return (
+          <text key={label} x={x} y={y} textAnchor="middle" dominantBaseline="central"
+            fill={color} fontSize={bold ? 11 : 8} fontWeight={bold ? 800 : 500}
+            fontFamily="system-ui" letterSpacing="0.03em">
+            {label}
+          </text>
+        );
+      })}
+
+      {/* Needle */}
+      <g transform={`rotate(${rot}, 60, 60)`}>
+        <polygon points="60,16 56.5,60 63.5,60" fill="#dc2626" opacity="0.85" />
+        <polygon points="60,104 56.5,60 63.5,60" fill="#64748b" opacity="0.4" />
       </g>
-      <circle cx="50" cy="50" r="3" fill="#64748b" />
+
+      {/* Center hub */}
+      <circle cx="60" cy="60" r="5" fill="#f8fafc" stroke="#94a3b8" strokeWidth="1" />
+      <circle cx="60" cy="60" r="2" fill="#475569" />
     </svg>
   );
 }
@@ -258,6 +291,18 @@ interface BottomDockProps {
 
 export default function BottomDock({ onOpenBudget }: BottomDockProps) {
   const [activePanel, setActivePanel] = useState<DockPanel>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!activePanel) return;
+    const handler = (e: MouseEvent) => {
+      if (dockRef.current && !dockRef.current.contains(e.target as Node)) {
+        setActivePanel(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [activePanel]);
 
   const northOffset = useStore((s) => s.environment.northOffset);
   const setNorthOffset = useStore((s) => s.setNorthOffset);
@@ -280,7 +325,7 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
   });
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center pointer-events-none"
+    <div ref={dockRef} className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center pointer-events-none"
       style={{ paddingBottom: '10px' }}
     >
       {/* ═══ Expanded Panel (floats above dock) ═══ */}
@@ -288,25 +333,36 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
         <div
           className="mb-2 rounded-2xl shadow-2xl pointer-events-auto"
           style={{
-            background: "rgba(255, 255, 255, 0.95)",
+            background: "var(--modal-bg, rgba(255,255,255,0.95))",
             backdropFilter: "blur(20px) saturate(180%)",
-            border: "1px solid rgba(0,0,0,0.08)",
+            border: "1px solid var(--border)",
+            color: "var(--text-main)",
             padding: '20px 24px',
             minWidth: '320px',
             maxWidth: '440px',
           }}
         >
           {activePanel === "compass" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>North Direction</span>
-                <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#1565c0' }}>{Math.round(northOffset)}°</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              {/* Degree + direction display */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-main, #111827)', lineHeight: 1 }}>
+                  {Math.round(northOffset)}°
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 2 }}>
+                  {getCompassDir(northOffset)} — North Direction
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <CompassRose northOffset={northOffset} onDrag={setNorthOffset} />
-              </div>
+              {/* Compass rose */}
+              <CompassRose northOffset={northOffset} onDrag={setNorthOffset} />
+              {/* Styled slider */}
               <input type="range" min={0} max={360} step={1} value={northOffset}
-                onChange={(e) => setNorthOffset(parseFloat(e.target.value))} className="w-full" />
+                onChange={(e) => setNorthOffset(parseFloat(e.target.value))}
+                style={{
+                  width: '100%', height: 6, borderRadius: 3, appearance: 'none',
+                  background: `linear-gradient(to right, #dc2626, #f59e0b, #22c55e, #3b82f6, #8b5cf6, #dc2626)`,
+                  cursor: 'pointer',
+                }} />
             </div>
           )}
 
@@ -356,14 +412,24 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
           boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)',
         }}
       >
-        {/* Container count */}
-        <span style={{
-          fontSize: '10px', color: 'rgba(255,255,255,0.5)',
-          fontFamily: 'monospace', padding: '0 8px',
-        }}>
-          {containerCount} container{containerCount !== 1 ? 's' : ''}
-          {estimate ? ` · ${formatCurrency(estimate.breakdown.total)}` : ''}
-        </span>
+        {/* Container count + cost — clickable opens budget modal */}
+        <button
+          onClick={onOpenBudget}
+          style={{
+            ...pillBtn(false),
+            padding: '4px 12px', gap: '6px',
+          }}
+          title="Click for cost breakdown"
+        >
+          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace' }}>
+            {containerCount} container{containerCount !== 1 ? 's' : ''}
+          </span>
+          {estimate && (
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', fontFamily: 'monospace', letterSpacing: '-0.02em' }}>
+              {formatCurrency(estimate.breakdown.total)}
+            </span>
+          )}
+        </button>
 
         <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)' }} />
 
@@ -383,18 +449,6 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
             <circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88" fill="currentColor" />
           </svg>
           {Math.round(northOffset)}°
-        </button>
-
-        {/* Pricing */}
-        <button
-          onClick={() => toggle("pricing")}
-          style={pillBtn(activePanel === "pricing")}
-          title="Cost Estimate"
-        >
-          <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2}>
-            <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-          </svg>
-          $
         </button>
 
         {/* Project */}
