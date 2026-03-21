@@ -38,6 +38,7 @@ import {
   Sun,
   Wand2,
 } from "lucide-react";
+import WarningBadge from './WarningBadge';
 import { THEMES, THEME_IDS, type ThemeId } from "@/config/themes";
 import { GROUND_PRESET_IDS, GROUND_PRESETS, type GroundPresetId } from "@/config/groundPresets";
 import { QUALITY_PRESET_IDS, type QualityPresetId } from "@/config/qualityPresets";
@@ -341,6 +342,9 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
             </button>
           ))}
         </div>
+
+        {/* Warning badge */}
+        <WarningBadge />
 
         {/* Theme & Environment button (first) */}
         <div style={{ position: "relative", flexShrink: 0 }}>

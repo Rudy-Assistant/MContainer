@@ -1,13 +1,6 @@
 "use client";
 
-/**
- * WarningPanel.tsx — Collapsible warning list in sidebar
- *
- * Displays validation warnings grouped by category. Hover bridges to 3D overlay,
- * click selects the associated container.
- */
-
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/react/shallow";
 import type { DesignWarning, WarningCategory, WarningSeverity } from "@/types/validation";
@@ -27,13 +20,22 @@ function WarningIcon({ severity }: { severity: WarningSeverity }) {
   return <Info size={14} color={color} />;
 }
 
-export default function WarningPanel() {
+export default function WarningPopover({ onClose }: { onClose: () => void }) {
   const warnings = useStore(useShallow((s) => s.warnings));
   const setHoveredWarning = useStore((s) => s.setHoveredWarning);
   const setSelectedVoxel = useStore((s) => s.setSelectedVoxel);
+  const setSelectedFace = useStore((s) => s.setSelectedFace);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const ref = useRef<HTMLDivElement>(null);
 
-  if (warnings.length === 0) return null;
+  // Click outside to close
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
 
   const grouped = CATEGORY_ORDER.reduce<Record<string, DesignWarning[]>>((acc, cat) => {
     const items = warnings.filter(w => w.category === cat);
@@ -41,24 +43,42 @@ export default function WarningPanel() {
     return acc;
   }, {});
 
-  return (
-    <div style={{
-      borderTop: "1px solid #334155", padding: "8px 0",
-    }}>
-      <div style={{
-        padding: "4px 14px", fontSize: 11, fontWeight: 700,
-        color: "#f59e0b", display: "flex", alignItems: "center", gap: 6,
-      }}>
-        <AlertTriangle size={14} />
-        {warnings.length} Warning{warnings.length !== 1 ? 's' : ''}
-      </div>
+  function handleWarningClick(w: DesignWarning) {
+    const idx = w.voxelIndices[0] ?? 0;
+    setSelectedVoxel({ containerId: w.containerId, index: idx });
 
+    // Guide hotbar to solution based on warning type
+    if (w.message.includes('all walls are solid') || w.message.includes('No exit')) {
+      const voxel = useStore.getState().containers[w.containerId]?.voxelGrid?.[idx];
+      const solidWall = (['n','s','e','w'] as const).find(f => voxel?.faces[f] === 'Solid_Steel');
+      if (solidWall) setSelectedFace(solidWall);
+    } else if (w.message.includes('without structural support') || w.message.includes('Stair to nowhere')) {
+      setSelectedFace(null);
+    } else if (w.message.includes('Unprotected edge') || w.message.includes('weather')) {
+      const voxel = useStore.getState().containers[w.containerId]?.voxelGrid?.[idx];
+      const openWall = (['n','s','e','w'] as const).find(f => voxel?.faces[f] === 'Open');
+      if (openWall) setSelectedFace(openWall);
+    } else {
+      setSelectedFace(null);
+    }
+
+    onClose();
+  }
+
+  return (
+    <div ref={ref} style={{
+      position: "absolute", top: "100%", right: 0, marginTop: 8,
+      width: 320, maxHeight: 400, overflowY: "auto",
+      background: "#0f172a", border: "1px solid #334155",
+      borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      zIndex: 100,
+    }}>
       {Object.entries(grouped).map(([cat, items]) => (
         <div key={cat}>
           <div
             onClick={() => setCollapsed(c => ({ ...c, [cat]: !c[cat] }))}
             style={{
-              padding: "4px 14px", fontSize: 10, fontWeight: 600,
+              padding: "6px 14px", fontSize: 10, fontWeight: 600,
               color: "#94a3b8", cursor: "pointer", textTransform: "uppercase",
               letterSpacing: "0.05em",
             }}
@@ -70,12 +90,9 @@ export default function WarningPanel() {
               key={w.id}
               onMouseEnter={() => setHoveredWarning(w.id)}
               onMouseLeave={() => setHoveredWarning(null)}
-              onClick={() => {
-                const idx = w.voxelIndices[0] ?? 0;
-                setSelectedVoxel({ containerId: w.containerId, index: idx });
-              }}
+              onClick={() => handleWarningClick(w)}
               style={{
-                padding: "4px 14px 4px 24px", fontSize: 11, color: "#cbd5e1",
+                padding: "6px 14px 6px 24px", fontSize: 11, color: "#cbd5e1",
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
                 transition: "background 100ms",
               }}
@@ -83,7 +100,7 @@ export default function WarningPanel() {
               onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
             >
               <WarningIcon severity={w.severity} />
-              {w.message}
+              <span style={{ flex: 1 }}>{w.message}</span>
             </div>
           ))}
         </div>
