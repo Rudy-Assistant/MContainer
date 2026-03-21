@@ -23,6 +23,7 @@ import IsoEditor from "@/components/ui/IsoEditor";
 import MatrixEditor from "@/components/ui/MatrixEditor";
 import { FrameInspector } from "@/components/ui/FrameInspector";
 import WallTypePicker from "@/components/ui/WallTypePicker";
+import FinishesPanel from "@/components/ui/FinishesPanel";
 import { useSelectionTarget } from "@/hooks/useSelectionTarget";
 import { CONTAINER_PRESETS } from "@/config/containerPresets";
 import { CONTAINER_ROLES } from "@/config/containerRoles";
@@ -532,15 +533,7 @@ function Inspector({
             voxelIndex={target.type === "voxel" ? target.index : target.indices[0]}
           />
         ) : (target.type === "face" || target.type === "bay-face") ? (
-          <div style={{ padding: "12px", color: "#94a3b8", fontSize: 12 }}>
-            <div style={{ fontWeight: 600, marginBottom: 8, textTransform: "uppercase", fontSize: 10 }}>
-              Finishes
-            </div>
-            <p>Face finish options coming soon.</p>
-            <p style={{ fontSize: 11 }}>
-              Selected: {target.face} face
-            </p>
-          </div>
+          <FinishesPanel />
         ) : (
           <div style={{ padding: "8px 12px" }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8 }}>
