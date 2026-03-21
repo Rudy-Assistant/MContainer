@@ -22,6 +22,8 @@ import {
 import IsoEditor from "@/components/ui/IsoEditor";
 import MatrixEditor from "@/components/ui/MatrixEditor";
 import { FrameInspector } from "@/components/ui/FrameInspector";
+import WallTypePicker from "@/components/ui/WallTypePicker";
+import { useSelectionTarget } from "@/hooks/useSelectionTarget";
 import { CONTAINER_PRESETS } from "@/config/containerPresets";
 import { CONTAINER_ROLES } from "@/config/containerRoles";
 import {
@@ -335,8 +337,14 @@ function Inspector({
   const saveContainerToLibrary = useStore((s) => s.saveContainerToLibrary);
   const renameContainer = useStore((s) => s.renameContainer);
   const frameMode = useStore((s) => s.frameMode);
+  const previewCollapsed = useStore((s) => s.previewCollapsed);
+  const setPreviewCollapsed = useStore((s) => s.setPreviewCollapsed);
+  const gridCollapsed = useStore((s) => s.gridCollapsed);
+  const setGridCollapsed = useStore((s) => s.setGridCollapsed);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(container.name || "");
+
+  const target = useSelectionTarget();
 
   // Sync local name when selection changes
   useEffect(() => {
@@ -352,14 +360,17 @@ function Inspector({
     setEditingName(false);
   }, [nameValue, container.name, containerId, renameContainer]);
 
+  const containerName = container.name || SIZE_LABEL[container.size];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Container badge */}
       <div style={{
-        padding: "8px 10px", borderRadius: "8px",
+        padding: "8px 10px", borderRadius: "8px", flexShrink: 0,
         background: CARD, border: `1px solid ${BORDER}`,
         boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         display: "flex", alignItems: "flex-start", gap: "8px",
+        marginBottom: "8px",
       }}>
         <div style={{ flex: 1 }}>
           {editingName ? (
@@ -390,7 +401,7 @@ function Inspector({
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = "transparent"; }}
               title="Click to rename"
             >
-              {container.name || SIZE_LABEL[container.size]}
+              {containerName}
             </div>
           )}
           <div style={{ fontSize: "9px", color: TEXT_DIM, marginTop: "2px", paddingLeft: "4px" }}>
@@ -401,7 +412,7 @@ function Inspector({
           </div>
         </div>
         <button
-          onClick={() => saveContainerToLibrary(containerId, container.name || SIZE_LABEL[container.size])}
+          onClick={() => saveContainerToLibrary(containerId, containerName)}
           title="Save container to library"
           style={{
             background: "none", border: "1px solid #e2e8f0", borderRadius: "5px",
@@ -424,6 +435,7 @@ function Inspector({
             padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
             background: "rgba(139, 92, 246, 0.12)", border: "1px solid rgba(139, 92, 246, 0.3)",
             color: "#c4b5fd", display: "flex", alignItems: "center", gap: "4px",
+            marginBottom: "8px", flexShrink: 0,
           }}>
             {preset.icon} {preset.label}
           </div>
@@ -438,74 +450,153 @@ function Inspector({
             padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
             background: "rgba(34, 197, 94, 0.12)", border: "1px solid rgba(34, 197, 94, 0.3)",
             color: "#86efac", display: "flex", alignItems: "center", gap: "4px",
+            marginBottom: "8px", flexShrink: 0,
           }}>
             {role.icon} {role.label}
           </div>
         ) : null;
       })()}
 
-      {/* Interior Finish */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_DIM }}>Finish:</span>
-        <select
-          value={container.interiorFinish ?? 'raw'}
-          onChange={(e) => {
-            useStore.getState().setInteriorFinish(containerId, e.target.value as any);
-          }}
-          style={{
-            flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 4,
-            border: `1px solid ${BORDER}`, background: CARD, color: TEXT,
-            cursor: "pointer",
-          }}
-        >
-          <option value="raw">Raw Steel</option>
-          <option value="plywood">Plywood</option>
-          <option value="drywall">Drywall</option>
-          <option value="painted">Painted</option>
-        </select>
-      </div>
-
-      {/* Rooftop Deck toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_DIM }}>Rooftop Deck:</span>
+      {/* ── Collapsible Preview Section ── */}
+      <div style={{ flexShrink: 0, marginBottom: "4px" }}>
+        {/* Preview section header */}
         <button
-          data-testid="btn-toggle-deck"
-          onClick={() => {
-            const s = useStore.getState();
-            const c = s.containers[containerId];
-            // Detect if deck is already applied by checking body voxel top faces
-            const bodyIdx = 1 * 8 + 1; // row=1, col=1
-            const hasDeck = c?.voxelGrid?.[bodyIdx]?.faces?.top === 'Deck_Wood';
-            if (hasDeck) {
-              s.removeRooftopDeck(containerId);
-            } else {
-              s.generateRooftopDeck(containerId);
-            }
-          }}
+          onClick={() => setPreviewCollapsed(!previewCollapsed)}
           style={{
-            flex: 1, fontSize: 10, padding: "4px 8px", borderRadius: 4,
-            border: `1px solid ${BORDER}`, background: CARD, color: TEXT,
-            cursor: "pointer", fontWeight: 600, transition: "all 100ms ease",
+            display: "flex", alignItems: "center", gap: "6px",
+            width: "100%", padding: "6px 8px", borderRadius: "6px",
+            background: "none", border: `1px solid ${BORDER}`,
+            cursor: "pointer", color: TEXT_DIM, fontSize: "11px", fontWeight: 600,
+            transition: "background 100ms",
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
         >
-          {container.voxelGrid?.[1 * 8 + 1]?.faces?.top === 'Deck_Wood' ? '✓ Remove Deck' : '+ Add Deck'}
+          <span style={{ fontSize: "9px" }}>{previewCollapsed ? "▶" : "▼"}</span>
+          <span>Preview</span>
+          {previewCollapsed && (
+            <span style={{ fontSize: "10px", color: TEXT_DIM, marginLeft: 4, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              — {containerName}
+            </span>
+          )}
         </button>
+        {/* Controls always visible regardless of collapse state */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 2px 2px" }}>
+          {/* These slots are reserved for Hide Roof / Hide Skin / Synced badge —
+              rendered by IsoEditor itself; kept here as structural placeholder */}
+        </div>
+        {/* IsoEditor — shown only when not collapsed */}
+        {!previewCollapsed && (
+          <div style={{ marginTop: "6px" }}>
+            <IsoEditor containerId={container.id} />
+          </div>
+        )}
       </div>
-
-      {/* IsoEditor — interactive 3D mini-view (reads from store for live sync) */}
-      <IsoEditor containerId={container.id} />
 
       <Divider />
 
-      {/* MatrixEditor / FrameInspector — toggled by frameMode */}
-      {frameMode ? (
-        <FrameInspector containerId={containerId} />
-      ) : (
-        <div>
-          <MatrixEditor container={container} containerId={containerId} />
-        </div>
-      )}
+      {/* ── Collapsible Grid Section ── */}
+      <div style={{ flexShrink: 0, marginTop: "4px", marginBottom: "4px" }}>
+        <button
+          onClick={() => setGridCollapsed(!gridCollapsed)}
+          style={{
+            display: "flex", alignItems: "center", gap: "6px",
+            width: "100%", padding: "6px 8px", borderRadius: "6px",
+            background: "none", border: `1px solid ${BORDER}`,
+            cursor: "pointer", color: TEXT_DIM, fontSize: "11px", fontWeight: 600,
+            transition: "background 100ms",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+        >
+          <span style={{ fontSize: "9px" }}>{gridCollapsed ? "▶" : "▼"}</span>
+          <span>{frameMode ? "Frame Inspector" : "Container Grid"}</span>
+        </button>
+        {/* MatrixEditor / FrameInspector — toggled by frameMode, hidden when gridCollapsed */}
+        {!gridCollapsed && (
+          <div style={{ marginTop: "6px" }}>
+            {frameMode ? (
+              <FrameInspector containerId={containerId} />
+            ) : (
+              <MatrixEditor container={container} containerId={containerId} />
+            )}
+          </div>
+        )}
+      </div>
 
+      {/* ── Contextual area — fills remaining space ── */}
+      <div style={{ flex: 1, overflowY: "auto", borderTop: "1px solid #1e293b", marginTop: "4px" }}>
+        {(target.type === "voxel" || target.type === "bay") ? (
+          <WallTypePicker
+            containerId={containerId}
+            voxelIndex={target.type === "voxel" ? target.index : target.indices[0]}
+          />
+        ) : (target.type === "face" || target.type === "bay-face") ? (
+          <div style={{ padding: "12px", color: "#94a3b8", fontSize: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, textTransform: "uppercase", fontSize: 10 }}>
+              Finishes
+            </div>
+            <p>Face finish options coming soon.</p>
+            <p style={{ fontSize: 11 }}>
+              Selected: {target.face} face
+            </p>
+          </div>
+        ) : (
+          <div style={{ padding: "8px 12px" }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8 }}>
+              Container Properties
+            </div>
+
+            {/* Interior Finish */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_DIM }}>Finish:</span>
+              <select
+                value={container.interiorFinish ?? "raw"}
+                onChange={(e) => {
+                  useStore.getState().setInteriorFinish(containerId, e.target.value as any);
+                }}
+                style={{
+                  flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 4,
+                  border: `1px solid ${BORDER}`, background: CARD, color: TEXT,
+                  cursor: "pointer",
+                }}
+              >
+                <option value="raw">Raw Steel</option>
+                <option value="plywood">Plywood</option>
+                <option value="drywall">Drywall</option>
+                <option value="painted">Painted</option>
+              </select>
+            </div>
+
+            {/* Rooftop Deck toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_DIM }}>Rooftop Deck:</span>
+              <button
+                data-testid="btn-toggle-deck"
+                onClick={() => {
+                  const s = useStore.getState();
+                  const c = s.containers[containerId];
+                  // Detect if deck is already applied by checking body voxel top faces
+                  const bodyIdx = 1 * 8 + 1; // row=1, col=1
+                  const hasDeck = c?.voxelGrid?.[bodyIdx]?.faces?.top === "Deck_Wood";
+                  if (hasDeck) {
+                    s.removeRooftopDeck(containerId);
+                  } else {
+                    s.generateRooftopDeck(containerId);
+                  }
+                }}
+                style={{
+                  flex: 1, fontSize: 10, padding: "4px 8px", borderRadius: 4,
+                  border: `1px solid ${BORDER}`, background: CARD, color: TEXT,
+                  cursor: "pointer", fontWeight: 600, transition: "all 100ms ease",
+                }}
+              >
+                {container.voxelGrid?.[1 * 8 + 1]?.faces?.top === "Deck_Wood" ? "✓ Remove Deck" : "+ Add Deck"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -856,16 +947,14 @@ export default function Sidebar() {
       <div style={{
         flex: 1, overflowY: "auto", overflowX: "hidden",
         padding: "12px 16px",
-        display: "flex", flexDirection: "column", gap: "12px",
+        display: "flex", flexDirection: "column",
       }}>
         {isInspecting && container ? (
-          <>
-            <Inspector
-              container={container}
-              containerId={selectedId!}
-              prevContainerId={prevSelectedId}
-            />
-          </>
+          <Inspector
+            container={container}
+            containerId={selectedId!}
+            prevContainerId={prevSelectedId}
+          />
         ) : viewMode === ViewMode.Realistic3D ? (
           <DesignModePanel />
         ) : (
