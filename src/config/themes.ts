@@ -27,11 +27,23 @@ export interface ThemeMaterialConfig {
 
 /** Per-theme texture directory paths (contain color.jpg, normal.jpg, roughness.jpg) */
 export interface ThemeTextureSet {
+  /** @deprecated Use folder fields with textureLoader instead */
   exterior_wall: string | null;  // null = no texture, use flat color
+  /** @deprecated Use folder fields with textureLoader instead */
   interior_wall: string | null;
+  /** @deprecated Use folder fields with textureLoader instead */
   floor: string | null;
+  /** @deprecated Use folder fields with textureLoader instead */
   ceiling: string | null;
   frame: null;                   // Frames always use flat color
+  /** Folder name under /assets/materials/ for exterior wall textures */
+  exterior_wall_folder: string;
+  /** Folder name under /assets/materials/ for interior wall textures */
+  interior_wall_folder: string;
+  /** Folder name under /assets/materials/ for floor textures */
+  floor_folder: string;
+  /** Folder name under /assets/materials/ for ceiling textures */
+  ceiling_folder: string;
 }
 
 export interface ThemeConfig {
@@ -39,6 +51,8 @@ export interface ThemeConfig {
   label: string;
   materials: ThemeMaterialConfig;
   textures: ThemeTextureSet;
+  /** Ground preset applied when this theme is selected */
+  groundPreset: 'grass' | 'concrete' | 'gravel' | 'dirt';
 }
 
 // ── Theme Definitions ──────────────────────────────────────
@@ -47,8 +61,9 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
   industrial: {
     id: 'industrial',
     label: 'Industrial',
+    groundPreset: 'grass',
     materials: {
-      steel:      { color: 0x607080, metalness: 0.72, roughness: 0.38, useCorrugation: true },
+      steel:      { color: 0x8a9aa8, metalness: 0.50, roughness: 0.55, useCorrugation: true },
       steelInner: { color: 0xb8845a, metalness: 0.05, roughness: 0.78 },
       glass:      { color: 0xe0f2fe, roughness: 0.05, transmission: 1, ior: 1.5 },
       frame:      { color: 0x4a5a6a, metalness: 0.90, roughness: 0.15 },
@@ -64,12 +79,17 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
       floor: '/assets/materials/Deck_Wood/',
       ceiling: '/assets/materials/Corrugated_Steel/',
       frame: null,
+      exterior_wall_folder: 'Corrugated_Steel',
+      interior_wall_folder: 'Concrete',
+      floor_folder: 'Deck_Wood',
+      ceiling_folder: 'Corrugated_Steel',
     },
   },
 
   japanese: {
     id: 'japanese',
     label: 'Japanese Modern',
+    groundPreset: 'gravel',
     materials: {
       // Charred Yakisugi vertical slats — dark, matte, no corrugation
       steel:      { color: 0x8c9090, metalness: 0.55, roughness: 0.50, useCorrugation: false },
@@ -91,12 +111,17 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
       floor: '/assets/materials/Bamboo/',
       ceiling: '/assets/materials/Japanese_Cedar/',
       frame: null,
+      exterior_wall_folder: 'Japanese_Cedar',
+      interior_wall_folder: 'Shoji_Paper',
+      floor_folder: 'Bamboo',
+      ceiling_folder: 'Japanese_Cedar',
     },
   },
 
   desert: {
     id: 'desert',
     label: 'Desert Modern',
+    groundPreset: 'dirt',
     materials: {
       // Smooth sand stucco — matte, zero metalness, no corrugation
       steel:      { color: 0xb0a898, metalness: 0.45, roughness: 0.55, useCorrugation: false },
@@ -118,6 +143,10 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
       floor: '/assets/materials/Terracotta/',
       ceiling: '/assets/materials/Bleached_Wood/',
       frame: null,
+      exterior_wall_folder: 'Stucco',
+      interior_wall_folder: 'Plaster',
+      floor_folder: 'Terracotta',
+      ceiling_folder: 'Bleached_Wood',
     },
   },
 };
