@@ -1952,6 +1952,22 @@ export default function ContainerSkin({
         return;
       }
 
+      // ★ Active light type: place/remove light on ceiling or floor click
+      const activeLightType = useStore.getState().activeLightType;
+      if (activeLightType) {
+        if ((activeLightType === 'ceiling' && faceName === 'top') ||
+            (activeLightType === 'lamp' && faceName === 'bottom')) {
+          const store = useStore.getState();
+          const existing = container.lights?.find((l: any) => l.voxelIndex === voxelIndex);
+          if (existing) {
+            store.removeLight(container.id, voxelIndex);
+          } else {
+            store.addLight(container.id, voxelIndex, activeLightType);
+          }
+        }
+        return;
+      }
+
       // ★ Active brush from Materials tab: paint immediately on click (like bucket mode)
       // In Simple mode, paint the entire bay group's wall face
       if (activeBrush) {

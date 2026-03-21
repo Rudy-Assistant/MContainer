@@ -103,12 +103,60 @@ const timeOfDay = useStore(s => s.environment.timeOfDay);
 
 ## §3 Rendering Architecture
 
+### Quality Presets System (`src/config/qualityPresets.ts`)
+
+Three-tier quality system (Low/Medium/High) gating all visual features:
+
+| Feature | Low | Medium | High |
+|---------|-----|--------|------|
+| Post-processing | Off | AO halfRes + Bloom | AO fullRes + Bloom |
+| Shadow map | 1024 | 2048 | 4096 |
+| Textures | Flat colors | JPG 1K PBR | KTX2 2K PBR |
+| Environment | None | Bundled HDRI | CubeCamera (256px) |
+| Max lights | 4 | 8 | 16 |
+
+Store: `qualityPreset` in environmentSlice (persisted). UI: three-button toggle in appearance panel.
+
+`QualityManager` component in Scene.tsx watches preset changes and triggers `rebuildThemeMaterials()` + imperative `gl.toneMapping` updates.
+
 ### Material Cache (`src/config/materialCache.ts`)
 
 Singleton module owning all PBR materials. Exports:
 - `ThemeMaterialSet` interface (9 materials: steel, steelInner, glass, frame, wood, woodGroove, rail, railGlass, concrete)
-- `_themeMats: Record<ThemeId, ThemeMaterialSet>` — built once at import, textures loaded async
-- `getTextureLoader()` — shared TextureLoader singleton
+- `_themeMats: Record<ThemeId, ThemeMaterialSet>` — built at import, textures applied by QualityManager on mount
+- `rebuildThemeMaterials(quality)` — disposes old materials, rebuilds at new quality level (builds new BEFORE disposing old to prevent one-frame black flicker)
+- `applyQualityTextures(quality)` — applies texture maps via `textureLoader.ts`
+
+### Texture Loader (`src/config/textureLoader.ts`)
+
+Consolidated texture path resolver and async loader (replaces retired `pbrTextures.ts`):
+- `getTexturePaths(folder, quality)` — returns JPG/KTX2 paths or null for flat quality
+- `applyTextures(material, paths, repeatX, repeatY, normalScale)` — async TextureLoader with per-texture error fallback
+
+### Post-Processing (`src/components/three/PostProcessingStack.tsx`)
+
+EffectComposer wrapper with ErrorBoundary (catches GL context loss gracefully):
+- N8AO (screen-space AO): halfRes on Medium, fullRes on High
+- Bloom: luminanceThreshold 0.85, mipmapBlur
+- ToneMapping: ACESFilmic (managed by PostProcessingStack, not renderer)
+- Disabled entirely on Low preset (returns null)
+
+### Interior Lighting (`src/components/three/InteriorLights.tsx`)
+
+Two placeable light types (not tied to room assignment):
+- **Ceiling Light**: SpotLight downward, warm white (3000K), castShadow on High only
+- **Floor Lamp**: PointLight, range 3m, no shadow
+- Glass emissive boost at low sun angles (isSunLow threshold)
+- Intensity scales with time-of-day via `getLightIntensity()` from `config/timeOfDay.ts`
+- State: `lights?: LightPlacement[]` on Container, `addLight`/`removeLight` actions
+- UI: Ceiling Light / Floor Lamp buttons in Furniture hotbar tab, click voxel ceiling/floor to place/remove
+
+### Time-of-Day Helpers (`src/config/timeOfDay.ts`)
+
+Centralized phase classification for all time-dependent systems:
+- `isNight`, `isGoldenHour`, `isDeepTwilight`, `isTwilight`, `isSunLow`
+- `getHdriFile(t)` — selects bundled HDRI by time bracket
+- `getLightIntensity(t)` — interior light intensity curve
 
 ### ContainerSkin.tsx (~2500 lines)
 
@@ -123,13 +171,13 @@ Orchestrates per-container rendering: bay walls (legacy), furniture GLBs via `us
 ### Scene.tsx (~1700 lines)
 
 Scene graph for all three view modes:
-- **RealisticScene**: Sky (Preetham atmospheric), TimeOfDayEnvironment (HDRI: park/sunset/dawn/night at 0.65 intensity), SunLight (PCFSoftShadow, frustum ±30), GroundManager, SceneFog (adaptive near/far), ContactShadows, Clouds, N8AO + Bloom + ToneMapping (Neutral)
+- **RealisticScene**: Sky (Preetham atmospheric), TimeOfDayEnvironment (bundled HDRIs or CubeCamera on High), SunLight (PCFSoftShadow, quality-dependent shadow map), GroundManager, SceneFog (adaptive near/far), InteriorLights, PostProcessingStack (N8AO + Bloom + ToneMapping ACESFilmic)
 - **BlueprintScene**: Orthographic camera, 1m grid, dimension labels
-- **WalkthroughScene**: PointerLockControls, voxel collision, auto-tour
+- **WalkthroughScene**: PointerLockControls, voxel collision, auto-tour, InteriorLights, PostProcessingStack
 
 ### GroundManager.tsx
 
-Grass: solid color `#4a6630` + procedural displacement (no texture tiling). Other presets (concrete/gravel/dirt): PBR textures via `useTexture` with ErrorBoundary fallback.
+Ground presets with per-preset texture filename overrides. Grass uses ambientCG 1K set (Color, NormalGL, Roughness, Displacement, AO). Other presets (concrete/gravel/dirt) use generic `color.jpg`/`normal.jpg`/`roughness.jpg`. All presets have ErrorBoundary fallback to solid color + procedural displacement. Random UV rotation per session breaks visible tiling.
 
 ### WalkthroughControls.tsx (1182 lines)
 
@@ -261,6 +309,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 | Staircase System | PRODUCTION |
 | Hotbar + Controls | PRODUCTION |
 | Ground + Atmosphere | PRODUCTION |
+| Extension Unpack Animations | PROTOTYPE |
 
 ---
 

@@ -43,6 +43,10 @@ export interface UiSlice {
   activeFurniturePreset: string | null;
   setActiveFurniturePreset: (type: string | null) => void;
 
+  // Active light type for placing lights via canvas click
+  activeLightType: 'ceiling' | 'lamp' | null;
+  setActiveLightType: (type: 'ceiling' | 'lamp' | null) => void;
+
   // Last stamp for spacebar repeat
   lastStamp: { containerId: string; voxelIndex: number; face: keyof VoxelFaces; surfaceType: SurfaceType } | null;
   setLastStamp: (s: { containerId: string; voxelIndex: number; face: keyof VoxelFaces; surfaceType: SurfaceType } | null) => void;
@@ -140,7 +144,10 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   cycleHotbarTab: (dir) => set((s: any) => ({ activeHotbarTab: ((s.activeHotbarTab + dir) % 4 + 4) % 4 })),
 
   activeFurniturePreset: null,
-  setActiveFurniturePreset: (type) => set({ activeFurniturePreset: type, activeHotbarSlot: null, activeBrush: null } as any),
+  setActiveFurniturePreset: (type) => set({ activeFurniturePreset: type, activeLightType: null, activeHotbarSlot: null, activeBrush: null } as any),
+
+  activeLightType: null,
+  setActiveLightType: (type) => set({ activeLightType: type, activeFurniturePreset: null, activeHotbarSlot: null, activeBrush: null } as any),
 
   lastStamp: null,
   setLastStamp: (s) => set({ lastStamp: s }),

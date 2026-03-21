@@ -7,10 +7,11 @@ import { useStore, type HotbarSlot, type HotbarCategory } from "@/store/useStore
 import { ViewMode, type SurfaceType, type VoxelFaces, FURNITURE_CATALOG } from "@/types/container";
 // getCycleForFace import removed (Sprint 15) — dotRingIndicator deleted
 import { MODULE_PRESETS, resolveModuleFaces } from "@/config/moduleCatalog";
+import { THEMES, type ThemeId } from "@/config/themes";
 
 // ── Room module slots for the Rooms tab ─────────────────────────
 const ROOM_SLOTS = MODULE_PRESETS.filter(p =>
-  ['kitchen_full', 'bathroom_full', 'bedroom', 'living_room', 'office', 'deck_open', 'storage', 'stairs'].includes(p.id)
+  ['kitchen_full', 'bathroom_full', 'bedroom', 'living_room', 'office', 'deck_open', 'storage', 'stairs', 'entry_door'].includes(p.id)
 );
 
 const ORIENT_LABEL: Record<string, string> = { n: 'N', e: 'E', s: 'S', w: 'W' };
@@ -70,30 +71,55 @@ const FIXED_PRESETS: Array<{
     icon: 'M3 3h18v18H3z M3 12h18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Glass_Pane', s: 'Glass_Pane', e: 'Solid_Steel', w: 'Solid_Steel' },
     contexts: ['wall'] },
-  // 7 — Empty: all faces open
-  { key: 7, category: 'basic', color: '#94a3b8', label: 'Empty',
-    description: 'Remove all surfaces — fully open',
-    icon: 'M3 3h18v18H3z',
-    faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
-    contexts: ['wall', 'floor', 'roof'] },
-  // 8 — Sealed: solid steel box with wood floor
-  { key: 8, category: 'basic', color: '#94a3b8', label: 'Sealed',
+  // 7 — Sealed: solid steel box with wood floor
+  { key: 7, category: 'basic', color: '#94a3b8', label: 'Sealed',
     description: 'Steel walls + ceiling, wood floor',
     icon: 'M3 3h18v18H3z M3 3l18 18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
     contexts: ['wall', 'roof'] },
-  // 9 — Corridor: steel walls N/S, open passage E/W
-  { key: 9, category: 'standard', color: '#3b82f6', label: 'Corridor',
+  // 8 — Corridor: steel walls N/S, open passage E/W
+  { key: 8, category: 'standard', color: '#3b82f6', label: 'Corridor',
     description: 'Walk-through passage — walls on long sides',
     icon: 'M3 3v18 M21 3v18',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Open', w: 'Open' },
     contexts: ['wall'] },
-  // 0 — Basin: concrete pool/planter
-  { key: 0, category: 'prefab', color: '#f59e0b', label: 'Basin',
-    description: 'Concrete basin — pool or planter',
-    icon: 'M3 6h18v12H3z M5 8h14v8H5z',
-    faces: { top: 'Open', bottom: 'Concrete', n: 'Concrete', s: 'Concrete', e: 'Concrete', w: 'Concrete' },
-    contexts: ['floor'] },
+  // 9 — Empty: all faces open
+  { key: 9, category: 'basic', color: '#94a3b8', label: 'Empty',
+    description: 'Remove all surfaces — fully open',
+    icon: 'M3 3h18v18H3z',
+    faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
+    contexts: ['wall', 'floor', 'roof'] },
+  // 0 — Default: container default (steel walls, steel ceiling, wood floor)
+  { key: 0, category: 'basic', color: '#94a3b8', label: 'Default',
+    description: 'Container default — steel walls + ceiling, wood floor',
+    icon: 'M3 3h18v18H3z M3 3l18 18 M21 3l-18 18',
+    faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
+    contexts: ['wall', 'floor', 'roof'] },
+];
+
+// ── Material swatches for the Materials tab ─────────────────
+// Curated list of paintable materials shown as flat squares with CSS fills
+const MATERIAL_SWATCHES: Array<{ surface: SurfaceType; label: string; group: 'wall' | 'floor' | 'window' | 'special' }> = [
+  { surface: 'Solid_Steel', label: 'Steel', group: 'wall' },
+  { surface: 'Glass_Pane', label: 'Glass', group: 'window' },
+  { surface: 'Deck_Wood', label: 'Wood', group: 'floor' },
+  { surface: 'Concrete', label: 'Concrete', group: 'floor' },
+  { surface: 'Window_Standard', label: 'Window', group: 'window' },
+  { surface: 'Window_Half', label: 'Half Win', group: 'window' },
+  { surface: 'Window_Sill', label: 'Sill Win', group: 'window' },
+  { surface: 'Window_Clerestory', label: 'Clerstry', group: 'window' },
+  { surface: 'Door', label: 'Door', group: 'wall' },
+  { surface: 'Railing_Cable', label: 'Cable Rail', group: 'wall' },
+  { surface: 'Railing_Glass', label: 'Glass Rail', group: 'wall' },
+  { surface: 'Half_Fold', label: 'Half-Fold', group: 'special' },
+  { surface: 'Gull_Wing', label: 'Gull-Wing', group: 'special' },
+  { surface: 'Wood_Hinoki', label: 'Hinoki', group: 'floor' },
+  { surface: 'Floor_Tatami', label: 'Tatami', group: 'floor' },
+  { surface: 'Wall_Washi', label: 'Washi', group: 'wall' },
+  { surface: 'Glass_Shoji', label: 'Shoji', group: 'window' },
+  { surface: 'Stairs', label: 'Stairs ↑', group: 'special' },
+  { surface: 'Stairs_Down', label: 'Stairs ↓', group: 'special' },
+  { surface: 'Open', label: 'Open', group: 'special' },
 ];
 
 // ── Human-readable surface names for tooltips ────────────────
@@ -149,6 +175,29 @@ function FurnitureSilhouette({ type }: { type: string }) {
   }
 }
 
+// ── Light SVG silhouettes ────────────────────────────────────
+function LightSilhouette({ type }: { type: 'ceiling' | 'lamp' }) {
+  if (type === 'ceiling') {
+    // Recessed ceiling disc with light rays
+    return (
+      <>
+        <ellipse cx="16" cy="10" rx="8" ry="3" />
+        <line x1="10" y1="13" x2="6" y2="24" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+        <line x1="16" y1="13" x2="16" y2="26" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+        <line x1="22" y1="13" x2="26" y2="24" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+      </>
+    );
+  }
+  // Floor lamp with shade
+  return (
+    <>
+      <rect x="14" y="14" width="4" height="14" rx="1" />
+      <path d="M8 14 L16 6 L24 14 Z" />
+      <rect x="12" y="26" width="8" height="2" rx="1" />
+    </>
+  );
+}
+
 // ── Surface → CSS color for cube icons ──────────────────────
 export function surfaceColor(s: SurfaceType): CSSProperties {
   switch (s) {
@@ -198,7 +247,36 @@ export function surfaceColor(s: SurfaceType): CSSProperties {
 }
 
 // ── High-contrast surface fills for isometric icon faces ─────
-function surfaceFill(s: SurfaceType): CSSProperties {
+// When themeId provided, returns theme-aware solid color (overrides gradients).
+function surfaceFill(s: SurfaceType, themeId?: ThemeId): CSSProperties {
+  if (themeId) {
+    const m = THEMES[themeId].materials;
+    const toHex = (c: number) => '#' + c.toString(16).padStart(6, '0');
+    const darken = (hex: string, f: number) => {
+      const n = parseInt(hex.slice(1), 16);
+      const r = Math.round(((n >> 16) & 0xff) * f);
+      const g = Math.round(((n >> 8) & 0xff) * f);
+      const b = Math.round((n & 0xff) * f);
+      return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+    };
+    const steelHex = toHex(m.steel.color);
+    const glassHex = toHex(m.glass.color);
+    const woodHex = toHex(m.wood.color);
+    const concreteHex = toHex(m.concrete.color);
+    const railHex = toHex(m.rail.color);
+    switch (s) {
+      case 'Solid_Steel': return { background: `linear-gradient(180deg, ${steelHex} 0%, ${darken(steelHex, 0.7)} 100%)`, borderColor: darken(steelHex, 0.5) };
+      case 'Glass_Pane': case 'Railing_Glass': case 'Glass_Shoji': return { background: `linear-gradient(135deg, ${glassHex} 0%, ${darken(glassHex, 0.8)} 100%)`, borderColor: darken(glassHex, 0.6) };
+      case 'Deck_Wood': return { background: `repeating-linear-gradient(0deg, ${woodHex} 0px, ${woodHex} 3px, ${darken(woodHex, 0.6)} 3px, ${darken(woodHex, 0.6)} 4px)`, borderColor: darken(woodHex, 0.4) };
+      case 'Concrete': return { background: `linear-gradient(180deg, ${concreteHex} 0%, ${darken(concreteHex, 0.8)} 100%)`, borderColor: darken(concreteHex, 0.6) };
+      case 'Railing_Cable': return { background: `repeating-linear-gradient(0deg, ${railHex} 0px, ${railHex} 2px, ${darken(railHex, 0.7)} 2px, ${darken(railHex, 0.7)} 4px)`, borderColor: darken(railHex, 0.5) };
+      case 'Door': return { background: `linear-gradient(180deg, ${darken(steelHex, 0.8)} 0%, ${steelHex} 50%, ${darken(steelHex, 0.8)} 100%)`, borderColor: darken(steelHex, 0.4) };
+      case 'Half_Fold': return { background: `linear-gradient(180deg, ${steelHex} 0%, ${steelHex} 45%, #333 45%, #333 55%, ${woodHex} 55%, ${woodHex} 100%)`, borderColor: darken(steelHex, 0.5) };
+      case 'Gull_Wing': return { background: `linear-gradient(180deg, ${darken(steelHex, 0.8)} 0%, ${steelHex} 20%, #333 42%, #eee 50%, #333 58%, ${steelHex} 80%, ${darken(steelHex, 0.8)} 100%)`, borderColor: darken(steelHex, 0.4) };
+      case 'Open': return { background: '#f1f5f9', borderColor: '#cbd5e1', borderStyle: 'dashed' };
+      // JP/specific surfaces fall through to default
+    }
+  }
   switch (s) {
     case "Solid_Steel":
       return {
@@ -452,8 +530,11 @@ function FaceDetail({ surface, w, h, brightness }: { surface: SurfaceType; w: nu
 // ── WU-6A: SVG Isometric Cube Icon ────────────────────────────
 // True isometric projection using face colors from surfaceColor().
 
-const ISO_COS = Math.cos(Math.PI / 6); // 0.866
-const ISO_SIN = Math.sin(Math.PI / 6); // 0.5
+// Standard isometric projection — arctan(1/√2) ≈ 35.264° from horizontal.
+// Top face appears as a diamond (the "floor" surface), sides are subordinate.
+const ISO_ANGLE = Math.atan(1 / Math.SQRT2);  // 35.264° — true isometric
+const ISO_COS = Math.cos(ISO_ANGLE);           // 0.8165
+const ISO_SIN = Math.sin(ISO_ANGLE);           // 0.5774
 
 function getIsoPoint(x: number, y: number, z: number, cx: number, cy: number): [number, number] {
   return [(x - z) * ISO_COS + cx, (x + z) * ISO_SIN - y + cy];
@@ -467,24 +548,51 @@ function extractSolidColor(cssBackground: string): string {
   return '#cccccc';
 }
 
-function svgFaceColor(s: SurfaceType): string {
+/** Get theme-aware SVG face color. Falls back to surfaceColor when no theme context. */
+function svgFaceColor(s: SurfaceType, themeId?: ThemeId): string {
+  if (themeId) {
+    const m = THEMES[themeId].materials;
+    const toHex = (c: number) => '#' + c.toString(16).padStart(6, '0');
+    switch (s) {
+      case 'Solid_Steel': case 'Half_Fold': case 'Gull_Wing': return toHex(m.steel.color);
+      case 'Glass_Pane': case 'Railing_Glass': case 'Glass_Shoji': return toHex(m.glass.color);
+      case 'Deck_Wood': case 'Stairs': case 'Stairs_Down': return toHex(m.wood.color);
+      case 'Concrete': return toHex(m.concrete.color);
+      case 'Railing_Cable': return toHex(m.rail.color);
+      case 'Door': return toHex(m.steel.color);
+      case 'Wood_Hinoki': return toHex(m.wood.color);
+      case 'Floor_Tatami': return '#b8c89a';
+      case 'Wall_Washi': return '#f8f4ec';
+      case 'Open': return '#f1f5f9';
+      default: return '#cccccc';
+    }
+  }
   return extractSolidColor((surfaceColor(s).background as string) || '#cccccc');
 }
 
+/**
+ * SvgVoxelIcon — Cutaway isometric icon showing interior configuration.
+ *
+ * Shows back wall (N), left wall (W), floor (bottom), and ceiling (top) from a
+ * front-right cutaway angle. South and East walls are removed to reveal the interior.
+ * This makes the distinguishing features visible: doors, glass, railings, open passages.
+ */
 export function SvgVoxelIcon({
   faces,
   size = 70,
   activeFace,
+  themeId,
 }: {
   faces: VoxelFaces;
   size?: number;
   activeFace?: keyof VoxelFaces;
+  themeId?: ThemeId;
 }) {
-  const isFloorSlab = faces.n === 'Open' && faces.s === 'Open' && faces.e === 'Open' && faces.w === 'Open';
-  // Floor slab: very thin (H=6) with centered positioning so it reads as a flat platform.
-  // Full cube: standard isometric box.
-  const W = 42, D = 25, H = isFloorSlab ? 6 : 60;
-  const cx = 25, cy = isFloorSlab ? 52 : 55;
+  const allOpen = faces.n === 'Open' && faces.s === 'Open' && faces.e === 'Open' && faces.w === 'Open';
+  const isFloorOnly = allOpen && faces.top === 'Open' && faces.bottom !== 'Open';
+  const S = 28, H = isFloorOnly ? 6 : S;
+  const W = S, D = S;
+  const cx = 32, cy = isFloorOnly ? 45 : 50;
 
   const p = (x: number, y: number, z: number) => getIsoPoint(x, y, z, cx, cy);
   const vx = {
@@ -497,53 +605,159 @@ export function SvgVoxelIcon({
   const isFloorProxy = faces.top === 'Open' && faces.bottom !== 'Open';
   const topSurface = isFloorProxy ? faces.bottom : faces.top;
 
-  const topColor   = topSurface !== 'Open' ? svgFaceColor(topSurface) : 'none';
-  const southColor = faces.s    !== 'Open' ? svgFaceColor(faces.s)    : 'none';
-  const eastColor  = faces.e    !== 'Open' ? svgFaceColor(faces.e)    : 'none';
+  const floorColor = faces.bottom !== 'Open' ? svgFaceColor(faces.bottom, themeId) : 'none';
+  const ceilColor  = topSurface !== 'Open' ? svgFaceColor(topSurface, themeId) : 'none';
+  const northColor = faces.n !== 'Open' ? svgFaceColor(faces.n, themeId) : 'none';
+  const westColor  = faces.w !== 'Open' ? svgFaceColor(faces.w, themeId) : 'none';
 
-  const stroke = '#1e293b', sw = 1.2, so = 0.35;
-  const dashed = '#94a3b8', activeStroke = '#06b6d4';
-  const topActive   = activeFace === 'top';
-  const southActive = activeFace === 's' || activeFace === 'n';
-  const eastActive  = activeFace === 'e' || activeFace === 'w';
+  const stroke = '#1e293b', sw = 1.0, so = 0.4;
+  const dashed = '#b0bec5';
   const vW = 70, vH = 95;
+
+  // Helper: draw railing lines across a face polygon
+  // Draw railing as short horizontal cables at ~35% wall height (realistic railing proportion)
+  const railingLines = (bl: [number,number], br: [number,number], tl: [number,number], tr: [number,number], key: string) => {
+    const lines = [];
+    // Railing cables at 10%, 20%, 35% of wall height (bottom third)
+    for (const t of [0.10, 0.20, 0.35]) {
+      lines.push(
+        <line key={`${key}${t}`}
+          x1={bl[0] + (tl[0]-bl[0])*t} y1={bl[1] + (tl[1]-bl[1])*t}
+          x2={br[0] + (tr[0]-br[0])*t} y2={br[1] + (tr[1]-br[1])*t}
+          stroke="#546e7a" strokeWidth={0.8} />
+      );
+    }
+    // Vertical posts at railing top height
+    const postH = 0.35;
+    const lPost: [number,number] = [bl[0] + (tl[0]-bl[0])*postH, bl[1] + (tl[1]-bl[1])*postH];
+    const rPost: [number,number] = [br[0] + (tr[0]-br[0])*postH, br[1] + (tr[1]-br[1])*postH];
+    lines.push(
+      <line key={`${key}lp`} x1={bl[0]} y1={bl[1]} x2={lPost[0]} y2={lPost[1]} stroke="#37474f" strokeWidth={1.0} />,
+      <line key={`${key}rp`} x1={br[0]} y1={br[1]} x2={rPost[0]} y2={rPost[1]} stroke="#37474f" strokeWidth={1.0} />,
+    );
+    return lines;
+  };
+
+  // Helper: is this surface a glass/transparent type?
+  const isGlass = (s: string) => s === 'Glass_Pane' || s === 'Railing_Glass' || s === 'Glass_Shoji';
+  const isRailing = (s: string) => s === 'Railing_Cable' || s === 'Railing_Glass';
+  const isDoor = (s: string) => s === 'Door';
 
   return (
     <svg width={size} height={(size / vW) * vH} viewBox={`0 0 ${vW} ${vH}`}
-      style={{ filter: 'drop-shadow(1px 2px 3px rgba(0,0,0,0.3))' }}>
-      {/* South face — hidden for floor slab (side height is invisible at H=10) */}
-      {!isFloorSlab && (southColor !== 'none'
-        ? <polygon points={polyStr([vx.F_BL, vx.F_BR, vx.F_TR, vx.F_TL])} fill={southColor}
-            style={{ filter: 'brightness(0.78)' }}
-            stroke={stroke} strokeWidth={sw} strokeOpacity={so} strokeLinejoin="round" />
-        : <polygon points={polyStr([vx.F_BL, vx.F_BR, vx.F_TR, vx.F_TL])} fill="rgba(241,245,249,0.15)"
-            stroke={dashed} strokeWidth={0.8} strokeDasharray="2,2" strokeLinejoin="round" />)}
-      {!isFloorSlab && southActive && <polygon points={polyStr([vx.F_BL, vx.F_BR, vx.F_TR, vx.F_TL])}
-        fill="none" stroke={activeStroke} strokeWidth={1.8} />}
+      style={{ filter: 'drop-shadow(1px 2px 3px rgba(0,0,0,0.25))' }}>
 
-      {/* East face — darker, hidden for floor slab */}
-      {!isFloorSlab && (eastColor !== 'none'
-        ? <polygon points={polyStr([vx.F_BR, vx.B_BR, vx.B_TR, vx.F_TR])} fill={eastColor}
-            style={{ filter: 'brightness(0.57)' }}
+      {/* ── FLOOR (bottom face) — always visible as base ── */}
+      {floorColor !== 'none'
+        ? <polygon points={polyStr([vx.F_BL, vx.F_BR, vx.B_BR, vx.B_BL])} fill={floorColor}
             stroke={stroke} strokeWidth={sw} strokeOpacity={so} strokeLinejoin="round" />
-        : <polygon points={polyStr([vx.F_BR, vx.B_BR, vx.B_TR, vx.F_TR])} fill="rgba(241,245,249,0.08)"
-            stroke={dashed} strokeWidth={0.8} strokeDasharray="2,2" strokeLinejoin="round" />)}
-      {!isFloorSlab && eastActive && <polygon points={polyStr([vx.F_BR, vx.B_BR, vx.B_TR, vx.F_TR])}
-        fill="none" stroke={activeStroke} strokeWidth={1.8} />}
+        : <polygon points={polyStr([vx.F_BL, vx.F_BR, vx.B_BR, vx.B_BL])} fill="none"
+            stroke={dashed} strokeWidth={0.5} strokeDasharray="2,2" strokeLinejoin="round" />}
 
-      {/* Top face — brightest, always rendered */}
-      {topColor !== 'none'
-        ? <polygon points={polyStr([vx.F_TL, vx.F_TR, vx.B_TR, vx.B_TL])} fill={topColor}
+      {/* ── BACK WALL (N face) — the interior-facing reveal ── */}
+      {!isFloorOnly && northColor !== 'none' && !isRailing(faces.n) && !isDoor(faces.n) && (
+        <polygon points={polyStr([vx.B_BL, vx.B_BR, vx.B_TR, vx.B_TL])}
+          fill={northColor} style={{ filter: 'brightness(0.72)' }}
+          opacity={isGlass(faces.n) ? 0.4 : 1}
+          stroke={stroke} strokeWidth={sw} strokeOpacity={so} strokeLinejoin="round" />
+      )}
+      {/* N wall door opening */}
+      {!isFloorOnly && isDoor(faces.n) && (() => {
+        // Show door as a rectangle cutout in the back wall
+        const midX = (vx.B_BL[0] + vx.B_BR[0]) / 2;
+        const midTX = (vx.B_TL[0] + vx.B_TR[0]) / 2;
+        const doorH = 0.8; // 80% height
+        const dTL: [number,number] = [vx.B_BL[0] + (vx.B_TL[0]-vx.B_BL[0])*doorH*0.3 + (midTX-vx.B_TL[0])*0.2,
+                                       vx.B_BL[1] + (vx.B_TL[1]-vx.B_BL[1])*doorH];
+        const dTR: [number,number] = [vx.B_BR[0] + (vx.B_TR[0]-vx.B_BR[0])*doorH*0.3 + (midTX-vx.B_TR[0])*0.2,
+                                       vx.B_BR[1] + (vx.B_TR[1]-vx.B_BR[1])*doorH];
+        return <>
+          <polygon points={polyStr([vx.B_BL, vx.B_BR, vx.B_TR, vx.B_TL])}
+            fill="#78909c" style={{ filter: 'brightness(0.65)' }}
             stroke={stroke} strokeWidth={sw} strokeOpacity={so} strokeLinejoin="round" />
-        : <polygon points={polyStr([vx.F_TL, vx.F_TR, vx.B_TR, vx.B_TL])} fill="none"
-            stroke={dashed} strokeWidth={0.8} strokeDasharray="2,2" strokeLinejoin="round" />}
-      {topActive && <polygon points={polyStr([vx.F_TL, vx.F_TR, vx.B_TR, vx.B_TL])}
-        fill="none" stroke={activeStroke} strokeWidth={1.8} />}
+          {/* Door opening */}
+          <rect x={midX-6} y={vx.B_BL[1]-H*0.6} width={12} height={H*0.6}
+            fill="#3e2723" rx={1} opacity={0.8} />
+        </>;
+      })()}
+      {/* N railing */}
+      {!isFloorOnly && isRailing(faces.n) && (
+        <>
+          <polygon points={polyStr([vx.B_BL, vx.B_BR, vx.B_TR, vx.B_TL])}
+            fill="none" stroke={dashed} strokeWidth={0.5} strokeDasharray="2,2" />
+          {railingLines(vx.B_BL, vx.B_BR, vx.B_TL, vx.B_TR, 'nr')}
+        </>
+      )}
+      {/* N open */}
+      {!isFloorOnly && faces.n === 'Open' && (
+        <polygon points={polyStr([vx.B_BL, vx.B_BR, vx.B_TR, vx.B_TL])}
+          fill="none" stroke={dashed} strokeWidth={0.5} strokeDasharray="2,2" />
+      )}
+      {/* N glass highlight */}
+      {!isFloorOnly && isGlass(faces.n) && (
+        <line x1={vx.B_BL[0]+3} y1={vx.B_BL[1]+(vx.B_TL[1]-vx.B_BL[1])*0.3}
+              x2={vx.B_BR[0]-3} y2={vx.B_BR[1]+(vx.B_TR[1]-vx.B_BR[1])*0.7}
+              stroke="rgba(255,255,255,0.5)" strokeWidth={0.8} />
+      )}
+
+      {/* ── LEFT WALL (W face) — the interior-facing reveal ── */}
+      {!isFloorOnly && westColor !== 'none' && !isRailing(faces.w) && !isDoor(faces.w) && (
+        <polygon points={polyStr([vx.F_BL, vx.B_BL, vx.B_TL, vx.F_TL])}
+          fill={westColor} style={{ filter: 'brightness(0.58)' }}
+          opacity={isGlass(faces.w) ? 0.35 : 1}
+          stroke={stroke} strokeWidth={sw} strokeOpacity={so} strokeLinejoin="round" />
+      )}
+      {/* W railing */}
+      {!isFloorOnly && isRailing(faces.w) && (
+        <>
+          <polygon points={polyStr([vx.F_BL, vx.B_BL, vx.B_TL, vx.F_TL])}
+            fill="none" stroke={dashed} strokeWidth={0.5} strokeDasharray="2,2" />
+          {railingLines(vx.F_BL, vx.B_BL, vx.F_TL, vx.B_TL, 'wr')}
+        </>
+      )}
+      {/* W open */}
+      {!isFloorOnly && faces.w === 'Open' && (
+        <polygon points={polyStr([vx.F_BL, vx.B_BL, vx.B_TL, vx.F_TL])}
+          fill="none" stroke={dashed} strokeWidth={0.5} strokeDasharray="2,2" />
+      )}
+      {/* W glass highlight */}
+      {!isFloorOnly && isGlass(faces.w) && (
+        <line x1={vx.F_BL[0]+1} y1={vx.F_BL[1]+(vx.F_TL[1]-vx.F_BL[1])*0.7}
+              x2={vx.B_BL[0]+1} y2={vx.B_BL[1]+(vx.B_TL[1]-vx.B_BL[1])*0.3}
+              stroke="rgba(255,255,255,0.4)" strokeWidth={0.8} />
+      )}
+
+      {/* ── CEILING (top face) ── */}
+      {!isFloorOnly && ceilColor !== 'none' && (
+        <polygon points={polyStr([vx.F_TL, vx.F_TR, vx.B_TR, vx.B_TL])} fill={ceilColor}
+          opacity={0.6}
+          stroke={stroke} strokeWidth={sw} strokeOpacity={so} strokeLinejoin="round" />
+      )}
+      {!isFloorOnly && ceilColor === 'none' && (
+        <polygon points={polyStr([vx.F_TL, vx.F_TR, vx.B_TR, vx.B_TL])} fill="none"
+          stroke={dashed} strokeWidth={0.5} strokeDasharray="2,2" strokeLinejoin="round" />
+      )}
+
+      {/* ── Wireframe edges for cutaway sides (S, E) — show as thin outlines ── */}
+      {!isFloorOnly && (
+        <>
+          {/* South edge (cut) */}
+          <line x1={vx.F_BL[0]} y1={vx.F_BL[1]} x2={vx.F_TL[0]} y2={vx.F_TL[1]}
+            stroke={dashed} strokeWidth={0.4} strokeDasharray="1,2" />
+          <line x1={vx.F_BR[0]} y1={vx.F_BR[1]} x2={vx.F_TR[0]} y2={vx.F_TR[1]}
+            stroke={dashed} strokeWidth={0.4} strokeDasharray="1,2" />
+          {/* East edge (cut) */}
+          <line x1={vx.F_BR[0]} y1={vx.F_BR[1]} x2={vx.B_BR[0]} y2={vx.B_BR[1]}
+            stroke={dashed} strokeWidth={0.4} strokeDasharray="1,2" />
+          <line x1={vx.F_TR[0]} y1={vx.F_TR[1]} x2={vx.B_TR[0]} y2={vx.B_TR[1]}
+            stroke={dashed} strokeWidth={0.4} strokeDasharray="1,2" />
+        </>
+      )}
 
       {/* Floor proxy ↓ glyph */}
-      {isFloorProxy && topColor !== 'none' && (
-        <text x={vx.B_TR[0] - 1} y={vx.B_TR[1] + 8} fontSize={7}
-          fill="rgba(255,255,255,0.7)" textAnchor="middle">↓</text>
+      {isFloorProxy && floorColor !== 'none' && (
+        <text x={cx} y={cy + 12} fontSize={7}
+          fill="rgba(100,100,100,0.7)" textAnchor="middle">floor</text>
       )}
     </svg>
   );
@@ -553,19 +767,18 @@ export function SvgVoxelIcon({
 // Shows 3 visible faces (top, south, east) with surface-specific fills
 // and inner structural detail overlays for physical accuracy
 
-export function CssVoxelIcon({ faces, size = 20, activeFace }: { faces: VoxelFaces; size?: number; activeFace?: keyof VoxelFaces }) {
-  const shortSide = 30;                   // East/West face width (hardcoded)
-  const longSide  = 60;                   // North/South face depth (hardcoded)
-  const wX = longSide;                    // Maps to South face in CSS (wide = colPitch)
-  const wZ = shortSide;                   // Maps to East face in CSS (narrow = rowPitch)
+export function CssVoxelIcon({ faces, size = 20, activeFace, themeId }: { faces: VoxelFaces; size?: number; activeFace?: keyof VoxelFaces; themeId?: ThemeId }) {
+  const cubeSide = 44;                    // Uniform cube — game-standard isometric tile
+  const wX = cubeSide;                    // South face width
+  const wZ = cubeSide;                    // East face width
   // Collapse to a flat slab (8px) for floor-only presets (all walls Open, top Open, bottom non-Open)
   const isFloorPreset = faces.bottom !== 'Open' && faces.top === 'Open' &&
     faces.n === 'Open' && faces.s === 'Open' && faces.e === 'Open' && faces.w === 'Open';
-  const wY = isFloorPreset ? 8 : Math.round(longSide * 1.43);
+  const wY = isFloorPreset ? 8 : cubeSide;
   const halfX = wX / 2;
   const halfZ = wZ / 2;
   const halfY = wY / 2;
-  const containerSize = longSide + shortSide + 30; // 120px outer viewport — accommodates taller icon
+  const containerSize = cubeSide * 2 + 30; // outer viewport for cube icon
 
   const faceBaseShared: CSSProperties = {
     position: "absolute",
@@ -579,7 +792,7 @@ export function CssVoxelIcon({ faces, size = 20, activeFace }: { faces: VoxelFac
   // WU-4: Floor proxy — when top is Open but bottom has material, show bottom on top face.
   const isFloorProxy = faces.top === 'Open' && faces.bottom !== 'Open';
   const topSurface = isFloorProxy ? faces.bottom : faces.top;
-  const topFill = surfaceFill(topSurface);
+  const topFill = surfaceFill(topSurface, themeId);
 
   // Open faces render as wireframe-only (no fill)
   const topIsOpen = topSurface === "Open";
@@ -604,7 +817,7 @@ export function CssVoxelIcon({ faces, size = 20, activeFace }: { faces: VoxelFac
         height: wY,
         position: "relative",
         transformStyle: "preserve-3d",
-        transform: "rotateX(60deg) rotateZ(45deg)",
+        transform: "rotateX(54.74deg) rotateZ(45deg)", /* 90° - arctan(1/√2) ≈ 54.74° — standard isometric, top face dominant */
       }}>
         {/* Top face */}
         <div style={{
@@ -627,7 +840,7 @@ export function CssVoxelIcon({ faces, size = 20, activeFace }: { faces: VoxelFac
         <div style={{
           ...faceBaseShared,
           width: wX, height: wY,
-          ...(faces.s === "Open" ? { background: "rgba(241,245,249,0.3)", borderColor: "#94a3b8", borderStyle: "dashed", borderWidth: 1 } : surfaceFill(faces.s)),
+          ...(faces.s === "Open" ? { background: "rgba(241,245,249,0.3)", borderColor: "#94a3b8", borderStyle: "dashed", borderWidth: 1 } : surfaceFill(faces.s, themeId)),
           transform: `translateZ(${halfZ}px)`,
           filter: faces.s === "Open" ? "brightness(0.9)" : "brightness(0.78)",
           ...(southActive ? { boxShadow: "inset 0 0 0 2px #06b6d4" } : {}),
@@ -638,7 +851,7 @@ export function CssVoxelIcon({ faces, size = 20, activeFace }: { faces: VoxelFac
         <div style={{
           ...faceBaseShared,
           width: wZ, height: wY,
-          ...(faces.e === "Open" ? { background: "rgba(241,245,249,0.2)", borderColor: "#94a3b8", borderStyle: "dashed", borderWidth: 1 } : surfaceFill(faces.e)),
+          ...(faces.e === "Open" ? { background: "rgba(241,245,249,0.2)", borderColor: "#94a3b8", borderStyle: "dashed", borderWidth: 1 } : surfaceFill(faces.e, themeId)),
           transform: `rotateY(90deg) translateZ(${halfX}px)`,
           filter: faces.e === "Open" ? "brightness(0.7)" : "brightness(0.55)",
           ...(eastActive ? { boxShadow: "inset 0 0 0 2px #06b6d4" } : {}),
@@ -650,7 +863,7 @@ export function CssVoxelIcon({ faces, size = 20, activeFace }: { faces: VoxelFac
           <div style={{
             ...faceBaseShared,
             width: wX, height: wZ,
-            ...surfaceFill(faces.bottom),
+            ...surfaceFill(faces.bottom, themeId),
             transform: `rotateX(-90deg) translateZ(${halfY}px)`,
             filter: "brightness(0.4)",
           }}>
@@ -662,37 +875,63 @@ export function CssVoxelIcon({ faces, size = 20, activeFace }: { faces: VoxelFac
   );
 }
 
-// ── Module-scope 3D materials — MeshBasicMaterial for immediate rendering ──
+// ── Theme-aware 3D materials — MeshBasicMaterial for immediate rendering ──
 // MeshBasicMaterial bypasses PBR shader compilation, ensuring icons are NEVER
 // unlit gray/black due to async shader compile + frameloop="demand" freezing.
+// Materials are updated in-place when theme changes (no disposal needed).
+
 const _mSteel     = new THREE.MeshBasicMaterial({ color: 0x78909c });
 const _mSteelInner = new THREE.MeshBasicMaterial({ color: 0xb8845a });
-const _mGlass     = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.70 });
+const _mGlass     = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.40, side: THREE.DoubleSide });
 const _mWood      = new THREE.MeshBasicMaterial({ color: 0x8b5a2b });
-const _mRail      = new THREE.MeshBasicMaterial({ color: 0x2a2a2a });
+const _mRail      = new THREE.MeshBasicMaterial({ color: 0x546e7a, transparent: true, opacity: 0.55 });
 const _mRailGlass = new THREE.MeshBasicMaterial({ color: 0xb3e5fc, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
 const _mConcrete  = new THREE.MeshBasicMaterial({ color: 0x9e9e9e });
 const _mOpen      = new THREE.MeshBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.06, side: THREE.DoubleSide });
 const _mFrame     = new THREE.MeshBasicMaterial({ color: 0x424242 });
-
-// ── Additional surface materials (JP palette + functional types) ──
-const _mDoor     = new THREE.MeshBasicMaterial({ color: 0x546e7a });          // Blue-gray steel door
-const _mStairs   = new THREE.MeshBasicMaterial({ color: 0x8b6f47 });          // Dark wood treads
-const _mHinoki   = new THREE.MeshBasicMaterial({ color: 0xf5e6c8 });          // Cream Hinoki cedar
-const _mTatami   = new THREE.MeshBasicMaterial({ color: 0xb8c89a });          // Sage green mat
+const _mDoor     = new THREE.MeshBasicMaterial({ color: 0x546e7a });
+const _mStairs   = new THREE.MeshBasicMaterial({ color: 0x8b6f47 });
+const _mHinoki   = new THREE.MeshBasicMaterial({ color: 0xf5e6c8 });
+const _mTatami   = new THREE.MeshBasicMaterial({ color: 0xb8c89a });
 const _mWashi    = new THREE.MeshBasicMaterial({ color: 0xf8f4ec, transparent: true, opacity: 0.85 });
-const _mStairsDn = new THREE.MeshBasicMaterial({ color: 0x6d4c32 });          // Darker wood, descend
+const _mStairsDn = new THREE.MeshBasicMaterial({ color: 0x6d4c32 });
 
-// X-ray variants (camera-facing walls) — same colors, reduced opacity
+// X-ray variants
 const _mSteelXray    = new THREE.MeshBasicMaterial({ color: 0x78909c, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
 const _mGlassXray    = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.28 });
 const _mWoodXray     = new THREE.MeshBasicMaterial({ color: 0x8b5a2b, transparent: true, opacity: 0.28 });
 const _mConcreteXray = new THREE.MeshBasicMaterial({ color: 0x9e9e9e, transparent: true, opacity: 0.28 });
 
-// Real container voxel proportions, normalized to H=1.0
-const MINI_W = 2.03 / 2.90;  // ≈ 0.700
+/** Update all mini-voxel materials to reflect the active theme colors. */
+let _lastAppliedTheme: ThemeId | null = null;
+function applyThemeToMiniMaterials(themeId: ThemeId) {
+  if (_lastAppliedTheme === themeId) return;
+  _lastAppliedTheme = themeId;
+  const m = THEMES[themeId].materials;
+  _mSteel.color.set(m.steel.color);
+  _mSteelInner.color.set(m.steelInner.color);
+  _mGlass.color.set(m.glass.color);
+  _mWood.color.set(m.wood.color);
+  _mRail.color.set(m.rail.color);
+  _mRailGlass.color.set(m.railGlass.color);
+  _mConcrete.color.set(m.concrete.color);
+  _mFrame.color.set(m.frame.color);
+  _mDoor.color.set(m.steel.color);     // Door uses steel tones
+  // X-ray variants track base
+  _mSteelXray.color.set(m.steel.color);
+  _mGlassXray.color.set(m.glass.color);
+  _mWoodXray.color.set(m.wood.color);
+  _mConcreteXray.color.set(m.concrete.color);
+  // Trigger needsUpdate on all
+  [_mSteel, _mSteelInner, _mGlass, _mWood, _mRail, _mRailGlass, _mConcrete, _mFrame, _mDoor,
+   _mSteelXray, _mGlassXray, _mWoodXray, _mConcreteXray].forEach(mat => { mat.needsUpdate = true; });
+}
+
+// Uniform cube for hotbar icons — cleaner presentation, works for all presets.
+// Ghost preview over the actual voxels in 3D provides the real-shape feedback.
+const MINI_W = 1.00;
 const MINI_H = 1.00;
-const MINI_D = 1.22 / 2.90;  // ≈ 0.421
+const MINI_D = 1.00;
 const _miniBox   = new THREE.BoxGeometry(MINI_W, MINI_H, MINI_D);
 const _miniEdges = new THREE.EdgesGeometry(_miniBox);
 const _edgeMat = new THREE.LineBasicMaterial({ color: 0x1e293b, transparent: true, opacity: 0.5 });
@@ -751,32 +990,122 @@ function MiniFace({ face, surface, xray = false }: { face: keyof VoxelFaces; sur
   );
 }
 
-/** Mini 3D voxel preview scene */
+/** Mini 3D voxel preview scene — standard isometric tile angle.
+ * arctan(1/√2) ≈ 35.264° from horizontal → top face is the dominant visible surface.
+ * This matches classic game isometric tiles where the "floor" diamond is largest. */
 function MiniVoxelScene({ faces }: { faces: VoxelFaces }) {
   return (
     <>
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[3, 5, 2]} intensity={0.7} />
-      <group position={[0, -0.08, 0]} rotation={[-Math.PI / 8, Math.PI / 4, 0]}>
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[3, 5, 2]} intensity={1.0} />
+      <directionalLight position={[-2, 3, -1]} intensity={0.3} color="#9ecfff" />
+      <group position={[0, 0.05, 0]} rotation={[-Math.atan(1 / Math.SQRT2), Math.PI / 4, 0]}>
         <lineSegments>
           <primitive object={_miniEdges} attach="geometry" />
           <primitive object={_edgeMat} attach="material" />
         </lineSegments>
-        {(["top", "bottom", "n", "s", "e", "w"] as const).map((f) => (
-          <MiniFace key={f} face={f} surface={faces[f]} xray={f === 'n' || f === 'w'} />
-        ))}
+        {/* Cutaway: show N (back), W (left), floor, ceiling. S & E shown as xray for context. */}
+        {(["top", "bottom", "n", "s", "e", "w"] as const).map((f) => {
+          // S and E walls rendered as very faint xray (cutaway reveals interior)
+          const isCutaway = f === 's' || f === 'e';
+          // Skip cutaway faces entirely if they're solid — cleaner interior view
+          if (isCutaway && faces[f] !== 'Open' && faces[f] !== 'Railing_Cable' && faces[f] !== 'Railing_Glass') {
+            return null;
+          }
+          return <MiniFace key={f} face={f} surface={faces[f]} xray={isCutaway} />;
+        })}
       </group>
     </>
   );
 }
 
+/**
+ * PresetSchematicIcon — Top-down floor plan view of voxel configuration.
+ *
+ * Shows: floor material as fill color, walls as thick colored borders,
+ * ceiling presence as a roof indicator. Each face type uses a distinct
+ * visual treatment (solid=filled, glass=blue line, railing=dashed, open=gap, door=break).
+ *
+ * This approach works at ANY icon size because it uses bold fills and thick strokes
+ * rather than trying to render 3D detail.
+ */
+function PresetSchematicIcon({ faces, size = 48 }: { faces: VoxelFaces; size?: number }) {
+  const s = size;
+  const m = 4; // margin
+  const w = 4; // wall thickness
+  const inner = s - m * 2 - w * 2; // interior rect size
+
+  // Surface → fill color
+  const fc = (st: SurfaceType): string => {
+    switch (st) {
+      case 'Solid_Steel': return '#78909c';
+      case 'Glass_Pane': case 'Railing_Glass': case 'Glass_Shoji': return '#42a5f5';
+      case 'Deck_Wood': case 'Wood_Hinoki': case 'Floor_Tatami': return '#a1887f';
+      case 'Railing_Cable': return '#78909c';
+      case 'Concrete': return '#bdbdbd';
+      case 'Door': return '#6d4c41';
+      case 'Open': return 'none';
+      default: return '#90a4ae';
+    }
+  };
+  const isO = (st: SurfaceType) => st === 'Open';
+  const isG = (st: SurfaceType) => st === 'Glass_Pane' || st === 'Railing_Glass' || st === 'Glass_Shoji';
+  const isR = (st: SurfaceType) => st === 'Railing_Cable' || st === 'Railing_Glass';
+  const isD = (st: SurfaceType) => st === 'Door';
+
+  // Wall stroke for each edge (top=N, right=E, bottom=S, left=W in plan view)
+  const wallStroke = (st: SurfaceType, x1: number, y1: number, x2: number, y2: number, key: string) => {
+    if (isO(st)) return <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--border, #e2e8f0)" strokeWidth={1} strokeDasharray="2,3" />;
+    if (isR(st)) return <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke={fc(st)} strokeWidth={w} strokeDasharray="3,3" />;
+    if (isG(st)) return <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#42a5f5" strokeWidth={w} opacity={0.6} />;
+    if (isD(st)) {
+      // Door: solid line with a gap in the middle
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const gapR = 5; // gap radius
+      return <g key={key}>
+        <line x1={x1} y1={y1} x2={mx - gapR} y2={my - (y1 === y2 ? 0 : gapR)} stroke="#78909c" strokeWidth={w} />
+        <line x1={mx + gapR} y1={my + (y1 === y2 ? 0 : gapR)} x2={x2} y2={y2} stroke="#78909c" strokeWidth={w} />
+        <rect x={mx - gapR} y={my - 1} width={gapR * 2} height={2} fill="#6d4c41" rx={1} />
+      </g>;
+    }
+    return <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke={fc(st)} strokeWidth={w} strokeLinecap="round" />;
+  };
+
+  // Coordinates for walls (plan view: N=top, S=bottom, W=left, E=right)
+  const L = m + w / 2, R = s - m - w / 2, T = m + w / 2, B = s - m - w / 2;
+
+  return (
+    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
+      {/* Floor fill — the dominant visual element */}
+      {!isO(faces.bottom) ? (
+        <rect x={m + w} y={m + w} width={inner} height={inner} rx={2} fill={fc(faces.bottom)} opacity={0.85} />
+      ) : (
+        <rect x={m + w} y={m + w} width={inner} height={inner} rx={2}
+          fill="none" stroke="var(--border, #e2e8f0)" strokeWidth={0.5} strokeDasharray="2,3" />
+      )}
+
+      {/* Ceiling indicator — small filled square in center if ceiling present */}
+      {!isO(faces.top) && (
+        <rect x={s/2 - 5} y={s/2 - 5} width={10} height={10} rx={2}
+          fill={fc(faces.top)} opacity={0.5} stroke={fc(faces.top)} strokeWidth={0.5} />
+      )}
+
+      {/* Four walls as thick edge strokes */}
+      {wallStroke(faces.n, L, T, R, T, 'n')}
+      {wallStroke(faces.s, L, B, R, B, 's')}
+      {wallStroke(faces.w, L, T, L, B, 'w')}
+      {wallStroke(faces.e, R, T, R, B, 'e')}
+    </svg>
+  );
+}
+
 /** Exported mini 3D icon component for hotbar slots. */
-export function MiniVoxel3D({ faces, size = 36, activeFace }: { faces: VoxelFaces; size?: number; activeFace?: keyof VoxelFaces }) {
+export function MiniVoxel3D({ faces, size = 36, activeFace, themeId }: { faces: VoxelFaces; size?: number; activeFace?: keyof VoxelFaces; themeId?: ThemeId }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   if (!mounted) {
-    return <CssVoxelIcon faces={faces} size={size * 0.72} activeFace={activeFace} />;
+    return <CssVoxelIcon faces={faces} size={size * 0.72} activeFace={activeFace} themeId={themeId} />;
   }
 
   return (
@@ -787,7 +1116,7 @@ export function MiniVoxel3D({ faces, size = 36, activeFace }: { faces: VoxelFace
     }}>
       <Canvas
         orthographic
-        camera={{ position: [2, 1.8, 2], zoom: size * 0.55, near: -10, far: 10 }}
+        camera={{ position: [0, 0, 4], zoom: size * 0.62, near: -10, far: 10 }}
         gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
         dpr={[1, 1.5]}
         frameloop="demand"
@@ -802,7 +1131,7 @@ export function MiniVoxel3D({ faces, size = 36, activeFace }: { faces: VoxelFace
 // ── Slot Button ─────────────────────────────────────────────
 
 function HotbarSlotButton({
-  slot, index, isActive, isCurrentMaterial, activeFace, onSelect, onHoverChange,
+  slot, index, isActive, isCurrentMaterial, activeFace, onSelect, onHoverChange, themeId,
 }: {
   slot: HotbarSlot;
   index: number;
@@ -811,6 +1140,7 @@ function HotbarSlotButton({
   activeFace?: keyof VoxelFaces;
   onSelect: (i: number) => void;
   onHoverChange: (hoveredIndex: number | null) => void;
+  themeId?: ThemeId;
 }) {
   const accent = RARITY_ACCENT[slot.category];
 
@@ -822,24 +1152,25 @@ function HotbarSlotButton({
       title={slot.label || `Slot ${slot.key}`}
       style={{
         width: 64,
-        height: 80,
-        borderRadius: 7,
-        border: `1px solid #e5e7eb`,
-        background: isActive ? `${accent}12` : "#ffffff",
+        borderRadius: 8,
+        border: isActive ? `2px solid ${accent}` : `1px solid var(--btn-border, #e5e7eb)`,
+        background: isActive ? `${accent}08` : "var(--btn-bg, #ffffff)",
         cursor: "pointer",
         position: "relative",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
         gap: 0,
-        transition: "all 120ms ease",
+        padding: "2px 0 0 0",
+        transition: "all 150ms ease",
+        transform: isActive ? "scale(1.06) translateY(-2px)" : "scale(1)",
         boxShadow: isActive
-          ? `0 0 0 1px ${accent}30, 0 4px 12px ${accent}20`
+          ? `0 0 0 2px ${accent}40, 0 6px 20px ${accent}30, 0 0 16px ${accent}15`
           : "0 1px 3px rgba(0,0,0,0.06)",
         outline: "none",
-        overflow: "hidden",
+        overflow: "visible",
         flexShrink: 0,
+        zIndex: isActive ? 5 : 1,
       }}
     >
       {/* Key badge */}
@@ -852,29 +1183,38 @@ function HotbarSlotButton({
         {slot.key === 0 ? "0" : String(slot.key)}
       </span>
 
-      {/* Current-material indicator — grey bottom border */}
+      {/* Active accent bar — bottom edge glow */}
+      {isActive && (
+        <div style={{
+          position: "absolute", bottom: -1, left: 8, right: 8, height: 3,
+          background: accent, borderRadius: 2,
+          boxShadow: `0 2px 8px ${accent}60`,
+        }} />
+      )}
+      {/* Current-material indicator — grey bottom border (when not active) */}
       {isCurrentMaterial && !isActive && (
         <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, height: 3,
-          background: "#94a3b8", borderRadius: "0 0 7px 7px",
+          position: "absolute", bottom: -1, left: 8, right: 8, height: 2,
+          background: "#94a3b8", borderRadius: 1,
         }} />
       )}
 
-      {/* 3D mini voxel icon */}
+      {/* Schematic cross-section icon — clearly shows each face type */}
       {slot.faces && (
         <div style={{ pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <MiniVoxel3D faces={slot.faces} size={50} activeFace={activeFace} />
+          <PresetSchematicIcon faces={slot.faces} size={48} />
         </div>
       )}
 
-      {/* Label */}
+      {/* Label — outside button frame for breathing room */}
       {slot.label && (
         <span style={{
-          position: "absolute", bottom: 2,
           fontSize: 7, fontWeight: 800,
           color: isActive ? accent : "#6b7280",
-          lineHeight: 1, letterSpacing: 0.5,
-          textTransform: "uppercase", zIndex: 2,
+          lineHeight: 1, letterSpacing: 0.3,
+          textTransform: "uppercase",
+          marginTop: 1, marginBottom: 2,
+          whiteSpace: "nowrap",
         }}>
           {slot.label}
         </span>
@@ -901,7 +1241,15 @@ export default function SmartHotbar() {
   const activeHotbarTab = useStore((s) => s.activeHotbarTab);
   const setActiveHotbarTab = useStore((s) => s.setActiveHotbarTab);
   const cycleHotbarTab = useStore((s) => s.cycleHotbarTab);
-  const hotbarMode: 'rooms' | 'materials' | 'furniture' = activeHotbarTab === 0 ? 'rooms' : activeHotbarTab === 1 ? 'materials' : 'furniture';
+  const hotbarMode: 'rooms' | 'surfaces' | 'materials' | 'furniture' = activeHotbarTab === 0 ? 'rooms' : activeHotbarTab === 1 ? 'surfaces' : activeHotbarTab === 2 ? 'materials' : 'furniture';
+
+  const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
+
+  // ── Theme-aware icon materials ──────────────────────────────
+  const currentTheme = useStore((s) => s.currentTheme) as ThemeId;
+  useEffect(() => {
+    applyThemeToMiniMaterials(currentTheme);
+  }, [currentTheme]);
 
   // Ghost scroll removed (Sprint 15) — use number keys or click to select hotbar slot
 
@@ -909,10 +1257,15 @@ export default function SmartHotbar() {
   const isWalkthrough = viewMode === ViewMode.Walkthrough;
   const hasSelection = selection.length > 0;
   const [hotbarHovered, setHotbarHovered] = useState(false);
-  const showHotbar = hasSelection || hotbarHovered || (hoveredVoxel !== null && !hoveredVoxel?.isExtension) || isWalkthrough;
+  // Hotbar only shows on SELECTION (not hover) — stable for ghost preview workflow
+  const showHotbar = hasSelection || hotbarHovered || isWalkthrough;
 
   // Hover tooltip state
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
+
+  // ── Materials tab pagination (10 per page) ──
+  const materialPageCount = Math.ceil(MATERIAL_SWATCHES.length / 10);
+  const [materialPage, setMaterialPage] = useState(0);
 
   // Eyedropper overlay — brief flash when activeBrush is set via Alt+click
   const activeBrush = useStore((s) => s.activeBrush);
@@ -928,17 +1281,7 @@ export default function SmartHotbar() {
     prevBrushRef.current = activeBrush;
   }, [activeBrush]);
 
-  // Context-aware tab auto-switch: face context → materials, null → rooms
-  const lastManualSwitchRef = useRef(0);
-  useEffect(() => {
-    if (Date.now() - lastManualSwitchRef.current < 2000) return;
-    const currentTab = useStore.getState().activeHotbarTab;
-    if (faceContext) {
-      if (currentTab !== 1) setActiveHotbarTab(1);
-    } else {
-      if (currentTab !== 0) setActiveHotbarTab(0);
-    }
-  }, [faceContext, setActiveHotbarTab]);
+  // Tab auto-switch removed (Sprint 15b) — user manually controls tab; stays stable
 
   // Sync FIXED_PRESETS to store on mount so ContainerSkin's getStampFaces() works
   useEffect(() => {
@@ -974,6 +1317,8 @@ export default function SmartHotbar() {
         setActiveSlot(null);
         setActiveModulePreset(null);
         useStore.getState().setActiveBrush(null);
+        useStore.getState().setSelectedVoxel(null);
+        useStore.getState().setSelectedVoxels(null);
         return;
       }
 
@@ -986,20 +1331,32 @@ export default function SmartHotbar() {
       // Tab / = / - : switch between Rooms and Materials tabs
       if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        lastManualSwitchRef.current = Date.now();
+
         cycleHotbarTab(1);
         return;
       }
       if (e.key === '=' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        lastManualSwitchRef.current = Date.now();
-        cycleHotbarTab(1);
+        const curTab = useStore.getState().activeHotbarTab;
+        if (curTab === 2) {
+          // Materials tab: paginate forward
+          setMaterialPage(p => (p + 1) % materialPageCount);
+        } else {
+  
+          cycleHotbarTab(1);
+        }
         return;
       }
       if (e.key === '-' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        lastManualSwitchRef.current = Date.now();
-        cycleHotbarTab(-1);
+        const curTab = useStore.getState().activeHotbarTab;
+        if (curTab === 2) {
+          // Materials tab: paginate backward
+          setMaterialPage(p => (p - 1 + materialPageCount) % materialPageCount);
+        } else {
+  
+          cycleHotbarTab(-1);
+        }
         return;
       }
 
@@ -1007,8 +1364,30 @@ export default function SmartHotbar() {
       if (e.key >= "1" && e.key <= "9") slotIndex = parseInt(e.key) - 1;
       else if (e.key === "0") slotIndex = 9;
 
-      // Only allow selection for the 8 fixed preset slots
-      if (slotIndex >= 0 && slotIndex < FIXED_PRESETS.length) {
+      if (slotIndex < 0) return;
+
+      const curTab = useStore.getState().activeHotbarTab;
+      if (curTab === 2) {
+        // Materials tab: number keys select material on current page
+        const matIndex = materialPage * 10 + slotIndex;
+        if (matIndex < MATERIAL_SWATCHES.length) {
+          e.preventDefault();
+          e.stopPropagation();
+          const swatch = MATERIAL_SWATCHES[matIndex];
+          const store = useStore.getState();
+          if (store.activeBrush === swatch.surface) {
+            store.setActiveBrush(null);
+          } else {
+            store.setActiveBrush(swatch.surface);
+            store.setActiveHotbarSlot(null);
+            store.setActiveModulePreset(null);
+          }
+        }
+        return;
+      }
+
+      // Surfaces tab: select preset slots
+      if (slotIndex < FIXED_PRESETS.length) {
         e.preventDefault();
         e.stopPropagation();
         setActiveSlot(activeSlot === slotIndex ? null : slotIndex);
@@ -1016,7 +1395,7 @@ export default function SmartHotbar() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeSlot, setActiveSlot]);
+  }, [activeSlot, setActiveSlot, materialPage, materialPageCount]);
 
   // Scroll-wheel cycling REMOVED (Sprint 14) — scroll now always means camera zoom.
   // Material cycling: use hotbar number keys (1-9) + click/E to apply.
@@ -1041,8 +1420,7 @@ export default function SmartHotbar() {
   const activeAccent = activePreset ? RARITY_ACCENT[activePreset.category] : null;
   const activeLabel = activePreset?.label ?? null;
 
-  const hoveredPreset = hoveredSlot !== null && hoveredSlot < FIXED_PRESETS.length ? FIXED_PRESETS[hoveredSlot] : null;
-  const hoveredAccent = hoveredPreset ? RARITY_ACCENT[hoveredPreset.category] : null;
+  // hoveredSlot still used for visual highlight glow on buttons — label display is select-only
 
   // Dot+Ring indicator REMOVED (Sprint 15) — was visually noisy.
 
@@ -1053,7 +1431,8 @@ export default function SmartHotbar() {
         onMouseEnter={() => setHotbarHovered(true)}
         onMouseLeave={() => { setHotbarHovered(false); }}
         style={{
-          position: "fixed", bottom: showHotbar ? 40 : 16, left: "50%",
+          position: "absolute", bottom: showHotbar ? 58 : 16,
+          left: "50%",
           transform: showHotbar ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(10px)",
           zIndex: 25, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
           opacity: showHotbar ? 1 : 0,
@@ -1061,8 +1440,8 @@ export default function SmartHotbar() {
           pointerEvents: showHotbar ? "auto" : "none",
         }}
       >
-        {/* Active label */}
-        {activeLabel && !hoveredPreset && (
+        {/* Active preset label (selected, not hover) */}
+        {activeLabel && (
           <div style={{
             fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase",
             color: activeAccent ?? "#374151",
@@ -1077,28 +1456,8 @@ export default function SmartHotbar() {
           </div>
         )}
 
-        {/* Hover tooltip — shows name + description */}
-        {hoveredPreset && (
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
-            background: "#ffffff",
-            padding: "4px 18px", borderRadius: 6,
-            border: `2px solid ${hoveredAccent}`,
-            boxShadow: `0 2px 10px ${hoveredAccent}30`,
-            whiteSpace: "nowrap",
-          }}>
-            <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.2, textTransform: "uppercase",
-              color: hoveredAccent ?? "#374151" }}>
-              {hoveredPreset.label}
-            </span>
-            <span style={{ fontSize: 9, fontWeight: 500, color: "#64748b", letterSpacing: 0.3 }}>
-              {hoveredPreset.description}
-            </span>
-          </div>
-        )}
-
         {/* Context chip */}
-        {faceContext !== null && !hoveredPreset && !activeLabel && (
+        {faceContext !== null && !activeLabel && (
           <div style={{
             fontSize: 9, fontWeight: 700, letterSpacing: 1.0, textTransform: "uppercase",
             color: faceContext === 'wall' ? "#607d8b" : faceContext === 'roof' ? "#5c6bc0" : "#8d6e63",
@@ -1111,11 +1470,12 @@ export default function SmartHotbar() {
         )}
 
         {/* ── Tab Pills ── */}
-        <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.6)", borderRadius: 8, padding: 2, border: "1px solid rgba(255,255,255,0.4)", backdropFilter: "blur(8px)" }}>
+        <div style={{ display: "flex", gap: 2, background: "var(--hotbar-bg)", borderRadius: 8, padding: 2, border: "1px solid var(--hotbar-border)", backdropFilter: "blur(8px)" }}>
           {([
             { tab: 0, label: "Rooms", mode: 'rooms' as const },
-            { tab: 1, label: "Surfaces", mode: 'materials' as const },
-            { tab: 2, label: "Furniture", mode: 'furniture' as const },
+            { tab: 1, label: "Surfaces", mode: 'surfaces' as const },
+            { tab: 2, label: "Materials", mode: 'materials' as const },
+            { tab: 3, label: "Furniture", mode: 'furniture' as const },
           ]).map(({ tab, label, mode }) => (
             <button
               key={tab}
@@ -1136,63 +1496,31 @@ export default function SmartHotbar() {
         {/* ── Hotbar Bar — 10 slots, flex-start, 720px ── */}
         <div
           style={{
-            display: hotbarMode === 'materials' ? "flex" : "none",
+            display: hotbarMode === 'surfaces' ? "flex" : "none",
             justifyContent: "flex-start",
             gap: 4,
             padding: "7px 10px 12px",
             borderRadius: 12,
             width: 720,
             position: "relative",
-            background: "rgba(255, 255, 255, 0.78)",
-            border: "1px solid rgba(255,255,255,0.4)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.04)",
+            background: "var(--hotbar-bg, rgba(255,255,255,0.78))",
+            border: "1px solid var(--hotbar-border, rgba(255,255,255,0.4))",
+            boxShadow: "var(--panel-shadow, 0 8px 32px rgba(0,0,0,0.10))",
             backdropFilter: "blur(16px) saturate(1.4)",
             WebkitBackdropFilter: "blur(16px) saturate(1.4)",
           }}
         >
-          {/* Active slot frame — solid border box around active slot */}
+          {/* Active slot underline bar — only indicator needed (clean, not busy) */}
           {activeSlot !== null && activeSlot < FIXED_PRESETS.length && (
             <div style={{
               position: 'absolute',
-              top: 7,
-              left: 10 + activeSlot * 68,
-              width: 64,
-              height: 80,
-              border: `2px solid ${activeAccent ?? '#1565c0'}`,
-              borderRadius: 8,
-              boxSizing: 'border-box',
-              pointerEvents: 'none',
-              zIndex: 10,
-              transition: 'left 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-            }} />
-          )}
-
-          {/* Active dot — at TOP of frame, above the icon */}
-          {activeSlot !== null && activeSlot < FIXED_PRESETS.length && (
-            <div style={{
-              position: 'absolute',
-              top: 3,
-              left: (10 + activeSlot * 68) + 28,
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: activeAccent ?? '#1565c0',
-              pointerEvents: 'none',
-              zIndex: 11,
-              transition: 'left 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-            }} />
-          )}
-
-          {/* Active slot underline bar */}
-          {activeSlot !== null && activeSlot < FIXED_PRESETS.length && (
-            <div style={{
-              position: 'absolute',
-              bottom: 7,
-              left: 10 + activeSlot * 68 + 4,
-              width: 56,
-              height: 2,
-              borderRadius: 1,
-              background: activeAccent ?? '#1565c0',
+              bottom: 8,
+              left: 10 + activeSlot * 68 + 6,
+              width: 52,
+              height: 3,
+              borderRadius: 2,
+              background: activeAccent ?? 'var(--accent)',
+              boxShadow: `0 2px 8px ${activeAccent ?? 'var(--accent)'}60`,
               pointerEvents: 'none',
               zIndex: 11,
               transition: 'left 150ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1208,15 +1536,15 @@ export default function SmartHotbar() {
               return (
                 <div key={`disabled-${i}`} style={{
                   width: 64, height: 80, borderRadius: 7,
-                  border: "1px dashed #e2e8f0",
-                  background: "#fafafa",
+                  border: "1px dashed var(--border, #e2e8f0)",
+                  background: "var(--surface-alt, #fafafa)",
                   display: "flex", alignItems: "flex-start", justifyContent: "flex-start",
                   padding: "2px 4px",
                   flexShrink: 0,
-                  opacity: 0.5,
+                  opacity: 0.3,
                   pointerEvents: 'none',
                 }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, color: "#d1d5db", fontFamily: "monospace" }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: "var(--text-dim, #d1d5db)", fontFamily: "monospace" }}>
                     {displayKey}
                   </span>
                 </div>
@@ -1246,6 +1574,7 @@ export default function SmartHotbar() {
                   activeFace={isActive ? hoveredVoxelEdge?.face : undefined}
                   onSelect={handleSelect}
                   onHoverChange={setHoveredSlot}
+                  themeId={currentTheme}
                 />
               </div>
             );
@@ -1274,9 +1603,9 @@ export default function SmartHotbar() {
             borderRadius: 12,
             width: 720,
             position: "relative",
-            background: "rgba(255, 255, 255, 0.78)",
-            border: "1px solid rgba(255,255,255,0.4)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.04)",
+            background: "var(--hotbar-bg, rgba(255,255,255,0.78))",
+            border: "1px solid var(--hotbar-border, rgba(255,255,255,0.4))",
+            boxShadow: "var(--panel-shadow, 0 8px 32px rgba(0,0,0,0.10))",
             backdropFilter: "blur(16px) saturate(1.4)",
             WebkitBackdropFilter: "blur(16px) saturate(1.4)",
           }}
@@ -1305,7 +1634,7 @@ export default function SmartHotbar() {
                 }}
               >
                 <div style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  <CssVoxelIcon faces={resolveModuleFaces(mod, 'n')} size={40} />
+                  <CssVoxelIcon faces={resolveModuleFaces(mod, 'n')} size={40} themeId={currentTheme} />
                 </div>
                 <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? "#3b82f6" : "#64748b", textAlign: "center", lineHeight: 1.1 }}>
                   {mod.label}
@@ -1324,6 +1653,135 @@ export default function SmartHotbar() {
           })}
         </div>
 
+        {/* ── Materials Bar — single row, paginated ── */}
+        <div
+          style={{
+            display: hotbarMode === 'materials' ? "flex" : "none",
+            alignItems: "center",
+            gap: 4,
+            padding: "6px 8px 8px",
+            borderRadius: 12,
+            width: 720,
+            position: "relative",
+            background: "var(--hotbar-bg, rgba(255,255,255,0.78))",
+            border: "1px solid var(--hotbar-border, rgba(255,255,255,0.4))",
+            boxShadow: "var(--panel-shadow, 0 8px 32px rgba(0,0,0,0.10))",
+            backdropFilter: "blur(16px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+          }}
+        >
+          {/* Prev page arrow */}
+          <button
+            onClick={() => setMaterialPage(p => (p - 1 + materialPageCount) % materialPageCount)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 16, color: materialPage > 0 ? "#475569" : "#cbd5e1",
+              padding: "2px 4px", lineHeight: 1, flexShrink: 0,
+            }}
+            title="Previous page ( - )"
+          >
+            ‹
+          </button>
+
+          {/* Material swatches — current page only */}
+          <div style={{ display: "flex", gap: 3, flex: 1, justifyContent: "flex-start" }}>
+            {MATERIAL_SWATCHES.slice(materialPage * 10, materialPage * 10 + 10).map((swatch, i) => {
+              const isActive = activeBrush === swatch.surface;
+              const fill = surfaceFill(swatch.surface, currentTheme);
+              const hotkey = i < 9 ? String(i + 1) : "0";
+              return (
+                <div
+                  key={swatch.surface}
+                  onClick={() => {
+                    const store = useStore.getState();
+                    if (store.activeBrush === swatch.surface) {
+                      store.setActiveBrush(null);
+                    } else {
+                      store.setActiveBrush(swatch.surface);
+                      store.setActiveHotbarSlot(null);
+                      store.setActiveModulePreset(null);
+                    }
+                  }}
+                  title={`${swatch.label} [${hotkey}]`}
+                  style={{
+                    width: 62,
+                    height: 52,
+                    borderRadius: 6,
+                    border: isActive ? "2px solid #2563eb" : "1px solid #d1d5db",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: 0,
+                    transition: "all 100ms ease",
+                    overflow: "hidden",
+                    flexShrink: 0,
+                    position: "relative",
+                    boxShadow: isActive ? "0 0 0 1px #2563eb40, 0 2px 8px #2563eb20" : "0 1px 2px rgba(0,0,0,0.06)",
+                  }}
+                >
+                  {/* Flat material swatch */}
+                  <div style={{
+                    position: "absolute",
+                    top: 0, left: 0, right: 0, bottom: 16,
+                    borderRadius: "5px 5px 0 0",
+                    ...fill,
+                    borderBottom: "1px solid rgba(0,0,0,0.08)",
+                  }} />
+                  {/* Hotkey badge */}
+                  <span style={{
+                    position: "absolute", top: 2, left: 3,
+                    fontSize: 7, fontWeight: 800, color: "rgba(0,0,0,0.35)",
+                    lineHeight: 1, zIndex: 2,
+                  }}>
+                    {hotkey}
+                  </span>
+                  {/* Label */}
+                  <span style={{
+                    fontSize: 8, fontWeight: 700,
+                    color: isActive ? "#2563eb" : "#64748b",
+                    lineHeight: 1, letterSpacing: 0.3,
+                    textTransform: "uppercase",
+                    padding: "2px 0 3px",
+                    zIndex: 1,
+                  }}>
+                    {swatch.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Next page arrow */}
+          <button
+            onClick={() => setMaterialPage(p => (p + 1) % materialPageCount)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 16, color: materialPage < materialPageCount - 1 ? "#475569" : "#cbd5e1",
+              padding: "2px 4px", lineHeight: 1, flexShrink: 0,
+            }}
+            title="Next page ( = )"
+          >
+            ›
+          </button>
+
+          {/* Page indicator dots */}
+          <div style={{ display: "flex", gap: 4, position: "absolute", bottom: 2, left: "50%", transform: "translateX(-50%)" }}>
+            {Array.from({ length: materialPageCount }, (_, i) => (
+              <div
+                key={i}
+                onClick={() => setMaterialPage(i)}
+                style={{
+                  width: 5, height: 5, borderRadius: "50%", cursor: "pointer",
+                  background: i === materialPage ? "#3b82f6" : "#cbd5e1",
+                  transition: "background 150ms ease",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
         {/* ── Furniture Bar ── */}
         <div
           style={{
@@ -1334,14 +1792,56 @@ export default function SmartHotbar() {
             borderRadius: 12,
             width: 720,
             position: "relative",
-            background: "rgba(255, 255, 255, 0.78)",
-            border: "1px solid rgba(255,255,255,0.4)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.04)",
+            background: "var(--hotbar-bg, rgba(255,255,255,0.78))",
+            border: "1px solid var(--hotbar-border, rgba(255,255,255,0.4))",
+            boxShadow: "var(--panel-shadow, 0 8px 32px rgba(0,0,0,0.10))",
             backdropFilter: "blur(16px) saturate(1.4)",
             WebkitBackdropFilter: "blur(16px) saturate(1.4)",
             overflowX: "auto",
           }}
         >
+          {/* ── Light placement buttons ── */}
+          {(['ceiling', 'lamp'] as const).map((lightType) => {
+            const isActive = useStore.getState().activeLightType === lightType;
+            const label = lightType === 'ceiling' ? 'Ceiling Light' : 'Floor Lamp';
+            return (
+              <div
+                key={`light-${lightType}`}
+                onClick={() => {
+                  const store = useStore.getState();
+                  if (store.activeLightType === lightType) {
+                    store.setActiveLightType(null);
+                  } else {
+                    store.setActiveLightType(lightType);
+                  }
+                }}
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 7,
+                  border: isActive ? "2px solid #f59e0b" : "1px solid #e2e8f0",
+                  background: isActive ? "rgba(245,158,11,0.08)" : "#fafafa",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  transition: "all 120ms ease",
+                }}
+              >
+                <svg viewBox="0 0 32 32" width={28} height={28} fill={isActive ? "#f59e0b" : "#607080"} opacity={0.7}>
+                  <LightSilhouette type={lightType} />
+                </svg>
+                <span style={{ fontSize: 7, fontWeight: 700, color: isActive ? "#f59e0b" : "#64748b", textAlign: "center", lineHeight: 1.1 }}>
+                  {label}
+                </span>
+              </div>
+            );
+          })}
+          <div style={{ width: 1, background: "#e2e8f0", margin: "4px 2px", flexShrink: 0 }} />
+          {/* ── Furniture items ── */}
           {FURNITURE_CATALOG.slice(0, 10).map((entry) => {
             const isActive = useStore.getState().activeFurniturePreset === entry.type;
             return (

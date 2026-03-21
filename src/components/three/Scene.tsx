@@ -289,10 +289,11 @@ function TimeOfDayEnvironmentInner({ intensity = 0.4 }: { intensity?: number }) 
   if (config.envMap === 'none') return null;
 
   if (config.envMap === 'cubeCamera') {
-    // High preset: CubeCamera captures actual scene for real-time reflections
-    // Resolution 256 per face, frames=1 (re-renders once per mount / HDRI change)
+    // High preset: CubeCamera captures actual scene for real-time reflections.
+    // Resolution 256 per face, frames=1 renders once per mount.
+    // Key on hdriFile so it re-captures when the time bracket changes (dawn→day→sunset→night).
     return (
-      <CubeCamera resolution={256} frames={1} near={0.5} far={200}>
+      <CubeCamera key={hdriFile} resolution={256} frames={1} near={0.5} far={200}>
         {(texture) => (
           <Environment map={texture} background={false} environmentIntensity={intensity} />
         )}
