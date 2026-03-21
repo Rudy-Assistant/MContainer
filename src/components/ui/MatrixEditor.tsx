@@ -274,6 +274,7 @@ function VoxelGrid({
   const cycleVoxelFace = useStore((s) => s.cycleVoxelFace);
   const setSelectedVoxelGrid = useStore((s) => s.setSelectedVoxel);
   const hoveredPreviewFace = useStore((s) => s.hoveredPreviewFace);
+  const selectedFace = useStore((s) => s.selectedFace);
   const voxelContextMenu = useStore((s) => s.voxelContextMenu);
 
   // Multi-select / marquee drag state
@@ -495,10 +496,11 @@ function VoxelGrid({
               selectedVoxels?.containerId === containerId &&
               selectedVoxels.indices.includes(cell.voxelIndex)
             ) || marqueeCells.includes(cell.voxelIndex);
-            // ★ Omni-sync: Cell View hover or context menu faceDir → cyan CSS border
+            // ★ Omni-sync: Cell View hover > persistent selectedFace > context menu faceDir → cyan CSS border
             const syncFace = isThisSelected
               ? (hoveredPreviewFace as string | null)
-                || (voxelContextMenu?.containerId === containerId
+                ?? (selectedFace as string | null)
+                ?? (voxelContextMenu?.containerId === containerId
                     && voxelContextMenu?.voxelIndex === cell.voxelIndex
                     ? (voxelContextMenu.faceDir ?? null)
                     : null)
