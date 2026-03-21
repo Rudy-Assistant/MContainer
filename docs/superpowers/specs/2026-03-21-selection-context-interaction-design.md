@@ -65,7 +65,7 @@ deriveSelectionTarget(state):
     const sv = state.selectedVoxel
     if sv.isExtension:
       // Extension voxels use col/row, not index. Convert to grid index for context.
-      const idx = sv.row * GRID_COLS + sv.col
+      const idx = sv.row * VOXEL_COLS + sv.col
       const cid = sv.containerId
       if state.selectedFace:
         return { type: 'face', containerId: cid, index: idx, face: state.selectedFace }
@@ -84,7 +84,7 @@ deriveSelectionTarget(state):
   return { type: 'none' }
 ```
 
-**Extension voxel handling:** `VoxelPayload` is a discriminated union (`VoxelRef | VoxelExtRef`). `VoxelExtRef` has `col`/`row` instead of `index`. The derivation converts extension coordinates to a grid index (`row * GRID_COLS + col`) so `SelectionTarget` always provides a flat `index`. All downstream consumers (highlight rendering, hotbar switching, paint application) already work with grid indices.
+**Extension voxel handling:** `VoxelPayload` is a discriminated union (`VoxelRef | VoxelExtRef`). `VoxelExtRef` has `col`/`row` instead of `index`. The derivation converts extension coordinates to a grid index (`row * VOXEL_COLS + col`) so `SelectionTarget` always provides a flat `index`. All downstream consumers (highlight rendering, hotbar switching, paint application) already work with grid indices.
 
 **Note:** `selectedVoxels` is checked regardless of `designComplexity`. In Simple mode, bay clicks set `selectedVoxels`; in Detail mode, shift-click multi-select also sets `selectedVoxels`. Both produce `'bay'`/`'bay-face'` targets — the hotbar mapping is the same. The `getBayGroupForVoxel` function is imported from `src/config/bayGroups.ts` (takes a single index, returns the bay group containing it).
 
