@@ -156,8 +156,11 @@ describe('Validation: checkUnsupportedCantilever', () => {
 
   it('VAL-10: extension voxel with roof triggers cantilever info', () => {
     const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    // Voxel 2 = row 0, col 2 (extension). Activate it with a steel roof.
     useStore.getState().setVoxelActive(id, 2, true);
     useStore.getState().paintFace(id, 2, 'top', 'Solid_Steel');
+    // Voxel 10 = row 1, col 2 (inward body neighbor). Deactivate so there is no support.
+    useStore.getState().setVoxelActive(id, 10, false);
     const containers = useStore.getState().containers;
     const warnings = checkUnsupportedCantilever(containers);
     expect(warnings.length).toBeGreaterThanOrEqual(1);

@@ -233,17 +233,35 @@ export const checkUnsupportedCantilever: ValidationRule = (containers: Record<st
     for (let i = 0; i < c.voxelGrid.length; i++) {
       const v = c.voxelGrid[i];
       if (!v.active) continue;
-      const { row, col } = decodeIndex(i);
+      const { level, row, col } = decodeIndex(i);
       const isExtension = row === 0 || row === VOXEL_ROWS - 1 || col === 0 || col === VOXEL_COLS - 1;
       if (!isExtension || v.faces.top === 'Open') continue;
-      warnings.push({
-        id: `structural-cantilever-${c.id}-${i}`,
-        category: 'structural',
-        severity: 'info',
-        message: `Extension voxel ${i} has roofing without structural support`,
-        containerId: c.id,
-        voxelIndices: [i],
+
+      // Check if any inward neighbor (toward body zone) is active
+      const perLevel = VOXEL_ROWS * VOXEL_COLS;
+      const encode = (r: number, cc: number) => level * perLevel + r * VOXEL_COLS + cc;
+
+      const inwardNeighbors: number[] = [];
+      if (row === 0 && row + 1 < VOXEL_ROWS) inwardNeighbors.push(encode(row + 1, col));
+      if (row === VOXEL_ROWS - 1 && row - 1 >= 0) inwardNeighbors.push(encode(row - 1, col));
+      if (col === 0 && col + 1 < VOXEL_COLS) inwardNeighbors.push(encode(row, col + 1));
+      if (col === VOXEL_COLS - 1 && col - 1 >= 0) inwardNeighbors.push(encode(row, col - 1));
+
+      const hasSupport = inwardNeighbors.some(ni => {
+        const nv = c.voxelGrid![ni];
+        return nv && nv.active;
       });
+
+      if (!hasSupport) {
+        warnings.push({
+          id: `structural-cantilever-${c.id}-${i}`,
+          category: 'structural',
+          severity: 'info',
+          message: `Extension voxel ${i} has roofing without structural support`,
+          containerId: c.id,
+          voxelIndices: [i],
+        });
+      }
     }
   }
   return warnings;
