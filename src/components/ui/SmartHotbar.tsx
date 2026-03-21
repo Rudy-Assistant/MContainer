@@ -9,6 +9,8 @@ import { ViewMode, type SurfaceType, type VoxelFaces, FURNITURE_CATALOG } from "
 import { MODULE_PRESETS, resolveModuleFaces } from "@/config/moduleCatalog";
 import { THEMES, type ThemeId } from "@/config/themes";
 
+import { useHotbarAutoSwitch } from '../../hooks/useHotbarAutoSwitch';
+
 // ── Room module slots for the Rooms tab ─────────────────────────
 const ROOM_SLOTS = MODULE_PRESETS.filter(p =>
   ['kitchen_full', 'bathroom_full', 'bedroom', 'living_room', 'office', 'deck_open', 'storage', 'stairs', 'entry_door'].includes(p.id)
@@ -1242,6 +1244,7 @@ export default function SmartHotbar() {
   const setActiveHotbarTab = useStore((s) => s.setActiveHotbarTab);
   const cycleHotbarTab = useStore((s) => s.cycleHotbarTab);
   const hotbarMode: 'rooms' | 'surfaces' | 'materials' | 'furniture' = activeHotbarTab === 0 ? 'rooms' : activeHotbarTab === 1 ? 'surfaces' : activeHotbarTab === 2 ? 'materials' : 'furniture';
+  useHotbarAutoSwitch();
 
   const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
 

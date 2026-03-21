@@ -34,7 +34,7 @@ export interface UiSlice {
   showFurnitureLabels: boolean;
   toggleFurnitureLabels: () => void;
 
-  // Hotbar tab (0 = rooms, 1 = materials, 2 = furniture)
+  // Hotbar tab: 0=Rooms, 1=Surfaces, 2=Materials, 3=Furniture (see SmartHotbar.tsx lines 1475-1478)
   activeHotbarTab: number;
   setActiveHotbarTab: (tab: number) => void;
   cycleHotbarTab: (dir: 1 | -1) => void;
