@@ -62,6 +62,8 @@ import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
 import { computePolePositions } from "@/utils/smartPoles";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
 import { makePoleKey } from "@/config/frameMaterials";
+import LightFixture from './LightFixture';
+import ElectricalPlate from './ElectricalPlate';
 // ── Constants ──────────────────────────────────────────────────
 
 // Surface cycle for hotbar face editing (shared with MatrixEditor)
@@ -1094,6 +1096,14 @@ function SingleFace({
       const panelMat = faceFinish?.paint || faceFinish?.material
         ? getMaterialForFace('Solid_Steel', faceFinish, activeTheme) as THREE.MeshStandardMaterial
         : mSteel;
+      if (dir === 'top' && faceFinish?.light && faceFinish.light !== 'none') {
+        return (
+          <>
+            <mesh geometry={getBox(colPitch, ROOF_THICK, rowPitch)} material={panelMat} castShadow receiveShadow raycast={nullRaycast} />
+            <LightFixture type={faceFinish.light} lightColor={faceFinish.lightColor} colPitch={colPitch} rowPitch={rowPitch} vHeight={vHeight} />
+          </>
+        );
+      }
       return (
         <mesh
           geometry={getBox(colPitch, ROOF_THICK, rowPitch)}
@@ -1106,11 +1116,13 @@ function SingleFace({
     }
     switch (s) {
       case "Solid_Steel": {
-        if (faceFinish?.paint || faceFinish?.material) {
-          const mat = getMaterialForFace('Solid_Steel', faceFinish, activeTheme);
-          return <mesh geometry={getBox(bW, bH, bD)} material={mat} castShadow receiveShadow raycast={nullRaycast} />;
+        const wallMesh = (faceFinish?.paint || faceFinish?.material)
+          ? <mesh geometry={getBox(bW, bH, bD)} material={getMaterialForFace('Solid_Steel', faceFinish, activeTheme)} castShadow receiveShadow raycast={nullRaycast} />
+          : <SteelFace w={bW} h={bH} d={bD} />;
+        if (!isHoriz && faceFinish?.electrical && faceFinish.electrical !== 'none') {
+          return <>{wallMesh}<ElectricalPlate type={faceFinish.electrical} dir={dir as 'n' | 's' | 'e' | 'w'} /></>;
         }
-        return <SteelFace w={bW} h={bH} d={bD} />;
+        return wallMesh;
       }
       case "Glass_Pane": {
         const tintMat = faceFinish?.tint
