@@ -9,12 +9,14 @@ import Sidebar from "@/components/ui/Sidebar";
 import BayContextMenu from "@/components/ui/BayContextMenu";
 import BottomDock from "@/components/ui/BottomDock";
 import BudgetModal from "@/components/ui/BudgetModal";
+import WizardModal from "@/components/ui/WizardModal";
 import StructureEditorModal from "@/components/ui/StructureEditorModal";
 import FloorDetailModal from "@/components/ui/FloorDetailModal";
 import ContainerContextMenu from "@/components/ui/ContainerContextMenu";
 import LevelSlicer from "@/components/ui/LevelSlicer";
 import TopToolbar from "@/components/ui/TopToolbar";
-import SmartHotbar from "@/components/ui/SmartHotbar";
+// import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
+import RecentItemsBar from "@/components/ui/RecentItemsBar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
 import VoxelContextMenu from "@/components/ui/VoxelContextMenu";
 import FaceContextMenu from "@/components/ui/FaceContextMenu";
@@ -35,6 +37,10 @@ function useHydrationSeed() {
   useEffect(() => {
     if (!hasHydrated) return;
     if (typeof window === 'undefined') return;
+
+    // Apply dark mode from store state
+    const dm = useStore.getState().darkMode;
+    if (dm) document.documentElement.setAttribute('data-theme', 'dark');
 
     // Check for shared design URL parameter
     const params = new URLSearchParams(window.location.search);
@@ -112,7 +118,7 @@ export default function Home() {
 
   if (!hasHydrated) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100vw', height: '100vh', background: '#f4f6f8', fontFamily: 'system-ui, sans-serif', color: '#37474f' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100vw', height: '100vh', background: 'var(--background, #f4f6f8)', fontFamily: 'system-ui, sans-serif', color: 'var(--text-main, #37474f)' }}>
         Loading project...
       </div>
     );
@@ -129,7 +135,7 @@ export default function Home() {
         {!isWalkthrough && !isPreviewMode && <Sidebar />}
 
         {/* Canvas Area — onContextMenu absolutely prevented */}
-        <div className="flex-1 relative" style={{ backgroundColor: "#f4f6f8", cursor: activeHotbarSlot !== null && !isWalkthrough ? 'crosshair' : 'default' }} onContextMenu={(e) => e.preventDefault()}>
+        <div className="flex-1 relative" style={{ backgroundColor: "var(--background, #f4f6f8)", cursor: activeHotbarSlot !== null && !isWalkthrough ? 'crosshair' : 'default' }} onContextMenu={(e) => e.preventDefault()}>
           <SceneCanvas />
 
           {/* Canvas hint overlay — bottom-right, hidden in walkthrough (has its own instructions) */}
@@ -152,9 +158,9 @@ export default function Home() {
 
           {/* Hotbars — visible when container selected (not walkthrough, not preview) */}
           {!isWalkthrough && !isPreviewMode && <CustomHotbar />}
-          {/* SmartHotbar: always rendered outside walkthrough (self-hides via opacity when !hasSelection);
-              also rendered in walkthrough for FPV targeting feedback */}
-          {!isPreviewMode && <SmartHotbar />}
+          {/* SmartHotbar replaced by RecentItemsBar (Task 6 — Sims-Style UI Overhaul Plan A)
+              SmartHotbar.tsx kept for CssVoxelIcon export used by CustomHotbar and UserLibrary */}
+          {!isPreviewMode && <RecentItemsBar />}
 
           {/* Bottom dock — persistent in all modes except preview (screenshot) mode */}
           {!isPreviewMode && (
@@ -204,6 +210,7 @@ export default function Home() {
       <StructureEditorModal />
       <FloorDetailModal />
       <ContainerContextMenu />
+      <WizardModal />
     </div>
   );
 }
