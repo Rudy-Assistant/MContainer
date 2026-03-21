@@ -1923,6 +1923,11 @@ const hlWallMat = new THREE.MeshBasicMaterial({
   color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.25,
   depthWrite: false, depthTest: false, side: THREE.DoubleSide,
 });
+// §7.2 Selection wall face overlay (cyan)
+const hlWallSelectMat = new THREE.MeshBasicMaterial({
+  color: 0x00bcd4, transparent: true, opacity: 0.3,
+  depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+});
 // Selection: wireframe outline instead of floor glow (eliminates teal artifact)
 const hlSelectEdgeMat = new THREE.LineBasicMaterial({
   color: 0x3b82f6, transparent: true, opacity: 0.8,
@@ -1962,6 +1967,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
   const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
   const selectedVoxel = useStore((s) => s.selectedVoxel);
   const selectedVoxels = useStore((s) => s.selectedVoxels);
+  const selectedFace = useStore((s) => s.selectedFace);
   const dims = CONTAINER_DIMENSIONS[container.size];
   const vHeight = dims.height;
   const vOffset = vHeight / 2;
@@ -2024,17 +2030,27 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
     return { individualHighlights: result, mergedHoverBox: mHover, mergedSelectBox: mSelect };
   }, [hoveredVoxel, hoveredVoxelEdge, hoveredBayGroup, selectedVoxel, selectedVoxels, container.id, dims]);
 
-  // Determine which wall face is hovered (for orange wall overlay)
+  // Determine which wall face is hovered (for amber wall overlay)
   const hoveredFace = (hoveredVoxelEdge && hoveredVoxelEdge.containerId === container.id)
     ? hoveredVoxelEdge.face : null;
   const hoveredFaceIdx = hoveredFace ? hoveredVoxelEdge!.voxelIndex : -1;
+
+  // Determine selected voxel index for face overlay
+  let selectedVoxelIdx = -1;
+  if (selectedVoxel && selectedVoxel.containerId === container.id) {
+    if (!selectedVoxel.isExtension && selectedVoxel.index !== undefined) {
+      selectedVoxelIdx = selectedVoxel.index;
+    } else if (selectedVoxel.isExtension) {
+      selectedVoxelIdx = (selectedVoxel as any).row * VOXEL_COLS + (selectedVoxel as any).col;
+    }
+  }
 
   if (individualHighlights.length === 0 && !mergedHoverBox && !mergedSelectBox) return null;
 
   return (
     <>
-      {/* Merged bay group selection wireframe (single box covering all group voxels) */}
-      {mergedSelectBox && (
+      {/* Merged bay group selection: wireframe when no face selected, face overlay when face selected */}
+      {mergedSelectBox && !selectedFace && (
         <lineSegments
           position={[mergedSelectBox.cx, vOffset, mergedSelectBox.cz]}
           geometry={getHlEdges(mergedSelectBox.w * 0.98, vHeight * 0.98, mergedSelectBox.d * 0.98)}
@@ -2043,6 +2059,36 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           raycast={nullRaycast}
         />
       )}
+      {/* §7.2 Merged bay group selection face overlay (cyan) when face is selected */}
+      {mergedSelectBox && selectedFace && (() => {
+        const mBox = mergedSelectBox;
+        const halfW = mBox.w / 2;
+        const halfD = mBox.d / 2;
+        let wallPos: [number, number, number] | null = null;
+        let wallSize: [number, number] | null = null;
+        let wallRotY = 0;
+        switch (selectedFace) {
+          case 'n': wallPos = [mBox.cx, vOffset, mBox.cz - halfD]; wallSize = [mBox.w, vHeight]; break;
+          case 's': wallPos = [mBox.cx, vOffset, mBox.cz + halfD]; wallSize = [mBox.w, vHeight]; break;
+          case 'e': wallPos = [mBox.cx + halfW, vOffset, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
+          case 'w': wallPos = [mBox.cx - halfW, vOffset, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
+          case 'top': wallPos = [mBox.cx, vHeight, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
+          case 'bottom': wallPos = [mBox.cx, 0, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
+        }
+        if (!wallPos || !wallSize) return null;
+        const isHoriz = selectedFace === 'top' || selectedFace === 'bottom';
+        return (
+          <mesh
+            position={wallPos}
+            rotation={isHoriz ? [-Math.PI / 2, 0, 0] : [0, wallRotY, 0]}
+            geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
+            material={hlWallSelectMat}
+            renderOrder={10}
+            raycast={nullRaycast}
+            frustumCulled={false}
+          />
+        );
+      })()}
       {/* Merged bay group hover wireframe */}
       {mergedHoverBox && (
         <lineSegments
@@ -2060,23 +2106,48 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         const layout = getVoxelLayout(col, row, dims);
 
         // Wall face overlay position + rotation for hovered edge
-        let wallPos: [number, number, number] | null = null;
-        let wallSize: [number, number] | null = null;
-        let wallRotY = 0;
+        let hoverWallPos: [number, number, number] | null = null;
+        let hoverWallSize: [number, number] | null = null;
+        let hoverWallRotY = 0;
         if (isHover && hoveredFace && idx === hoveredFaceIdx) {
           const halfW = layout.voxW / 2;
           const halfD = layout.voxD / 2;
           switch (hoveredFace) {
-            case 'n': wallPos = [layout.px, vOffset, layout.pz - halfD]; wallSize = [layout.voxW, vHeight]; break;
-            case 's': wallPos = [layout.px, vOffset, layout.pz + halfD]; wallSize = [layout.voxW, vHeight]; break;
-            case 'e': wallPos = [layout.px + halfW, vOffset, layout.pz]; wallSize = [layout.voxD, vHeight]; wallRotY = Math.PI / 2; break;
-            case 'w': wallPos = [layout.px - halfW, vOffset, layout.pz]; wallSize = [layout.voxD, vHeight]; wallRotY = Math.PI / 2; break;
+            case 'n': hoverWallPos = [layout.px, vOffset, layout.pz - halfD]; hoverWallSize = [layout.voxW, vHeight]; break;
+            case 's': hoverWallPos = [layout.px, vOffset, layout.pz + halfD]; hoverWallSize = [layout.voxW, vHeight]; break;
+            case 'e': hoverWallPos = [layout.px + halfW, vOffset, layout.pz]; hoverWallSize = [layout.voxD, vHeight]; hoverWallRotY = Math.PI / 2; break;
+            case 'w': hoverWallPos = [layout.px - halfW, vOffset, layout.pz]; hoverWallSize = [layout.voxD, vHeight]; hoverWallRotY = Math.PI / 2; break;
           }
         }
 
+        // §7.2 Selection face overlay position + rotation
+        let selWallPos: [number, number, number] | null = null;
+        let selWallSize: [number, number] | null = null;
+        let selWallRotY = 0;
+        let selIsHoriz = false;
+        if (isSelect && selectedFace && idx === selectedVoxelIdx) {
+          const halfW = layout.voxW / 2;
+          const halfD = layout.voxD / 2;
+          switch (selectedFace) {
+            case 'n': selWallPos = [layout.px, vOffset, layout.pz - halfD]; selWallSize = [layout.voxW, vHeight]; break;
+            case 's': selWallPos = [layout.px, vOffset, layout.pz + halfD]; selWallSize = [layout.voxW, vHeight]; break;
+            case 'e': selWallPos = [layout.px + halfW, vOffset, layout.pz]; selWallSize = [layout.voxD, vHeight]; selWallRotY = Math.PI / 2; break;
+            case 'w': selWallPos = [layout.px - halfW, vOffset, layout.pz]; selWallSize = [layout.voxD, vHeight]; selWallRotY = Math.PI / 2; break;
+            case 'top': selWallPos = [layout.px, vHeight, layout.pz]; selWallSize = [layout.voxW, layout.voxD]; selIsHoriz = true; break;
+            case 'bottom': selWallPos = [layout.px, 0, layout.pz]; selWallSize = [layout.voxW, layout.voxD]; selIsHoriz = true; break;
+          }
+        }
+
+        // Show whole-voxel wireframe only when selected without a face, or when selected+face but not this voxel
+        const showVoxelWireframe = isSelect && (!selectedFace || idx !== selectedVoxelIdx);
+        // Show face overlay when this voxel is selected and has a face selected
+        // Hover takes visual priority when hovering the same face
+        const showFaceOverlay = isSelect && selectedFace && idx === selectedVoxelIdx
+          && !(hoveredFace === selectedFace && idx === hoveredFaceIdx);
+
         return (
           <group key={`hl_${idx}`}>
-            {isSelect && (
+            {showVoxelWireframe && (
               <lineSegments
                 position={[layout.px, vOffset, layout.pz]}
                 geometry={getHlEdges(layout.voxW * 0.98, vHeight * 0.98, layout.voxD * 0.98)}
@@ -2095,13 +2166,25 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
               />
             )}
             {/* §7.1 Amber wall face overlay on hover */}
-            {isHover && wallPos && wallSize && (
+            {isHover && hoverWallPos && hoverWallSize && (
               <mesh
-                position={wallPos}
-                rotation={[0, wallRotY, 0]}
-                geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
+                position={hoverWallPos}
+                rotation={[0, hoverWallRotY, 0]}
+                geometry={getHlBox(hoverWallSize[0] * 0.95, hoverWallSize[1] * 0.95, 0.04)}
                 material={hlWallMat}
                 renderOrder={11}
+                raycast={nullRaycast}
+                frustumCulled={false}
+              />
+            )}
+            {/* §7.2 Cyan face overlay on selection */}
+            {showFaceOverlay && selWallPos && selWallSize && (
+              <mesh
+                position={selWallPos}
+                rotation={selIsHoriz ? [-Math.PI / 2, 0, 0] : [0, selWallRotY, 0]}
+                geometry={getHlBox(selWallSize[0] * 0.95, selWallSize[1] * 0.95, 0.04)}
+                material={hlWallSelectMat}
+                renderOrder={10}
                 raycast={nullRaycast}
                 frustumCulled={false}
               />
