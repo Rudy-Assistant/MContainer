@@ -122,13 +122,14 @@ export interface BlockPreset {
 }
 
 export const BLOCK_PRESETS: BlockPreset[] = [
-  // Cycle order: Deck → Default → Platform → Balcony → Glass Box → Sealed → Empty
-  { label: "Deck",             active: true,  faces: { top: "Open",        bottom: "Deck_Wood", n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
-  { label: "Default (Steel)",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Solid_Steel",  s: "Solid_Steel",  e: "Solid_Steel",  w: "Solid_Steel"  } },
+  // Cycle order: Floor+Ceil → +Rail → +Glass → Deck → Default → Empty
+  // Floor-centric first (most common editing = opening up a bay)
   { label: "Floor + Ceiling",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
   { label: "Floor+Ceil+Rail",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Railing_Cable",s: "Railing_Cable",e: "Railing_Cable", w: "Railing_Cable" } },
   { label: "Floor+Ceil+Glass", active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Glass_Pane",   s: "Glass_Pane",   e: "Glass_Pane",   w: "Glass_Pane"   } },
-  { label: "Sealed",           active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Solid_Steel",  s: "Solid_Steel",  e: "Solid_Steel",  w: "Solid_Steel"  } },
+  { label: "Deck",             active: true,  faces: { top: "Open",        bottom: "Deck_Wood", n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
+  { label: "Default (Steel)",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Solid_Steel",  s: "Solid_Steel",  e: "Solid_Steel",  w: "Solid_Steel"  } },
+  // "Sealed" removed — identical faces to Default (findIndex always matched Default first)
   { label: "Empty",            active: false, faces: { top: "Open",        bottom: "Open",      n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
 ];
 
