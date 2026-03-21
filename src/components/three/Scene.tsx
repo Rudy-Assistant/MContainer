@@ -43,12 +43,8 @@ import { validateDesign } from "@/utils/designValidation";
 import WarningOverlay from "./WarningOverlay";
 import { DevSceneExpose } from "./DevSceneExpose";
 import PostProcessingStack from './PostProcessingStack';
-import {
-  loadAllTextures,
-  getSteelTextures,
-  getWoodTextures,
-  applyTexturesToMaterial,
-} from "@/config/pbrTextures";
+import InteriorLights from './InteriorLights';
+// pbrTextures.ts removed — texture loading consolidated into materialCache.ts via textureLoader.ts
 import GroundManager from "./GroundManager";
 import DebugOverlay from "./DebugOverlay";
 // FaceContextWidget removed — replaced by Materials hotbar
@@ -300,34 +296,7 @@ function TimeOfDayEnvironment({ intensity = 0.4 }: { intensity?: number }) {
   );
 }
 
-function PBRTextureLoader() {
-  const { invalidate } = useThree();
-
-  useEffect(() => {
-    loadAllTextures().then(() => {
-      const steel = getSteelTextures();
-      if (steel) {
-        applyTexturesToMaterial(_themeMats.industrial.steel, steel, 1.2);
-        // Brighten steel with PBR textures — lighter base for visibility from all angles
-        _themeMats.industrial.steel.color.setHex(0xc0c8d0);
-        _themeMats.industrial.steel.envMapIntensity = 1.0;
-        _themeMats.industrial.steel.metalness = 0.40;
-        _themeMats.industrial.steel.roughness = 0.60;
-        _themeMats.industrial.steel.needsUpdate = true;
-      }
-
-      const wood = getWoodTextures();
-      if (wood) {
-        applyTexturesToMaterial(_themeMats.industrial.wood, wood, 0.8);
-        applyTexturesToMaterial(_themeMats.industrial.woodGroove, wood, 0.8);
-      }
-
-      invalidate();
-    });
-  }, [invalidate]);
-
-  return null;
-}
+// PBRTextureLoader removed — texture loading consolidated into materialCache.ts via textureLoader.ts
 
 // Ground plane is now managed by GroundManager.tsx
 
@@ -1197,7 +1166,7 @@ function RealisticScene() {
       <SunLight />
       <FollowLight />
       <GroundManager />
-      <PBRTextureLoader />
+      {/* PBRTextureLoader removed — textures now loaded by materialCache at module init */}
       <FrameModeInvalidator />
       <ValidationSubscriber />
 
@@ -1308,6 +1277,9 @@ function RealisticScene() {
       )}
 
       {/* FaceContextWidget removed — Materials hotbar replaces it */}
+
+      {/* Interior lighting (ceiling spots + floor lamps) */}
+      <InteriorLights />
 
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
@@ -1828,6 +1800,9 @@ function WalkthroughScene() {
       ))}
 
       <WalkthroughControls />
+
+      {/* Interior lighting (ceiling spots + floor lamps) */}
+      <InteriorLights />
 
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />

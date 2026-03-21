@@ -113,6 +113,13 @@ export interface WallConfig {
   bays: BaySlot[];
 }
 
+// ── Interior Light Placement ────────────────────────────────
+
+export interface LightPlacement {
+  voxelIndex: number;
+  type: 'ceiling' | 'lamp';
+}
+
 // ── Container ───────────────────────────────────────────────
 
 export type ContainerID = string; // UUID v4
@@ -199,6 +206,8 @@ export interface Container {
   railOverrides?: Record<string, ElementConfig>;
 
   // ── Interior / Furniture ──────────────────────────────────
+  /** Interior light placements */
+  lights?: LightPlacement[];
   /** Furniture items placed inside this container */
   furniture: FurnitureItem[];
 

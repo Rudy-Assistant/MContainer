@@ -12,6 +12,10 @@ const containerSchema = z.object({
     z: z.number(),
   }),
   walls: z.record(z.string(), z.any()),
+  lights: z.array(z.object({
+    voxelIndex: z.number(),
+    type: z.enum(['ceiling', 'lamp']),
+  })).optional().default([]),
 }).passthrough();
 
 export const persistedStateSchema = z.object({

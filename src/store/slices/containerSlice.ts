@@ -37,6 +37,7 @@ import {
   SHORT_WALL_BAYS,
   type ElementConfig,
   type PoleConfig,
+  type LightPlacement,
 } from "@/types/container";
 import {
   createContainer,
@@ -237,6 +238,10 @@ export interface ContainerSlice {
   setFrameElementOverride: (containerId: string, key: string, config: ElementConfig | PoleConfig) => void;
   clearFrameElementOverride: (containerId: string, key: string) => void;
   batchSetFrameOverrides: (containerId: string, keys: string[], config: ElementConfig | PoleConfig) => void;
+
+  // ── Interior Lights ─────────────────────────────────────────
+  addLight: (containerId: string, voxelIndex: number, type: 'ceiling' | 'lamp') => void;
+  removeLight: (containerId: string, voxelIndex: number) => void;
 
   // ── Debug ─────────────────────────────────────────────────
   __debugTwoStoryStack: () => void;
@@ -1685,6 +1690,40 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
     requestAnimationFrame(() => get().refreshAdjacency());
   },
+
+  // ── Interior Lights ─────────────────────────────────────────
+
+  addLight: (containerId, voxelIndex, type) =>
+    set((s: any) => {
+      const container = s.containers[containerId];
+      if (!container) return {};
+      const lights: LightPlacement[] = container.lights ?? [];
+      if (lights.some((l: LightPlacement) => l.voxelIndex === voxelIndex)) return {};
+      return {
+        containers: {
+          ...s.containers,
+          [containerId]: {
+            ...container,
+            lights: [...lights, { voxelIndex, type }],
+          },
+        },
+      };
+    }),
+
+  removeLight: (containerId, voxelIndex) =>
+    set((s: any) => {
+      const container = s.containers[containerId];
+      if (!container || !container.lights) return {};
+      return {
+        containers: {
+          ...s.containers,
+          [containerId]: {
+            ...container,
+            lights: container.lights.filter((l: LightPlacement) => l.voxelIndex !== voxelIndex),
+          },
+        },
+      };
+    }),
 
   // ── Debug — Temporary Verification ────────────────────────
 
