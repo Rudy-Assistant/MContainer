@@ -34,7 +34,7 @@ function getEdges(w: number, h: number, d: number): THREE.EdgesGeometry {
   return _edgeCache.get(k)!;
 }
 
-const nullRaycast = () => {};
+import { nullRaycast } from '@/utils/nullRaycast';
 
 /** Gate component — only subscribes to containers when a warning is hovered */
 export default function WarningOverlay() {

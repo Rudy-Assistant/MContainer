@@ -29,8 +29,7 @@ import {
 import { useStore } from "@/store/useStore";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER } from "@/config/highlightColors";
 
-// ── Raycast nuke helper ─────────────────────────────────────
-const nullRaycast = () => {};
+import { nullRaycast } from '@/utils/nullRaycast';
 
 // ═══════════════════════════════════════════════════════════════
 // PROCEDURAL CORRUGATION NORMAL MAP

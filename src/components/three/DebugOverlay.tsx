@@ -27,7 +27,7 @@ function getEdges(w: number, h: number, d: number): THREE.EdgesGeometry {
   return _edgeCache.get(k)!;
 }
 
-const nullRaycast = () => {};
+import { nullRaycast } from '@/utils/nullRaycast';
 
 function ContainerDebugWireframe({ container }: { container: Container }) {
   const dims = CONTAINER_DIMENSIONS[container.size];

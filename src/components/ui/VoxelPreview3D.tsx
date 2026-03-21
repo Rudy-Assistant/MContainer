@@ -88,7 +88,7 @@ function getEdges(w: number, h: number, d: number): THREE.BufferGeometry {
 
 // ── Raycast helpers ─────────────────────────────────────────────
 
-const nullRaycast = () => {};
+import { nullRaycast } from '@/utils/nullRaycast';
 const PV_STRIP = 0.18;  // picture-frame strip width for inspector hitboxes
 
 function PreviewPictureFrameHitbox({
@@ -255,9 +255,10 @@ function GhostNeighbor({ position, nW, nH, nD }: {
 
 // ── CubeScene ──────────────────────────────────────────────────
 
-function CubeScene({ containerId, voxelIndex, overrideFaces }: {
+function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: {
   containerId: string; voxelIndex: number;
   overrideFaces?: Partial<VoxelFaces>;
+  bayGroupIndices?: number[];
 }) {
   const voxel = useStore((s) => s.containers[containerId]?.voxelGrid?.[voxelIndex]);
   const voxelGrid = useStore((s) => s.containers[containerId]?.voxelGrid);
@@ -266,11 +267,31 @@ function CubeScene({ containerId, voxelIndex, overrideFaces }: {
   const activeBrush = useStore((s) => s.activeBrush);
   const openVoxelContextMenu = useStore((s) => s.openVoxelContextMenu);
 
-  // Dynamic voxel proportions from container spec (body voxels: 6 cols × 2 rows)
+  // Dynamic voxel proportions — varies by position (body vs extension)
   const dims = containerSize ? CONTAINER_DIMENSIONS[containerSize] : { length: 12.19, width: 2.44, height: 2.90 };
-  const nW = dims.length / 6;   // colPitch (X axis)
-  const nH = dims.height;       // vHeight  (Y axis)
-  const nD = dims.width / 2;    // rowPitch (Z axis)
+  const bodyColPitch = dims.length / (VOXEL_COLS - 2);
+  const bodyRowPitch = dims.width / (VOXEL_ROWS - 2);
+
+  // Bay group: compute merged dimensions spanning all voxels
+  const { nW, nH, nD } = useMemo(() => {
+    const indices = bayGroupIndices && bayGroupIndices.length > 1 ? bayGroupIndices : [voxelIndex];
+    let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+    for (const idx of indices) {
+      const c = idx % VOXEL_COLS;
+      const r = Math.floor(idx / VOXEL_COLS) % VOXEL_ROWS;
+      if (c < minCol) minCol = c;
+      if (c > maxCol) maxCol = c;
+      if (r < minRow) minRow = r;
+      if (r > maxRow) maxRow = r;
+    }
+    // Sum widths across columns
+    let w = 0;
+    for (let c = minCol; c <= maxCol; c++) w += (c === 0 || c === VOXEL_COLS - 1) ? dims.height : bodyColPitch;
+    // Sum depths across rows
+    let d = 0;
+    for (let r = minRow; r <= maxRow; r++) d += (r === 0 || r === VOXEL_ROWS - 1) ? dims.height : bodyRowPitch;
+    return { nW: w, nH: dims.height, nD: d };
+  }, [voxelIndex, bayGroupIndices, dims.height, bodyColPitch, bodyRowPitch]);
 
   const isEmptyVoxel = !voxel || !voxel.active;
 
@@ -390,11 +411,12 @@ function CubeScene({ containerId, voxelIndex, overrideFaces }: {
             containerId={containerId}
             voxelIndex={voxelIndex}
             onCycle={() => {
-              if (activeBrush) {
-                setVoxelFace(containerId, voxelIndex, config.face, activeBrush);
+              const surface = activeBrush ?? cycleSurface(faces[config.face], 1);
+              // Bay group: apply to all voxels in the group
+              if (bayGroupIndices && bayGroupIndices.length > 1) {
+                for (const bi of bayGroupIndices) setVoxelFace(containerId, bi, config.face, surface);
               } else {
-                const next = cycleSurface(faces[config.face], 1);
-                setVoxelFace(containerId, voxelIndex, config.face, next);
+                setVoxelFace(containerId, voxelIndex, config.face, surface);
               }
             }}
             onContextMenu={(e: ThreeEvent<MouseEvent>) => {
@@ -435,20 +457,20 @@ function CubeScene({ containerId, voxelIndex, overrideFaces }: {
 
 // ── Public Export ───────────────────────────────────────────────
 
-export default function VoxelPreview3D({ containerId, voxelIndex, overrideFaces }: {
+export default function VoxelPreview3D({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: {
   containerId: string; voxelIndex: number;
   overrideFaces?: Partial<VoxelFaces>;
+  bayGroupIndices?: number[];
 }) {
   return (
     <div style={{
-      width: "100%", maxWidth: "200px", aspectRatio: "1.35 / 1",
+      width: "100%", aspectRatio: "1.6 / 1",
       borderRadius: "8px", overflow: "hidden",
-      background: "#f1f5f9", border: "1px solid #e2e8f0", position: "relative",
-      margin: "0 auto",
+      background: "var(--surface-alt, #f1f5f9)", border: "1px solid var(--border, #e2e8f0)", position: "relative",
     }}>
       <Canvas
         orthographic
-        camera={{ position: [2, 3.5, 7], zoom: 34, near: -100, far: 100 }}
+        camera={{ position: [3, 3.5, 5], zoom: 30, near: -100, far: 100 }}
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", background: "transparent" }}
@@ -456,13 +478,63 @@ export default function VoxelPreview3D({ containerId, voxelIndex, overrideFaces 
           useStore.getState().setHoveredPreviewFace(null);
         }}
       >
-        <CubeScene containerId={containerId} voxelIndex={voxelIndex} overrideFaces={overrideFaces} />
+        <CubeScene containerId={containerId} voxelIndex={voxelIndex} overrideFaces={overrideFaces} bayGroupIndices={bayGroupIndices} />
       </Canvas>
-      <div style={{
-        position: "absolute", bottom: "4px", right: "6px",
-        fontSize: "8px", color: "#94a3b8", pointerEvents: "none", letterSpacing: "0.02em",
-      }}>
-        Drag to rotate · Right-click face for options
+      {/* Hint text removed — too busy */}
+    </div>
+  );
+}
+
+/**
+ * GroupedVoxelPreview — Shows merged dimensions for a bay group (Simple mode).
+ * Computes the bounding box of the selected voxel indices and displays combined size.
+ */
+export function GroupedVoxelPreview({ containerId, indices }: { containerId: string; indices: number[] }) {
+  const containerSize = useStore((s) => s.containers[containerId]?.size);
+  if (!containerSize || indices.length === 0) return null;
+
+  const dims = CONTAINER_DIMENSIONS[containerSize];
+  const bodyColPitch = dims.length / (VOXEL_COLS - 2);
+  const bodyRowPitch = dims.width / (VOXEL_ROWS - 2);
+
+  // Compute bounding box of selected indices
+  let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+  for (const idx of indices) {
+    const col = idx % VOXEL_COLS;
+    const row = Math.floor(idx / VOXEL_COLS) % VOXEL_ROWS;
+    if (col < minCol) minCol = col;
+    if (col > maxCol) maxCol = col;
+    if (row < minRow) minRow = row;
+    if (row > maxRow) maxRow = row;
+  }
+
+  // Compute merged dimensions
+  const colSpan = maxCol - minCol + 1;
+  const rowSpan = maxRow - minRow + 1;
+  const hasHaloCol = minCol === 0 || maxCol === VOXEL_COLS - 1;
+  const hasHaloRow = minRow === 0 || maxRow === VOXEL_ROWS - 1;
+
+  const mergedW = hasHaloCol
+    ? (colSpan - 1) * bodyColPitch + dims.height  // one halo col + body cols
+    : colSpan * bodyColPitch;
+  const mergedD = hasHaloRow
+    ? (rowSpan - 1) * bodyRowPitch + dims.height
+    : rowSpan * bodyRowPitch;
+  const mergedH = dims.height;
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+      padding: "8px 12px",
+      background: "var(--surface-alt, #f8fafc)",
+      border: "1px solid var(--border, #e2e8f0)",
+      borderRadius: 8, margin: "0 auto", maxWidth: 200,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-main)", fontFamily: "monospace" }}>
+        {mergedW.toFixed(1)}m × {mergedD.toFixed(1)}m × {mergedH.toFixed(1)}m
+      </div>
+      <div style={{ fontSize: 9, color: "var(--text-muted)" }}>
+        {indices.length} voxels · {colSpan}×{rowSpan} grid
       </div>
     </div>
   );

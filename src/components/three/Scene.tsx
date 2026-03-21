@@ -277,13 +277,7 @@ function DimensionLabels() {
 // With its own Suspense, the scene renders immediately with the Sky dome
 // and all geometry, and the HDRI environment map loads asynchronously.
 
-/** Select bundled HDRI file path based on time bracket */
-function getHdriFile(timeOfDay: number): string {
-  if (timeOfDay >= 5 && timeOfDay < 8) return '/assets/hdri/dawn.hdr';
-  if (timeOfDay >= 8 && timeOfDay < 17) return '/assets/hdri/day.hdr';
-  if (timeOfDay >= 17 && timeOfDay < 20) return '/assets/hdri/sunset.hdr';
-  return '/assets/hdri/night.hdr';
-}
+// getHdriFile imported from @/config/timeOfDay
 
 function TimeOfDayEnvironmentInner({ intensity = 0.4 }: { intensity?: number }) {
   const timeOfDay = useStore((s) => s.environment.timeOfDay);
@@ -365,12 +359,8 @@ function ValidationSubscriber() {
   return null;
 }
 
-// ── Time-of-Day Phase Helpers ──────────────────────────────
-
-function isNightTime(t: number) { return t < 5 || t > 21; }
-function isGoldenHourTime(t: number) { return (t >= 5 && t < 8) || (t > 17 && t <= 21); }
-function isDeepTwilightTime(t: number) { return t < 6 || t > 20; }
-function isTwilightTime(t: number) { return t < 6.5 || t > 19.5; }
+// ── Time-of-Day Phase Helpers (centralized in config/timeOfDay.ts) ──
+import { isNight as isNightTime, isGoldenHour as isGoldenHourTime, isDeepTwilight as isDeepTwilightTime, isTwilight as isTwilightTime, getHdriFile } from '@/config/timeOfDay';
 
 const FOG_NIGHT = { color: '#060614', near: 60, far: 200 } as const;
 const FOG_GOLDEN = { color: '#d4c4a8', near: 60, far: 180 } as const;
@@ -1057,7 +1047,7 @@ const mGhostFill = new THREE.MeshStandardMaterial({
 const mGhostWire = new THREE.LineBasicMaterial({
   color: "#94a3b8", transparent: true, opacity: 0.25,
 });
-const nullRaycastScene = () => {};
+import { nullRaycast as nullRaycastScene } from '@/utils/nullRaycast';
 
 function GhostContainer({ container }: { container: Container }) {
   const dims = CONTAINER_DIMENSIONS[container.size];
@@ -1209,7 +1199,7 @@ function RealisticScene() {
         resolution={1024}
         frames={1}
         color="#0a1a06"
-        raycast={() => {}}
+        raycast={nullRaycastScene}
       />
 
       {/* Clouds REMOVED — see SkyDome comment above */}

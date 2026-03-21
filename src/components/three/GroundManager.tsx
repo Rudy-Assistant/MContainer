@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
 import { useStore } from "@/store/useStore";
 import { GROUND_PRESETS, DEFAULT_GROUND_PRESET, type GroundPresetId } from "@/config/groundPresets";
+import { nullRaycast } from '@/utils/nullRaycast';
 
 // ── ErrorBoundary ──────────────────────────────────────────
 // useTexture throws Error on 404 (not Promise) — Suspense can't catch it.
@@ -68,8 +69,6 @@ const _displacementTex = (() => {
 
 // Random UV rotation angle per session — breaks visible tiling pattern
 const _uvRotAngle = Math.random() * Math.PI * 0.25; // 0–45° random rotation
-const _uvCos = Math.cos(_uvRotAngle);
-const _uvSin = Math.sin(_uvRotAngle);
 
 // ── Fallback (solid color, no textures) ────────────────────
 
@@ -83,7 +82,7 @@ function GroundFallback({ presetId }: { presetId: GroundPresetId }) {
     );
   }, [presetId, preset.folder]);
   return (
-    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow raycast={() => {}}>
+    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow raycast={nullRaycast}>
       <planeGeometry args={[GROUND_SIZE, GROUND_SIZE, GROUND_SEGMENTS, GROUND_SEGMENTS]} />
       <meshStandardMaterial
         color={preset.color}
@@ -142,7 +141,7 @@ function TexturedGround({ presetId }: { presetId: GroundPresetId }) {
   const aoMap = textures.aoMap as THREE.Texture | undefined;
 
   return (
-    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow raycast={() => {}}>
+    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow raycast={nullRaycast}>
       <planeGeometry args={[GROUND_SIZE, GROUND_SIZE, GROUND_SEGMENTS, GROUND_SEGMENTS]} />
       <meshStandardMaterial
         map={textures.map as THREE.Texture}

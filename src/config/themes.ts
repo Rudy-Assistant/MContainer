@@ -25,17 +25,8 @@ export interface ThemeMaterialConfig {
   concrete:   { color: number; metalness: number; roughness: number };
 }
 
-/** Per-theme texture directory paths (contain color.jpg, normal.jpg, roughness.jpg) */
+/** Per-theme texture folder names (under /assets/materials/) */
 export interface ThemeTextureSet {
-  /** @deprecated Use folder fields with textureLoader instead */
-  exterior_wall: string | null;  // null = no texture, use flat color
-  /** @deprecated Use folder fields with textureLoader instead */
-  interior_wall: string | null;
-  /** @deprecated Use folder fields with textureLoader instead */
-  floor: string | null;
-  /** @deprecated Use folder fields with textureLoader instead */
-  ceiling: string | null;
-  frame: null;                   // Frames always use flat color
   /** Folder name under /assets/materials/ for exterior wall textures */
   exterior_wall_folder: string;
   /** Folder name under /assets/materials/ for interior wall textures */
@@ -74,11 +65,6 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
       concrete:   { color: 0x999999, metalness: 0.0, roughness: 0.85 },
     },
     textures: {
-      exterior_wall: '/assets/materials/Corrugated_Steel/',
-      interior_wall: '/assets/materials/Concrete/',
-      floor: '/assets/materials/Deck_Wood/',
-      ceiling: '/assets/materials/Corrugated_Steel/',
-      frame: null,
       exterior_wall_folder: 'Corrugated_Steel',
       interior_wall_folder: 'Concrete',
       floor_folder: 'Deck_Wood',
@@ -106,11 +92,6 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
       concrete:   { color: 0x888888, metalness: 0.0, roughness: 0.80 },
     },
     textures: {
-      exterior_wall: '/assets/materials/Japanese_Cedar/',
-      interior_wall: '/assets/materials/Shoji_Paper/',
-      floor: '/assets/materials/Bamboo/',
-      ceiling: '/assets/materials/Japanese_Cedar/',
-      frame: null,
       exterior_wall_folder: 'Japanese_Cedar',
       interior_wall_folder: 'Shoji_Paper',
       floor_folder: 'Bamboo',
@@ -138,11 +119,6 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
       concrete:   { color: 0xb0a090, metalness: 0.0, roughness: 0.80 },
     },
     textures: {
-      exterior_wall: '/assets/materials/Stucco/',
-      interior_wall: '/assets/materials/Plaster/',
-      floor: '/assets/materials/Terracotta/',
-      ceiling: '/assets/materials/Bleached_Wood/',
-      frame: null,
       exterior_wall_folder: 'Stucco',
       interior_wall_folder: 'Plaster',
       floor_folder: 'Terracotta',

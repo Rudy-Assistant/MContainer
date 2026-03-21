@@ -12,14 +12,14 @@ import {
   type ContainerSize,
 } from '@/types/container';
 import { getVoxelLayout } from '@/components/objects/ContainerSkin';
+import { nullRaycast } from '@/utils/nullRaycast';
+import { getLightIntensity, isSunLow } from '@/config/timeOfDay';
 import type { ThemeId } from '@/config/themes';
 
 const LIGHT_COLOR = 0xffe4b5; // Warm white (3000K)
 const SPOT_ANGLE = Math.PI / 3; // ~60 degrees
 const SPOT_PENUMBRA = 0.5;
 const POINT_RANGE = 3; // meters
-
-const nullRaycast = () => {};
 
 // ── Geometry & material singletons (never recreated per render) ──
 const _ceilingDiscGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.02, 16);
@@ -29,17 +29,9 @@ const _housingMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness:
 const _poleMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.6, roughness: 0.3 });
 const _shadeMat = new THREE.MeshStandardMaterial({ color: 0xffeedd, emissive: LIGHT_COLOR, emissiveIntensity: 0.6 });
 
-/** Pure function — exported for testing */
-export function getLightIntensity(timeOfDay: number): number {
-  // Daytime: low intensity (ambient daylight dominates)
-  if (timeOfDay >= 8 && timeOfDay <= 16) return 0.3;
-  // Nighttime: full intensity
-  if (timeOfDay >= 18 || timeOfDay <= 5) return 2.0;
-  // Dawn transition (5 → 8): intensity ramps down from 2.0 to 0.3
-  if (timeOfDay < 8) return 0.3 + (8 - timeOfDay) / 3 * 1.7;
-  // Dusk transition (16 → 18): intensity ramps up from 0.3 to 2.0
-  return 0.3 + (timeOfDay - 16) / 2 * 1.7;
-}
+// getLightIntensity and isSunLow imported from @/config/timeOfDay
+// Re-export for test compatibility
+export { getLightIntensity } from '@/config/timeOfDay';
 
 interface LightData {
   key: string;
@@ -77,7 +69,7 @@ export default function InteriorLights() {
   const intensity = useMemo(() => getLightIntensity(timeOfDay), [timeOfDay]);
 
   // Glass emissive boost at low sun angles — only fires when threshold crossed
-  const sunLow = timeOfDay < 7 || timeOfDay > 17;
+  const sunLow = isSunLow(timeOfDay);
   useEffect(() => {
     const matSet = _themeMats[currentTheme];
     if (!matSet?.glass) return;

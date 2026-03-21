@@ -197,8 +197,7 @@ const mBaseplateWire = new THREE.LineBasicMaterial({
   color: 0x546e7a, transparent: true, opacity: 0.30,
 });
 
-// ── nullRaycast — disables raycasting on a single mesh ────────
-const nullRaycast = () => {};
+import { nullRaycast } from '@/utils/nullRaycast';
 
 // ── Frame mode highlight materials ────────────────────────────
 const frameHoverMat = new THREE.MeshStandardMaterial({

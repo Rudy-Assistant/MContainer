@@ -13,7 +13,7 @@
  *   - User can orbit independently; "Link" toggle re-enables sync
  */
 
-import { useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -26,7 +26,7 @@ import {
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { useStore } from "@/store/useStore";
 import { Text } from "@react-three/drei";
-import ContainerSkin from "@/components/objects/ContainerSkin";
+import ContainerSkin, { getVoxelLayout } from "@/components/objects/ContainerSkin";
 
 // ═══════════════════════════════════════════════════════════
 // SKELETON MATERIALS — module scope, never re-created
@@ -68,9 +68,9 @@ function CameraSync({
   // Dynamic zoom — compute from actual bounding volume to fill the preview canvas
   useLayoutEffect(() => {
     if ("zoom" in camera) {
-      const colPitch = dims.length / 6;
-      const expandedLen = hasHaloCols ? dims.length + colPitch * 2 : dims.length;
-      const expandedWid = hasHaloRows ? dims.width + 1.22 * 2 : dims.width;
+      const foldDepth = dims.height; // halo projection = container height
+      const expandedLen = hasHaloCols ? dims.length + foldDepth * 2 : dims.length;
+      const expandedWid = hasHaloRows ? dims.width + foldDepth * 2 : dims.width;
       // Isometric projection: effective screen extent ≈ max(length, width) * sqrt(2)/2 + height
       const isoExtent = Math.max(expandedLen, expandedWid) * 0.85 + dims.height * 0.35;
       // Canvas is ~352px wide (sidebar 384 - padding). Target 90% fill.
@@ -84,9 +84,9 @@ function CameraSync({
   useLayoutEffect(() => {
     if (!linked) return;
 
-    const colPitch = dims.length / 6;
-    const expandedLen = hasHaloCols ? dims.length + colPitch * 2 : dims.length;
-    const expandedWid = hasHaloRows ? dims.width + 1.22 * 2 : dims.width;
+    const foldDepth = dims.height; // halo projection = container height
+    const expandedLen = hasHaloCols ? dims.length + foldDepth * 2 : dims.length;
+    const expandedWid = hasHaloRows ? dims.width + foldDepth * 2 : dims.width;
     const maxDim = Math.max(expandedLen, expandedWid);
     const dist = maxDim * 0.95;
 
@@ -164,6 +164,103 @@ function IsoSkeleton({
   );
 }
 
+// ── Selection + Hover highlight for ISO preview ────────────────────
+import { nullRaycast } from '@/utils/nullRaycast';
+const _hlSelectMat = new THREE.LineBasicMaterial({ color: 0x00bcd4, transparent: true, opacity: 0.8 });
+const _hlHoverMat = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.7 });
+
+/** Compute position for a voxel index in ISO preview coordinate space.
+ *  Delegates to the canonical getVoxelLayout() so highlights align with ContainerSkin faces. */
+function isoVoxelPos(idx: number, dims: { length: number; width: number; height: number }) {
+  const col = idx % VOXEL_COLS;
+  const row = Math.floor(idx / VOXEL_COLS) % VOXEL_ROWS;
+  return getVoxelLayout(col, row, dims);
+}
+
+/** Compute merged AABB for multiple voxel indices in ISO space */
+function isoMergedAABB(indices: number[], dims: { length: number; width: number; height: number }) {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const idx of indices) {
+    const { px, pz, voxW, voxD } = isoVoxelPos(idx, dims);
+    minX = Math.min(minX, px - voxW / 2);
+    maxX = Math.max(maxX, px + voxW / 2);
+    minZ = Math.min(minZ, pz - voxD / 2);
+    maxZ = Math.max(maxZ, pz + voxD / 2);
+  }
+  return { cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, w: maxX - minX, d: maxZ - minZ };
+}
+
+// Geometry cache for merged boxes (keyed by rounded dimensions)
+const _isoEdgeCache = new Map<string, THREE.EdgesGeometry>();
+function getIsoEdges(w: number, h: number, d: number): THREE.EdgesGeometry {
+  const key = `${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}`;
+  let eg = _isoEdgeCache.get(key);
+  if (!eg) { eg = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)); _isoEdgeCache.set(key, eg); }
+  return eg;
+}
+
+function IsoSelectionHighlight({ containerId, dims }: { containerId: string; dims: { length: number; width: number; height: number } }) {
+  const selectedVoxel = useStore((s) => s.selectedVoxel);
+  const selectedVoxels = useStore((s) => s.selectedVoxels);
+  const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
+  const vHeight = dims.height;
+
+  // Bay group selection (Simple mode)
+  const selectIndices = selectedVoxels?.containerId === containerId ? selectedVoxels.indices : null;
+  // Bay group hover
+  const hoverIndices = hoveredBayGroup?.containerId === containerId ? hoveredBayGroup.indices : null;
+
+  // Individual voxel selection (Detail mode fallback)
+  let singleIdx = -1;
+  if (!selectIndices && selectedVoxel?.containerId === containerId) {
+    singleIdx = selectedVoxel.isExtension
+      ? (selectedVoxel.row ?? 0) * VOXEL_COLS + (selectedVoxel.col ?? 0)
+      : selectedVoxel.index ?? -1;
+  }
+
+  if (!selectIndices && !hoverIndices && singleIdx < 0) return null;
+
+  // Pre-compute AABBs outside JSX
+  const selectAABB = selectIndices && selectIndices.length > 0 ? isoMergedAABB(selectIndices, dims) : null;
+  const hoverAABB = hoverIndices && hoverIndices.length > 0 ? isoMergedAABB(hoverIndices, dims) : null;
+  const singlePos = singleIdx >= 0 ? isoVoxelPos(singleIdx, dims) : null;
+
+  return (
+    <>
+      {/* Merged bay group selection wireframe */}
+      {selectAABB && (
+        <lineSegments
+          position={[selectAABB.cx, vHeight / 2, selectAABB.cz]}
+          geometry={getIsoEdges(selectAABB.w * 0.96, vHeight * 0.96, selectAABB.d * 0.96)}
+          material={_hlSelectMat}
+          renderOrder={20}
+          raycast={nullRaycast}
+        />
+      )}
+      {/* Merged bay group hover wireframe */}
+      {hoverAABB && (
+        <lineSegments
+          position={[hoverAABB.cx, vHeight / 2, hoverAABB.cz]}
+          geometry={getIsoEdges(hoverAABB.w, vHeight, hoverAABB.d)}
+          material={_hlHoverMat}
+          renderOrder={21}
+          raycast={nullRaycast}
+        />
+      )}
+      {/* Individual voxel selection (Detail mode) */}
+      {singlePos && (
+        <lineSegments
+          position={[singlePos.px, vHeight / 2, singlePos.pz]}
+          geometry={getIsoEdges(singlePos.voxW * 0.96, vHeight * 0.96, singlePos.voxD * 0.96)}
+          material={_hlSelectMat}
+          renderOrder={20}
+          raycast={nullRaycast}
+        />
+      )}
+    </>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════
 // ISO CANVAS — the isolated R3F scene, reads from STORE
 // ═══════════════════════════════════════════════════════════
@@ -206,10 +303,11 @@ function IsoEditorCanvas({
       />
 
       {/* Studio lighting — matches main 3D scene quality */}
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[10, 14, 8]} intensity={1.4} castShadow shadow-mapSize={[512, 512]} />
-      <directionalLight position={[-8, 6, -6]} intensity={0.5} />
-      <directionalLight position={[0, -4, 0]} intensity={0.2} />
+      <ambientLight intensity={1.2} />
+      <directionalLight position={[10, 14, 8]} intensity={1.6} castShadow shadow-mapSize={[512, 512]} />
+      <directionalLight position={[-8, 6, -6]} intensity={0.7} />
+      <directionalLight position={[0, -4, 0]} intensity={0.3} />
+      <hemisphereLight args={['#b0c4de', '#2a3a4a', 0.4]} />
 
       <group>
         {/* 1. Bare steel skeleton — floor/roof/posts/beams only, zero cladding */}
@@ -219,6 +317,9 @@ function IsoEditorCanvas({
               key={containerId} forces full remount when selected container changes,
               preventing stale R3F fiber tree state. */}
         {!hideSkin && <ContainerSkin key={containerId} container={container} animated={false} />}
+
+        {/* 3. Selected voxel highlight — cyan wireframe box in preview matching main scene */}
+        <IsoSelectionHighlight containerId={containerId} dims={dims} />
 
         {/* 3. Orientation labels — "FRONT" at +X (A-End), "BACK" at -X */}
         <Text
@@ -312,7 +413,7 @@ export default function IsoEditor({ containerId }: { containerId: string }) {
           fontSize: "10px", color: "#64748b", fontWeight: 600,
           letterSpacing: "0.06em", textTransform: "uppercase", marginRight: "2px",
         }}>
-          Layers
+          Container
         </span>
         <LayerBtn label="Roof" active={hideRoof} onClick={() => setHideRoof((v) => !v)} />
         <LayerBtn label="Skin" active={hideSkin} onClick={() => setHideSkin((v) => !v)} />
@@ -361,8 +462,8 @@ export default function IsoEditor({ containerId }: { containerId: string }) {
       {/* Mini canvas */}
       <div style={{
         width: "100%", height: "220px", borderRadius: "8px", overflow: "hidden",
-        background: "#f1f5f9",
-        border: "1px solid #e2e8f0",
+        background: "var(--surface-alt, #f1f5f9)",
+        border: "1px solid var(--border, #e2e8f0)",
         position: "relative",
       }}>
         <Canvas
@@ -379,13 +480,7 @@ export default function IsoEditor({ containerId }: { containerId: string }) {
             linked={linked}
           />
         </Canvas>
-        <div style={{
-          position: "absolute", bottom: "6px", right: "8px",
-          fontSize: "9px", color: "#94a3b8", pointerEvents: "none",
-          letterSpacing: "0.02em",
-        }}>
-          Drag to orbit · Click surface to select
-        </div>
+        {/* Hint text removed — too busy for compact preview */}
       </div>
     </div>
   );
