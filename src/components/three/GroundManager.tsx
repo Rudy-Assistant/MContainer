@@ -41,7 +41,7 @@ const GROUND_POSITION: [number, number, number] = [0, GROUND_Y, 0];
 
 // ── Procedural displacement texture (module-level singleton) ──
 
-const DISP_SIZE = 256;
+const DISP_SIZE = 512;
 const DISP_SEED = 42;
 const TWO_PI = Math.PI * 2;
 
@@ -51,10 +51,12 @@ const _displacementTex = (() => {
     for (let x = 0; x < DISP_SIZE; x++) {
       const nx = x / DISP_SIZE, ny = y / DISP_SIZE;
       const v =
-        0.5  * Math.sin(nx * TWO_PI * 2 + DISP_SEED) * Math.cos(ny * TWO_PI * 2) +
-        0.25 * Math.sin(nx * TWO_PI * 4 + DISP_SEED * 1.3) * Math.cos(ny * TWO_PI * 3) +
+        0.45 * Math.sin(nx * TWO_PI * 2 + DISP_SEED) * Math.cos(ny * TWO_PI * 2) +
+        0.22 * Math.sin(nx * TWO_PI * 4 + DISP_SEED * 1.3) * Math.cos(ny * TWO_PI * 3) +
         0.12 * Math.sin(nx * TWO_PI * 8 + DISP_SEED * 0.7) * Math.cos(ny * TWO_PI * 7) +
-        0.06 * Math.sin(nx * TWO_PI * 16) * Math.cos(ny * TWO_PI * 14 + DISP_SEED);
+        0.08 * Math.sin(nx * TWO_PI * 16) * Math.cos(ny * TWO_PI * 14 + DISP_SEED) +
+        0.05 * Math.sin(nx * TWO_PI * 32 + 1.7) * Math.cos(ny * TWO_PI * 28 + DISP_SEED * 0.3) +
+        0.03 * Math.sin(nx * TWO_PI * 64 + 2.1) * Math.cos(ny * TWO_PI * 48);
       data[y * DISP_SIZE + x] = Math.floor(((v + 1) / 2) * 255);
     }
   }
@@ -63,6 +65,11 @@ const _displacementTex = (() => {
   tex.needsUpdate = true;
   return tex;
 })();
+
+// Random UV rotation angle per session — breaks visible tiling pattern
+const _uvRotAngle = Math.random() * Math.PI * 0.25; // 0–45° random rotation
+const _uvCos = Math.cos(_uvRotAngle);
+const _uvSin = Math.sin(_uvRotAngle);
 
 // ── Fallback (solid color, no textures) ────────────────────
 
@@ -76,7 +83,7 @@ function GroundFallback({ presetId }: { presetId: GroundPresetId }) {
     );
   }, [presetId, preset.folder]);
   return (
-    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow>
+    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow raycast={() => {}}>
       <planeGeometry args={[GROUND_SIZE, GROUND_SIZE, GROUND_SEGMENTS, GROUND_SEGMENTS]} />
       <meshStandardMaterial
         color={preset.color}
@@ -97,18 +104,29 @@ function TexturedGround({ presetId }: { presetId: GroundPresetId }) {
   const preset = GROUND_PRESETS[presetId];
   const base = `/assets/materials/${preset.folder}`;
 
-  const rawTextures = useTexture({
-    map: `${base}/color.jpg`,
-    normalMap: `${base}/normal.jpg`,
-    roughnessMap: `${base}/roughness.jpg`,
-  });
+  // Load core textures + optional displacement/AO when preset specifies them
+  const texPaths: Record<string, string> = useMemo(() => {
+    const paths: Record<string, string> = {
+      map: `${base}/${preset.colorFile ?? 'color.jpg'}`,
+      normalMap: `${base}/${preset.normalFile ?? 'normal.jpg'}`,
+      roughnessMap: `${base}/${preset.roughnessFile ?? 'roughness.jpg'}`,
+    };
+    if (preset.displacementFile) paths.displacementMap = `${base}/${preset.displacementFile}`;
+    if (preset.aoFile) paths.aoMap = `${base}/${preset.aoFile}`;
+    return paths;
+  }, [base, preset.colorFile, preset.normalFile, preset.roughnessFile, preset.displacementFile, preset.aoFile]);
+
+  const rawTextures = useTexture(texPaths);
 
   // Configure textures once per preset change (not every render)
   const textures = useMemo(() => {
     for (const tex of Object.values(rawTextures) as THREE.Texture[]) {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       tex.repeat.set(preset.repeatX, preset.repeatY);
-      tex.anisotropy = 4;
+      // Apply random UV rotation to break visible tiling
+      tex.rotation = _uvRotAngle;
+      tex.center.set(0.5, 0.5);
+      tex.anisotropy = 8; // Higher anisotropy for oblique viewing
       tex.needsUpdate = true;
     }
     (rawTextures.map as THREE.Texture).colorSpace = THREE.SRGBColorSpace;
@@ -120,8 +138,11 @@ function TexturedGround({ presetId }: { presetId: GroundPresetId }) {
     [preset.normalScale],
   );
 
+  const dispMap = (textures.displacementMap as THREE.Texture | undefined) ?? _displacementTex;
+  const aoMap = textures.aoMap as THREE.Texture | undefined;
+
   return (
-    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow>
+    <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow raycast={() => {}}>
       <planeGeometry args={[GROUND_SIZE, GROUND_SIZE, GROUND_SEGMENTS, GROUND_SEGMENTS]} />
       <meshStandardMaterial
         map={textures.map as THREE.Texture}
@@ -132,7 +153,9 @@ function TexturedGround({ presetId }: { presetId: GroundPresetId }) {
         metalness={0}
         envMapIntensity={preset.envMapIntensity}
         color={preset.tint ?? 0xffffff}
-        displacementMap={_displacementTex}
+        aoMap={aoMap}
+        aoMapIntensity={aoMap ? 0.6 : 0}
+        displacementMap={dispMap ?? _displacementTex}
         displacementScale={preset.displacementScale}
         displacementBias={-preset.displacementScale * 0.3}
       />

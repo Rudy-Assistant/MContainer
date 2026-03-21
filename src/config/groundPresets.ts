@@ -22,6 +22,16 @@ export interface GroundPreset {
   normalScale: number;
   envMapIntensity: number;
   displacementScale: number;
+  /** Optional real displacement texture filename (in folder) — overrides procedural */
+  displacementFile?: string;
+  /** Optional AO texture filename (in folder) */
+  aoFile?: string;
+  /** Override color texture filename (default: "color.jpg") */
+  colorFile?: string;
+  /** Override normal texture filename (default: "normal.jpg") */
+  normalFile?: string;
+  /** Override roughness texture filename (default: "roughness.jpg") */
+  roughnessFile?: string;
 }
 
 export const GROUND_PRESETS: Record<GroundPresetId, GroundPreset> = {
@@ -30,13 +40,18 @@ export const GROUND_PRESETS: Record<GroundPresetId, GroundPreset> = {
     label: "Grass",
     folder: "Ground_Grass",
     color: 0x2d7a1e,            // Vivid green fallback (golf course tone)
-    tint: 0x88cc88,             // Light green tint — shifts texture toward lush lawn
-    roughness: 0.92,
-    repeatX: 40,                // Finer tiling — less visible repeat
-    repeatY: 40,
-    normalScale: 0.6,           // Subtle blade detail (was 1.5 — too harsh)
-    envMapIntensity: 0.25,      // Slight sheen from sunlight
-    displacementScale: 0.03,    // Nearly flat (was 0.15 — created bumpy terrain)
+    tint: 0x77dd77,             // Bright natural green tint — lush lawn
+    roughness: 0.95,            // Very rough — grass is matte, not reflective
+    repeatX: 80,                // Higher repeat = smaller grass blades = less visible tiling
+    repeatY: 80,
+    normalScale: 0.25,          // Subtle blade detail — real displacement handles depth
+    envMapIntensity: 0.05,      // Minimal reflection — grass doesn't shine
+    displacementScale: 0.015,   // Very gentle — real displacement texture has proper grass detail
+    displacementFile: "Grass005_1K-JPG_Displacement.jpg",
+    aoFile: "Grass005_1K-JPG_AmbientOcclusion.jpg",
+    colorFile: "Grass005_1K-JPG_Color.jpg",
+    normalFile: "Grass005_1K-JPG_NormalGL.jpg",
+    roughnessFile: "Grass005_1K-JPG_Roughness.jpg",
   },
   concrete: {
     id: "concrete",
