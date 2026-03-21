@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { THEMES, type ThemeId, type ThemeMaterialConfig } from './themes';
 import { getTexturePaths, applyTextures, type TextureQuality } from './textureLoader';
+import type { FaceFinish, SurfaceType } from '../types/container';
 
 // ── Theme Material Set ──────────────────────────────────────
 
@@ -206,6 +207,7 @@ export function rebuildThemeMaterials(quality: TextureQuality, invalidate?: () =
       (mat as THREE.Material).dispose();
     }
   }
+  clearFinishMaterialCaches();
   applyQualityTextures(quality, invalidate);
   // Ensure demand-mode canvas re-renders even if no textures load (e.g., 'flat' quality)
   invalidate?.();
@@ -214,3 +216,92 @@ export function rebuildThemeMaterials(quality: TextureQuality, invalidate?: () =
 // NOTE: No module-level texture loading here — QualityManager in Scene.tsx
 // owns the initial applyQualityTextures call on mount, which ensures the
 // correct quality is used (from persisted store state, not a hardcoded default).
+
+// ── FaceFinish material resolution ─────────────────────────────
+
+const _paintCache = new Map<string, THREE.MeshStandardMaterial>();
+const _tintCache = new Map<string, THREE.MeshPhysicalMaterial>();
+const _frameColorCache = new Map<string, THREE.MeshStandardMaterial>();
+
+const MATERIAL_ID_MAP: Record<string, keyof ThemeMaterialSet> = {
+  steel: 'steel',
+  wood: 'wood',
+  concrete: 'concrete',
+  bamboo: 'wood',
+};
+
+function surfaceToMatKey(surface: SurfaceType): keyof ThemeMaterialSet {
+  switch (surface) {
+    case 'Solid_Steel': case 'Half_Fold': case 'Gull_Wing': return 'steel';
+    case 'Glass_Pane': case 'Glass_Shoji': return 'glass';
+    case 'Window_Standard': case 'Window_Half': case 'Window_Sill': case 'Window_Clerestory': return 'frame';
+    case 'Deck_Wood': case 'Wood_Hinoki': return 'wood';
+    case 'Concrete': return 'concrete';
+    case 'Railing_Cable': return 'rail';
+    case 'Railing_Glass': return 'railGlass';
+    case 'Door': case 'Wall_Washi': return 'wood';
+    default: return 'steel';
+  }
+}
+
+export function getMaterialForFace(
+  surface: SurfaceType,
+  finish: FaceFinish | undefined,
+  theme: ThemeId,
+): THREE.Material {
+  const mats = _themeMats[theme];
+  const baseKey = surfaceToMatKey(surface);
+  const baseMat = mats[baseKey];
+  if (!finish) return baseMat;
+
+  if (finish.paint) {
+    const cacheKey = `${theme}:${baseKey}:paint:${finish.paint}`;
+    let cached = _paintCache.get(cacheKey);
+    if (!cached) {
+      cached = (baseMat as THREE.MeshStandardMaterial).clone();
+      cached.color = new THREE.Color(finish.paint);
+      _paintCache.set(cacheKey, cached);
+    }
+    return cached;
+  }
+
+  if (finish.tint && (baseKey === 'glass' || baseKey === 'railGlass')) {
+    const cacheKey = `${theme}:${baseKey}:tint:${finish.tint}`;
+    let cached = _tintCache.get(cacheKey);
+    if (!cached) {
+      cached = (baseMat as THREE.MeshPhysicalMaterial).clone();
+      cached.color = new THREE.Color(finish.tint);
+      _tintCache.set(cacheKey, cached);
+    }
+    return cached;
+  }
+
+  if (finish.frameColor && (baseKey === 'frame' || surface === 'Door')) {
+    const frameMat = mats.frame;
+    const cacheKey = `${theme}:frame:color:${finish.frameColor}`;
+    let cached = _frameColorCache.get(cacheKey);
+    if (!cached) {
+      cached = frameMat.clone();
+      cached.color = new THREE.Color(finish.frameColor);
+      _frameColorCache.set(cacheKey, cached);
+    }
+    return cached;
+  }
+
+  if (finish.material) {
+    const overrideKey = MATERIAL_ID_MAP[finish.material];
+    if (overrideKey) return mats[overrideKey];
+    return baseMat;
+  }
+
+  return baseMat;
+}
+
+export function clearFinishMaterialCaches() {
+  for (const mat of _paintCache.values()) mat.dispose();
+  for (const mat of _tintCache.values()) mat.dispose();
+  for (const mat of _frameColorCache.values()) mat.dispose();
+  _paintCache.clear();
+  _tintCache.clear();
+  _frameColorCache.clear();
+}
