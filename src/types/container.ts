@@ -324,7 +324,23 @@ export interface Voxel {
    *  - walls_deploy: side walls swivel outward from floor center
    *  - reverse: plays the entry animation in reverse (wall swivels back up/down) */
   unpackPhase?: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy' | 'reverse';
+  /** Per-face finish overrides — absent values fall back to theme defaults */
+  faceFinishes?: FaceFinishes;
 }
+
+/** Per-face finish overrides — absent values fall back to theme defaults */
+export interface FaceFinish {
+  material?: string;
+  paint?: string;
+  tint?: string;
+  frameColor?: string;
+  doorStyle?: string;
+  light?: string;
+  lightColor?: string;
+  electrical?: string;
+}
+
+export type FaceFinishes = Partial<Record<keyof VoxelFaces, FaceFinish>>;
 
 /** Tracks faces auto-modified by smart stair placement, keyed by "voxelIndex:face".
  *  Values are the original SurfaceType before the smart change.

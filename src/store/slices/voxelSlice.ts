@@ -16,6 +16,7 @@ import {
   type SmartStairChanges,
   type ModuleOrientation,
   type DoorConfig,
+  type FaceFinish,
   VOXEL_COLS,
   VOXEL_ROWS,
   VOXEL_LEVELS,
@@ -70,6 +71,8 @@ export interface VoxelSlice {
   setDoorConfig: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, config: Partial<DoorConfig>) => void;
   applyDoorModule: (containerId: string, voxelIndex: number, orientation: ModuleOrientation) => void;
   getDoorConstraints: (containerId: string, voxelIndex: number, face: keyof VoxelFaces) => DoorConstraints;
+  setFaceFinish: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, finish: Partial<FaceFinish>) => void;
+  clearFaceFinish: (containerId: string, voxelIndex: number, face: keyof VoxelFaces) => void;
 }
 
 export interface DoorConstraints {
@@ -1444,6 +1447,42 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
         };
+    });
+  },
+
+  setFaceFinish: (containerId, voxelIndex, face, finish) => {
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      const voxel = grid[voxelIndex];
+      if (!voxel) return {};
+      const prevFinishes = voxel.faceFinishes ?? {};
+      grid[voxelIndex] = {
+        ...voxel,
+        faceFinishes: {
+          ...prevFinishes,
+          [face]: { ...prevFinishes[face as keyof typeof prevFinishes], ...finish },
+        },
+      };
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+    });
+  },
+
+  clearFaceFinish: (containerId, voxelIndex, face) => {
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      const voxel = grid[voxelIndex];
+      if (!voxel?.faceFinishes) return {};
+      const newFinishes = { ...voxel.faceFinishes };
+      delete newFinishes[face as keyof typeof newFinishes];
+      grid[voxelIndex] = {
+        ...voxel,
+        faceFinishes: Object.keys(newFinishes).length === 0 ? undefined : newFinishes,
+      };
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
     });
   },
 });
