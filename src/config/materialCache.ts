@@ -207,6 +207,8 @@ export function rebuildThemeMaterials(quality: TextureQuality, invalidate?: () =
     }
   }
   applyQualityTextures(quality, invalidate);
+  // Ensure demand-mode canvas re-renders even if no textures load (e.g., 'flat' quality)
+  invalidate?.();
 }
 
 // NOTE: No module-level texture loading here — QualityManager in Scene.tsx
