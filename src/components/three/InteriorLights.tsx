@@ -9,9 +9,9 @@ import { _themeMats } from '@/config/materialCache';
 import {
   CONTAINER_DIMENSIONS,
   VOXEL_COLS,
-  VOXEL_ROWS,
   type ContainerSize,
 } from '@/types/container';
+import { getVoxelLayout } from '@/components/objects/ContainerSkin';
 import type { ThemeId } from '@/config/themes';
 
 const LIGHT_COLOR = 0xffe4b5; // Warm white (3000K)
@@ -20,6 +20,14 @@ const SPOT_PENUMBRA = 0.5;
 const POINT_RANGE = 3; // meters
 
 const nullRaycast = () => {};
+
+// ── Geometry & material singletons (never recreated per render) ──
+const _ceilingDiscGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.02, 16);
+const _poleGeo = new THREE.CylinderGeometry(0.02, 0.05, 0.6, 8);
+const _shadeGeo = new THREE.ConeGeometry(0.12, 0.15, 16);
+const _housingMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8, roughness: 0.2 });
+const _poleMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.6, roughness: 0.3 });
+const _shadeMat = new THREE.MeshStandardMaterial({ color: 0xffeedd, emissive: LIGHT_COLOR, emissiveIntensity: 0.6 });
 
 /** Pure function — exported for testing */
 export function getLightIntensity(timeOfDay: number): number {
@@ -31,34 +39,6 @@ export function getLightIntensity(timeOfDay: number): number {
   if (timeOfDay < 8) return 0.3 + (8 - timeOfDay) / 3 * 1.7;
   // Dusk transition (16 → 18): intensity ramps up from 0.3 to 2.0
   return 0.3 + (timeOfDay - 16) / 2 * 1.7;
-}
-
-/**
- * Compute voxel center X/Z in container-local space.
- * Matches ContainerSkin getVoxelLayout coordinate system:
- *   col → X = -(col - 3.5) * coreWidth  (negated X axis)
- *   row → Z = (row - 1.5) * coreDepth
- * Halo cols/rows use dims.height as pitch (fold depth).
- */
-function voxelLocalXZ(
-  col: number, row: number,
-  dims: { length: number; width: number; height: number },
-): [number, number] {
-  const coreWidth = dims.length / 6;
-  const coreDepth = dims.width / 2;
-  const foldDepth = dims.height;
-
-  let px: number;
-  if (col === 0) px = dims.length / 2 + foldDepth / 2;
-  else if (col === VOXEL_COLS - 1) px = -(dims.length / 2 + foldDepth / 2);
-  else px = -(col - 3.5) * coreWidth;
-
-  let pz: number;
-  if (row === 0) pz = -(dims.width / 2 + foldDepth / 2);
-  else if (row === VOXEL_ROWS - 1) pz = dims.width / 2 + foldDepth / 2;
-  else pz = (row - 1.5) * coreDepth;
-
-  return [px, pz];
 }
 
 interface LightData {
@@ -77,19 +57,17 @@ export default function InteriorLights() {
   const containersWithLights = useStore(useShallow((s) => {
     const result: {
       id: string;
-      position: { x: number; y: number; z: number };
+      px: number; py: number; pz: number;
       size: ContainerSize;
       lights: { voxelIndex: number; type: 'ceiling' | 'lamp' }[];
-      level: number;
     }[] = [];
     for (const [id, c] of Object.entries(s.containers)) {
       if (c.lights && c.lights.length > 0) {
         result.push({
           id,
-          position: c.position,
+          px: c.position.x, py: c.position.y, pz: c.position.z,
           size: c.size,
           lights: c.lights,
-          level: c.level,
         });
       }
     }
@@ -98,44 +76,50 @@ export default function InteriorLights() {
 
   const intensity = useMemo(() => getLightIntensity(timeOfDay), [timeOfDay]);
 
-  // Glass emissive boost at low sun angles
+  // Glass emissive boost at low sun angles — only fires when threshold crossed
+  const sunLow = timeOfDay < 7 || timeOfDay > 17;
   useEffect(() => {
     const matSet = _themeMats[currentTheme];
     if (!matSet?.glass) return;
-    const sunLow = timeOfDay < 7 || timeOfDay > 17;
-    (matSet.glass as THREE.MeshPhysicalMaterial).emissive.setHex(sunLow ? 0xffe4b5 : 0x000000);
+    (matSet.glass as THREE.MeshPhysicalMaterial).emissive.setHex(sunLow ? LIGHT_COLOR : 0x000000);
     (matSet.glass as THREE.MeshPhysicalMaterial).emissiveIntensity = sunLow ? 0.15 : 0;
     matSet.glass.needsUpdate = true;
-  }, [timeOfDay, currentTheme]);
+  }, [sunLow, currentTheme]);
+
+  // Update lamp shade emissive to match time-of-day intensity
+  useEffect(() => {
+    _shadeMat.emissiveIntensity = intensity * 0.3;
+    _shadeMat.needsUpdate = true;
+  }, [intensity]);
 
   // Build light positions from container data
+  const maxLights = config.maxLights;
   const lights = useMemo<LightData[]>(() => {
     const result: LightData[] = [];
-    for (const c of containersWithLights) {
+    outer: for (const c of containersWithLights) {
       const dims = CONTAINER_DIMENSIONS[c.size];
       const vHeight = dims.height;
 
       for (const light of c.lights) {
-        if (result.length >= config.maxLights) break;
+        if (result.length >= maxLights) break outer;
 
         const row = Math.floor(light.voxelIndex / VOXEL_COLS);
         const col = light.voxelIndex % VOXEL_COLS;
-
-        const [localX, localZ] = voxelLocalXZ(col, row, dims);
-
-        const worldX = c.position.x + localX;
-        const worldY = c.position.y + (light.type === 'ceiling' ? vHeight - 0.05 : 0.5);
-        const worldZ = c.position.z + localZ;
+        const { px: localX, pz: localZ } = getVoxelLayout(col, row, dims);
 
         result.push({
           key: `${c.id}-${light.voxelIndex}-${light.type}`,
-          position: [worldX, worldY, worldZ],
+          position: [
+            c.px + localX,
+            c.py + (light.type === 'ceiling' ? vHeight - 0.05 : 0.5),
+            c.pz + localZ,
+          ],
           type: light.type,
         });
       }
     }
     return result;
-  }, [containersWithLights, config.maxLights]);
+  }, [containersWithLights, maxLights]);
 
   if (lights.length === 0) return null;
 
@@ -145,11 +129,7 @@ export default function InteriorLights() {
         if (light.type === 'ceiling') {
           return (
             <group key={light.key} position={light.position}>
-              {/* Visual: recessed disc */}
-              <mesh rotation={[Math.PI / 2, 0, 0]} raycast={nullRaycast}>
-                <cylinderGeometry args={[0.08, 0.1, 0.02, 16]} />
-                <meshStandardMaterial color={0x333333} metalness={0.8} roughness={0.2} />
-              </mesh>
+              <mesh rotation={[Math.PI / 2, 0, 0]} geometry={_ceilingDiscGeo} material={_housingMat} raycast={nullRaycast} />
               <spotLight
                 color={LIGHT_COLOR}
                 intensity={intensity}
@@ -161,23 +141,10 @@ export default function InteriorLights() {
           );
         }
 
-        // Floor lamp
         return (
           <group key={light.key} position={light.position}>
-            {/* Pole */}
-            <mesh position={[0, 0.3, 0]} raycast={nullRaycast}>
-              <cylinderGeometry args={[0.02, 0.05, 0.6, 8]} />
-              <meshStandardMaterial color={0x444444} metalness={0.6} roughness={0.3} />
-            </mesh>
-            {/* Shade */}
-            <mesh position={[0, 0.65, 0]} raycast={nullRaycast}>
-              <coneGeometry args={[0.12, 0.15, 16]} />
-              <meshStandardMaterial
-                color={0xffeedd}
-                emissive={LIGHT_COLOR}
-                emissiveIntensity={intensity * 0.3}
-              />
-            </mesh>
+            <mesh position={[0, 0.3, 0]} geometry={_poleGeo} material={_poleMat} raycast={nullRaycast} />
+            <mesh position={[0, 0.65, 0]} geometry={_shadeGeo} material={_shadeMat} raycast={nullRaycast} />
             <pointLight
               color={LIGHT_COLOR}
               intensity={intensity * 0.6}

@@ -61,7 +61,7 @@ export function applyTextures(
   getTextureLoader().load(paths.normal, (t) => {
     configure(t);
     mat.normalMap = t;
-    mat.normalScale = new THREE.Vector2(normalScale, normalScale);
+    mat.normalScale.set(normalScale, normalScale);
     mat.needsUpdate = true;
   }, undefined, onError(paths.normal));
 

@@ -7,7 +7,6 @@ import { Component, type ReactNode, Suspense, useCallback, useRef } from "react"
 import Scene from "./Scene";
 import { useStore } from "@/store/useStore";
 import { CAMERA_INITIAL_POSITION } from "@/config/cameraConstants";
-import { QUALITY_PRESETS } from "@/config/qualityPresets";
 import "@/utils/bvhSetup";
 
 // ── ErrorBoundary ─────────────────────────────────────────────
@@ -63,8 +62,6 @@ const INITIAL_BG = new THREE.Color(0x2a4a20);
 export default function SceneCanvas() {
   const activeBrush = useStore((s) => s.activeBrush);
   const activeSlot = useStore((s) => s.activeHotbarSlot);
-  const qualityPreset = useStore((s) => s.qualityPreset);
-  const qualityConfig = QUALITY_PRESETS[qualityPreset];
   const cursor = (activeBrush || activeSlot !== null) ? 'crosshair' : 'default';
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +86,7 @@ export default function SceneCanvas() {
         }}
         gl={{
           antialias: true,
-          toneMapping: qualityConfig.postProcessing ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping,
+          toneMapping: THREE.NoToneMapping, // Tone mapping managed by QualityManager in Scene.tsx
           toneMappingExposure: 1.3,
         }}
         onCreated={onCreated}

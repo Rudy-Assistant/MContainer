@@ -43,14 +43,12 @@ function PostProcessingEffects() {
 
   if (!config.postProcessing) return null;
 
+  const aoProps = { ...N8AO_CONFIG, quality: config.aoHalfRes ? 'medium' as const : 'high' as const, halfRes: config.aoHalfRes };
+
   if (config.bloomEnabled) {
     return (
       <EffectComposer>
-        <N8AO
-          {...N8AO_CONFIG}
-          quality={config.aoHalfRes ? 'medium' : 'high'}
-          halfRes={config.aoHalfRes}
-        />
+        <N8AO {...aoProps} />
         <Bloom {...BLOOM_CONFIG} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       </EffectComposer>
@@ -59,11 +57,7 @@ function PostProcessingEffects() {
 
   return (
     <EffectComposer>
-      <N8AO
-        {...N8AO_CONFIG}
-        quality={config.aoHalfRes ? 'medium' : 'high'}
-        halfRes={config.aoHalfRes}
-      />
+      <N8AO {...aoProps} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>
   );

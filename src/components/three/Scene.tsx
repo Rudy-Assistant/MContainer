@@ -1930,9 +1930,19 @@ function RaycasterConfig() {
 function QualityManager() {
   const qualityPreset = useStore((s) => s.qualityPreset);
   const config = QUALITY_PRESETS[qualityPreset];
+  const { gl } = useThree();
+
+  // Rebuild materials when quality changes (also handles initial load)
   useEffect(() => {
     rebuildThemeMaterials(config.textureQuality);
   }, [config.textureQuality]);
+
+  // Toggle tone mapping: NoToneMapping when post-processing handles it,
+  // ACESFilmic when post-processing is off (Low preset)
+  useEffect(() => {
+    gl.toneMapping = config.postProcessing ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+  }, [config.postProcessing, gl]);
+
   return null;
 }
 

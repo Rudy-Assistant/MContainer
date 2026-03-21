@@ -191,23 +191,26 @@ export let _themeMats: Record<ThemeId, ThemeMaterialSet> = {
 
 /**
  * Rebuild all theme materials at a new quality level.
- * Disposes old materials and applies textures at the new quality.
+ * Build new materials BEFORE disposing old ones to avoid a frame where the
+ * scene references disposed (black/corrupt) materials.
  */
 export function rebuildThemeMaterials(quality: TextureQuality) {
   if (quality === _currentQuality) return;
   _currentQuality = quality;
-  for (const matSet of Object.values(_themeMats)) {
+  // Build new materials first
+  const oldMats = Object.values(_themeMats);
+  for (const themeId of Object.keys(THEMES) as ThemeId[]) {
+    _themeMats[themeId] = buildThemeMaterials(THEMES[themeId].materials, quality);
+  }
+  // Dispose old materials AFTER swapping references
+  for (const matSet of oldMats) {
     for (const mat of Object.values(matSet)) {
       (mat as THREE.Material).dispose();
     }
   }
-  for (const themeId of Object.keys(THEMES) as ThemeId[]) {
-    _themeMats[themeId] = buildThemeMaterials(THEMES[themeId].materials, quality);
-  }
   applyQualityTextures(quality);
 }
 
-// Load textures for each theme's materials (skip during SSR / test — no document)
-if (typeof document !== 'undefined') {
-  applyQualityTextures('1k');
-}
+// NOTE: No module-level texture loading here — QualityManager in Scene.tsx
+// owns the initial applyQualityTextures call on mount, which ensures the
+// correct quality is used (from persisted store state, not a hardcoded default).
