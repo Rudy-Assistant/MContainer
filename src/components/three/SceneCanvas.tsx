@@ -3,9 +3,11 @@
 import { Canvas } from "@react-three/fiber";
 import type { RootState } from "@react-three/fiber";
 import * as THREE from "three";
-import { Component, type ReactNode, Suspense, useCallback } from "react";
+import { Component, type ReactNode, Suspense, useCallback, useRef } from "react";
 import Scene from "./Scene";
 import { useStore } from "@/store/useStore";
+import { CAMERA_INITIAL_POSITION } from "@/config/cameraConstants";
+import { QUALITY_PRESETS } from "@/config/qualityPresets";
 import "@/utils/bvhSetup";
 
 // ── ErrorBoundary ─────────────────────────────────────────────
@@ -61,7 +63,10 @@ const INITIAL_BG = new THREE.Color(0x2a4a20);
 export default function SceneCanvas() {
   const activeBrush = useStore((s) => s.activeBrush);
   const activeSlot = useStore((s) => s.activeHotbarSlot);
+  const qualityPreset = useStore((s) => s.qualityPreset);
+  const qualityConfig = QUALITY_PRESETS[qualityPreset];
   const cursor = (activeBrush || activeSlot !== null) ? 'crosshair' : 'default';
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const onCreated = useCallback((state: RootState) => {
     // Set a neutral initial background before SkyDome takes over.
@@ -72,26 +77,27 @@ export default function SceneCanvas() {
 
   return (
     <SceneErrorBoundary>
-      <div data-testid="canvas-3d" style={{ width: "100%", height: "100%" }}>
+      <div ref={containerRef} data-testid="canvas-3d" style={{ width: "100%", height: "100%", position: "relative" }}>
       <Canvas
         frameloop="always"
         shadows={{ type: THREE.PCFSoftShadowMap }}
         camera={{
-          position: [14, 5, 14],
+          position: CAMERA_INITIAL_POSITION,  /* 2:1 dimetric — 45° azimuth, ~26.8° elevation */
           fov: 48,
           near: 0.1,
           far: 500,
         }}
         gl={{
           antialias: true,
-          toneMapping: THREE.NoToneMapping,
-          toneMappingExposure: 1.0,
+          toneMapping: qualityConfig.postProcessing ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.3,
         }}
         onCreated={onCreated}
         onPointerMissed={() => {
           const s = useStore.getState();
           s.setHoveredVoxel(null);
           s.setHoveredVoxelEdge(null);
+          s.setHoveredBayGroup(null);
           s.setFaceContext(null);
           s.setSelectedFace(null);
           s.setSelectedVoxel(null);

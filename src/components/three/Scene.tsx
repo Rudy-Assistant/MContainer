@@ -42,15 +42,7 @@ import TapeMeasure from "./TapeMeasure";
 import { validateDesign } from "@/utils/designValidation";
 import WarningOverlay from "./WarningOverlay";
 import { DevSceneExpose } from "./DevSceneExpose";
-// postprocessing DISABLED: importing @react-three/postprocessing causes
-// "THREE.WebGLRenderer: Context Lost" in real browsers (module-level GL init).
-// Stub the types so SafeEffectComposer compiles without the real import.
-type _EC = React.FC<{ children?: React.ReactNode; enableNormalPass?: boolean }>;
-const EffectComposer: _EC = () => null;
-const N8AO = null as any;
-const Bloom = null as any;
-const ToneMapping = null as any;
-const ToneMappingMode = { NEUTRAL: 0 } as any;
+import PostProcessingStack from './PostProcessingStack';
 import {
   loadAllTextures,
   getSteelTextures,
@@ -65,30 +57,7 @@ import { type ThemeId } from "@/config/themes";
 import { HIGHLIGHT_COLOR_SELECT } from "@/config/highlightColors";
 import { applyPalette } from "@/utils/applyPalette";
 import type { MaterialPalette } from "@/store/slices/librarySlice";
-// ── N8AO config (shared between Design + Walkthrough scenes) ─
-const N8AO_CONFIG = {
-  aoRadius: 0.8,
-  intensity: 1.0,
-  distanceFalloff: 1.5,
-  quality: "medium" as const,
-  halfRes: true,
-};
 
-const BLOOM_CONFIG = {
-  luminanceThreshold: 0.85,
-  luminanceSmoothing: 0.1,
-  mipmapBlur: true,
-} as const;
-
-/** Wraps EffectComposer with a renderer-readiness guard to prevent null-GL crashes.
- *  postprocessing v6.38 + @react-three/postprocessing v3.0.4 crash on EffectComposer.addPass
- *  because gl.getContext() returns null during R3F's initial reconciler commit.
- *  WORKAROUND: Disabled until postprocessing version is upgraded. */
-function SafeEffectComposer({ children: _children, ...props }: React.ComponentProps<typeof EffectComposer>) {
-  void props;
-  // TODO: Re-enable after upgrading postprocessing to a version that handles null context
-  return null;
-}
 
 // ── Sun Position Calculator ─────────────────────────────────
 
@@ -1340,12 +1309,8 @@ function RealisticScene() {
 
       {/* FaceContextWidget removed — Materials hotbar replaces it */}
 
-      {/* Phase 8: Post-processing — AO + Bloom */}
-      <SafeEffectComposer enableNormalPass>
-        <N8AO {...N8AO_CONFIG} />
-        <Bloom intensity={0.4} {...BLOOM_CONFIG} />
-        <ToneMapping mode={ToneMappingMode.NEUTRAL} />
-      </SafeEffectComposer>
+      {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
+      <PostProcessingStack />
 
       {/* 3D orientation gizmo */}
       <GizmoHelper alignment="top-right" margin={[50, 50]}>
@@ -1864,12 +1829,8 @@ function WalkthroughScene() {
 
       <WalkthroughControls />
 
-      {/* Phase 8: Post-processing — AO + Bloom */}
-      <SafeEffectComposer enableNormalPass>
-        <N8AO {...N8AO_CONFIG} />
-        <Bloom intensity={0.25} {...BLOOM_CONFIG} />
-        <ToneMapping mode={ToneMappingMode.NEUTRAL} />
-      </SafeEffectComposer>
+      {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
+      <PostProcessingStack />
     </>
   );
 }
