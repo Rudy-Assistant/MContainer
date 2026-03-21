@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { THEMES, THEME_IDS, type ThemeId } from "@/config/themes";
 import { GROUND_PRESET_IDS, GROUND_PRESETS, type GroundPresetId } from "@/config/groundPresets";
+import { QUALITY_PRESET_IDS, type QualityPresetId } from "@/config/qualityPresets";
 import { buildShareUrl } from "@/utils/shareUrl";
 import { exportSceneToGLB } from "@/utils/exportGLB";
 
@@ -79,6 +80,8 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
   const setTheme = useStore((s) => s.setTheme);
   const groundPreset = useStore((s) => s.environment.groundPreset) as GroundPresetId | undefined;
   const setGroundPreset = useStore((s) => s.setGroundPreset);
+  const qualityPreset = useStore((s) => s.qualityPreset) as QualityPresetId;
+  const setQualityPreset = useStore((s) => s.setQualityPreset);
   const setActivePalette = useStore((s) => s.setActivePalette);
   const designComplexity = useStore((s) => s.designComplexity);
   const setDesignComplexity = useStore((s) => s.setDesignComplexity);
@@ -407,6 +410,33 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                       title={GROUND_PRESETS[gid].label}
                     >
                       {GROUND_PRESETS[gid].label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #6b7280)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 8px" }}>
+                Quality
+              </div>
+              <div style={{ display: "flex", gap: "4px" }}>
+                {QUALITY_PRESET_IDS.map((qid) => {
+                  const active = qualityPreset === qid;
+                  return (
+                    <button
+                      key={qid}
+                      data-testid={`quality-${qid}`}
+                      onClick={() => setQualityPreset(qid)}
+                      style={{
+                        flex: 1, height: "32px", borderRadius: "6px", border: "1px solid",
+                        borderColor: active ? "var(--accent, #2563eb)" : "#e5e7eb",
+                        cursor: "pointer", fontSize: "10px", fontWeight: active ? 700 : 500,
+                        color: active ? "#fff" : "#6b7280",
+                        background: active ? "var(--accent, #2563eb)" : "#f9fafb",
+                        transition: "all 150ms ease",
+                        textTransform: "capitalize",
+                      }}
+                      title={`${qid.charAt(0).toUpperCase() + qid.slice(1)} quality`}
+                    >
+                      {qid.charAt(0).toUpperCase() + qid.slice(1)}
                     </button>
                   );
                 })}

@@ -9,6 +9,7 @@ import {
   OrbitControls,
   Sky,
   Environment,
+  CubeCamera,
   Stars,
   ContactShadows,
   Html,
@@ -48,11 +49,12 @@ import InteriorLights from './InteriorLights';
 import GroundManager from "./GroundManager";
 import DebugOverlay from "./DebugOverlay";
 // FaceContextWidget removed — replaced by Materials hotbar
-import { _themeMats } from "@/config/materialCache";
+import { _themeMats, rebuildThemeMaterials } from "@/config/materialCache";
 import { type ThemeId } from "@/config/themes";
 import { HIGHLIGHT_COLOR_SELECT } from "@/config/highlightColors";
 import { applyPalette } from "@/utils/applyPalette";
 import type { MaterialPalette } from "@/store/slices/librarySlice";
+import { QUALITY_PRESETS } from "@/config/qualityPresets";
 
 
 // ── Sun Position Calculator ─────────────────────────────────
@@ -78,6 +80,8 @@ function useSunPosition() {
 function SunLight() {
   const sunPos = useSunPosition();
   const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const qualityPreset = useStore((s) => s.qualityPreset);
+  const shadowMapSize = QUALITY_PRESETS[qualityPreset].shadowMapSize;
 
   const intensity = useMemo(() => {
     if (timeOfDay < 5 || timeOfDay > 21) return 0;
@@ -120,7 +124,7 @@ function SunLight() {
         color={color}
         position={timeOfDay >= 5 && timeOfDay <= 21 ? [Math.max(sunPos.x, -80), Math.max(sunPos.y, 2.0), sunPos.z] : [20, 40, 20]}
         intensity={Math.min(Math.max(intensity * 0.8, 0.25), 2.0)}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0005}
         shadow-normalBias={0.002}
         shadow-camera-left={-30}
@@ -264,28 +268,46 @@ function DimensionLabels() {
 // Must be inside <Canvas> tree for useThree/invalidate access.
 
 // ── Time-of-Day HDRI Environment ─────────────────────────────
-// drei's <Environment preset="..."> uses useLoader internally, which SUSPENDS
-// until the HDRI file loads from a CDN (polyhaven via drei's preset system).
+// Bundled 1K HDRIs from Polyhaven (public/assets/hdri/) replace CDN presets.
+// Quality gating: 'none' skips entirely, 'hdri' uses static HDRI,
+// 'cubeCamera' adds real-time scene reflections via drei CubeCamera.
 //
 // CRITICAL: This must be wrapped in its OWN <Suspense> boundary.
-// Without it, a slow/failed HDRI fetch blocks the ENTIRE scene tree
-// (because SceneCanvas wraps <Scene> in <Suspense fallback={null}>).
-// The user sees a blank canvas (blue/grey) until the HDRI loads.
-//
+// Without it, a slow HDRI load blocks the ENTIRE scene tree.
 // With its own Suspense, the scene renders immediately with the Sky dome
 // and all geometry, and the HDRI environment map loads asynchronously.
-// Reflections appear once loaded — this is an acceptable progressive enhancement.
+
+/** Select bundled HDRI file path based on time bracket */
+function getHdriFile(timeOfDay: number): string {
+  if (timeOfDay >= 5 && timeOfDay < 8) return '/assets/hdri/dawn.hdr';
+  if (timeOfDay >= 8 && timeOfDay < 17) return '/assets/hdri/day.hdr';
+  if (timeOfDay >= 17 && timeOfDay < 20) return '/assets/hdri/sunset.hdr';
+  return '/assets/hdri/night.hdr';
+}
 
 function TimeOfDayEnvironmentInner({ intensity = 0.4 }: { intensity?: number }) {
   const timeOfDay = useStore((s) => s.environment.timeOfDay);
-  const envPreset = useMemo(() => {
-    if (timeOfDay >= 17 && timeOfDay <= 20) return 'sunset' as const;
-    if (timeOfDay >= 5 && timeOfDay <= 8)   return 'dawn' as const;
-    if (timeOfDay >= 8 && timeOfDay <= 17)  return 'park' as const;
-    return 'night' as const;
-  }, [timeOfDay]);
+  const qualityPreset = useStore((s) => s.qualityPreset);
+  const config = QUALITY_PRESETS[qualityPreset];
 
-  return <Environment preset={envPreset} background={false} environmentIntensity={intensity} />;
+  const hdriFile = useMemo(() => getHdriFile(timeOfDay), [timeOfDay]);
+
+  if (config.envMap === 'none') return null;
+
+  if (config.envMap === 'cubeCamera') {
+    // High preset: CubeCamera captures actual scene for real-time reflections
+    // Resolution 256 per face, frames=1 (re-renders once per mount / HDRI change)
+    return (
+      <CubeCamera resolution={256} frames={1} near={0.5} far={200}>
+        {(texture) => (
+          <Environment map={texture} background={false} environmentIntensity={intensity} />
+        )}
+      </CubeCamera>
+    );
+  }
+
+  // Medium preset: static HDRI environment map from bundled files
+  return <Environment files={hdriFile} background={false} environmentIntensity={intensity} />;
 }
 
 function TimeOfDayEnvironment({ intensity = 0.4 }: { intensity?: number }) {
@@ -1905,6 +1927,15 @@ function RaycasterConfig() {
   return null;
 }
 
+function QualityManager() {
+  const qualityPreset = useStore((s) => s.qualityPreset);
+  const config = QUALITY_PRESETS[qualityPreset];
+  useEffect(() => {
+    rebuildThemeMaterials(config.textureQuality);
+  }, [config.textureQuality]);
+  return null;
+}
+
 function SceneExporter() {
   const { scene, camera } = useThree();
   useEffect(() => { setExportScene(scene); (window as any).__scene = scene; (window as any).__camera = camera; }, [scene, camera]);
@@ -1920,6 +1951,7 @@ export default function Scene() {
 
   return (
     <>
+      <QualityManager />
       <DevSceneExpose />
       <SceneExporter />
       <RaycasterConfig />
