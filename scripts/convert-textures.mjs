@@ -2,19 +2,20 @@
 /**
  * KTX2 Texture Conversion Script
  *
- * Converts JPG/PNG textures in public/assets/materials/ to GPU-compressed KTX2
- * format in public/assets/materials-ktx2/ using the toktx CLI from KTX-Software.
+ * Converts 2K JPG/PNG textures to GPU-compressed KTX2 format.
  *
  * Usage:
  *   npm run convert-textures
+ *   npm run convert-textures -- --source-suffix=-2k    (default)
+ *   npm run convert-textures -- --source-suffix=""      (convert all textures)
+ *
+ * Codec strategy:
+ *   - Normal maps → UASTC (lossless, precision-critical)
+ *   - Color/roughness → ETC1S (lossy, small files)
  *
  * Prerequisites:
  *   Install KTX-Software: https://github.com/KhronosGroup/KTX-Software/releases
  *   Ensure `toktx` is on your PATH.
- *
- * Output mirrors the input directory structure:
- *   public/assets/materials/Corrugated_Steel/color.jpg
- *   → public/assets/materials-ktx2/Corrugated_Steel/color.ktx2
  */
 
 import { execSync } from 'child_process';
@@ -28,6 +29,10 @@ const __dirname = dirname(__filename);
 
 const INPUT_DIR = resolve(__dirname, '../public/assets/materials');
 const OUTPUT_DIR = resolve(__dirname, '../public/assets/materials-ktx2');
+
+// Parse --source-suffix arg (default: '-2k')
+const suffixArg = process.argv.find(a => a.startsWith('--source-suffix'));
+const SOURCE_SUFFIX = suffixArg ? suffixArg.split('=')[1] ?? '-2k' : '-2k';
 
 // ── Check prerequisites ──────────────────────────────────────
 
@@ -43,7 +48,6 @@ function checkToktx() {
 if (!checkToktx()) {
   console.error('ERROR: toktx not found on PATH.');
   console.error('Install KTX-Software from: https://github.com/KhronosGroup/KTX-Software/releases');
-  console.error('Then ensure toktx is available in your PATH.');
   process.exit(1);
 }
 
@@ -63,7 +67,8 @@ if (folders.length === 0) {
   process.exit(0);
 }
 
-console.log(`Found ${folders.length} texture folders to convert.\n`);
+console.log(`Source suffix: "${SOURCE_SUFFIX}"`);
+console.log(`Found ${folders.length} texture folders to scan.\n`);
 
 // ── Convert each folder ──────────────────────────────────────
 
@@ -75,18 +80,19 @@ for (const folder of folders) {
   const inputPath = join(INPUT_DIR, folder);
   const outputPath = join(OUTPUT_DIR, folder);
 
+  // Filter to files matching the source suffix
+  const suffixPattern = SOURCE_SUFFIX
+    ? new RegExp(`${SOURCE_SUFFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.(jpg|jpeg|png)$`, 'i')
+    : /\.(jpg|jpeg|png)$/i;
+
   const files = readdirSync(inputPath)
-    .filter(f => /\.(jpg|jpeg|png)$/i.test(f))
+    .filter(f => suffixPattern.test(f))
     .filter(f => {
-      // Skip files that are clearly not textures (thumbs, etc.)
       const stats = statSync(join(inputPath, f));
-      return stats.size > 1024; // Skip files < 1KB
+      return stats.size > 1024;
     });
 
-  if (files.length === 0) {
-    console.log(`  ${folder}/: no texture files, skipping`);
-    continue;
-  }
+  if (files.length === 0) continue;
 
   if (!existsSync(outputPath)) {
     mkdirSync(outputPath, { recursive: true });
@@ -96,7 +102,11 @@ for (const folder of folders) {
 
   for (const file of files) {
     const input = join(inputPath, file);
-    const outputFile = basename(file, extname(file)) + '.ktx2';
+
+    // Strip source suffix from output filename: color-2k.jpg → color.ktx2
+    const baseName = basename(file, extname(file));
+    const strippedName = SOURCE_SUFFIX ? baseName.replace(new RegExp(`${SOURCE_SUFFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '') : baseName;
+    const outputFile = strippedName + '.ktx2';
     const output = join(outputPath, outputFile);
 
     // Skip if output already exists and is newer than input
@@ -109,18 +119,23 @@ for (const folder of folders) {
       }
     }
 
-    // Determine if this is a color texture (needs sRGB) or data texture (linear)
+    // Determine codec: normal maps get UASTC (lossless), others get ETC1S (lossy)
+    const isNormal = /normal/i.test(file);
     const isColor = /color|diffuse|albedo|base/i.test(file);
     const colorSpace = isColor ? '--assign_oetf srgb' : '--assign_oetf linear';
 
+    const encodeArgs = isNormal
+      ? '--encode uastc --uastc_quality 2 --zstd 5'
+      : '--encode etc1s --clevel 2';
+
     try {
-      // ETC1S encoding: good compression ratio, fast decode, universal GPU support
       execSync(
-        `toktx --encode etc1s --clevel 2 ${colorSpace} "${output}" "${input}"`,
+        `toktx ${encodeArgs} ${colorSpace} "${output}" "${input}"`,
         { stdio: 'pipe' }
       );
       totalConverted++;
-      console.log(`    ✓ ${file} → ${outputFile}`);
+      const codec = isNormal ? 'UASTC' : 'ETC1S';
+      console.log(`    ✓ ${file} → ${outputFile} (${codec})`);
     } catch (err) {
       totalFailed++;
       console.error(`    ✗ ${file} — conversion failed: ${err.message}`);
