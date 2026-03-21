@@ -11,7 +11,6 @@ import {
   Environment,
   CubeCamera,
   Stars,
-  ContactShadows,
   Html,
   GizmoHelper,
   GizmoViewport,
@@ -1191,19 +1190,7 @@ function RealisticScene() {
       {/* Distance fog — softens horizon edge */}
       <SceneFog />
 
-      {/* Contact shadows — soft shadow blob under containers.
-           frames={1} bakes once (doesn't update on drag — acceptable for design tool). */}
-      <ContactShadows
-        position={[0, 0.01, 0]}
-        scale={35}
-        blur={2.0}
-        opacity={0.28}
-        far={6}
-        resolution={1024}
-        frames={1}
-        color="#0a1a06"
-        raycast={nullRaycastScene}
-      />
+      {/* ContactShadows removed — caused ground afterburn artifact (Sprint 8 fix re-applied) */}
 
       {/* Clouds REMOVED — see SkyDome comment above */}
 
