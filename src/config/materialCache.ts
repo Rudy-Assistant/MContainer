@@ -160,22 +160,22 @@ function buildThemeMaterials(cfg: ThemeMaterialConfig, quality: TextureQuality =
 
 // ── Quality-aware Texture Application ────────────────────────
 
-export function applyQualityTextures(quality: TextureQuality) {
+export function applyQualityTextures(quality: TextureQuality, invalidate?: () => void) {
   for (const themeId of Object.keys(THEMES) as ThemeId[]) {
     const matSet = _themeMats[themeId];
     const textures = THEMES[themeId].textures;
 
     const steelPaths = getTexturePaths(textures.exterior_wall_folder, quality);
-    if (steelPaths) applyTextures(matSet.steel, steelPaths, 3, 1);
+    if (steelPaths) applyTextures(matSet.steel, steelPaths, 3, 1, 0.6, invalidate, textures.exterior_wall_folder);
 
     const woodPaths = getTexturePaths(textures.floor_folder, quality);
-    if (woodPaths) applyTextures(matSet.wood, woodPaths, 4, 1);
+    if (woodPaths) applyTextures(matSet.wood, woodPaths, 4, 1, 0.6, invalidate, textures.floor_folder);
 
     const concretePaths = getTexturePaths(textures.ceiling_folder, quality);
-    if (concretePaths) applyTextures(matSet.concrete, concretePaths);
+    if (concretePaths) applyTextures(matSet.concrete, concretePaths, 2, 2, 0.6, invalidate, textures.ceiling_folder);
 
     const innerPaths = getTexturePaths(textures.interior_wall_folder, quality);
-    if (innerPaths) applyTextures(matSet.steelInner, innerPaths);
+    if (innerPaths) applyTextures(matSet.steelInner, innerPaths, 2, 2, 0.6, invalidate, textures.interior_wall_folder);
   }
 }
 
@@ -194,21 +194,19 @@ export let _themeMats: Record<ThemeId, ThemeMaterialSet> = {
  * Build new materials BEFORE disposing old ones to avoid a frame where the
  * scene references disposed (black/corrupt) materials.
  */
-export function rebuildThemeMaterials(quality: TextureQuality) {
+export function rebuildThemeMaterials(quality: TextureQuality, invalidate?: () => void) {
   if (quality === _currentQuality) return;
   _currentQuality = quality;
-  // Build new materials first
   const oldMats = Object.values(_themeMats);
   for (const themeId of Object.keys(THEMES) as ThemeId[]) {
     _themeMats[themeId] = buildThemeMaterials(THEMES[themeId].materials, quality);
   }
-  // Dispose old materials AFTER swapping references
   for (const matSet of oldMats) {
     for (const mat of Object.values(matSet)) {
       (mat as THREE.Material).dispose();
     }
   }
-  applyQualityTextures(quality);
+  applyQualityTextures(quality, invalidate);
 }
 
 // NOTE: No module-level texture loading here — QualityManager in Scene.tsx

@@ -50,6 +50,7 @@ import GroundManager from "./GroundManager";
 import DebugOverlay from "./DebugOverlay";
 // FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats, rebuildThemeMaterials } from "@/config/materialCache";
+import { initKTX2Loader } from '../../config/textureLoader';
 import { type ThemeId } from "@/config/themes";
 import { HIGHLIGHT_COLOR_SELECT } from "@/config/highlightColors";
 import { applyPalette } from "@/utils/applyPalette";
@@ -1922,15 +1923,16 @@ function RaycasterConfig() {
 function QualityManager() {
   const qualityPreset = useStore((s) => s.qualityPreset);
   const config = QUALITY_PRESETS[qualityPreset];
-  const { gl } = useThree();
+  const { gl, invalidate } = useThree();
 
-  // Rebuild materials when quality changes (also handles initial load)
   useEffect(() => {
-    rebuildThemeMaterials(config.textureQuality);
-  }, [config.textureQuality]);
+    // Initialize KTX2Loader BEFORE rebuilding materials.
+    // Must happen synchronously in the same effect to guarantee KTX2Loader
+    // is ready when applyTextures tries to use it for '2k' quality.
+    initKTX2Loader(gl);
+    rebuildThemeMaterials(config.textureQuality, invalidate);
+  }, [config.textureQuality, invalidate, gl]);
 
-  // Toggle tone mapping: NoToneMapping when post-processing handles it,
-  // ACESFilmic when post-processing is off (Low preset)
   useEffect(() => {
     gl.toneMapping = config.postProcessing ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
   }, [config.postProcessing, gl]);
