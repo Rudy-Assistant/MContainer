@@ -2207,9 +2207,12 @@ export default function ContainerSkin({
                   setHovered(baseKey);
                   setFootprintOrigin({ col, row });
                   // Use non-extension form so MatrixEditor grid sync works via index match
-                  setHoveredVoxel({ containerId: container.id, index: idx });
-                  // Simple mode: set bay group hover for merged wireframe
-                  if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
+                  // Batch all three hover fields atomically to prevent single-voxel flash before bay group kicks in
+                  useStore.getState().setHoverState({
+                    hoveredVoxel: { containerId: container.id, index: idx },
+                    hoveredVoxelEdge: null,
+                    hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null,
+                  });
                 }}
                 onLeave={() => {
                   setHovered((k) => (k === baseKey ? null : k));
@@ -2218,7 +2221,7 @@ export default function ContainerSkin({
                   );
                   setFaceContext(null);
                   // Simple mode: clear bay group hover
-                  if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup(null);
+                  useStore.getState().setHoveredBayGroup(null);
                   // Debounce clearing hoveredVoxel — matches body voxel pattern
                   if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
                   leaveTimerRef.current = setTimeout(() => {
@@ -2379,8 +2382,8 @@ export default function ContainerSkin({
               isOpen={isFaceOpen}
               doorState={voxel.doorStates?.[dir]}
               doorConfig={voxel.doorConfig?.[dir]}
-              onEnter={() => { setHovered(faceKey); setHoveredVoxel({ containerId: container.id, index: idx }); if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel }); handlePaintDragMove(idx, dir); }}
-              onLeave={() => { setHovered((k) => (k === faceKey ? null : k)); setHoveredVoxel(null); if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup(null); }}
+              onEnter={() => { setHovered(faceKey); useStore.getState().setHoverState({ hoveredVoxel: { containerId: container.id, index: idx }, hoveredVoxelEdge: null, hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null }); handlePaintDragMove(idx, dir); }}
+              onLeave={() => { setHovered((k) => (k === faceKey ? null : k)); useStore.getState().setHoverState({ hoveredVoxel: null, hoveredVoxelEdge: null, hoveredBayGroup: null }); }}
               onClick={(e?: any) => {
                 // Ctrl+click starts drag-paint mode
                 if (e?.ctrlKey && handlePaintDragStart(idx, dir, true)) return;
@@ -2485,12 +2488,14 @@ export default function ContainerSkin({
               const bayIndices = bayIndicesForVoxel;
 
               // Shared hover enter for center + edge hitboxes
+              // Batch hoveredVoxel + hoveredBayGroup atomically to prevent single-voxel flash
               const onEnterShared = (e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
-                setHoveredVoxel({ containerId: container.id, index: idx });
-                if (bayIndices) {
-                  useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndices });
-                }
+                useStore.getState().setHoverState({
+                  hoveredVoxel: { containerId: container.id, index: idx },
+                  hoveredVoxelEdge: null,
+                  hoveredBayGroup: bayIndices ? { containerId: container.id, indices: bayIndices } : null,
+                });
                 document.body.style.cursor = 'pointer';
               };
               const onLeaveShared = (e: ThreeEvent<PointerEvent>) => {
@@ -2709,9 +2714,11 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredVoxel({ containerId: container.id, index: idx });
-                                setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'bottom' });
-                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
+                                useStore.getState().setHoverState({
+                                  hoveredVoxel: { containerId: container.id, index: idx },
+                                  hoveredVoxelEdge: { containerId: container.id, voxelIndex: idx, face: 'bottom' },
+                                  hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null,
+                                });
                                 setFaceContext('floor');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2827,9 +2834,11 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                setHoveredVoxel({ containerId: container.id, index: idx });
-                                setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'top' });
-                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
+                                useStore.getState().setHoverState({
+                                  hoveredVoxel: { containerId: container.id, index: idx },
+                                  hoveredVoxelEdge: { containerId: container.id, voxelIndex: idx, face: 'top' },
+                                  hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null,
+                                });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2850,10 +2859,11 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                // (hoveredEdge removed — dead state)
-                                setHoveredVoxel({ containerId: container.id, index: idx });
-                                setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'n' });
-                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
+                                useStore.getState().setHoverState({
+                                  hoveredVoxel: { containerId: container.id, index: idx },
+                                  hoveredVoxelEdge: { containerId: container.id, voxelIndex: idx, face: 'n' },
+                                  hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null,
+                                });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2873,10 +2883,11 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                // (hoveredEdge removed — dead state)
-                                setHoveredVoxel({ containerId: container.id, index: idx });
-                                setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 's' });
-                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
+                                useStore.getState().setHoverState({
+                                  hoveredVoxel: { containerId: container.id, index: idx },
+                                  hoveredVoxelEdge: { containerId: container.id, voxelIndex: idx, face: 's' },
+                                  hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null,
+                                });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2896,10 +2907,11 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                // (hoveredEdge removed — dead state)
-                                setHoveredVoxel({ containerId: container.id, index: idx });
-                                setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'e' });
-                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
+                                useStore.getState().setHoverState({
+                                  hoveredVoxel: { containerId: container.id, index: idx },
+                                  hoveredVoxelEdge: { containerId: container.id, voxelIndex: idx, face: 'e' },
+                                  hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null,
+                                });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}
@@ -2919,10 +2931,11 @@ export default function ContainerSkin({
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-                                // (hoveredEdge removed — dead state)
-                                setHoveredVoxel({ containerId: container.id, index: idx });
-                                setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face: 'w' });
-                                if (bayIndicesForVoxel) useStore.getState().setHoveredBayGroup({ containerId: container.id, indices: bayIndicesForVoxel });
+                                useStore.getState().setHoverState({
+                                  hoveredVoxel: { containerId: container.id, index: idx },
+                                  hoveredVoxelEdge: { containerId: container.id, voxelIndex: idx, face: 'w' },
+                                  hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null,
+                                });
                                 setFaceContext('roof');
                                 document.body.style.cursor = 'pointer';
                               }}

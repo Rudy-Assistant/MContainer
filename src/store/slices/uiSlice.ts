@@ -64,6 +64,14 @@ export interface UiSlice {
   hoveredBayGroup: { containerId: string; indices: number[] } | null;
   setHoveredBayGroup: (g: { containerId: string; indices: number[] } | null) => void;
 
+  // Batched hover — sets hoveredVoxel + hoveredVoxelEdge + hoveredBayGroup atomically
+  // to prevent one-frame flash of single-voxel highlight before bay group highlight kicks in.
+  setHoverState: (state: {
+    hoveredVoxel: UiSlice['hoveredVoxel'];
+    hoveredVoxelEdge: UiSlice['hoveredVoxelEdge'];
+    hoveredBayGroup: UiSlice['hoveredBayGroup'];
+  }) => void;
+
   // Inspector view: floor shows bottom faces, ceiling shows top faces
   inspectorView: 'floor' | 'ceiling';
   setInspectorView: (v: 'floor' | 'ceiling') => void;
@@ -161,6 +169,8 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   hoveredBayGroup: null,
   setHoveredBayGroup: (g) => set({ hoveredBayGroup: g }),
+  setHoverState: ({ hoveredVoxel, hoveredVoxelEdge, hoveredBayGroup }) =>
+    set({ hoveredVoxel, hoveredVoxelEdge, hoveredBayGroup }),
 
   inspectorView: 'floor' as 'floor' | 'ceiling',
   setInspectorView: (v: 'floor' | 'ceiling') => set({ inspectorView: v }),
