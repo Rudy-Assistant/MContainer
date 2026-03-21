@@ -55,7 +55,8 @@ import {
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
 import { type ThemeId, THEMES } from "@/config/themes";
-import { _themeMats, type ThemeMaterialSet } from "@/config/materialCache";
+import { _themeMats, type ThemeMaterialSet, getMaterialForFace } from "@/config/materialCache";
+import type { FaceFinish } from "@/types/container";
 import { getNextPhase, PHASE_DAMP_SPEED } from "@/config/unpackAnimations";
 import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
 import { computePolePositions } from "@/utils/smartPoles";
@@ -270,13 +271,14 @@ function SteelFace({ w, h, d }: { w: number; h: number; d: number }) {
  * isNS=false → face normal along X (E/W walls): opening = Y×Z, glass thin in X
  */
 function GlassFace({
-  w, h, d, isNS,
-}: { w: number; h: number; d: number; isNS: boolean }) {
+  w, h, d, isNS, glassMat,
+}: { w: number; h: number; d: number; isNS: boolean; glassMat?: THREE.MeshPhysicalMaterial }) {
+  const gm = glassMat ?? mGlass;
   if (isNS) {
     // N/S face: spans X=w, Y=h, thin in Z=d
     return (
       <>
-        <mesh geometry={getBox(w - FRAME_W * 2, h - FRAME_W * 2, 0.012)} material={mGlass} raycast={nullRaycast} />
+        <mesh geometry={getBox(w - FRAME_W * 2, h - FRAME_W * 2, 0.012)} material={gm} raycast={nullRaycast} />
         <mesh position={[0,  h / 2 - FRAME_W / 2, 0]} geometry={getBox(w, FRAME_W, PANEL_THICK)} material={mFrame} castShadow raycast={nullRaycast} />
         <mesh position={[0, -h / 2 + FRAME_W / 2, 0]} geometry={getBox(w, FRAME_W, PANEL_THICK)} material={mFrame} castShadow raycast={nullRaycast} />
         <mesh position={[-w / 2 + FRAME_W / 2, 0, 0]} geometry={getBox(FRAME_W, h, PANEL_THICK)} material={mFrame} castShadow raycast={nullRaycast} />
@@ -287,7 +289,7 @@ function GlassFace({
   // E/W face: spans Z=d, Y=h, thin in X=w
   return (
     <>
-      <mesh geometry={getBox(0.012, h - FRAME_W * 2, d - FRAME_W * 2)} material={mGlass} raycast={nullRaycast} />
+      <mesh geometry={getBox(0.012, h - FRAME_W * 2, d - FRAME_W * 2)} material={gm} raycast={nullRaycast} />
       <mesh position={[0,  h / 2 - FRAME_W / 2, 0]} geometry={getBox(PANEL_THICK, FRAME_W, d)} material={mFrame} castShadow raycast={nullRaycast} />
       <mesh position={[0, -h / 2 + FRAME_W / 2, 0]} geometry={getBox(PANEL_THICK, FRAME_W, d)} material={mFrame} castShadow raycast={nullRaycast} />
       <mesh position={[0, 0, -d / 2 + FRAME_W / 2]} geometry={getBox(PANEL_THICK, h, FRAME_W)} material={mFrame} castShadow raycast={nullRaycast} />
@@ -447,10 +449,11 @@ function GullWingFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS
 }
 
 /** Hinged steel door panel — supports swing (pivot) and slide modes via doorState/doorConfig. */
-function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig }: {
+function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig, doorMat }: {
   w: number; h: number; d: number; isNS: boolean;
   isOpen?: boolean; doorState?: string;
   doorConfig?: import('@/types/container').DoorConfig;
+  doorMat?: THREE.MeshStandardMaterial;
 }) {
   const doorW = w * 0.7;
   const halfSpan = doorW / 2;
@@ -506,7 +509,7 @@ function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig }: {
           <mesh
             geometry={isNS ? getBox(doorW, h * 0.95, d * 0.6) : getBox(d * 0.6, h * 0.95, doorW)}
             position={isSlide ? [0, 0, 0] : [pivotOffset, 0, pivotOffsetZ]}
-            material={mSteel}
+            material={doorMat ?? mSteel}
             castShadow raycast={nullRaycast}
           />
           {/* Handle dot */}
@@ -715,13 +718,15 @@ const WINDOW_PROFILES: Record<string, { sillRatio: number; headRatio: number }> 
 };
 
 /** Composite window face: stacked steel + glass + steel panels. */
-function WindowFace({ w, h, d, isNS, sillRatio, headRatio }: {
+function WindowFace({ w, h, d, isNS, sillRatio, headRatio, frameMat }: {
   w: number; h: number; d: number; isNS: boolean;
   sillRatio: number; headRatio: number;
+  frameMat?: THREE.MeshStandardMaterial;
 }) {
   const bottomH = sillRatio * h;
   const midH    = (headRatio - sillRatio) * h;
   const topH    = (1 - headRatio) * h;
+  const fm = frameMat ?? mSteel;
 
   return (
     <group>
@@ -729,7 +734,7 @@ function WindowFace({ w, h, d, isNS, sillRatio, headRatio }: {
       {bottomH > 0.01 && (
         <mesh position={[0, -h / 2 + bottomH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
           <boxGeometry args={[isNS ? w : PANEL_THICK, bottomH, isNS ? PANEL_THICK : w]} />
-          <primitive object={mSteel} attach="material" />
+          <primitive object={fm} attach="material" />
         </mesh>
       )}
       {/* Glass panel */}
@@ -741,7 +746,7 @@ function WindowFace({ w, h, d, isNS, sillRatio, headRatio }: {
       {topH > 0.01 && (
         <mesh position={[0, h / 2 - topH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
           <boxGeometry args={[isNS ? w : PANEL_THICK, topH, isNS ? PANEL_THICK : w]} />
-          <primitive object={mSteel} attach="material" />
+          <primitive object={fm} attach="material" />
         </mesh>
       )}
     </group>
@@ -913,13 +918,17 @@ interface FaceProps {
   doorConfig?: import('@/types/container').DoorConfig;
   /** Wall cut scale: 1.0=full, 0.5=half, 0.05=down. Only affects wall faces (n/s/e/w). */
   wallCutScale?: number;
+  /** Per-face finish overrides (paint, tint, frameColor, etc.) */
+  faceFinish?: FaceFinish;
+  /** Active theme ID for material resolution */
+  theme: ThemeId;
 }
 
 function SingleFace({
   dir, surface, colPitch, rowPitch, vHeight, vOffset,
   activeBrush, isHovered, isVoxelSelected, connectedStart, connectedEnd,
   onEnter, onLeave, onClick, onDoubleClick, onContextMenu, isOpen, doorState, doorConfig,
-  wallCutScale = 1.0,
+  wallCutScale = 1.0, faceFinish, theme: activeTheme,
 }: FaceProps) {
   const halfCol = colPitch / 2;
   const halfRow = rowPitch / 2;
@@ -1082,7 +1091,9 @@ function SingleFace({
       const ROOF_THICK = 0.08;
       // Both roof (top) and floor (bottom) use steel — emissive ceiling glow removed
       // (mCeilingLight was causing white-out on roof when viewed from above)
-      const panelMat = mSteel;
+      const panelMat = faceFinish?.paint || faceFinish?.material
+        ? getMaterialForFace('Solid_Steel', faceFinish, activeTheme) as THREE.MeshStandardMaterial
+        : mSteel;
       return (
         <mesh
           geometry={getBox(colPitch, ROOF_THICK, rowPitch)}
@@ -1094,8 +1105,19 @@ function SingleFace({
       );
     }
     switch (s) {
-      case "Solid_Steel":   return <SteelFace w={bW} h={bH} d={bD} />;
-      case "Glass_Pane":    return <GlassFace w={bW} h={bH} d={bD} isNS={isNS} />;
+      case "Solid_Steel": {
+        if (faceFinish?.paint || faceFinish?.material) {
+          const mat = getMaterialForFace('Solid_Steel', faceFinish, activeTheme);
+          return <mesh geometry={getBox(bW, bH, bD)} material={mat} castShadow receiveShadow raycast={nullRaycast} />;
+        }
+        return <SteelFace w={bW} h={bH} d={bD} />;
+      }
+      case "Glass_Pane": {
+        const tintMat = faceFinish?.tint
+          ? getMaterialForFace('Glass_Pane', faceFinish, activeTheme) as THREE.MeshPhysicalMaterial
+          : undefined;
+        return <GlassFace w={bW} h={bH} d={bD} isNS={isNS} glassMat={tintMat} />;
+      }
       case "Wall_Washi":    return <mesh geometry={getBox(bW, bH, bD)} material={mWashi} castShadow raycast={nullRaycast} />;
       case "Glass_Shoji":   return <ShojiSlide w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} />;
       case "Wood_Hinoki":   return <mesh geometry={getBox(bW, bH, bD)} material={mHinoki} castShadow raycast={nullRaycast} />;
@@ -1107,7 +1129,25 @@ function SingleFace({
       case "Concrete":      return <ConcreteFace w={bW} h={bH} d={bD} />;
       case "Half_Fold":     return <HalfFoldFace w={bW} h={bH} d={bD} isNS={isNS} />;
       case "Gull_Wing":     return <GullWingFace w={bW} h={bH} d={bD} isNS={isNS} />;
-      case "Door":          return <DoorFace w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} doorState={doorState} doorConfig={doorConfig} />;
+      case "Door": {
+        const effectiveDoorConfig = faceFinish?.doorStyle && doorConfig
+          ? { ...doorConfig, type: faceFinish.doorStyle as 'swing' | 'slide' }
+          : doorConfig;
+        const dMat = faceFinish?.frameColor
+          ? getMaterialForFace('Door', faceFinish, activeTheme) as THREE.MeshStandardMaterial
+          : undefined;
+        return <DoorFace w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} doorState={doorState} doorConfig={effectiveDoorConfig} doorMat={dMat} />;
+      }
+      case "Window_Standard":
+      case "Window_Sill":
+      case "Window_Clerestory":
+      case "Window_Half": {
+        const profile = WINDOW_PROFILES[s];
+        const wFrameMat = faceFinish?.frameColor
+          ? getMaterialForFace(s, faceFinish, activeTheme) as THREE.MeshStandardMaterial
+          : undefined;
+        return <WindowFace w={bW} h={bH} d={bD} isNS={isNS} sillRatio={profile.sillRatio} headRatio={profile.headRatio} frameMat={wFrameMat} />;
+      }
       default:              return null;
     }
   }
@@ -2392,6 +2432,8 @@ export default function ContainerSkin({
               onDoubleClick={undefined}
               onContextMenu={(e: any) => handleContextMenu(idx, dir, e.nativeEvent ?? e)}
               wallCutScale={wallCutScale}
+              faceFinish={voxel.faceFinishes?.[dir]}
+              theme={currentTheme}
             />
           );
         });
