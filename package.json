@@ -12,7 +12,8 @@
     "gates": "node acceptance-gates.mjs",
     "baselines": "node scripts/capture-baselines.mjs",
     "quality": "node generate-quality-assessment.mjs",
-    "convert-textures": "node scripts/convert-textures.mjs"
+    "convert-textures": "node scripts/convert-textures.mjs",
+    "postinstall": "node scripts/copy-basis-transcoder.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
