@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHotbarTabForTarget } from '../hooks/useHotbarAutoSwitch';
+import { getHotbarTabForTarget, getVisibleSwatches } from '../hooks/useHotbarAutoSwitch';
 import type { SelectionTarget } from '../hooks/useSelectionTarget';
 
 describe('getHotbarTabForTarget', () => {
@@ -25,5 +25,35 @@ describe('getHotbarTabForTarget', () => {
 
   it('returns null for none target (no switch)', () => {
     expect(getHotbarTabForTarget({ type: 'none' })).toBeNull();
+  });
+});
+
+describe('getVisibleSwatches', () => {
+  it('returns all swatches when no face selected', () => {
+    const result = getVisibleSwatches(null);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.some(s => s.group === 'wall')).toBe(true);
+    expect(result.some(s => s.group === 'floor')).toBe(true);
+  });
+
+  it('returns wall + window + special (minus stairs) for wall face', () => {
+    const result = getVisibleSwatches('n');
+    expect(result.every(s => s.group !== 'floor')).toBe(true);
+    expect(result.some(s => s.group === 'wall')).toBe(true);
+    expect(result.some(s => s.group === 'window')).toBe(true);
+    expect(result.every(s => s.surface !== 'Stairs' && s.surface !== 'Stairs_Down')).toBe(true);
+  });
+
+  it('returns floor + Open for floor face (bottom)', () => {
+    const result = getVisibleSwatches('bottom');
+    expect(result.some(s => s.group === 'floor')).toBe(true);
+    expect(result.some(s => s.surface === 'Open')).toBe(true);
+    expect(result.every(s => s.group === 'floor' || s.surface === 'Open')).toBe(true);
+  });
+
+  it('returns only Steel + Open for ceiling face (top)', () => {
+    const result = getVisibleSwatches('top');
+    expect(result.every(s => s.surface === 'Solid_Steel' || s.surface === 'Open')).toBe(true);
+    expect(result.length).toBe(2);
   });
 });

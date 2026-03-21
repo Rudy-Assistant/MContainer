@@ -9,7 +9,7 @@ import { ViewMode, type SurfaceType, type VoxelFaces, FURNITURE_CATALOG } from "
 import { MODULE_PRESETS, resolveModuleFaces } from "@/config/moduleCatalog";
 import { THEMES, type ThemeId } from "@/config/themes";
 
-import { useHotbarAutoSwitch } from '../../hooks/useHotbarAutoSwitch';
+import { useHotbarAutoSwitch, MATERIAL_SWATCHES, getVisibleSwatches } from '../../hooks/useHotbarAutoSwitch';
 
 // ── Room module slots for the Rooms tab ─────────────────────────
 const ROOM_SLOTS = MODULE_PRESETS.filter(p =>
@@ -99,30 +99,7 @@ const FIXED_PRESETS: Array<{
     contexts: ['wall', 'floor', 'roof'] },
 ];
 
-// ── Material swatches for the Materials tab ─────────────────
-// Curated list of paintable materials shown as flat squares with CSS fills
-const MATERIAL_SWATCHES: Array<{ surface: SurfaceType; label: string; group: 'wall' | 'floor' | 'window' | 'special' }> = [
-  { surface: 'Solid_Steel', label: 'Steel', group: 'wall' },
-  { surface: 'Glass_Pane', label: 'Glass', group: 'window' },
-  { surface: 'Deck_Wood', label: 'Wood', group: 'floor' },
-  { surface: 'Concrete', label: 'Concrete', group: 'floor' },
-  { surface: 'Window_Standard', label: 'Window', group: 'window' },
-  { surface: 'Window_Half', label: 'Half Win', group: 'window' },
-  { surface: 'Window_Sill', label: 'Sill Win', group: 'window' },
-  { surface: 'Window_Clerestory', label: 'Clerstry', group: 'window' },
-  { surface: 'Door', label: 'Door', group: 'wall' },
-  { surface: 'Railing_Cable', label: 'Cable Rail', group: 'wall' },
-  { surface: 'Railing_Glass', label: 'Glass Rail', group: 'wall' },
-  { surface: 'Half_Fold', label: 'Half-Fold', group: 'special' },
-  { surface: 'Gull_Wing', label: 'Gull-Wing', group: 'special' },
-  { surface: 'Wood_Hinoki', label: 'Hinoki', group: 'floor' },
-  { surface: 'Floor_Tatami', label: 'Tatami', group: 'floor' },
-  { surface: 'Wall_Washi', label: 'Washi', group: 'wall' },
-  { surface: 'Glass_Shoji', label: 'Shoji', group: 'window' },
-  { surface: 'Stairs', label: 'Stairs ↑', group: 'special' },
-  { surface: 'Stairs_Down', label: 'Stairs ↓', group: 'special' },
-  { surface: 'Open', label: 'Open', group: 'special' },
-];
+// MATERIAL_SWATCHES imported from useHotbarAutoSwitch
 
 // ── Human-readable surface names for tooltips ────────────────
 const SURFACE_NAME: Record<SurfaceType, string> = {
@@ -1267,8 +1244,11 @@ export default function SmartHotbar() {
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
 
   // ── Materials tab pagination (10 per page) ──
-  const materialPageCount = Math.ceil(MATERIAL_SWATCHES.length / 10);
+  const selectedFace = useStore((s) => s.selectedFace);
+  const visibleSwatches = getVisibleSwatches(selectedFace);
+  const materialPageCount = Math.ceil(visibleSwatches.length / 10);
   const [materialPage, setMaterialPage] = useState(0);
+  useEffect(() => { setMaterialPage(0); }, [selectedFace]);
 
   // Eyedropper overlay — brief flash when activeBrush is set via Alt+click
   const activeBrush = useStore((s) => s.activeBrush);
@@ -1373,10 +1353,10 @@ export default function SmartHotbar() {
       if (curTab === 2) {
         // Materials tab: number keys select material on current page
         const matIndex = materialPage * 10 + slotIndex;
-        if (matIndex < MATERIAL_SWATCHES.length) {
+        if (matIndex < visibleSwatches.length) {
           e.preventDefault();
           e.stopPropagation();
-          const swatch = MATERIAL_SWATCHES[matIndex];
+          const swatch = visibleSwatches[matIndex];
           const store = useStore.getState();
           if (store.activeBrush === swatch.surface) {
             store.setActiveBrush(null);
@@ -1688,7 +1668,7 @@ export default function SmartHotbar() {
 
           {/* Material swatches — current page only */}
           <div style={{ display: "flex", gap: 3, flex: 1, justifyContent: "flex-start" }}>
-            {MATERIAL_SWATCHES.slice(materialPage * 10, materialPage * 10 + 10).map((swatch, i) => {
+            {visibleSwatches.slice(materialPage * 10, materialPage * 10 + 10).map((swatch, i) => {
               const isActive = activeBrush === swatch.surface;
               const fill = surfaceFill(swatch.surface, currentTheme);
               const hotkey = i < 9 ? String(i + 1) : "0";
