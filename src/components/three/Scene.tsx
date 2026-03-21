@@ -55,6 +55,7 @@ import { HIGHLIGHT_COLOR_SELECT } from "@/config/highlightColors";
 import { applyPalette } from "@/utils/applyPalette";
 import type { MaterialPalette } from "@/store/slices/librarySlice";
 import { QUALITY_PRESETS } from "@/config/qualityPresets";
+import { QualityAutoDetect } from './QualityAutoDetect';
 
 
 // ── Sun Position Calculator ─────────────────────────────────
@@ -1952,6 +1953,7 @@ export default function Scene() {
 
   return (
     <>
+      <QualityAutoDetect />
       <QualityManager />
       <DevSceneExpose />
       <SceneExporter />
