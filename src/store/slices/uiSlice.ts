@@ -12,6 +12,13 @@ import type { VoxelPayload } from '../useStore';
 type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
 type Get = () => any;
 
+export interface RecentItem {
+  type: 'wallType' | 'finish';
+  value: string;
+  label: string;
+  icon?: string;
+}
+
 export interface UiSlice {
   hoveredVoxel: VoxelPayload | null;
   setHoveredVoxel: (v: VoxelPayload | null) => void;
@@ -126,6 +133,16 @@ export interface UiSlice {
   openWizard: () => void;
   closeWizard: () => void;
   setWizardPresetId: (id: string | null) => void;
+
+  // Recent items MRU list (ephemeral — reset on page load, capped at 8)
+  recentItems: RecentItem[];
+  addRecentItem: (item: RecentItem) => void;
+
+  // Collapsible inspector sidebar sections (ephemeral)
+  previewCollapsed: boolean;
+  setPreviewCollapsed: (v: boolean) => void;
+  gridCollapsed: boolean;
+  setGridCollapsed: (v: boolean) => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -228,4 +245,17 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   openWizard: () => set({ wizardOpen: true, wizardPresetId: null }),
   closeWizard: () => set({ wizardOpen: false, wizardPresetId: null }),
   setWizardPresetId: (id) => set({ wizardPresetId: id }),
+
+  // Recent items MRU list
+  recentItems: [],
+  addRecentItem: (item) => set((s: any) => {
+    const filtered = (s.recentItems as RecentItem[]).filter((r) => r.value !== item.value);
+    return { recentItems: [item, ...filtered].slice(0, 8) };
+  }),
+
+  // Collapsible inspector sidebar sections
+  previewCollapsed: false,
+  setPreviewCollapsed: (v) => set({ previewCollapsed: v }),
+  gridCollapsed: false,
+  setGridCollapsed: (v) => set({ gridCollapsed: v }),
 });
