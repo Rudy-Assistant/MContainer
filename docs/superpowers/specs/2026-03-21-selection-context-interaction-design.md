@@ -58,12 +58,24 @@ deriveSelectionTarget(state):
     return { type: 'bay', containerId: cid, indices, bayId }
 
   // Single voxel selection (Detail mode, or Simple mode single-voxel bay like corners)
-  if state.selectedVoxel && !state.selectedVoxel.isExtension:
-    const cid = state.selectedVoxel.containerId
-    const idx = state.selectedVoxel.index
-    if state.selectedFace:
-      return { type: 'face', containerId: cid, index: idx, face: state.selectedFace }
-    return { type: 'voxel', containerId: cid, index: idx }
+  // VoxelPayload = VoxelRef | VoxelExtRef (discriminated by isExtension)
+  // VoxelRef: { containerId, index, isExtension?: undefined }
+  // VoxelExtRef: { containerId, isExtension: true, col, row } — no `index` field
+  if state.selectedVoxel:
+    const sv = state.selectedVoxel
+    if sv.isExtension:
+      // Extension voxels use col/row, not index. Convert to grid index for context.
+      const idx = sv.row * GRID_COLS + sv.col
+      const cid = sv.containerId
+      if state.selectedFace:
+        return { type: 'face', containerId: cid, index: idx, face: state.selectedFace }
+      return { type: 'voxel', containerId: cid, index: idx }
+    else:
+      const cid = sv.containerId
+      const idx = sv.index
+      if state.selectedFace:
+        return { type: 'face', containerId: cid, index: idx, face: state.selectedFace }
+      return { type: 'voxel', containerId: cid, index: idx }
 
   // Container-level selection
   if state.selection.length > 0:
@@ -71,6 +83,8 @@ deriveSelectionTarget(state):
 
   return { type: 'none' }
 ```
+
+**Extension voxel handling:** `VoxelPayload` is a discriminated union (`VoxelRef | VoxelExtRef`). `VoxelExtRef` has `col`/`row` instead of `index`. The derivation converts extension coordinates to a grid index (`row * GRID_COLS + col`) so `SelectionTarget` always provides a flat `index`. All downstream consumers (highlight rendering, hotbar switching, paint application) already work with grid indices.
 
 **Note:** `selectedVoxels` is checked regardless of `designComplexity`. In Simple mode, bay clicks set `selectedVoxels`; in Detail mode, shift-click multi-select also sets `selectedVoxels`. Both produce `'bay'`/`'bay-face'` targets — the hotbar mapping is the same. The `getBayGroupForVoxel` function is imported from `src/config/bayGroups.ts` (takes a single index, returns the bay group containing it).
 
@@ -174,7 +188,7 @@ It removed ALL auto-switching. The problem wasn't auto-switching — it was swit
 
 - `src/hooks/useHotbarAutoSwitch.ts` — new hook
 - `src/components/ui/SmartHotbar.tsx` — mount hook, add face-category filtering
-- `src/store/slices/uiSlice.ts` — fix outdated comment on line 37 (says `0=rooms, 1=materials, 2=furniture` but actual layout is `0=rooms, 1=surfaces, 2=materials, 3=furniture`)
+- `src/store/slices/uiSlice.ts` — fix outdated comment on line 37 (says `0=rooms, 1=materials, 2=furniture` but actual layout confirmed in SmartHotbar.tsx lines 1475-1478: `0=Rooms, 1=Surfaces, 2=Materials, 3=Furniture`)
 
 ---
 
