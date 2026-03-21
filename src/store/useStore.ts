@@ -20,8 +20,9 @@ import { createUiSlice, type UiSlice } from "./slices/uiSlice";
 import { createSelectionSlice, type SelectionSlice } from "./slices/selectionSlice";
 import { createDragSlice, type DragSlice, setTemporalApiAccessor } from "./slices/dragSlice";
 import { createLibrarySlice, type LibrarySlice, setLibraryTemporalAccessor } from "./slices/librarySlice";
-import { createVoxelSlice, type VoxelSlice, setVoxelStoreRef } from "./slices/voxelSlice";
+import { createVoxelSlice, type VoxelSlice, setVoxelStoreRef, recomputeSmartRailings } from "./slices/voxelSlice";
 import { createContainerSlice, type ContainerSlice, setContainerTemporalAccessor } from "./slices/containerSlice";
+import { THEMES } from "@/config/themes";
 
 // ── Voxel Target Union ─────────────────────────────────────
 /** Standard voxel reference (maps to a real grid index). */
@@ -121,14 +122,14 @@ export interface BlockPreset {
 }
 
 export const BLOCK_PRESETS: BlockPreset[] = [
-  { label: "Floor Only",       active: true,  faces: { top: "Open",        bottom: "Deck_Wood", n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
+  // Cycle order: Deck → Default → Platform → Balcony → Glass Box → Sealed → Empty
+  { label: "Deck",             active: true,  faces: { top: "Open",        bottom: "Deck_Wood", n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
+  { label: "Default (Steel)",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Solid_Steel",  s: "Solid_Steel",  e: "Solid_Steel",  w: "Solid_Steel"  } },
   { label: "Floor + Ceiling",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
   { label: "Floor+Ceil+Rail",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Railing_Cable",s: "Railing_Cable",e: "Railing_Cable", w: "Railing_Cable" } },
   { label: "Floor+Ceil+Glass", active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Glass_Pane",   s: "Glass_Pane",   e: "Glass_Pane",   w: "Glass_Pane"   } },
+  { label: "Sealed",           active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Solid_Steel",  s: "Solid_Steel",  e: "Solid_Steel",  w: "Solid_Steel"  } },
   { label: "Empty",            active: false, faces: { top: "Open",        bottom: "Open",      n: "Open",         s: "Open",         e: "Open",         w: "Open"         } },
-  { label: "Default (Steel)",  active: true,  faces: { top: "Solid_Steel", bottom: "Deck_Wood", n: "Solid_Steel",  s: "Solid_Steel",  e: "Solid_Steel",  w: "Solid_Steel"  } },
-  { label: "Stairs",           active: true,  faces: { top: "Open",        bottom: "Deck_Wood", n: "Solid_Steel",  s: "Solid_Steel",  e: "Open",         w: "Open"         }, voxelType: 'stairs', stairDir: 'ns' },
-  { label: "Pool Basin",       active: true,  faces: { top: "Open",        bottom: "Concrete",  n: "Concrete",     s: "Concrete",     e: "Concrete",     w: "Concrete"     } },
 ];
 
 // ── Auto Stair Direction ─────────────────────────────────────
@@ -212,16 +213,37 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
   partialize: (state) => {
     const { containers, zones, environment, viewMode, pricing, furnitureIndex,
             libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-            palettes, activePaletteId } = state;
-    // Strip ephemeral _preMergeWalls and _preExtensionDoors from persisted containers
+            palettes, activePaletteId, currentTheme } = state;
+    // Strip ephemeral _preMergeWalls, _preExtensionDoors, _smartRailingChanges, and voxel unpackPhase from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
-      const { _preMergeWalls, _preExtensionDoors, ...rest } = c;
+      const { _preMergeWalls, _preExtensionDoors, _smartRailingChanges, ...rest } = c;
+      // Strip ephemeral unpackPhase from voxels (animation-only, never persisted)
+      if (rest.voxelGrid) {
+        rest.voxelGrid = rest.voxelGrid.map(v => {
+          if (v.unpackPhase === undefined) return v;
+          const { unpackPhase: _, ...cleanVoxel } = v;
+          return cleanVoxel;
+        });
+      }
       cleanContainers[id] = rest;
     }
     return { containers: cleanContainers, zones, environment, viewMode, pricing, furnitureIndex,
              libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-             palettes, activePaletteId } as StoreState;
+             palettes, activePaletteId, currentTheme } as StoreState;
+  },
+  merge: (persistedState, currentState) => {
+    if (!persistedState) return currentState as StoreState;
+    const persisted = persistedState as Partial<StoreState>;
+    const merged = { ...currentState, ...persisted };
+    // Sync groundPreset with theme (theme determines ground preset)
+    if (persisted.environment) {
+      const themeId = (persisted as any).currentTheme ?? (currentState as any).currentTheme ?? 'industrial';
+      const expectedGround = THEMES[themeId as import('@/config/themes').ThemeId]?.groundPreset ?? 'grass';
+      // Theme determines ground preset — override persisted ground if mismatched
+      (merged as any).environment = { ...persisted.environment, groundPreset: expectedGround };
+    }
+    return merged as StoreState;
   },
   onRehydrateStorage: () => (state, error) => {
     if (error) {
@@ -234,11 +256,18 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
       if (!result.success) {
         console.warn('ModuHome: Invalid persisted state, using defaults:', result.error);
       }
-      // Back-fill defaults for fields added after initial persist
-      if (state.environment && !state.environment.groundPreset) {
-        useStore.setState({
-          environment: { ...state.environment, groundPreset: 'grass' },
-        });
+      // Rebuild smart railing tracking from persisted voxel state
+      // (_smartRailingChanges is stripped from persist but Railing_Cable faces are persisted)
+      if (state.containers) {
+        for (const [id, container] of Object.entries(state.containers)) {
+          const c = container as any;
+          if (c.voxelGrid) {
+            const grid = [...c.voxelGrid];
+            const rc: any = { _smartRailingChanges: undefined };
+            recomputeSmartRailings(grid, rc);
+            c._smartRailingChanges = rc._smartRailingChanges;
+          }
+        }
       }
     }
     useStore.setState({ _hasHydrated: true });
