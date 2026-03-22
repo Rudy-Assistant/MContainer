@@ -2,15 +2,7 @@
 
 import { useStore } from "@/store/useStore";
 import type { SurfaceType, VoxelFaces } from "@/types/container";
-
-const QUICK_MATERIALS: Array<{ label: string; material: SurfaceType; color: string }> = [
-  { label: "Steel", material: "Solid_Steel", color: "#78909c" },
-  { label: "Glass", material: "Glass_Pane", color: "#60a5fa" },
-  { label: "Window", material: "Window_Standard", color: "#7dd3fc" },
-  { label: "Wood", material: "Deck_Wood", color: "#8d6e63" },
-  { label: "Railing", material: "Railing_Glass", color: "#93c5fd" },
-  { label: "Open", material: "Open", color: "#e2e8f0" },
-];
+import { QUICK_MATERIALS } from "@/config/surfaceLabels";
 
 function MaterialBtn({ label, color, onClick }: {
   label: string; color: string; onClick: () => void;
@@ -36,8 +28,9 @@ export default function BatchFaceControls({ containerId, indices }: {
     useStore.setState((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return s;
+      const indexSet = new Set(indices);
       const grid = c.voxelGrid.map((v, i) => {
-        if (!indices.includes(i) || !v.active) return v;
+        if (!indexSet.has(i) || !v.active) return v;
         const faces = { ...v.faces };
         for (const [face, mat] of Object.entries(faceUpdates)) {
           faces[face as keyof VoxelFaces] = mat as SurfaceType;
@@ -79,7 +72,7 @@ export default function BatchFaceControls({ containerId, indices }: {
         <div style={{ fontSize: 9, color: "var(--text-muted, #94a3b8)", marginBottom: 3 }}>Exterior walls:</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
           {QUICK_MATERIALS.map(m => (
-            <MaterialBtn key={m.material + "-ext"} label={m.label} color={m.color} onClick={() => applyToAllExterior(m.material)} />
+            <MaterialBtn key={m.type + "-ext"} label={m.label} color={m.color} onClick={() => applyToAllExterior(m.type)} />
           ))}
         </div>
       </div>

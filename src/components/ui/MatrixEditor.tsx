@@ -369,7 +369,7 @@ function VoxelGrid({
   useEffect(() => {
     if (!ctxMenu) return;
     const close = () => setCtxMenu(null);
-    document.addEventListener('click', close, { once: true });
+    document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [ctxMenu]);
 
@@ -1023,7 +1023,7 @@ export default function MatrixEditor({
   useEffect(() => {
     if (!deployMenuOpen) return;
     const handleClickOutside = () => setDeployMenuOpen(false);
-    document.addEventListener('click', handleClickOutside, { once: true });
+    document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [deployMenuOpen]);
 

@@ -2129,7 +2129,14 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           set((st: any) => {
             const c = st.containers[containerId];
             if (!c?.voxelGrid) return st;
-            const grid = [...c.voxelGrid.map((v: any) => ({ ...v, faces: { ...v.faces } }))];
+            const grid = [...c.voxelGrid];  // shallow array copy only
+            const cloned = new Set<number>();
+            const ensureCloned = (idx: number) => {
+              if (!cloned.has(idx)) {
+                grid[idx] = { ...grid[idx], faces: { ...grid[idx].faces } };
+                cloned.add(idx);
+              }
+            };
             for (let level = 0; level < 2; level++) {
               for (let row = 0; row < VOXEL_ROWS; row++) {
                 for (let col = 0; col < VOXEL_COLS; col++) {
@@ -2146,6 +2153,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
                     if (nr < 0 || nr >= VOXEL_ROWS || nc < 0 || nc >= VOXEL_COLS) continue;
                     const ni = level * VOXEL_ROWS * VOXEL_COLS + nr * VOXEL_COLS + nc;
                     if (grid[ni]?.active) {
+                      ensureCloned(idx);
                       grid[idx].faces[face] = 'Open';
                     }
                   }

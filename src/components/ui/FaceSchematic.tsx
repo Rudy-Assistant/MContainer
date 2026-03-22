@@ -2,22 +2,13 @@
 
 import type { VoxelFaces, SurfaceType } from "@/types/container";
 import { SURFACE_COLORS } from "@/components/ui/MatrixEditor";
-
-const SHORT: Record<string, string> = {
-  Open: "Open", Solid_Steel: "Steel", Glass_Pane: "Glass",
-  Railing_Glass: "Rail", Railing_Cable: "Cable", Deck_Wood: "Wood",
-  Concrete: "Conc", Door: "Door", Window_Standard: "Win",
-  Stairs: "Stair", Half_Fold: "½Fold", Gull_Wing: "Gull",
-  Window_Sill: "Sill", Window_Clerestory: "Clr", Window_Half: "½Win",
-  Stairs_Down: "StDn", Wood_Hinoki: "Hnki", Floor_Tatami: "Tata",
-  Wall_Washi: "Washi", Glass_Shoji: "Shoji",
-};
+import { SURFACE_SHORT_LABELS } from "@/config/surfaceLabels";
 
 function FaceBtn({ face, material, onClick }: {
   face: string; material: SurfaceType; onClick: () => void;
 }) {
   const bg = SURFACE_COLORS[material] || "#78909c";
-  const label = SHORT[material] || material.slice(0, 4);
+  const label = SURFACE_SHORT_LABELS[material] || material.slice(0, 4);
   return (
     <button
       onClick={onClick}
