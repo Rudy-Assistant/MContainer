@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import type { SurfaceType, VoxelFaces } from "@/types/container";
-import { SURFACE_COLORS, SURFACE_SHORT_LABELS, QUICK_MATERIALS } from "@/config/surfaceLabels";
+import { SURFACE_COLORS, SURFACE_SHORT_LABELS, QUICK_MATERIALS, FLOOR_MATERIALS, CEILING_MATERIALS } from "@/config/surfaceLabels";
 import { BookmarkPlus } from "lucide-react";
 
 const FACE_KEYS: (keyof VoxelFaces)[] = ['n', 's', 'e', 'w', 'top', 'bottom'];
@@ -58,10 +58,13 @@ export default function FaceStrip({ containerId, indices }: {
 
   const isSingle = indices.length === 1;
 
-  const faceMaterials: Record<keyof VoxelFaces, SurfaceType | null> = {} as Record<keyof VoxelFaces, SurfaceType | null>;
-  for (const face of FACE_KEYS) {
-    faceMaterials[face] = resolvedFaceMaterial(grid, indices, face);
-  }
+  const faceMaterials = useMemo(() => {
+    const result: Record<keyof VoxelFaces, SurfaceType | null> = {} as Record<keyof VoxelFaces, SurfaceType | null>;
+    for (const face of FACE_KEYS) {
+      result[face] = resolvedFaceMaterial(grid, indices, face);
+    }
+    return result;
+  }, [grid, indices]);
 
   const handleDeselect = () => {
     setSelectedVoxel(null);
@@ -201,11 +204,7 @@ export default function FaceStrip({ containerId, indices }: {
         <div>
           <span style={{ fontSize: 9, color: "var(--text-muted, #94a3b8)", marginRight: 4 }}>Floors:</span>
           <span style={{ display: "inline-flex", gap: 2, flexWrap: "wrap" }}>
-            {[
-              { type: "Deck_Wood" as SurfaceType, label: "Wood", color: "#8d6e63" },
-              { type: "Concrete" as SurfaceType, label: "Concrete", color: "#9e9e9e" },
-              { type: "Open" as SurfaceType, label: "Open", color: "#e2e8f0" },
-            ].map((m) =>
+            {FLOOR_MATERIALS.map((m) =>
               renderMaterialBtn(m, 'floor', () => batchSetFaces(containerId, indices, { bottom: m.type }))
             )}
           </span>
@@ -213,10 +212,7 @@ export default function FaceStrip({ containerId, indices }: {
         <div>
           <span style={{ fontSize: 9, color: "var(--text-muted, #94a3b8)", marginRight: 4 }}>Ceilings:</span>
           <span style={{ display: "inline-flex", gap: 2, flexWrap: "wrap" }}>
-            {[
-              { type: "Solid_Steel" as SurfaceType, label: "Steel", color: "#78909c" },
-              { type: "Open" as SurfaceType, label: "Open", color: "#e2e8f0" },
-            ].map((m) =>
+            {CEILING_MATERIALS.map((m) =>
               renderMaterialBtn(m, 'ceil', () => batchSetFaces(containerId, indices, { top: m.type }))
             )}
           </span>

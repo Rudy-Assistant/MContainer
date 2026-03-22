@@ -197,6 +197,18 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
 
   // ── Shared button styles ──────────────────────────────────
 
+  const toggleBtn = (active: boolean): React.CSSProperties => ({
+    padding: "5px 10px",
+    border: `1px solid ${active ? 'var(--accent, #2563eb)' : 'var(--btn-border, #e5e7eb)'}`,
+    borderRadius: 6,
+    cursor: "pointer",
+    background: active ? "var(--accent, #2563eb)" : "transparent",
+    color: active ? "#fff" : "var(--text-muted, #6b7280)",
+    fontSize: 11,
+    fontWeight: 600,
+    transition: "all 100ms",
+  });
+
   const btn = (enabled: boolean): React.CSSProperties => ({
     display: "flex",
     alignItems: "center",
@@ -373,38 +385,10 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
         </div>
 
         {/* ── Global Roof / Skin toggles ── */}
-        <button
-          onClick={toggleHideRoof}
-          title={hideRoof ? "Show Roof" : "Hide Roof"}
-          style={{
-            padding: "5px 10px",
-            border: `1px solid ${hideRoof ? 'var(--accent, #2563eb)' : 'var(--btn-border, #e5e7eb)'}`,
-            borderRadius: 6,
-            cursor: "pointer",
-            background: hideRoof ? "var(--accent, #2563eb)" : "transparent",
-            color: hideRoof ? "#fff" : "var(--text-muted, #6b7280)",
-            fontSize: 11,
-            fontWeight: 600,
-            transition: "all 100ms",
-          }}
-        >
+        <button onClick={toggleHideRoof} title={hideRoof ? "Show Roof" : "Hide Roof"} style={toggleBtn(hideRoof)}>
           Roof
         </button>
-        <button
-          onClick={toggleHideSkin}
-          title={hideSkin ? "Show Skin" : "Hide Skin"}
-          style={{
-            padding: "5px 10px",
-            border: `1px solid ${hideSkin ? 'var(--accent, #2563eb)' : 'var(--btn-border, #e5e7eb)'}`,
-            borderRadius: 6,
-            cursor: "pointer",
-            background: hideSkin ? "var(--accent, #2563eb)" : "transparent",
-            color: hideSkin ? "#fff" : "var(--text-muted, #6b7280)",
-            fontSize: 11,
-            fontWeight: 600,
-            transition: "all 100ms",
-          }}
-        >
+        <button onClick={toggleHideSkin} title={hideSkin ? "Show Skin" : "Hide Skin"} style={toggleBtn(hideSkin)}>
           Skin
         </button>
 

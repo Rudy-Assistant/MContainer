@@ -27,6 +27,19 @@ export const QUICK_MATERIALS: QuickMaterial[] = [
   { type: "Open",            label: "Open",    color: "#e2e8f0" },
 ];
 
+/** Floor material shortcuts for batch UI */
+export const FLOOR_MATERIALS: QuickMaterial[] = [
+  { type: "Deck_Wood", label: "Wood", color: "#8d6e63" },
+  { type: "Concrete",  label: "Concrete", color: "#9e9e9e" },
+  { type: "Open",      label: "Open", color: "#e2e8f0" },
+];
+
+/** Ceiling material shortcuts for batch UI */
+export const CEILING_MATERIALS: QuickMaterial[] = [
+  { type: "Solid_Steel", label: "Steel", color: "#78909c" },
+  { type: "Open",        label: "Open", color: "#e2e8f0" },
+];
+
 /** Color mapping for each surface type — used by grid cells, face buttons, etc. */
 export const SURFACE_COLORS: Record<SurfaceType, string> = {
   Open:           "transparent",
