@@ -8,12 +8,13 @@
  *   2. VoxelPreview3D cube — shows the selected block's 6 faces, click to cycle
  */
 
-import React, { useMemo, useCallback, useState, useRef } from "react";
+import React, { useMemo, useCallback, useState, useRef, useEffect } from "react";
 import { useStore, autoStairDir } from "@/store/useStore";
 import {
   type Container,
   type SurfaceType,
   type VoxelFaces,
+  type ExtensionConfig,
   VOXEL_COLS,
   VOXEL_ROWS,
   VOXEL_LEVELS,
@@ -948,6 +949,16 @@ export default function MatrixEditor({
   const selectedVoxels   = useStore((s) => s.selectedVoxels);
   const saveBlockToLibrary = useStore((s) => s.saveBlockToLibrary);
   const globalCullSet    = useStore((s) => s.globalCullSet);
+  const setAllExtensions = useStore((s) => s.setAllExtensions);
+
+  const [deployMenuOpen, setDeployMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!deployMenuOpen) return;
+    const handleClickOutside = () => setDeployMenuOpen(false);
+    document.addEventListener('click', handleClickOutside, { once: true });
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [deployMenuOpen]);
 
   const voxelGrid = container.voxelGrid ?? createDefaultVoxelGrid();
 
@@ -1020,11 +1031,61 @@ export default function MatrixEditor({
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
 
       {/* ── Section Header ── */}
-      <div style={{
-        fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #64748b)",
-        textTransform: "uppercase", letterSpacing: "0.08em",
-      }}>
-        Container Grid
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{
+          fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #64748b)",
+          textTransform: "uppercase", letterSpacing: "0.08em",
+        }}>
+          Container Grid
+        </div>
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setDeployMenuOpen(!deployMenuOpen)}
+            style={{
+              fontSize: 10, fontWeight: 600, padding: "3px 8px",
+              borderRadius: 6, border: "1px solid var(--border, #cbd5e1)",
+              background: "var(--btn-bg, #fff)", cursor: "pointer",
+              color: "var(--text-muted, #64748b)",
+            }}
+          >
+            Deploy ▾
+          </button>
+          {deployMenuOpen && (
+            <div style={{
+              position: "absolute", top: "100%", right: 0, zIndex: 30,
+              background: "var(--bg-panel, #fff)", borderRadius: 8,
+              border: "1px solid var(--border, #e2e8f0)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+              minWidth: 160, marginTop: 4, overflow: "hidden",
+            }}>
+              {([
+                { label: "All Extensions", config: "all_deck" as ExtensionConfig },
+                { label: "All + Interior", config: "all_interior" as ExtensionConfig },
+                { label: "North Decks", config: "north_deck" as ExtensionConfig },
+                { label: "South Decks", config: "south_deck" as ExtensionConfig },
+                { label: "Retract All", config: "none" as ExtensionConfig },
+              ]).map(item => (
+                <button
+                  key={item.config}
+                  onClick={() => {
+                    setAllExtensions(containerId, item.config);
+                    setDeployMenuOpen(false);
+                  }}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    padding: "8px 12px", border: "none", cursor: "pointer",
+                    background: "transparent", fontSize: 12, fontWeight: 500,
+                    color: item.config === "none" ? "#ef4444" : "var(--text-main, #1e293b)",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--input-bg, #f1f5f9)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Level selector moved to TopToolbar (inspectorView: floor/ceiling) */}
