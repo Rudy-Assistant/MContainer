@@ -22,6 +22,8 @@ import {
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import VoxelPreview3D, { GroupedVoxelPreview } from "@/components/ui/VoxelPreview3D";
+import FaceSchematic from "@/components/ui/FaceSchematic";
+import BatchFaceControls from "@/components/ui/BatchFaceControls";
 import { BookmarkPlus } from "lucide-react";
 import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
 import { HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
@@ -1013,8 +1015,10 @@ export default function MatrixEditor({
   const saveBlockToLibrary = useStore((s) => s.saveBlockToLibrary);
   const globalCullSet    = useStore((s) => s.globalCullSet);
   const setAllExtensions = useStore((s) => s.setAllExtensions);
+  const cycleVoxelFace = useStore((s) => s.cycleVoxelFace);
 
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (!deployMenuOpen) return;
@@ -1322,13 +1326,35 @@ export default function MatrixEditor({
               );
             })()}
 
-            {/* Interactive 3D Cube Inspector */}
-            <VoxelPreview3D
-              containerId={containerId}
-              voxelIndex={selIdx}
-              overrideFaces={effectiveFaces}
-              bayGroupIndices={isBaySelected ? selectedVoxels!.indices : undefined}
-            />
+            {/* Face Schematic — compact 6-face button grid */}
+            {selVoxel && (
+              <FaceSchematic
+                faces={selVoxel.faces}
+                onCycleFace={(face) => {
+                  cycleVoxelFace(containerId, selIdx, face);
+                }}
+              />
+            )}
+
+            {/* Interactive 3D Cube Inspector — collapsible */}
+            <button
+              onClick={() => setPreviewOpen(!previewOpen)}
+              style={{
+                width: "100%", textAlign: "left", padding: "6px 8px",
+                fontSize: 10, fontWeight: 600, color: "var(--text-muted, #64748b)",
+                background: "transparent", border: "none", cursor: "pointer",
+              }}
+            >
+              {previewOpen ? "▾" : "▸"} 3D Preview
+            </button>
+            {previewOpen && (
+              <VoxelPreview3D
+                containerId={containerId}
+                voxelIndex={selIdx}
+                overrideFaces={effectiveFaces}
+                bayGroupIndices={isBaySelected ? selectedVoxels!.indices : undefined}
+              />
+            )}
 
           </div>
         </>
