@@ -24,7 +24,8 @@ In `ContainerMesh.tsx`:
 - `FramePosts` (line ~1759): Remove `cutScale` height calculation. Posts always use `dims.height`. Add opacity logic.
 - `FrameBeams` (line ~1816): Remove `hideTopBeams` filter so top beams always render. Add same opacity logic.
 - **Opacity condition:** `wallCutMode === 'half' || wallCutMode === 'down'` (not `!== 'full'`). The `'custom'` mode uses `wallCutHeight` — apply opacity only when `wallCutHeight < 1.0` in custom mode.
-- **Material approach:** `frameMat` is a module-scope singleton shared across all containers. Do NOT mutate it directly. Create a second module-scope material `frameMatGhost` with `opacity: 0.3, transparent: true`. Switch between `frameMat` and `frameMatGhost` based on wall cut state. No per-instance cloning needed.
+- **Material approach:** `frameMat` is a module-scope singleton shared across all containers. Do NOT mutate it directly. Create a second module-scope material `frameSemiMat` (MeshStandardMaterial, `opacity: 0.3, transparent: true`) for the wall-cut semi-transparent state. NOTE: `frameGhostMat` already exists (opacity=0, invisible but clickable for hidden structural elements) — this is a different purpose. Material selection priority: `isHidden` → `frameGhostMat` (invisible); else wall-cut active → `frameSemiMat` (semi-transparent); else → `frameMat` (opaque).
+- **FramePosts simplification:** With cutScale removed, `effectivePostH = dims.height` and `effectivePostY = dims.height / 2` always. Remove the `cutScale`, `postH`, `postY` intermediate variables entirely.
 
 ### Files
 - `src/components/three/ContainerMesh.tsx` — FramePosts, FrameBeams functions
