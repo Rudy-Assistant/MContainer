@@ -1326,15 +1326,23 @@ export default function MatrixEditor({
               );
             })()}
 
-            {/* Face Schematic — compact 6-face button grid */}
-            {selVoxel && (
-              <FaceSchematic
-                faces={selVoxel.faces}
-                onCycleFace={(face) => {
-                  cycleVoxelFace(containerId, selIdx, face);
-                }}
-              />
-            )}
+            {/* Batch controls for multi-selection, single-face schematic otherwise */}
+            {selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1
+              ? (
+                <BatchFaceControls
+                  containerId={containerId}
+                  indices={selectedVoxels.indices}
+                />
+              )
+              : selVoxel && (
+                <FaceSchematic
+                  faces={selVoxel.faces}
+                  onCycleFace={(face) => {
+                    cycleVoxelFace(containerId, selIdx, face);
+                  }}
+                />
+              )
+            }
 
             {/* Interactive 3D Cube Inspector — collapsible */}
             <button
