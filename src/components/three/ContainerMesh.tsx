@@ -1858,9 +1858,10 @@ function FrameBeams({ container, dims, hoveredElement, setHoveredElement }: Fram
         return (
           <group key={key}>
             {/* Visual geometry: full material when visible, cyan ghost when hidden — raycast nuked */}
+            {/* Bottom beams always opaque per spec; only top beams go semi-transparent */}
             <mesh
               position={pos}
-              material={isHidden ? frameGhostMat : translucent ? frameSemiMat : frameMat}
+              material={isHidden ? frameGhostMat : (translucent && !key.startsWith('bottom')) ? frameSemiMat : frameMat}
               raycast={nullRaycast}
             >
               <boxGeometry args={args} />
