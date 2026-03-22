@@ -1814,13 +1814,15 @@ export default function ContainerSkin({
   const isWalkthrough        = viewMode === ViewMode.Walkthrough;
   const isPreviewMode        = useStore((s) => s.isPreviewMode);
   const wallCutMode          = useStore((s) => s.wallCutMode);
+  const globalHideRoof       = useStore((s) => s.hideRoof);
+  const globalHideSkin       = useStore((s) => s.hideSkin);
   const frameMode            = useStore((s) => s.frameMode);
   const selectedFrameElement = useStore((s) => s.selectedFrameElement);
   const setSelectedFrameElement = useStore((s) => s.setSelectedFrameElement);
   // Wall cut scale: full=1.0, half=0.2 (low wainscot), down=0.05 (baseboard), custom reads wallCutHeight
   const wallCutScale = wallCutMode === 'full' ? 1.0 : wallCutMode === 'half' ? 0.2 : wallCutMode === 'down' ? 0.05 : useStore.getState().wallCutHeight;
   // Hide ceiling (top faces) when walls are cut — improves interior visibility
-  const hideCeiling = wallCutMode !== 'full';
+  const hideCeiling = wallCutMode !== 'full' || globalHideRoof;
   // facePreview hover removed (Sprint 15) — no longer swaps materials on hover
 
   // Sync module-scope material aliases whenever theme changes
@@ -2056,6 +2058,8 @@ export default function ContainerSkin({
         } else {
           setSelectedVoxel({ containerId: container.id, index: voxelIndex });
         }
+        // Record which face was clicked so sidebar shows face configuration (FinishesPanel)
+        useStore.getState().setSelectedFace(faceName);
         return;
       }
 
@@ -2210,6 +2214,9 @@ export default function ContainerSkin({
       forceRender(c => c + 1);
     }
   });
+
+  // Global skin hide — skip ALL face rendering
+  if (globalHideSkin) return null;
 
   return (
     <group
@@ -2658,6 +2665,8 @@ export default function ContainerSkin({
                   } else {
                     setSelectedVoxel({ containerId: container.id, index: idx });
                   }
+                  // Set floor face so sidebar shows face configuration
+                  useStore.getState().setSelectedFace('bottom');
                   return;
                 }
                 // Already focused: stamp or cycle preset

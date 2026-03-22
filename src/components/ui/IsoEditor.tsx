@@ -398,8 +398,8 @@ function LayerBtn({
 // ═══════════════════════════════════════════════════════════
 
 export default function IsoEditor({ containerId }: { containerId: string }) {
-  const [hideRoof, setHideRoof] = useState(false);
-  const [hideSkin, setHideSkin] = useState(false);
+  const hideRoof = useStore((s) => s.hideRoof);
+  const hideSkin = useStore((s) => s.hideSkin);
   const [linked, setLinked] = useState(true);
   const saveContainerToLibrary = useStore((s) => s.saveContainerToLibrary);
   const container = useStore((s) => s.containers[containerId]);
@@ -415,9 +415,6 @@ export default function IsoEditor({ containerId }: { containerId: string }) {
         }}>
           Container
         </span>
-        <LayerBtn label="Roof" active={hideRoof} onClick={() => setHideRoof((v) => !v)} />
-        <LayerBtn label="Skin" active={hideSkin} onClick={() => setHideSkin((v) => !v)} />
-
         <div style={{ marginLeft: "auto", display: "flex", gap: "3px", alignItems: "center" }}>
           <button
             onClick={() => saveContainerToLibrary(containerId, containerLabel)}
