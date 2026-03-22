@@ -21,38 +21,11 @@ import {
   CONTAINER_DIMENSIONS,
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
-import VoxelPreview3D, { GroupedVoxelPreview } from "@/components/ui/VoxelPreview3D";
-import FaceSchematic from "@/components/ui/FaceSchematic";
-import BatchFaceControls from "@/components/ui/BatchFaceControls";
-import { BookmarkPlus } from "lucide-react";
+import FaceStrip from "@/components/ui/FaceStrip";
 import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
 import { HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
 import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
-
-// ── Face-color mapping for grid cells ────────────────────────
-
-export const SURFACE_COLORS: Record<SurfaceType, string> = {
-  Open:           "transparent",
-  Solid_Steel:    "#78909c",
-  Glass_Pane:     "#60a5fa",
-  Railing_Glass:  "#93c5fd",
-  Railing_Cable:  "#607d8b",
-  Deck_Wood:      "#8d6e63",
-  Concrete:       "#9e9e9e",
-  Half_Fold:      "#ab47bc",
-  Gull_Wing:      "#7e57c2",
-  Door:           "#607d8b",
-  Stairs:         "#5d4037",
-  Stairs_Down:    "#3e2723",
-  Wood_Hinoki:    "#f5e6c8",
-  Floor_Tatami:   "#c8d5a0",
-  Wall_Washi:     "#f8f4ec",
-  Glass_Shoji:    "#fafafa",
-  Window_Standard: "#7dd3fc",
-  Window_Sill:     "#93c5fd",
-  Window_Clerestory: "#bfdbfe",
-  Window_Half:     "#a5f3fc",
-};
+import { SURFACE_COLORS } from "@/config/surfaceLabels";
 
 /** Derive a single representative color from a voxel's faces */
 function cellColor(faces: { n: SurfaceType; s: SurfaceType; e: SurfaceType; w: SurfaceType; top: SurfaceType; bottom: SurfaceType }): string {
@@ -1010,15 +983,10 @@ export default function MatrixEditor({
   containerId: string;
 }) {
   const selectedVoxel    = useStore((s) => s.selectedVoxel);
-  const setSelectedVoxel = useStore((s) => s.setSelectedVoxel);
   const selectedVoxels   = useStore((s) => s.selectedVoxels);
-  const saveBlockToLibrary = useStore((s) => s.saveBlockToLibrary);
-  const globalCullSet    = useStore((s) => s.globalCullSet);
   const setAllExtensions = useStore((s) => s.setAllExtensions);
-  const cycleVoxelFace = useStore((s) => s.cycleVoxelFace);
 
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (!deployMenuOpen) return;
@@ -1038,52 +1006,14 @@ export default function MatrixEditor({
   const selVoxel = isRealVoxel ? voxelGrid[selectedVoxel.index]
     : isBaySelected ? voxelGrid[selectedVoxels!.indices[0]]
     : null;
-  // Compute a grid index for VoxelPreview3D — real voxels use .index, extensions derive from col/row
+  // Compute a grid index for display/door config — real voxels use .index, extensions derive from col/row
   const selIdx   = isRealVoxel ? selectedVoxel.index
     : isExtVoxel ? (selectedVoxel.row * VOXEL_COLS + selectedVoxel.col)
     : isBaySelected ? selectedVoxels!.indices[0]
     : -1;
 
-  const selCol = isExtVoxel ? selectedVoxel.col
-    : (typeof selIdx === 'number' && selIdx >= 0) ? selIdx % VOXEL_COLS : 0;
-  const selRow = isExtVoxel ? selectedVoxel.row
-    : (typeof selIdx === 'number' && selIdx >= 0) ? Math.floor((selIdx % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS) : 0;
-  const selLevel = (typeof selIdx === 'number' && selIdx >= 0)
-    ? Math.floor(selIdx / (VOXEL_ROWS * VOXEL_COLS)) : 0;
-
-  // Compute effective faces for the preview: apply globalCullSet + within-container adjacency culling.
-  // Culled faces (shared walls, global adjacency) are shown as 'Open' so the preview matches the 3D view.
-  const effectiveFaces = useMemo((): Partial<VoxelFaces> | undefined => {
-    if (!selVoxel || selIdx < 0) return undefined;
-    const HORIZ_DIRS: (keyof VoxelFaces)[] = ['n', 's', 'e', 'w'];
-    const ALL_DIRS: (keyof VoxelFaces)[] = ['n', 's', 'e', 'w', 'top', 'bottom'];
-    const override: Partial<VoxelFaces> = {};
-
-    // E/W adjacency inversion: E(+X) maps to col-1, W(-X) maps to col+1 (negated X mapping)
-    const adjDelta: Record<string, [number, number]> = {
-      n: [0, -1], s: [0, 1], e: [-1, 0], w: [1, 0],
-    };
-
-    for (const dir of ALL_DIRS) {
-      // 1. Global cull set (cross-container adjacency)
-      if (globalCullSet.has(`${containerId}:${selIdx}:${dir}`)) {
-        override[dir] = 'Open';
-        continue;
-      }
-      // 2. Within-container adjacency (horizontal only)
-      if (HORIZ_DIRS.includes(dir)) {
-        const [dc, dr] = adjDelta[dir];
-        const nc = selCol + dc, nr = selRow + dr;
-        if (nc >= 0 && nc < VOXEL_COLS && nr >= 0 && nr < VOXEL_ROWS) {
-          const ni = nr * VOXEL_COLS + nc;
-          if (voxelGrid[ni]?.active) {
-            override[dir] = 'Open';
-          }
-        }
-      }
-    }
-    return Object.keys(override).length > 0 ? override : undefined;
-  }, [selVoxel, selIdx, selCol, selRow, containerId, voxelGrid, globalCullSet]);
+  // Single-select: one real voxel selected (not multi-select)
+  const isSingleVoxelSelected = isVoxelSelected && !(selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1);
 
   const inspectorView = useStore((s) => s.inspectorView);
   const setInspectorView = useStore((s) => s.setInspectorView);
@@ -1181,190 +1111,81 @@ export default function MatrixEditor({
         ))}
       </div>
 
-      {/* ── CubeInspector — Interactive 3D Block Preview ──── */}
+      {/* ── FaceStrip — Unified face editor ──── */}
       {(isVoxelSelected || isBaySelected) && selIdx >= 0 && (
         <>
           <div style={{ height: "1px", background: "#e2e8f0" }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{
-                fontSize: "10px", fontWeight: 700, color: "var(--text-main, #334155)",
-                textTransform: "uppercase", letterSpacing: "0.06em",
-              }}>
-                {selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1
-                  ? `${selectedVoxels.indices.length} Tiles`
-                  : `Tile Detail`
-                }
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                {selVoxel && (
-                  <button
-                    onClick={() => {
-                      const f = selVoxel.faces;
-                      const label = `${f.n === 'Glass_Pane' || f.s === 'Glass_Pane' ? 'Glass' : f.n === 'Open' ? 'Open' : 'Steel'} Block`;
-                      saveBlockToLibrary(label, f);
-                    }}
-                    style={{
-                      background: "none", border: "1px solid var(--border, #e2e8f0)", borderRadius: "4px",
-                      cursor: "pointer", padding: "2px 4px",
-                      color: "var(--text-muted, #64748b)", display: "flex", alignItems: "center",
-                      transition: "all 100ms ease",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f59e0b"; e.currentTarget.style.borderColor = "#f59e0b"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; }}
-                    title="Save block to library"
-                  >
-                    <BookmarkPlus size={11} />
-                  </button>
-                )}
-                <button
-                  onClick={() => { setSelectedVoxel(null); useStore.getState().setSelectedVoxels(null); }}
-                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: "#94a3b8", padding: "0 2px" }}
-                  title="Deselect block"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Room Tag */}
-            {selVoxel && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0" }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted, #64748b)" }}>Room:</span>
-                <select
-                  value={selVoxel.roomTag ?? ""}
-                  onChange={(e) => {
-                    const tag = e.target.value || undefined;
-                    // Bay group: apply room tag to all voxels in group
-                    if (isBaySelected) {
-                      for (const bi of selectedVoxels!.indices) useStore.getState().setVoxelRoomTag(containerId, bi, tag);
-                    } else {
-                      useStore.getState().setVoxelRoomTag(containerId, selIdx, tag);
-                    }
-                  }}
-                  style={{
-                    flex: 1, fontSize: 10, padding: "2px 4px", borderRadius: 4,
-                    border: "1px solid var(--border, #e2e8f0)", background: "var(--btn-bg, #fff)", color: "var(--text-main, #374151)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value="">None</option>
-                  <option value="Kitchen">Kitchen</option>
-                  <option value="Bedroom">Bedroom</option>
-                  <option value="Bathroom">Bathroom</option>
-                  <option value="Living Room">Living Room</option>
-                  <option value="Office">Office</option>
-                  <option value="Storage">Storage</option>
-                  <option value="Hallway">Hallway</option>
-                  <option value="Deck">Deck</option>
-                </select>
-              </div>
-            )}
-
-            {/* Door Configuration */}
-            {selVoxel && (() => {
-              // Find any face on this voxel that is Door type and has doorConfig
-              const doorFaces = (['n','s','e','w'] as const).filter(
-                f => selVoxel.faces[f] === 'Door' && selVoxel.doorConfig?.[f]
-              );
-              if (doorFaces.length === 0) return null;
-              const doorFace = doorFaces[0];
-              const cfg = selVoxel.doorConfig![doorFace]!;
-              const constraints = useStore.getState().getDoorConstraints(containerId, selIdx, doorFace);
-              return (
-                <div style={{
-                  marginTop: 4, padding: '8px 10px', background: 'rgba(0,0,0,0.04)',
-                  borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6,
-                }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                    Door Configuration
-                  </span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {([
-                      { label: 'Hinge', options: ['left', 'right'] as const, value: cfg.hingeEdge, key: 'hingeEdge', disabled: (_: string) => false, tooltip: (_: string) => '' },
-                      { label: 'Swing', options: ['in', 'out'] as const, value: cfg.swingDirection, key: 'swingDirection', disabled: (_: string) => cfg.type !== 'swing', tooltip: (_: string) => cfg.type !== 'swing' ? 'Only for swing doors' : '' },
-                      { label: 'Type', options: ['swing', 'slide'] as const, value: cfg.type, key: 'type',
-                        disabled: (opt: string) => (opt === 'swing' && !constraints.canSwing) || (opt === 'slide' && !constraints.canSlide),
-                        tooltip: (opt: string) => opt === 'swing' && !constraints.canSwing ? (constraints.swingBlockReason ?? '') : opt === 'slide' && !constraints.canSlide ? (constraints.slideBlockReason ?? '') : '',
-                      },
-                    ] as const).map(({ label, options, value, key, disabled, tooltip }) => (
-                      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ fontSize: 9, color: '#9ca3af' }}>{label}</span>
-                        <div style={{ display: 'flex', gap: 1 }}>
-                          {options.map(opt => {
-                            const isDisabled = disabled(opt);
-                            const tip = tooltip(opt);
-                            return (
-                              <button
-                                key={opt}
-                                onClick={() => !isDisabled && useStore.getState().setDoorConfig(containerId, selIdx, doorFace, { [key]: opt } as any)}
-                                title={tip || undefined}
-                                style={{
-                                  padding: '2px 6px', fontSize: 10, borderRadius: 4,
-                                  background: value === opt ? '#3b82f6' : isDisabled ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.06)',
-                                  color: value === opt ? 'white' : isDisabled ? '#d1d5db' : '#374151',
-                                  border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', fontWeight: 500,
-                                  opacity: isDisabled ? 0.5 : 1,
-                                }}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {(!constraints.canSwing || !constraints.canSlide) && (
-                    <span style={{ fontSize: 9, color: '#f59e0b', fontStyle: 'italic' }}>
-                      {constraints.swingBlockReason || constraints.slideBlockReason}
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Batch controls for multi-selection, single-face schematic otherwise */}
-            {selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1
-              ? (
-                <BatchFaceControls
-                  containerId={containerId}
-                  indices={selectedVoxels.indices}
-                />
-              )
-              : selVoxel && (
-                <FaceSchematic
-                  faces={selVoxel.faces}
-                  onCycleFace={(face) => {
-                    cycleVoxelFace(containerId, selIdx, face);
-                  }}
-                />
-              )
+          <FaceStrip
+            containerId={containerId}
+            indices={
+              selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1
+                ? selectedVoxels.indices
+                : [selIdx]
             }
+          />
 
-            {/* Interactive 3D Cube Inspector — collapsible */}
-            <button
-              onClick={() => setPreviewOpen(!previewOpen)}
-              style={{
-                width: "100%", textAlign: "left", padding: "6px 8px",
-                fontSize: 10, fontWeight: 600, color: "var(--text-muted, #64748b)",
-                background: "transparent", border: "none", cursor: "pointer",
-              }}
-            >
-              {previewOpen ? "▾" : "▸"} 3D Preview
-            </button>
-            {previewOpen && (
-              <VoxelPreview3D
-                containerId={containerId}
-                voxelIndex={selIdx}
-                overrideFaces={effectiveFaces}
-                bayGroupIndices={isBaySelected ? selectedVoxels!.indices : undefined}
-              />
-            )}
-
-          </div>
+          {/* Door Configuration — single-select only */}
+          {isSingleVoxelSelected && selVoxel && (() => {
+            // Find any face on this voxel that is Door type and has doorConfig
+            const doorFaces = (['n','s','e','w'] as const).filter(
+              f => selVoxel.faces[f] === 'Door' && selVoxel.doorConfig?.[f]
+            );
+            if (doorFaces.length === 0) return null;
+            const doorFace = doorFaces[0];
+            const cfg = selVoxel.doorConfig![doorFace]!;
+            const constraints = useStore.getState().getDoorConstraints(containerId, selIdx, doorFace);
+            return (
+              <div style={{
+                marginTop: 4, padding: '8px 10px', background: 'rgba(0,0,0,0.04)',
+                borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6,
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Door Configuration
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([
+                    { label: 'Hinge', options: ['left', 'right'] as const, value: cfg.hingeEdge, key: 'hingeEdge', disabled: (_: string) => false, tooltip: (_: string) => '' },
+                    { label: 'Swing', options: ['in', 'out'] as const, value: cfg.swingDirection, key: 'swingDirection', disabled: (_: string) => cfg.type !== 'swing', tooltip: (_: string) => cfg.type !== 'swing' ? 'Only for swing doors' : '' },
+                    { label: 'Type', options: ['swing', 'slide'] as const, value: cfg.type, key: 'type',
+                      disabled: (opt: string) => (opt === 'swing' && !constraints.canSwing) || (opt === 'slide' && !constraints.canSlide),
+                      tooltip: (opt: string) => opt === 'swing' && !constraints.canSwing ? (constraints.swingBlockReason ?? '') : opt === 'slide' && !constraints.canSlide ? (constraints.slideBlockReason ?? '') : '',
+                    },
+                  ] as const).map(({ label, options, value, key, disabled, tooltip }) => (
+                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 9, color: '#9ca3af' }}>{label}</span>
+                      <div style={{ display: 'flex', gap: 1 }}>
+                        {options.map(opt => {
+                          const isDisabled = disabled(opt);
+                          const tip = tooltip(opt);
+                          return (
+                            <button
+                              key={opt}
+                              onClick={() => !isDisabled && useStore.getState().setDoorConfig(containerId, selIdx, doorFace, { [key]: opt } as any)}
+                              title={tip || undefined}
+                              style={{
+                                padding: '2px 6px', fontSize: 10, borderRadius: 4,
+                                background: value === opt ? '#3b82f6' : isDisabled ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.06)',
+                                color: value === opt ? 'white' : isDisabled ? '#d1d5db' : '#374151',
+                                border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', fontWeight: 500,
+                                opacity: isDisabled ? 0.5 : 1,
+                              }}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {(!constraints.canSwing || !constraints.canSlide) && (
+                  <span style={{ fontSize: 9, color: '#f59e0b', fontStyle: 'italic' }}>
+                    {constraints.swingBlockReason || constraints.slideBlockReason}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </>
       )}
 
