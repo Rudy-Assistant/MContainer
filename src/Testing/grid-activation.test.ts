@@ -58,3 +58,35 @@ describe('Deploy All Extensions', () => {
     }
   });
 });
+
+describe('Grid context menu actions', () => {
+  let containerId: string;
+
+  beforeEach(() => {
+    const initial = useStore.getInitialState();
+    useStore.setState(initial, true);
+    containerId = useStore.getState().addContainer(ContainerSize.HighCube40);
+  });
+
+  it('setVoxelAllFaces paints all 6 faces of a voxel', () => {
+    const s = useStore.getState();
+    s.setVoxelActive(containerId, 0, true);
+    s.setVoxelAllFaces(containerId, 0, 'Glass_Pane');
+    const v = useStore.getState().containers[containerId]!.voxelGrid![0]!;
+    expect(v.faces.n).toBe('Glass_Pane');
+    expect(v.faces.s).toBe('Glass_Pane');
+    expect(v.faces.e).toBe('Glass_Pane');
+    expect(v.faces.w).toBe('Glass_Pane');
+    expect(v.faces.top).toBe('Glass_Pane');
+    expect(v.faces.bottom).toBe('Glass_Pane');
+  });
+
+  it('copyVoxel + pasteVoxel applies source faces to target', () => {
+    const s = useStore.getState();
+    s.setVoxelFace(containerId, 9, 'n', 'Glass_Pane');
+    s.copyVoxel(containerId, 9);
+    s.pasteVoxel(containerId, 10);
+    const target = useStore.getState().containers[containerId]!.voxelGrid![10]!;
+    expect(target.faces.n).toBe('Glass_Pane');
+  });
+});

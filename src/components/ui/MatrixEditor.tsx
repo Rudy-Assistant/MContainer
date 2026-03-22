@@ -86,6 +86,7 @@ function GridCell({
   onCellMouseDown,
   onCellMouseEnterDrag,
   onActivate,
+  onContextMenu,
 }: {
   voxelIndex: number;
   containerId: string;
@@ -110,6 +111,7 @@ function GridCell({
   onCellMouseDown: (e: React.MouseEvent) => void;
   onCellMouseEnterDrag: () => void;
   onActivate: () => void;
+  onContextMenu: (e: React.MouseEvent, voxelIndex: number) => void;
 }) {
 
   // Active cells show floor material color as a subtle bottom stripe
@@ -161,6 +163,10 @@ function GridCell({
           return;
         }
         onSelect(e);
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onContextMenu(e, voxelIndex);
       }}
       onMouseDown={(e) => onCellMouseDown(e)}
       onMouseEnter={() => { onHover(); onCellMouseEnterDrag(); }}
@@ -270,6 +276,13 @@ function GridCell({
   );
 }
 
+// ── Context menu item style (module-level to avoid recreation) ──
+const ctxMenuItemStyle: React.CSSProperties = {
+  display: "block", width: "100%", textAlign: "left",
+  padding: "7px 12px", border: "none", cursor: "pointer",
+  background: "transparent", fontSize: 12, color: "var(--text-main, #1e293b)",
+};
+
 // ── Voxel Grid (4×8 for one level) ──────────────────────────
 
 function VoxelGrid({
@@ -296,6 +309,11 @@ function VoxelGrid({
   const selectedFace = useStore((s) => s.selectedFace);
   const voxelContextMenu = useStore((s) => s.voxelContextMenu);
   const setVoxelActive = useStore((s) => s.setVoxelActive);
+  const setVoxelAllFaces = useStore((s) => s.setVoxelAllFaces);
+  const copyVoxel = useStore((s) => s.copyVoxel);
+  const pasteVoxel = useStore((s) => s.pasteVoxel);
+
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; idx: number } | null>(null);
 
   // Multi-select / marquee drag state
   const isDraggingRef = useRef(false);
@@ -344,6 +362,18 @@ function VoxelGrid({
     setSelectedVoxelGrid({ containerId, index: idx });
     cycleVoxelFace(containerId, idx, face as keyof import("@/types/container").VoxelFaces);
   }, [containerId, setSelectedVoxelGrid, cycleVoxelFace]);
+
+  // Context menu: open on right-click, close on outside click
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    document.addEventListener('click', close, { once: true });
+    return () => document.removeEventListener('click', close);
+  }, [ctxMenu]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, idx: number) => {
+    setCtxMenu({ x: e.clientX, y: e.clientY, idx });
+  }, []);
 
   // Multi-select: Ctrl/Cmd=toggle, Shift=range-fill, plain click=single select
   const handleCellSelect = useCallback((idx: number, e: React.MouseEvent) => {
@@ -554,11 +584,44 @@ function VoxelGrid({
                   setVoxelActive(containerId, cell.voxelIndex, true);
                   setSelectedVoxelGrid({ containerId, index: cell.voxelIndex });
                 }}
+                onContextMenu={handleContextMenu}
               />
             );
           })}
           </div>
       </div>
+      {ctxMenu && (() => {
+        const v = voxelGrid[ctxMenu.idx];
+        const isActive = v?.active ?? false;
+        return (
+          <div style={{
+            position: "fixed", left: ctxMenu.x, top: ctxMenu.y, zIndex: 100,
+            background: "var(--bg-panel, #fff)", borderRadius: 8,
+            border: "1px solid var(--border, #e2e8f0)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+            minWidth: 160, overflow: "hidden",
+          }}>
+            <button onClick={() => { setVoxelActive(containerId, ctxMenu.idx, !isActive); setCtxMenu(null); }}
+              style={ctxMenuItemStyle}>
+              {isActive ? "Deactivate" : "Activate"}
+            </button>
+            {isActive && <>
+              <div style={{ height: 1, background: "var(--border, #e2e8f0)" }} />
+              <button onClick={() => { setVoxelAllFaces(containerId, ctxMenu.idx, 'Glass_Pane'); setCtxMenu(null); }}
+                style={ctxMenuItemStyle}>Set All → Glass</button>
+              <button onClick={() => { setVoxelAllFaces(containerId, ctxMenu.idx, 'Solid_Steel'); setCtxMenu(null); }}
+                style={ctxMenuItemStyle}>Set All → Steel</button>
+              <button onClick={() => { setVoxelAllFaces(containerId, ctxMenu.idx, 'Open'); setCtxMenu(null); }}
+                style={ctxMenuItemStyle}>Set All → Open</button>
+              <div style={{ height: 1, background: "var(--border, #e2e8f0)" }} />
+              <button onClick={() => { copyVoxel(containerId, ctxMenu.idx); setCtxMenu(null); }}
+                style={ctxMenuItemStyle}>Copy Style</button>
+              <button onClick={() => { pasteVoxel(containerId, ctxMenu.idx); setCtxMenu(null); }}
+                style={ctxMenuItemStyle}>Paste Style</button>
+            </>}
+          </div>
+        );
+      })()}
     </div>
   );
 }
