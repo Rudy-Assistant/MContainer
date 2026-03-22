@@ -21,9 +21,10 @@ Four inspector panel improvements: semi-transparent frame in wall-cut modes, glo
 
 ### Implementation
 In `ContainerMesh.tsx`:
-- `FramePosts` (line ~1759): Remove `cutScale` height calculation. Posts always use `dims.height`. Add opacity logic keyed on `wallCutMode !== 'full'`.
+- `FramePosts` (line ~1759): Remove `cutScale` height calculation. Posts always use `dims.height`. Add opacity logic.
 - `FrameBeams` (line ~1816): Remove `hideTopBeams` filter so top beams always render. Add same opacity logic.
-- Material: Use `material.opacity = 0.3` + `material.transparent = true` via ref or conditional material variant. Avoid creating new meshes.
+- **Opacity condition:** `wallCutMode === 'half' || wallCutMode === 'down'` (not `!== 'full'`). The `'custom'` mode uses `wallCutHeight` — apply opacity only when `wallCutHeight < 1.0` in custom mode.
+- **Material approach:** `frameMat` is a module-scope singleton shared across all containers. Do NOT mutate it directly. Create a second module-scope material `frameMatGhost` with `opacity: 0.3, transparent: true`. Switch between `frameMat` and `frameMatGhost` based on wall cut state. No per-instance cloning needed.
 
 ### Files
 - `src/components/three/ContainerMesh.tsx` — FramePosts, FrameBeams functions
@@ -38,8 +39,9 @@ In `ContainerMesh.tsx`:
 ### Solution
 1. Add `hideRoof: boolean` and `hideSkin: boolean` to `uiSlice.ts` as ephemeral store state with `toggleHideRoof` and `toggleHideSkin` actions.
 2. Add two toggle buttons to `TopToolbar.tsx` Zone C, next to the wall visibility pill (`▮ ▄ ▁`). Same compact styling as the existing Frame button — highlighted when active.
-3. `ContainerSkin.tsx` reads `hideRoof`/`hideSkin` from store. When `hideRoof` is true, skip rendering top faces. When `hideSkin` is true, skip rendering all voxel faces (same as existing per-container hideSkin but global).
+3. `ContainerSkin.tsx` — **new render logic required.** ContainerSkin currently has no hideRoof/hideSkin filtering. Add face-level filtering in the render loop: skip top faces when `hideRoof` is true, skip all faces when `hideSkin` is true. This is new code in ContainerSkin, not merely a state source swap.
 4. `IsoEditor.tsx` removes local `hideRoof`/`hideSkin` state and `LayerBtn` controls. Reads from store instead.
+5. **Global vs per-container:** The global `hideSkin` acts as an OR with any per-container `hideSkin` flag. If global is on, all containers hide skin. If global is off, per-container flags (if they exist) still apply. The toolbar button reflects global state only — it does not indicate per-container overrides.
 
 ### Toolbar Layout
 ```
@@ -60,10 +62,12 @@ In `ContainerMesh.tsx`:
 Room dropdown in the tile detail section assigns room tags to voxels but has no visible effect. UI clutter.
 
 ### Solution
-Remove the `<select>` element and its wrapper `<div>` from `MatrixEditor.tsx` (lines ~1232-1264). The `setVoxelRoomTag` store action remains for API consumers.
+Remove the `<select>` element and its wrapper `<div>` from `MatrixEditor.tsx` (lines ~1232-1264). The `setVoxelRoomTag` store action remains for API consumers and future room management UI.
+
+**UI Change Policy note:** Room tagging is still accessible via the store API. No keyboard shortcut is lost. This removal is subsumed by Issue 4's larger tile detail replacement — implement together, not separately.
 
 ### Files
-- `src/components/ui/MatrixEditor.tsx` — remove Room Tag JSX block
+- `src/components/ui/MatrixEditor.tsx` — remove Room Tag JSX block (done as part of Issue 4)
 
 ---
 
@@ -78,6 +82,8 @@ Replace all three with a single `FaceStrip` component.
 ### Component: FaceStrip.tsx
 
 **Props:** `containerId: string`, `indices: number[]` (works for 1 or N voxels)
+
+**Render condition:** FaceStrip only renders when `indices.length > 0`. MatrixEditor guards this — when no voxels are selected, the tile detail area shows "CONTAINER PROPERTIES" (finish, rooftop deck) as it does today.
 
 **Layout:**
 ```
@@ -99,7 +105,8 @@ Replace all three with a single `FaceStrip` component.
 - 6 buttons, filled with `SURFACE_COLORS[material]`
 - Label: abbreviated face + short material (e.g. "N·Stl")
 - Single select: exact material per face
-- Multi select: material if unanimous, "Mix" with striped fill if voxels differ
+- Multi select: material if unanimous, "Mix" with striped/hatched fill if voxels differ
+- When a "Mix" face is expanded, no material button is highlighted in the picker (no consensus to show). Clicking any material applies it to all selected voxels, resolving the mix.
 - Click expands picker for that face; click again collapses
 - Right-aligned quiet "N sel" count + ✕ deselect button
 
@@ -122,8 +129,8 @@ Replace all three with a single `FaceStrip` component.
 - "3D Preview" collapsible toggle + VoxelPreview3D in tile detail
 
 **What stays:**
-- Door Configuration section (renders below FaceStrip when door face present)
-- Save-to-library bookmark button (moves into FaceStrip near the ✕)
+- Door Configuration section — renders below FaceStrip. **Single select only.** In multi-select, door config is hidden (too ambiguous when voxels have different door states). If user needs to configure a specific door, they click that single voxel.
+- Save-to-library bookmark button — moves into the face button area, left of the ✕ deselect button (same row as "N sel" count).
 - Finishes/Electrical panels in contextual area below
 
 ### Files
@@ -131,16 +138,34 @@ Replace all three with a single `FaceStrip` component.
 - **Modified:** `src/components/ui/MatrixEditor.tsx` — replace tile detail section with `<FaceStrip />`
 - **Delete:** `src/components/ui/FaceSchematic.tsx` (fully replaced)
 - **Delete:** `src/components/ui/BatchFaceControls.tsx` (fully replaced)
-- **Modified:** VoxelPreview3D usage in tile detail removed (IsoEditor sidebar preview unchanged)
+- **Modified:** VoxelPreview3D usage in tile detail removed. `VoxelPreview3D.tsx` file kept — still used by IsoEditor sidebar preview.
+- **Extract:** Move `SURFACE_COLORS` from `MatrixEditor.tsx` to `src/config/surfaceLabels.ts` (alongside existing `QUICK_MATERIALS` and `SURFACE_SHORT_LABELS`). FaceStrip and any remaining consumers import from there.
 
 ---
+
+## Implementation Order
+
+1. Issue 1 (frame opacity) — standalone, no dependencies
+2. Issue 2 (global hide roof/skin) — standalone, touches different files
+3. Issues 3+4 together (room dropdown removal + FaceStrip) — Issue 3 is subsumed by Issue 4's tile detail replacement
 
 ## Testing Strategy
 
 - Existing tests (553) must continue passing — no store API changes except new UI slice fields
+
+**Positive tests:**
 - FaceStrip unit test: single-select renders 6 face buttons with correct materials
 - FaceStrip unit test: multi-select shows "Mix" when voxels disagree on a face
 - FaceStrip unit test: batch shortcuts apply material to correct faces
+- FaceStrip unit test: door config renders for single-select door voxel
 - Frame opacity test: wallCutMode 'half'/'down' produces opacity < 1 on posts/beams
 - Global hideRoof/hideSkin: store toggle test + verify ContainerSkin reads from store
-- Browser verification: all 4 changes visually confirmed
+
+**Negative / edge case tests:**
+- FaceStrip with empty indices array: renders nothing (guard in MatrixEditor)
+- FaceStrip with indices pointing to inactive voxels: graceful handling
+- Frame opacity when wallCutMode='custom' and wallCutHeight=1.0: posts remain opaque
+- Door config hidden in multi-select mode
+- Global hideSkin=true OR per-container hideSkin=true both suppress rendering
+
+**Browser verification:** all 4 changes visually confirmed
