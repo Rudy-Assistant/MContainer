@@ -143,6 +143,12 @@ export interface UiSlice {
   setPreviewCollapsed: (v: boolean) => void;
   gridCollapsed: boolean;
   setGridCollapsed: (v: boolean) => void;
+
+  // Global roof / skin visibility toggles
+  hideRoof: boolean;
+  toggleHideRoof: () => void;
+  hideSkin: boolean;
+  toggleHideSkin: () => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -258,4 +264,10 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   setPreviewCollapsed: (v) => set({ previewCollapsed: v }),
   gridCollapsed: false,
   setGridCollapsed: (v) => set({ gridCollapsed: v }),
+
+  // Global roof / skin visibility toggles
+  hideRoof: false,
+  toggleHideRoof: () => set((s: any) => ({ hideRoof: !s.hideRoof })),
+  hideSkin: false,
+  toggleHideSkin: () => set((s: any) => ({ hideSkin: !s.hideSkin })),
 });

@@ -93,6 +93,10 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
   const designMode = useStore((s) => s.designMode);
   const wallCutMode = useStore((s) => s.wallCutMode);
   const setWallCutMode = useStore((s) => s.setWallCutMode);
+  const hideRoof = useStore((s) => s.hideRoof);
+  const toggleHideRoof = useStore((s) => s.toggleHideRoof);
+  const hideSkin = useStore((s) => s.hideSkin);
+  const toggleHideSkin = useStore((s) => s.toggleHideSkin);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const openWizard = useStore((s) => s.openWizard);
@@ -368,6 +372,42 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           ))}
         </div>
 
+        {/* ── Global Roof / Skin toggles ── */}
+        <button
+          onClick={toggleHideRoof}
+          title={hideRoof ? "Show Roof" : "Hide Roof"}
+          style={{
+            padding: "5px 10px",
+            border: `1px solid ${hideRoof ? 'var(--accent, #2563eb)' : 'var(--btn-border, #e5e7eb)'}`,
+            borderRadius: 6,
+            cursor: "pointer",
+            background: hideRoof ? "var(--accent, #2563eb)" : "transparent",
+            color: hideRoof ? "#fff" : "var(--text-muted, #6b7280)",
+            fontSize: 11,
+            fontWeight: 600,
+            transition: "all 100ms",
+          }}
+        >
+          Roof
+        </button>
+        <button
+          onClick={toggleHideSkin}
+          title={hideSkin ? "Show Skin" : "Hide Skin"}
+          style={{
+            padding: "5px 10px",
+            border: `1px solid ${hideSkin ? 'var(--accent, #2563eb)' : 'var(--btn-border, #e5e7eb)'}`,
+            borderRadius: 6,
+            cursor: "pointer",
+            background: hideSkin ? "var(--accent, #2563eb)" : "transparent",
+            color: hideSkin ? "#fff" : "var(--text-muted, #6b7280)",
+            fontSize: 11,
+            fontWeight: 600,
+            transition: "all 100ms",
+          }}
+        >
+          Skin
+        </button>
+
         {/* Warning badge */}
         <WarningBadge />
 
@@ -536,8 +576,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                   fontSize: 11, fontWeight: 500, color: enabled ? "var(--text-main)" : "var(--text-dim)",
                   background: "transparent", transition: "all 100ms", opacity: enabled ? 1 : 0.5,
                 }}
-                  onMouseEnter={(e) => { if (enabled) e.currentTarget.style.background = "var(--btn-hover, #f9fafb)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  className={enabled ? "hover-toolbar-btn" : ""}
                 >
                   <Icon size={12} /> {label}
                 </button>
@@ -558,8 +597,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                 padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer",
                 fontSize: 11, fontWeight: 500, color: "#ef4444", background: "transparent", transition: "all 100ms",
               }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                className="hover-danger"
               >
                 <RotateCcw size={12} /> Reset Canvas
               </button>
