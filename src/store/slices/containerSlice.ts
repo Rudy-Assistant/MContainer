@@ -51,14 +51,28 @@ import {
 import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverlap, getFootprintAt, getFullFootprint, findEdgeSnap } from "@/store/spatialEngine";
 import defaultPricing from "@/config/pricing_config.json";
 import { getContainerRole, CONTAINER_ROLES } from "@/config/containerRoles";
-import type { ExtensionConfig } from "@/types/container";
+import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from "@/types/container";
 import { type HotbarSlot, BLOCK_PRESETS, autoStairDir, autoStairAscending } from "../useStore";
 import { isPoleKey } from "@/config/frameMaterials";
+import { WIZARD_PRESETS } from "@/config/wizardPresets";
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
 type SetFn = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
 type GetFn = () => any;
+
+/**
+ * Debounced adjacency recompute — cancels any pending rAF before scheduling a new one.
+ * Prevents stale-position adjacency when addContainer + stackContainer fire back-to-back.
+ */
+let _pendingAdjacencyRaf: number | null = null;
+export function scheduleAdjacency(get: GetFn) {
+  if (_pendingAdjacencyRaf !== null) cancelAnimationFrame(_pendingAdjacencyRaf);
+  _pendingAdjacencyRaf = requestAnimationFrame(() => {
+    _pendingAdjacencyRaf = null;
+    get().refreshAdjacency();
+  });
+}
 
 /** Callback to access the temporal API (pause/resume). Set by useStore.ts after creation. */
 let _getTemporalApi: (() => { pause: () => void; resume: () => void; pastStates: unknown[]; futureStates: unknown[]; undo: () => void; redo: () => void }) | null = null;
@@ -313,7 +327,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       containers: { ...s.containers, [c.id]: c },
     }));
     // Refresh adjacency after adding
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
     return c.id;
   },
 
@@ -742,7 +756,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         };
     });
     // Refresh adjacency after removal so remaining containers recalculate shared walls
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
   },
 
   updateContainerPosition: (id, position) => {
@@ -753,7 +767,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         [id]: { ...s.containers[id], position },
       },
     }));
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
   },
 
   updateContainerRotation: (id, rotation) => {
@@ -764,7 +778,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         [id]: { ...s.containers[id], rotation },
       },
     }));
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
   },
 
   renameContainer: (id, name) =>
@@ -792,7 +806,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         containers: { ...s.containers, [id]: fresh },
       };
     });
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
   },
 
   toggleRoof: (id) => {
@@ -1315,7 +1329,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     }
 
     // generateRooftopDeck already called above (before inheritance)
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
     return true;
   },
 
@@ -1348,7 +1362,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
       return { containers };
     });
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
   },
 
   // ── Adjacency Detection ───────────────────────────────────
@@ -1362,7 +1376,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
    * Tracks original wall states in mergedWalls for restoration when containers are separated.
    *
    * Called after: moveContainer, addContainer, removeContainer, stackContainer, commitContainerDrag.
-   * Always wrapped in requestAnimationFrame to batch multiple position changes.
+   * Always called via scheduleAdjacency() which debounces via cancelAnimationFrame to batch
+   * back-to-back mutations (e.g. addContainer + stackContainer).
    *
    * @see spatialEngine.ts findAdjacentPairs for the AABB-based adjacency detection
    */
@@ -1605,7 +1620,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     });
 
     // Expand extensions as deck
-    get().setAllExtensions(containerId, 'all_deck', true);
+    get().setAllExtensions(containerId, DEFAULT_EXTENSION_CONFIG, true);
   },
 
   removeRooftopDeck: (containerId) => {
@@ -1688,7 +1703,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       }
     }
 
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
   },
 
   // ── Interior Lights ─────────────────────────────────────────
@@ -2056,8 +2071,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
   saveWalkthroughPos: (position, yaw) => set({ savedWalkthroughPos: { position, yaw } }),
 
   applyWizardPreset: (containerId, presetId) => {
-    const { WIZARD_PRESETS } = require('@/config/wizardPresets');
-    const preset = (WIZARD_PRESETS as any[]).find((p: any) => p.id === presetId);
+    const preset = WIZARD_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
 
     // Force a tracked set() to snapshot current state as the undo baseline,
@@ -2107,6 +2121,75 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             }
           }
           break;
+
+        case 'open_interior_walls': {
+          // Batch all face changes in a single set() call for performance.
+          // CRITICAL: Direction mapping matches codebase convention (row=X, col=Z):
+          //   e → row+1, w → row-1, s → col+1, n → col-1
+          set((st: any) => {
+            const c = st.containers[containerId];
+            if (!c?.voxelGrid) return st;
+            const grid = [...c.voxelGrid.map((v: any) => ({ ...v, faces: { ...v.faces } }))];
+            for (let level = 0; level < 2; level++) {
+              for (let row = 0; row < VOXEL_ROWS; row++) {
+                for (let col = 0; col < VOXEL_COLS; col++) {
+                  const idx = level * VOXEL_ROWS * VOXEL_COLS + row * VOXEL_COLS + col;
+                  if (!grid[idx]?.active) continue;
+                  const neighbors: Array<{ face: 'n' | 's' | 'e' | 'w'; dr: number; dc: number }> = [
+                    { face: 'e', dr: 1, dc: 0 },
+                    { face: 'w', dr: -1, dc: 0 },
+                    { face: 's', dr: 0, dc: 1 },
+                    { face: 'n', dr: 0, dc: -1 },
+                  ];
+                  for (const { face, dr, dc } of neighbors) {
+                    const nr = row + dr, nc = col + dc;
+                    if (nr < 0 || nr >= VOXEL_ROWS || nc < 0 || nc >= VOXEL_COLS) continue;
+                    const ni = level * VOXEL_ROWS * VOXEL_COLS + nr * VOXEL_COLS + nc;
+                    if (grid[ni]?.active) {
+                      grid[idx].faces[face] = 'Open';
+                    }
+                  }
+                }
+              }
+            }
+            return { containers: { ...st.containers, [containerId]: { ...c, voxelGrid: grid } } };
+          });
+          break;
+        }
+
+        case 'set_all_floors': {
+          if (!step.floorMaterial) break;
+          set((st: any) => {
+            const c = st.containers[containerId];
+            if (!c?.voxelGrid) return st;
+            const grid = c.voxelGrid.map((v: any) =>
+              v.active ? { ...v, faces: { ...v.faces, bottom: step.floorMaterial! } } : v
+            );
+            return { containers: { ...st.containers, [containerId]: { ...c, voxelGrid: grid } } };
+          });
+          break;
+        }
+
+        case 'set_all_ceilings': {
+          if (!step.ceilingMaterial) break;
+          set((st: any) => {
+            const c = st.containers[containerId];
+            if (!c?.voxelGrid) return st;
+            const grid = c.voxelGrid.map((v: any) =>
+              v.active ? { ...v, faces: { ...v.faces, top: step.ceilingMaterial! } } : v
+            );
+            return { containers: { ...st.containers, [containerId]: { ...c, voxelGrid: grid } } };
+          });
+          break;
+        }
+
+        case 'add_door': {
+          if (step.doorVoxelIndex !== undefined && step.doorFace) {
+            // Use paintFace for consistency with paint_outer_walls (marks userPaintedFaces)
+            get().paintFace(containerId, step.doorVoxelIndex, step.doorFace, 'Door');
+          }
+          break;
+        }
       }
     }
 
