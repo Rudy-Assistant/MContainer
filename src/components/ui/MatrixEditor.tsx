@@ -84,6 +84,7 @@ function GridCell({
   onSelect,
   onCellMouseDown,
   onCellMouseEnterDrag,
+  onActivate,
 }: {
   voxelIndex: number;
   containerId: string;
@@ -107,6 +108,7 @@ function GridCell({
   onSelect: (e: React.MouseEvent) => void;
   onCellMouseDown: (e: React.MouseEvent) => void;
   onCellMouseEnterDrag: () => void;
+  onActivate: () => void;
 }) {
 
   // Active cells show floor material color as a subtle bottom stripe
@@ -152,7 +154,13 @@ function GridCell({
 
   return (
     <button
-      onClick={(e) => onSelect(e)}
+      onClick={(e) => {
+        if (!active) {
+          onActivate();
+          return;
+        }
+        onSelect(e);
+      }}
       onMouseDown={(e) => onCellMouseDown(e)}
       onMouseEnter={() => { onHover(); onCellMouseEnterDrag(); }}
       onMouseLeave={onLeave}
@@ -172,7 +180,7 @@ function GridCell({
         boxShadow: active ? "inset 0 0 0 1px rgba(0,0,0,0.1)" : isHovered ? "0 0 0 1px #fef08a, 0 1px 4px rgba(254,240,138,0.3)" : "none",
         transition: "all 80ms ease",
       }}
-      title={`Block [C${voxelIndex % VOXEL_COLS}, R${Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS)}]${active ? "" : " (empty)"}${isLocked ? " locked" : ""}`}
+      title={`Block [C${voxelIndex % VOXEL_COLS}, R${Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS)}]${active ? "" : " (click to deploy)"}${isLocked ? " locked" : ""}`}
     >
       {/* Floor material stripe at bottom of cell */}
       {hasFloor && (
@@ -188,6 +196,16 @@ function GridCell({
           fontSize: 7, color: "#475569", pointerEvents: "none",
         }}>
           🔒
+        </div>
+      )}
+      {!active && !isCore && (
+        <div style={{
+          position: "absolute", inset: 0, display: "flex",
+          alignItems: "center", justifyContent: "center",
+          fontSize: 14, color: "var(--text-muted, #94a3b8)",
+          pointerEvents: "none", opacity: 0.6,
+        }}>
+          +
         </div>
       )}
       {/* ★ Fix 5: Clickable edge hotspots (only on active cells) */}
@@ -276,6 +294,7 @@ function VoxelGrid({
   const hoveredPreviewFace = useStore((s) => s.hoveredPreviewFace);
   const selectedFace = useStore((s) => s.selectedFace);
   const voxelContextMenu = useStore((s) => s.voxelContextMenu);
+  const setVoxelActive = useStore((s) => s.setVoxelActive);
 
   // Multi-select / marquee drag state
   const isDraggingRef = useRef(false);
@@ -530,6 +549,10 @@ function VoxelGrid({
                 onSelect={(e) => handleCellSelect(cell.voxelIndex, e)}
                 onCellMouseDown={(e) => handleCellMouseDown(cell.voxelIndex, e)}
                 onCellMouseEnterDrag={() => handleCellMouseEnterDrag(cell.voxelIndex)}
+                onActivate={() => {
+                  setVoxelActive(containerId, cell.voxelIndex, true);
+                  setSelectedVoxelGrid({ containerId, index: cell.voxelIndex });
+                }}
               />
             );
           })}
@@ -594,6 +617,7 @@ function SimpleBayGrid({
   const activeSlot = useStore((s) => s.activeHotbarSlot);
   const setVoxelFace = useStore((s) => s.setVoxelFace);
   const setHoveredBayGroup = useStore((s) => s.setHoveredBayGroup);
+  const setSelectedFace = useStore((s) => s.setSelectedFace);
   const selectedVoxels = useStore((s) => s.selectedVoxels);
   const selectedVoxel = useStore((s) => s.selectedVoxel);
   const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
@@ -630,7 +654,10 @@ function SimpleBayGrid({
     } else {
       setSelectedVoxels({ containerId, indices });
     }
-  }, [level, containerId, activeBrush, setVoxelFace, setSelectedVoxel, setSelectedVoxels]);
+    // Set a default face so sidebar shows face configuration (FinishesPanel)
+    // Use 's' (south/front) as default — the face visible from the default camera angle
+    setSelectedFace('s');
+  }, [level, containerId, activeBrush, setVoxelFace, setSelectedVoxel, setSelectedVoxels, setSelectedFace]);
 
   const handleBayHover = useCallback((group: BayGroup) => {
     setHoveredGroupId(group.id);
