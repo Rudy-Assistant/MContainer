@@ -143,6 +143,23 @@ const frameGhostMat = new THREE.MeshBasicMaterial({
   color: HIGHLIGHT_HEX_SELECT, transparent: true, opacity: 0,
   side: THREE.DoubleSide, depthWrite: false,
 });
+
+/** Pure function: should frame use semi-transparent material? */
+export function isFrameTranslucent(wallCutMode: string, wallCutHeight: number): boolean {
+  return wallCutMode === 'half' || wallCutMode === 'down' ||
+    (wallCutMode === 'custom' && wallCutHeight < 1.0);
+}
+
+// Semi-transparent frame material for wall-cut modes (half/down) — structural orientation cue
+const frameSemiMat = new THREE.MeshStandardMaterial({
+  color: 0x3d4a55,
+  metalness: 0.90,
+  roughness: 0.55,
+  envMapIntensity: 0.4,
+  transparent: true,
+  opacity: 0.3,
+  depthWrite: false,
+});
 // Permanent hitbox for hidden frame elements — invisible but raycastable
 const frameHitMat = new THREE.MeshBasicMaterial({
   transparent: true, opacity: 0.001, colorWrite: false, depthWrite: false,
@@ -1760,12 +1777,10 @@ const PROXY_SIZE = 0.4;
 function FramePosts({ container, dims, hoveredElement, setHoveredElement }: FrameProps) {
   const toggleStructuralElement = useStore((s) => s.toggleStructuralElement);
   const wallCutMode = useStore((s) => s.wallCutMode);
-  const cutScale = wallCutMode === 'full' ? 1.0 : wallCutMode === 'half' ? 0.2 : wallCutMode === 'down' ? 0.05 : 1.0;
-  const postH = dims.height * cutScale;
-  const postY = cutScale < 1 ? postH / 2 - (dims.height - postH) / 2 + dims.height / 2 : dims.height / 2;
-  // Simpler: bottom-aligned post
-  const effectivePostH = postH;
-  const effectivePostY = effectivePostH / 2; // bottom at Y=0
+  const wallCutHeight = useStore((s) => s.wallCutHeight);
+  const translucent = isFrameTranslucent(wallCutMode, wallCutHeight);
+  const effectivePostH = dims.height;
+  const effectivePostY = dims.height / 2;
 
   const h = container.structureConfig?.hiddenElements ?? [];
   const posts: [string, number, number, number][] = [
@@ -1782,17 +1797,17 @@ function FramePosts({ container, dims, hoveredElement, setHoveredElement }: Fram
           <group key={key}>
             {/* Visual geometry: full material when visible, cyan ghost when hidden — raycast nuked */}
             <mesh
-              key={`${key}_vis_${cutScale}`}
+              key={`${key}_vis`}
               position={[px, effectivePostY, pz]}
               castShadow={!isHidden}
-              material={isHidden ? frameGhostMat : frameMat}
+              material={isHidden ? frameGhostMat : translucent ? frameSemiMat : frameMat}
               raycast={nullRaycast}
             >
               <boxGeometry args={[0.1, effectivePostH, 0.1]} />
             </mesh>
             {/* ★ PERMANENT proxy hitbox — never unmounts, even when element is hidden */}
             <mesh
-              key={`${key}_hit_${cutScale}`}
+              key={`${key}_hit`}
               position={[px, effectivePostY, pz]}
               visible={false}
               userData={{ isStructural: true, elementKey: key, containerId: container.id }}
@@ -1817,11 +1832,10 @@ function FramePosts({ container, dims, hoveredElement, setHoveredElement }: Fram
 function FrameBeams({ container, dims, hoveredElement, setHoveredElement }: FrameProps) {
   const toggleStructuralElement = useStore((s) => s.toggleStructuralElement);
   const wallCutMode = useStore((s) => s.wallCutMode);
-  const hideTopBeams = wallCutMode !== 'full';
+  const wallCutHeight = useStore((s) => s.wallCutHeight);
+  const translucent = isFrameTranslucent(wallCutMode, wallCutHeight);
   const h = container.structureConfig?.hiddenElements ?? [];
-  const levels: [string, number][] = hideTopBeams
-    ? [["bottom", 0.03]]
-    : [["bottom", 0.03], ["top", dims.height + 0.01]];
+  const levels: [string, number][] = [["bottom", 0.03], ["top", dims.height + 0.01]];
   const beamDefs: [string, [number, number, number], [number, number, number]][] = [];
   for (const [prefix, y] of levels) {
     beamDefs.push(
@@ -1846,7 +1860,7 @@ function FrameBeams({ container, dims, hoveredElement, setHoveredElement }: Fram
             {/* Visual geometry: full material when visible, cyan ghost when hidden — raycast nuked */}
             <mesh
               position={pos}
-              material={isHidden ? frameGhostMat : frameMat}
+              material={isHidden ? frameGhostMat : translucent ? frameSemiMat : frameMat}
               raycast={nullRaycast}
             >
               <boxGeometry args={args} />
