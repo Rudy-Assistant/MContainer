@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/store/useStore";
-import type { SurfaceType } from "@/types/container";
+import type { SurfaceType, VoxelFaces } from "@/types/container";
 
 const QUICK_MATERIALS: Array<{ label: string; material: SurfaceType; color: string }> = [
   { label: "Steel", material: "Solid_Steel", color: "#78909c" },
@@ -29,8 +29,24 @@ function MaterialBtn({ label, color, onClick }: {
 export default function BatchFaceControls({ containerId, indices }: {
   containerId: string; indices: number[];
 }) {
-  const setVoxelFace = useStore((s) => s.setVoxelFace);
   const stampAreaSmart = useStore((s) => s.stampAreaSmart);
+
+  /** Batch-set specific faces on all selected voxels in a single store mutation */
+  const batchSetFaces = (faceUpdates: Partial<VoxelFaces>) => {
+    useStore.setState((s) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return s;
+      const grid = c.voxelGrid.map((v, i) => {
+        if (!indices.includes(i) || !v.active) return v;
+        const faces = { ...v.faces };
+        for (const [face, mat] of Object.entries(faceUpdates)) {
+          faces[face as keyof VoxelFaces] = mat as SurfaceType;
+        }
+        return { ...v, faces };
+      });
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+    });
+  };
 
   const applyToAllExterior = (material: SurfaceType) => {
     stampAreaSmart(containerId, indices, {
@@ -40,23 +56,15 @@ export default function BatchFaceControls({ containerId, indices }: {
   };
 
   const applyToAllInterior = (material: SurfaceType) => {
-    for (const idx of indices) {
-      for (const face of ["n", "s", "e", "w"] as const) {
-        setVoxelFace(containerId, idx, face, material);
-      }
-    }
+    batchSetFaces({ n: material, s: material, e: material, w: material });
   };
 
   const applyFloor = (material: SurfaceType) => {
-    for (const idx of indices) {
-      setVoxelFace(containerId, idx, "bottom", material);
-    }
+    batchSetFaces({ bottom: material });
   };
 
   const applyCeiling = (material: SurfaceType) => {
-    for (const idx of indices) {
-      setVoxelFace(containerId, idx, "top", material);
-    }
+    batchSetFaces({ top: material });
   };
 
   return (

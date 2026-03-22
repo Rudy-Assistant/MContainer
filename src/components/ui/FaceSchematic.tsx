@@ -1,13 +1,7 @@
 "use client";
 
 import type { VoxelFaces, SurfaceType } from "@/types/container";
-
-const SURFACE_COLORS: Record<string, string> = {
-  Open: "transparent", Solid_Steel: "#78909c", Glass_Pane: "#60a5fa",
-  Railing_Glass: "#93c5fd", Railing_Cable: "#607d8b", Deck_Wood: "#8d6e63",
-  Concrete: "#9e9e9e", Door: "#607d8b", Window_Standard: "#7dd3fc",
-  Stairs: "#5d4037", Half_Fold: "#ab47bc", Gull_Wing: "#7e57c2",
-};
+import { SURFACE_COLORS } from "@/components/ui/MatrixEditor";
 
 const SHORT: Record<string, string> = {
   Open: "Open", Solid_Steel: "Steel", Glass_Pane: "Glass",

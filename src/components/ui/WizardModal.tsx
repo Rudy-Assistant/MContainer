@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/store/useStore";
-import { WIZARD_PRESETS } from "@/config/wizardPresets";
+import { WIZARD_PRESETS, type WizardStep } from "@/config/wizardPresets";
 import { X } from "lucide-react";
 
 export default function WizardModal() {
@@ -153,7 +153,7 @@ export default function WizardModal() {
             </div>
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--text-muted, #475569)", lineHeight: 1.8 }}>
               {selectedPreset.steps.map((step, i) => {
-                const labels: Record<string, string> = {
+                const labels: Record<WizardStep['action'], string> = {
                   extensions: `Deploy extensions (${step.config || 'default'})`,
                   rooftop_deck: 'Stack rooftop deck with railings',
                   vertical_stairs: `Add staircase (facing ${step.stairFacing || 'S'})`,

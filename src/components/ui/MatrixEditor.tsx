@@ -31,7 +31,7 @@ import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
 
 // ── Face-color mapping for grid cells ────────────────────────
 
-const SURFACE_COLORS: Record<SurfaceType, string> = {
+export const SURFACE_COLORS: Record<SurfaceType, string> = {
   Open:           "transparent",
   Solid_Steel:    "#78909c",
   Glass_Pane:     "#60a5fa",

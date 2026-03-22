@@ -342,11 +342,10 @@ function Inspector({
   const stackContainer = useStore((s) => s.stackContainer);
   const unstackContainer = useStore((s) => s.unstackContainer);
   const removeContainer = useStore((s) => s.removeContainer);
-  const allContainers = useStore((s) => s.containers);
-
-  const hasContainerAbove = useMemo(() => {
-    return Object.values(allContainers).some((c: any) => c.stackedOn === containerId);
-  }, [allContainers, containerId]);
+  // Primitive selector — only re-renders when the boolean flips, not on every voxel paint
+  const hasContainerAbove = useStore((s) =>
+    Object.values(s.containers).some((c: any) => c.stackedOn === containerId)
+  );
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(container.name || "");
