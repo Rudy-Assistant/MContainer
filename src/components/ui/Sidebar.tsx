@@ -10,7 +10,7 @@
  * returning to State A seamlessly.
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import {
   type Container,
@@ -43,11 +43,7 @@ import UserLibrary from "@/components/ui/UserLibrary";
 
 // ── BOM formatting ────────────────────────────────────────────
 
-function fmtUSD(n: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency", currency: "USD", maximumFractionDigits: 0,
-  }).format(n);
-}
+import { formatUSD as fmtUSD } from "@/utils/formatters";
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -342,6 +338,16 @@ function Inspector({
   const setPreviewCollapsed = useStore((s) => s.setPreviewCollapsed);
   const gridCollapsed = useStore((s) => s.gridCollapsed);
   const setGridCollapsed = useStore((s) => s.setGridCollapsed);
+  const addContainer = useStore((s) => s.addContainer);
+  const stackContainer = useStore((s) => s.stackContainer);
+  const unstackContainer = useStore((s) => s.unstackContainer);
+  const removeContainer = useStore((s) => s.removeContainer);
+  const allContainers = useStore((s) => s.containers);
+
+  const hasContainerAbove = useMemo(() => {
+    return Object.values(allContainers).some((c: any) => c.stackedOn === containerId);
+  }, [allContainers, containerId]);
+
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(container.name || "");
 
@@ -398,8 +404,7 @@ function Inspector({
                 padding: "1px 4px", borderRadius: "4px", border: "1px solid transparent",
                 transition: "border-color 100ms",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#cbd5e1"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "transparent"; }}
+              className="hover-rename"
               title="Click to rename"
             >
               {containerName}
@@ -411,6 +416,46 @@ function Inspector({
             {" · "}
             {Object.values(container.walls).reduce((n, w) => n + w.bays.length, 0)} bays
           </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            {container.level === 0 && !hasContainerAbove && (
+              <button
+                onClick={() => {
+                  const newId = addContainer(container.size);
+                  if (newId) stackContainer(newId, containerId);
+                }}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: "4px 10px",
+                  borderRadius: 6, border: "1px solid var(--border, #cbd5e1)",
+                  background: "var(--accent, #3b82f6)", color: "#fff",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                }}
+              >
+                ⬆ Stack Above
+              </button>
+            )}
+            {container.level > 0 && container.stackedOn && (
+              <button
+                onClick={() => {
+                  unstackContainer(containerId);
+                  removeContainer(containerId);
+                }}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: "4px 10px",
+                  borderRadius: 6, border: "1px solid #fca5a5",
+                  background: "#fef2f2", color: "#dc2626",
+                  cursor: "pointer",
+                }}
+              >
+                ✕ Unstack
+              </button>
+            )}
+            <span style={{
+              fontSize: 10, color: "var(--text-muted, #94a3b8)",
+              alignSelf: "center",
+            }}>
+              {container.level === 0 ? "L0 (ground)" : `L${container.level} (stacked)`}
+            </span>
+          </div>
         </div>
         <button
           onClick={() => saveContainerToLibrary(containerId, containerName)}
@@ -421,8 +466,7 @@ function Inspector({
             color: "#64748b", display: "flex", alignItems: "center",
             transition: "all 100ms ease",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "#f59e0b"; e.currentTarget.style.borderColor = "#f59e0b"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; }}
+          className="hover-accent-text"
         >
           <BookmarkPlus size={13} />
         </button>
@@ -470,8 +514,7 @@ function Inspector({
             cursor: "pointer", color: TEXT_DIM, fontSize: "11px", fontWeight: 600,
             transition: "background 100ms",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+          className="hover-accent-ghost"
         >
           <span style={{ fontSize: "9px" }}>{previewCollapsed ? "▶" : "▼"}</span>
           <span>Preview</span>
@@ -507,8 +550,7 @@ function Inspector({
             cursor: "pointer", color: TEXT_DIM, fontSize: "11px", fontWeight: 600,
             transition: "background 100ms",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+          className="hover-accent-ghost"
         >
           <span style={{ fontSize: "9px" }}>{gridCollapsed ? "▶" : "▼"}</span>
           <span>{frameMode ? "Frame Inspector" : "Container Grid"}</span>
@@ -788,8 +830,7 @@ export default function Sidebar() {
             cursor: "pointer", color: TEXT_DIM,
             transition: "all 120ms ease",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}10`; e.currentTarget.style.color = ACCENT; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = TEXT_DIM; }}
+          className="hover-accent-icon"
         >
           <ChevronRight size={16} />
         </button>
@@ -929,8 +970,7 @@ export default function Sidebar() {
             cursor: "pointer", color: TEXT_DIM, flexShrink: 0,
             transition: "all 120ms ease",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}10`; e.currentTarget.style.color = ACCENT; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = TEXT_DIM; }}
+          className="hover-accent-icon"
         >
           <ChevronLeft size={14} />
         </button>
