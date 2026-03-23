@@ -19,43 +19,14 @@ import type { FormDefinition, QuickSkinPreset, StyleId } from '@/types/sceneObje
 // ── Styles ───────────────────────────────────────────────────
 
 const panelStyle: CSSProperties = {
-  position: 'fixed',
-  top: 60,
-  left: 12,
-  zIndex: 100,
-  width: 280,
-  maxHeight: 'calc(100vh - 80px)',
-  overflowY: 'auto',
-  background: 'rgba(0, 0, 0, 0.85)',
-  borderRadius: 12,
-  padding: '14px 16px',
   display: 'flex',
   flexDirection: 'column',
   gap: 10,
-  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  userSelect: 'none',
+  padding: '8px 12px',
   color: '#e2e8f0',
   fontSize: 13,
-  scrollbarWidth: 'thin',
 };
 
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-};
-
-const closeBtnStyle: CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#94a3b8',
-  fontSize: 18,
-  cursor: 'pointer',
-  padding: '2px 6px',
-  borderRadius: 4,
-  lineHeight: 1,
-};
 
 const sectionLabelStyle: CSSProperties = {
   fontSize: 10,
@@ -150,7 +121,6 @@ export default function SkinEditor() {
   // Narrow selector: subscribe to only the selected object, not the full map (Fix 5)
   const obj = useStore((s) => selectedObjectId ? s.sceneObjects[selectedObjectId] : null);
   const activeStyle = useStore((s) => s.activeStyle);
-  const selectObject = useStore((s) => s.selectObject);
   const updateSkin = useStore((s) => s.updateSkin);
   const applyQuickSkin = useStore((s) => s.applyQuickSkin);
   const updateObjectState = useStore((s) => s.updateObjectState);
@@ -163,8 +133,6 @@ export default function SkinEditor() {
   const quickSkins = useMemo(() => getQuickSkins(activeStyle), [activeStyle]);
 
   // ── Callbacks ────────────────────────────────────────────
-  const handleClose = useCallback(() => selectObject(null), [selectObject]);
-
   const handleSkinChange = useCallback(
     (slotId: string, materialId: string) => {
       if (selectedObjectId) updateSkin(selectedObjectId, slotId, materialId);
@@ -199,8 +167,8 @@ export default function SkinEditor() {
   const handleRemove = useCallback(() => {
     if (!selectedObjectId) return;
     removeObject(selectedObjectId);
-    selectObject(null);
-  }, [selectedObjectId, removeObject, selectObject]);
+    useStore.getState().selectObject(null);
+  }, [selectedObjectId, removeObject]);
 
   // ── Bail if nothing selected ─────────────────────────────
   if (!obj || !form) return null;
@@ -210,19 +178,14 @@ export default function SkinEditor() {
 
   return (
     <div style={panelStyle}>
-      {/* Header: form name + close */}
-      <div style={headerStyle}>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{form.name}</div>
-          {styleDef && (
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-              {styleDef.label}
-            </div>
-          )}
-        </div>
-        <button style={closeBtnStyle} onClick={handleClose} title="Deselect object">
-          ✕
-        </button>
+      {/* Header: form name */}
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{form.name}</div>
+        {styleDef && (
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+            {styleDef.label}
+          </div>
+        )}
       </div>
 
       <div style={dividerStyle} />

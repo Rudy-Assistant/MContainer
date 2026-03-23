@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { useStore } from '../store/useStore';
 
 function resetStore() {
@@ -83,5 +85,15 @@ describe('selection mutual exclusion', () => {
     expect(after.selectedObjectId).toBeNull();
     // selectObject(null) still clears voxel (mutual exclusion is unconditional)
     expect(after.selectedVoxel).toBeNull();
+  });
+});
+
+// NOTE: This is a rare exception to the "no source-scanning tests" rule.
+// The spec explicitly requires an anti-pattern guard against SkinEditor
+// regressing to position:fixed. This is a structural constraint, not behavior.
+describe('SkinEditor anti-patterns', () => {
+  it('must not use position: fixed', () => {
+    const src = readFileSync(resolve(__dirname, '../components/ui/SkinEditor.tsx'), 'utf8');
+    expect(src).not.toMatch(/position\s*:\s*['"]?fixed/);
   });
 });
