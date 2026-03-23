@@ -159,6 +159,10 @@ export interface UiSlice {
   placementMode: boolean;
   activePlacementFormId: string | null;
   setPlacementMode: (formId: string | null) => void;
+
+  // Scene object selection (Task 14: SkinEditor)
+  selectedObjectId: string | null;
+  selectObject: (id: string | null) => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -296,4 +300,8 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
     placementMode: formId != null,
     activePlacementFormId: formId,
   }),
+
+  // Scene object selection (Task 14: SkinEditor)
+  selectedObjectId: null,
+  selectObject: (id) => set({ selectedObjectId: id }),
 });

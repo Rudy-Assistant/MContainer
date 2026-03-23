@@ -22,6 +22,7 @@ import VoxelContextMenu from "@/components/ui/VoxelContextMenu";
 import FaceContextMenu from "@/components/ui/FaceContextMenu";
 import MaterialPaletteModal from "@/components/ui/MaterialPaletteModal";
 import FormCatalog from "@/components/ui/FormCatalog";
+import SkinEditor from "@/components/ui/SkinEditor";
 // Legacy GameHUD, Hotbar, StyleSelector removed in Phase 7
 
 const SceneCanvas = dynamic(
@@ -165,6 +166,9 @@ export default function Home() {
 
           {/* Form catalog — placeable forms browser (Task 13) */}
           {!isPreviewMode && <FormCatalog />}
+
+          {/* Skin editor — context-sensitive object editor (Task 14) */}
+          {!isPreviewMode && <SkinEditor />}
 
           {/* Bottom dock — persistent in all modes except preview (screenshot) mode */}
           {!isPreviewMode && (
