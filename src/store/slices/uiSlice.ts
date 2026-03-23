@@ -163,6 +163,14 @@ export interface UiSlice {
   // Scene object selection (Task 14: SkinEditor)
   selectedObjectId: string | null;
   selectObject: (id: string | null) => void;
+
+  // SceneObject hover (Feature 1: emissive tint)
+  hoveredObjectId: string | null;
+  setHoveredObjectId: (id: string | null) => void;
+
+  // Form card hover → 3D preview ghost (Feature 3)
+  hoveredFormId: string | null;
+  setHoveredFormId: (id: string | null) => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -309,4 +317,12 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
     selectedFace: null,
     selectedVoxels: null,
   }),
+
+  // SceneObject hover (Feature 1: emissive tint)
+  hoveredObjectId: null,
+  setHoveredObjectId: (id) => set({ hoveredObjectId: id }),
+
+  // Form card hover → 3D preview ghost (Feature 3)
+  hoveredFormId: null,
+  setHoveredFormId: (id) => set({ hoveredFormId: id }),
 });
