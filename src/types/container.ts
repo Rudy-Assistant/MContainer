@@ -349,6 +349,7 @@ export interface FaceFinish {
   light?: string;
   lightColor?: string;
   electrical?: string;
+  color?: string;  // universal tint — applied on every face category
 }
 
 export type FaceFinishes = Partial<Record<keyof VoxelFaces, FaceFinish>>;

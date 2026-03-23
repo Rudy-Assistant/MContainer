@@ -5,6 +5,7 @@ export interface MaterialPreset {
   label: string;
   color: string;
   icon?: string;
+  textureFolder?: string;  // maps to /assets/materials/{folder}/color.jpg
 }
 
 export interface ColorPreset {
@@ -13,10 +14,10 @@ export interface ColorPreset {
 }
 
 export const EXTERIOR_MATERIALS: MaterialPreset[] = [
-  { id: 'steel',    label: 'Steel',    color: '#708090' },
-  { id: 'wood',     label: 'Wood',     color: '#8B7355' },
-  { id: 'concrete', label: 'Concrete', color: '#A9A9A9' },
-  { id: 'bamboo',   label: 'Bamboo',   color: '#D4B896' },
+  { id: 'steel',    label: 'Steel',    color: '#708090', textureFolder: 'Corrugated_Steel' },
+  { id: 'wood',     label: 'Wood',     color: '#8B7355', textureFolder: 'Deck_Wood' },
+  { id: 'concrete', label: 'Concrete', color: '#A9A9A9', textureFolder: 'Concrete' },
+  { id: 'bamboo',   label: 'Bamboo',   color: '#D4B896', textureFolder: 'Bamboo' },
 ];
 
 export const PAINT_COLORS: ColorPreset[] = [
@@ -80,18 +81,18 @@ export const ELECTRICAL_TYPES: MaterialPreset[] = [
 ];
 
 export const FLOOR_MATERIALS: MaterialPreset[] = [
-  { id: 'oak_wood',    label: 'Oak Planks',        color: '#A0785A' },
-  { id: 'concrete',    label: 'Polished Concrete',  color: '#A9A9A9' },
-  { id: 'bamboo',      label: 'Bamboo',             color: '#D4B896' },
-  { id: 'hinoki',      label: 'Hinoki Cedar',       color: '#F5E6C8' },
+  { id: 'oak_wood',    label: 'Oak Planks',        color: '#A0785A', textureFolder: 'Deck_Wood' },
+  { id: 'concrete',    label: 'Polished Concrete',  color: '#A9A9A9', textureFolder: 'Concrete' },
+  { id: 'bamboo',      label: 'Bamboo',             color: '#D4B896', textureFolder: 'Bamboo' },
+  { id: 'hinoki',      label: 'Hinoki Cedar',       color: '#F5E6C8', textureFolder: 'Japanese_Cedar' },
   { id: 'tatami',      label: 'Tatami',             color: '#C8D5A0' },
   { id: 'tile',        label: 'Tile',               color: '#E0D5C5' },
 ];
 
 export const CEILING_MATERIALS: MaterialPreset[] = [
-  { id: 'steel',   label: 'Steel',   color: '#708090' },
+  { id: 'steel',   label: 'Steel',   color: '#708090', textureFolder: 'Corrugated_Steel' },
   { id: 'open',    label: 'Open',    color: '#333333' },
-  { id: 'plaster', label: 'Plaster', color: '#F5F5F5' },
+  { id: 'plaster', label: 'Plaster', color: '#F5F5F5', textureFolder: 'Plaster' },
 ];
 
 export interface FinishOptions {
