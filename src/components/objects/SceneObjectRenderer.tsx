@@ -7,8 +7,10 @@ import { getStyle } from '@/config/styleRegistry';
 import { getMaterial } from '@/config/materialRegistry';
 import { applyStyleEffects, applyEmberWarmth } from '@/utils/styleEffects';
 import { anchorToLocalPosition, anchorToLocalRotation, localToWorld, localRotToWorld } from '@/utils/anchorMath';
-import { useMemo, useEffect } from 'react';
+import { getProceduralGeometry } from '@/utils/proceduralGeometry';
+import { Suspense, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
+import { useGLTF } from '@react-three/drei';
 import type { SceneObject, StyleId, StyleEffect, FormDefinition } from '@/types/sceneObject';
 import type { Container } from '@/types/container';
 
@@ -89,6 +91,93 @@ function SceneObjectMeshInner({
   );
   const rotation = useMemo(() => anchorToLocalRotation(object.anchor), [object.anchor]);
 
+  const worldPosition = useMemo(
+    () => localToWorld(position, container),
+    [position, container],
+  );
+
+  const worldRotation = useMemo(
+    () => localRotToWorld(rotation, container),
+    [rotation, container],
+  );
+
+  // GLB branch: load model and apply skin materials
+  if (form.geometry === 'glb' && form.glbPath) {
+    return (
+      <Suspense fallback={
+        <ProceduralFormMesh
+          form={form}
+          resolvedSkin={resolvedSkin}
+          worldPosition={worldPosition}
+          worldRotation={worldRotation}
+          style={style}
+          objectId={objectId}
+          placementMode={placementMode}
+          selectObject={selectObject}
+        />
+      }>
+        <GlbFormMesh
+          glbPath={form.glbPath}
+          form={form}
+          resolvedSkin={resolvedSkin}
+          worldPosition={worldPosition}
+          worldRotation={worldRotation}
+          style={style}
+          objectId={objectId}
+          placementMode={placementMode}
+          selectObject={selectObject}
+        />
+        {form.category === 'light' && (
+          <group position={worldPosition} rotation={worldRotation}>
+            <LightSource object={object} form={form} effects={style?.effects} />
+          </group>
+        )}
+      </Suspense>
+    );
+  }
+
+  // Procedural branch: improved category-specific placeholder shapes
+  return (
+    <>
+      <ProceduralFormMesh
+        form={form}
+        resolvedSkin={resolvedSkin}
+        worldPosition={worldPosition}
+        worldRotation={worldRotation}
+        style={style}
+        objectId={objectId}
+        placementMode={placementMode}
+        selectObject={selectObject}
+      />
+      {form.category === 'light' && (
+        <group position={worldPosition} rotation={worldRotation}>
+          <LightSource object={object} form={form} effects={style?.effects} />
+        </group>
+      )}
+    </>
+  );
+}
+
+/** Procedural placeholder mesh with category-specific geometry. */
+function ProceduralFormMesh({
+  form,
+  resolvedSkin,
+  worldPosition,
+  worldRotation,
+  style,
+  objectId,
+  placementMode,
+  selectObject,
+}: {
+  form: FormDefinition;
+  resolvedSkin: Record<string, string>;
+  worldPosition: [number, number, number];
+  worldRotation: [number, number, number];
+  style: ReturnType<typeof getStyle>;
+  objectId: string;
+  placementMode: boolean;
+  selectObject: (id: string | null) => void;
+}) {
   // Look up material for the primary skin slot
   const primarySlot = form.skinSlots[0]?.id ?? 'frame';
   const matId = resolvedSkin[primarySlot] ?? 'raw_steel';
@@ -109,20 +198,15 @@ function SceneObjectMeshInner({
   // Dispose material when it changes or component unmounts (Fix 4)
   useEffect(() => () => { material.dispose(); }, [material]);
 
-  const worldPosition = useMemo(
-    () => localToWorld(position, container),
-    [position, container],
-  );
-
-  const worldRotation = useMemo(
-    () => localRotToWorld(rotation, container),
-    [rotation, container],
+  const geometry = useMemo(
+    () => getProceduralGeometry(form.id, form.category, form.dimensions),
+    [form.id, form.category, form.dimensions],
   );
 
   return (
     <group position={worldPosition} rotation={worldRotation}>
-      {/* Procedural placeholder box — replaced with GLB models in art pipeline sprint */}
       <mesh
+        geometry={geometry}
         material={material}
         castShadow
         receiveShadow
@@ -132,13 +216,89 @@ function SceneObjectMeshInner({
           e.stopPropagation();
           selectObject(objectId);
         }}
-      >
-        <boxGeometry args={[form.dimensions.w, form.dimensions.h, form.dimensions.d]} />
-      </mesh>
-      {/* Light sources for light-category forms */}
-      {form.category === 'light' && (
-        <LightSource object={object} form={form} effects={style?.effects} />
-      )}
+      />
+    </group>
+  );
+}
+
+/** GLB model mesh with per-mesh skin material application. */
+function GlbFormMesh({
+  glbPath,
+  form,
+  resolvedSkin,
+  worldPosition,
+  worldRotation,
+  style,
+  objectId,
+  placementMode,
+  selectObject,
+}: {
+  glbPath: string;
+  form: FormDefinition;
+  resolvedSkin: Record<string, string>;
+  worldPosition: [number, number, number];
+  worldRotation: [number, number, number];
+  style: ReturnType<typeof getStyle>;
+  objectId: string;
+  placementMode: boolean;
+  selectObject: (id: string | null) => void;
+}) {
+  const { scene } = useGLTF(glbPath);
+
+  // Clone the scene so each instance gets its own materials.
+  // Convention: mesh names in the GLB match skin slot IDs (e.g., "frame", "panel", "glass").
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone(true);
+
+    clone.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        // Apply skin material if this mesh name matches a skin slot
+        if (child.name) {
+          const skinMatId = resolvedSkin[child.name];
+          if (skinMatId) {
+            const matDef = getMaterial(skinMatId);
+            if (matDef) {
+              const mat = new THREE.MeshStandardMaterial({
+                color: matDef.color,
+                metalness: matDef.metalness,
+                roughness: matDef.roughness,
+              });
+              if (style?.effects?.length) {
+                applyStyleEffects(mat, style.effects);
+              }
+              child.material = mat;
+            }
+          }
+        }
+        child.castShadow = true;
+        child.receiveShadow = true;
+        // Suppress raycasts on individual meshes — clicks handled by the group onClick
+        child.raycast = nullRaycast;
+      }
+    });
+
+    return clone;
+  }, [scene, resolvedSkin, style?.effects]);
+
+  // Dispose cloned materials on unmount or when clone changes
+  useEffect(() => {
+    return () => {
+      clonedScene.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.material) {
+          (child.material as THREE.Material).dispose();
+        }
+      });
+    };
+  }, [clonedScene]);
+
+  return (
+    <group
+      position={worldPosition}
+      rotation={worldRotation}
+      onClick={placementMode ? undefined : (e) => { e.stopPropagation(); selectObject(objectId); }}
+      {...(placementMode ? { raycast: nullRaycast } : {})}
+    >
+      <primitive object={clonedScene} />
     </group>
   );
 }
