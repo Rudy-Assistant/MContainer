@@ -13,14 +13,14 @@ interface Props {
 
 export default function TextureSwatchGrid({ items, activeId, onSelect, label }: Props) {
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom: 14 }}>
       <div style={{
         fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-        color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 6,
+        color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 8,
       }}>
         {label}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         {items.map((item) => (
           <SwatchButton key={item.id} item={item} active={activeId === item.id} onSelect={onSelect} />
         ))}
@@ -35,7 +35,7 @@ function SwatchButton({ item, active, onSelect }: {
   const [useFallback, setUseFallback] = useState(false);
   const textureSrc = getSwatchSrc(item);
   const needsFallback = !textureSrc || useFallback;
-  const fallbackSrc = needsFallback ? generateNoiseSwatch(item.id, item.color) : null;
+  const fallbackSrc = needsFallback ? generateNoiseSwatch(item.id, item.color, 80) : null;
 
   const handleError = useCallback(() => setUseFallback(true), []);
 
@@ -45,11 +45,12 @@ function SwatchButton({ item, active, onSelect }: {
     <button
       onClick={() => onSelect(item.id, item.label)}
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-        padding: 4, borderRadius: 6, cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
+        padding: 0, borderRadius: 8, cursor: 'pointer', overflow: 'hidden',
         border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-        background: active ? 'var(--border-subtle)' : 'var(--btn-bg)',
-        transition: 'border-color 100ms',
+        background: 'var(--btn-bg)',
+        boxShadow: active ? '0 0 0 1px var(--accent)' : 'none',
+        transition: 'border-color 120ms, box-shadow 120ms',
       }}
     >
       <img
@@ -58,13 +59,14 @@ function SwatchButton({ item, active, onSelect }: {
         loading="lazy"
         onError={textureSrc ? handleError : undefined}
         style={{
-          width: 64, height: 64, borderRadius: 4,
+          width: '100%', height: 80, borderRadius: 0,
           objectFit: 'cover', display: 'block',
         }}
       />
       <span style={{
-        fontSize: 9, textTransform: 'uppercase', color: 'var(--text-dim)',
-        lineHeight: 1.2, textAlign: 'center',
+        fontSize: 10, color: 'var(--text-main)', fontWeight: 500,
+        lineHeight: 1.3, textAlign: 'center', padding: '5px 4px 6px',
+        width: '100%',
       }}>
         {item.label}
       </span>

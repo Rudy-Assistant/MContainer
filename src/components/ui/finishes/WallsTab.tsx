@@ -48,29 +48,31 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
   return (
     <div style={{ padding: '8px 12px' }}>
       {/* Surface type picker — always visible */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 14 }}>
         <div style={{
           fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-          color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 6,
+          color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 8,
         }}>
           Wall Surface
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           {wallTypes.map((entry) => (
             <button
               key={entry.surface + '-' + entry.category}
               onClick={() => handleSurfaceChange(entry.surface)}
               title={entry.label}
               style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                padding: '8px 4px', borderRadius: 6, cursor: 'pointer', fontSize: 9,
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 6,
+                padding: '10px 4px', borderRadius: 8, cursor: 'pointer',
                 border: `2px solid ${surface === entry.surface ? 'var(--accent)' : 'var(--border)'}`,
                 background: surface === entry.surface ? 'var(--border-subtle)' : 'var(--btn-bg)',
-                color: 'var(--text-main)', transition: 'border-color 100ms',
+                boxShadow: surface === entry.surface ? '0 0 0 1px var(--accent)' : 'none',
+                color: 'var(--text-main)', transition: 'border-color 120ms, box-shadow 120ms',
               }}
             >
-              <span style={{ fontSize: 16 }}>{entry.icon}</span>
-              <span style={{ textAlign: 'center', lineHeight: 1.2 }}>{entry.label}</span>
+              <span style={{ fontSize: 18 }}>{entry.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 500, textAlign: 'center', lineHeight: 1.3 }}>{entry.label}</span>
             </button>
           ))}
         </div>

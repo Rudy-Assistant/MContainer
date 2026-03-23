@@ -13,6 +13,7 @@ import ElectricalTab from './ElectricalTab';
 export default function FinishesPanel() {
   const target = useSelectionTarget();
   const selectedFace = useStore((s) => s.selectedFace) as FaceKey | null;
+  const clearSelection = useStore((s) => s.clearSelection);
 
   // Derived tab from face; manual override when user clicks a tab directly
   const derivedTab = faceToTab(selectedFace);
@@ -53,13 +54,38 @@ export default function FinishesPanel() {
     containerId,
     voxelIndex,
     indices,
-    face: selectedFace || ('n' as FaceKey), // fallback, tabs guard on hasFace
+    face: selectedFace || ('n' as FaceKey),
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Panel header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 12px 6px',
+      }}>
+        <span style={{
+          fontSize: 13, fontWeight: 700, color: 'var(--text-main)',
+          letterSpacing: '-0.01em',
+        }}>
+          Interior Finishes
+        </span>
+        <button
+          onClick={() => clearSelection()}
+          title="Close"
+          style={{
+            width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
+            border: '1px solid var(--border)', background: 'var(--btn-bg)',
+            color: 'var(--text-muted)', fontSize: 13, lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          ×
+        </button>
+      </div>
+
       {/* VoxelPreview3D — face selector */}
-      <div style={{ padding: '8px 8px 0' }}>
+      <div style={{ padding: '0 8px 4px' }}>
         <VoxelPreview3D
           containerId={containerId}
           voxelIndex={voxelIndex}
@@ -77,7 +103,7 @@ export default function FinishesPanel() {
       {/* Tab content — scrollable */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {!hasFace ? (
-          <div style={{ padding: '16px 12px', textAlign: 'center' }}>
+          <div style={{ padding: '24px 12px', textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
               Click a face in the preview to edit finishes
             </div>
