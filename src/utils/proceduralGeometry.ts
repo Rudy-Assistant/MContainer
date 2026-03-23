@@ -35,7 +35,9 @@ export function getProceduralGeometry(
       const hBar = new THREE.BoxGeometry(dims.w, 0.02, dims.d * 0.5);
       const vBar = new THREE.BoxGeometry(0.02, dims.h, dims.d * 0.5);
       const merged = mergeGeometries([pane, hBar, vBar]);
-      geo = merged ?? pane;
+      // Dispose intermediate geometries after merge (their GPU buffers are now in `merged`)
+      pane.dispose(); hBar.dispose(); vBar.dispose();
+      geo = merged ?? new THREE.BoxGeometry(dims.w, dims.h, dims.d);
       break;
     }
     case 'light': {
@@ -45,7 +47,9 @@ export function getProceduralGeometry(
         base.translate(0, -dims.h * 0.15, 0);
         const shade = new THREE.SphereGeometry(dims.w * 0.3, 8, 6);
         shade.translate(0, dims.h * 0.35, 0);
-        geo = mergeGeometries([base, shade]) ?? new THREE.BoxGeometry(dims.w, dims.h, dims.d);
+        const lampMerged = mergeGeometries([base, shade]);
+        base.dispose(); shade.dispose();
+        geo = lampMerged ?? new THREE.BoxGeometry(dims.w, dims.h, dims.d);
       } else {
         // Short = ceiling/wall fixture: cylinder disc
         geo = new THREE.CylinderGeometry(dims.w * 0.4, dims.w * 0.4, dims.h * 0.3, 12);

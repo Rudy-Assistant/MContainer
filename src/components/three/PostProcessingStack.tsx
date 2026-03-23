@@ -47,16 +47,6 @@ const BLOOM_CONFIG = {
   mipmapBlur: true,
 } as const;
 
-// ── Style effect helpers ─────────────────────────────────────
-
-function hasEffect(effects: StyleEffect[], type: string): boolean {
-  return effects.some((e) => e.type === type);
-}
-
-function findEffect(effects: StyleEffect[], type: string): StyleEffect | undefined {
-  return effects.find((e) => e.type === type);
-}
-
 // Stable empty array to avoid re-renders when no style effects are active
 const EMPTY_EFFECTS: StyleEffect[] = [];
 
@@ -71,27 +61,25 @@ function PostProcessingEffects() {
   const style = getStyle(activeStyle);
   const effects = style?.effects ?? EMPTY_EFFECTS;
 
-  // Detect active postprocessing style effects
-  const hasSaltFrost = hasEffect(effects, 'salt_frost');
-  const hasSoftBloom = hasEffect(effects, 'soft_bloom');
-  const hasEdgeGlow = hasEffect(effects, 'edge_glow');
+  // Find active postprocessing effects (single traversal each, ≤3 effects per style)
+  const saltFrostEffect = effects.find((e) => e.type === 'salt_frost');
+  const softBloomEffect = effects.find((e) => e.type === 'soft_bloom');
+  const edgeGlowEffect = effects.find((e) => e.type === 'edge_glow');
 
   // soft_bloom: lower luminance threshold so light fixtures bloom more visibly
-  const bloomThreshold = hasSoftBloom ? 0.5 : BLOOM_CONFIG.luminanceThreshold;
-  const bloomSmoothing = hasSoftBloom ? 0.3 : BLOOM_CONFIG.luminanceSmoothing;
-  const bloomIntensity = hasSoftBloom ? 1.5 : 1.0;
+  const bloomThreshold = softBloomEffect ? 0.5 : BLOOM_CONFIG.luminanceThreshold;
+  const bloomSmoothing = softBloomEffect ? 0.3 : BLOOM_CONFIG.luminanceSmoothing;
+  const bloomIntensity = softBloomEffect ? 1.5 : 1.0;
 
-  // edge_glow: outline color from effect definition
-  const edgeGlowEffect = findEffect(effects, 'edge_glow');
+  // edge_glow: outline color from effect definition (memoize to avoid new Color per render)
   const edgeGlowColor = useMemo(
-    () => new THREE.Color(edgeGlowEffect?.color ?? '#00ff88'),
+    () => edgeGlowEffect ? new THREE.Color(edgeGlowEffect.color ?? '#00ff88') : null,
     [edgeGlowEffect?.color],
   );
 
   // salt_frost: frosty white-blue outline + desaturation
-  const saltFrostEffect = findEffect(effects, 'salt_frost');
   const saltFrostColor = useMemo(
-    () => new THREE.Color(saltFrostEffect?.color ?? '#a8d8ff'),
+    () => saltFrostEffect ? new THREE.Color(saltFrostEffect.color ?? '#a8d8ff') : null,
     [saltFrostEffect?.color],
   );
 
@@ -120,15 +108,15 @@ function PostProcessingEffects() {
   }
 
   // salt_frost — frosty desaturation + brightness boost
-  if (hasSaltFrost) {
+  if (saltFrostEffect && saltFrostColor) {
     children.push(
-      <HueSaturation key="frost-hue" saturation={-(saltFrostEffect?.intensity ?? 0.3)} />,
+      <HueSaturation key="frost-hue" saturation={-(saltFrostEffect.intensity ?? 0.3)} />,
       <BrightnessContrast key="frost-bc" brightness={0.06} contrast={0.04} />,
       // White-blue edge outline on selectionLayer 11
       <Outline
         key="frost-outline"
         edgeStrength={2.5}
-        visibleEdgeColor={saltFrostColor as unknown as number}
+        visibleEdgeColor={saltFrostColor.getHex()}
         hiddenEdgeColor={0x000000}
         blur
         xRay={false}
@@ -138,12 +126,12 @@ function PostProcessingEffects() {
   }
 
   // edge_glow — colored outline on selectionLayer 12
-  if (hasEdgeGlow) {
+  if (edgeGlowEffect && edgeGlowColor) {
     children.push(
       <Outline
         key="edge-outline"
         edgeStrength={4.0}
-        visibleEdgeColor={edgeGlowColor as unknown as number}
+        visibleEdgeColor={edgeGlowColor.getHex()}
         hiddenEdgeColor={0x000000}
         blur
         xRay={false}

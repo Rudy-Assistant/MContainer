@@ -17,8 +17,7 @@ import type { Container } from '@/types/container';
 // Module-level constant to avoid per-render allocation (Fix 6)
 const WHITE = new THREE.Color('#ffffff');
 
-// Suppress raycasts on non-interactive meshes (project anti-pattern rule)
-const nullRaycast = () => {};
+import { nullRaycast } from '@/utils/nullRaycast';
 
 export function SceneObjectRenderer() {
   const objectIds = useStore(useShallow((s) => Object.keys(s.sceneObjects)));
@@ -280,12 +279,13 @@ function GlbFormMesh({
     return clone;
   }, [scene, resolvedSkin, style?.effects]);
 
-  // Dispose cloned materials on unmount or when clone changes
+  // Dispose cloned materials AND geometries on unmount or when clone changes
   useEffect(() => {
     return () => {
       clonedScene.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.material) {
-          (child.material as THREE.Material).dispose();
+        if (child instanceof THREE.Mesh) {
+          if (child.material) (child.material as THREE.Material).dispose();
+          if (child.geometry) child.geometry.dispose();
         }
       });
     };
@@ -315,44 +315,43 @@ function LightSource({
   const brightness = (object.state?.brightness as number) ?? 75;
   const intensity = (brightness / 100) * 2; // 0-2 range
 
-  // Use module-level WHITE constant instead of allocating per render (Fix 6)
-  const baseColor = WHITE.clone();
-  const ember = effects?.length ? applyEmberWarmth(effects, baseColor, 5) : null;
-  const lightColor = ember?.color ?? baseColor;
+  // Memoize color computation to avoid allocating a new THREE.Color per render
+  const { lightColor, lightDistance } = useMemo(() => {
+    const base = WHITE.clone();
+    const em = effects?.length ? applyEmberWarmth(effects, base, 5) : null;
+    return { lightColor: em?.color ?? base, lightDistance: em?.distance ?? 5 };
+  }, [effects]);
 
   if (form.anchorType === 'ceiling') {
-    const dist = ember ? ember.distance : 5;
     return (
       <spotLight
         color={lightColor}
         intensity={intensity}
         angle={Math.PI / 4}
         penumbra={0.5}
-        distance={dist}
+        distance={lightDistance}
         position={[0, -0.1, 0]}
       />
     );
   }
   if (form.anchorType === 'face') {
-    const dist = ember ? ember.distance * (4 / 5) : 4;
     return (
       <spotLight
         color={lightColor}
         intensity={intensity}
         angle={Math.PI / 3}
         penumbra={0.7}
-        distance={dist}
+        distance={lightDistance * 0.8}
         position={[0, 0, 0.1]}
       />
     );
   }
   // Floor lights (lamps)
-  const dist = ember ? ember.distance * (4 / 5) : 4;
   return (
     <pointLight
       color={lightColor}
       intensity={intensity}
-      distance={dist}
+      distance={lightDistance * 0.8}
       position={[0, form.dimensions.h, 0]}
     />
   );
