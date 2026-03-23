@@ -324,6 +324,15 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       }
     }
 
+    // Always try edge-snap, even when smart placement didn't trigger (Fix 3: palette drop snap)
+    const snapResult = findEdgeSnap(get().containers, null, c.position.x, c.position.z, c.size, c.rotation ?? 0);
+    if (snapResult.snapped) {
+      const snapFoot = getFootprintAt(snapResult.x, snapResult.z, c.size, c.rotation ?? 0);
+      if (!checkOverlap(get().containers, null, snapFoot)) {
+        c.position = { ...c.position, x: snapResult.x, z: snapResult.z };
+      }
+    }
+
     set((s) => ({
       containers: { ...s.containers, [c.id]: c },
     }));
