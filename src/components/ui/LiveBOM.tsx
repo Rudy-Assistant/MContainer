@@ -1,14 +1,7 @@
 "use client";
 
 import { useStore } from "@/store/useStore";
-
-function fmt(n: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
+import { formatUSD as fmt } from "@/utils/formatters";
 
 export default function LiveBOM() {
   const containerCount = useStore((s) => Object.keys(s.containers).length);
@@ -47,6 +40,15 @@ export default function LiveBOM() {
           <span className="text-[9px] uppercase" style={{ color: "#90a4ae" }}>Cuts</span>
           <span className="text-xs font-semibold" style={{ color: "#263238" }}>{fmt(est.breakdown.cuts)}</span>
         </div>
+        {(est.breakdown.sceneObjects ?? 0) > 0 && (
+          <>
+            <div className="w-px h-6" style={{ background: "rgba(0,0,0,0.08)" }} />
+            <div className="flex flex-col">
+              <span className="text-[9px] uppercase" style={{ color: "#90a4ae" }}>Objects</span>
+              <span className="text-xs font-semibold" style={{ color: "#263238" }}>{fmt(est.breakdown.sceneObjects!)}</span>
+            </div>
+          </>
+        )}
         <div className="w-px h-6" style={{ background: "rgba(0,0,0,0.08)" }} />
         <div className="flex flex-col rounded-md px-2 py-0.5" style={{ background: "rgba(21,101,192,0.08)" }}>
           <span className="text-[9px] uppercase font-bold" style={{ color: "#1565c0" }}>Total</span>

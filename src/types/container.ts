@@ -261,6 +261,10 @@ export type SurfaceType =
   | 'Window_Clerestory' // steel 0-2.0m, glass clerestory strip
   | 'Window_Half';    // steel bottom half, glass top half
 
+/** Type guard: true for Railing_Glass or Railing_Cable surface types */
+export const isRailingSurface = (s: SurfaceType): boolean =>
+  s === 'Railing_Cable' || s === 'Railing_Glass';
+
 /** Backward-compat alias — use SurfaceType for new code */
 export type VoxelMaterial = SurfaceType;
 
@@ -324,6 +328,13 @@ export interface Voxel {
    *  - walls_deploy: side walls swivel outward from floor center
    *  - reverse: plays the entry animation in reverse (wall swivels back up/down) */
   unpackPhase?: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy' | 'reverse';
+  /** When unpackPhase='reverse', which original phase to reverse.
+   *  Ephemeral — NOT persisted. Determines reverse animation style (top vs bottom hinge, etc.) */
+  _reverseOriginalPhase?: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy';
+  /** Ephemeral flag — set by removeStairs to trigger telescope-retract exit animation.
+   *  When true, StairTelescope plays isExiting=true. On completion, clearStairExit deletes stair data.
+   *  NOT persisted. */
+  _stairExiting?: boolean;
   /** Per-face finish overrides — absent values fall back to theme defaults */
   faceFinishes?: FaceFinishes;
 }
@@ -394,6 +405,9 @@ export interface ModulePreset {
 }
 
 export type ExtensionConfig = 'none' | 'all_deck' | 'all_interior' | 'all_glass_interior' | 'north_deck' | 'south_deck' | 'east_deck' | 'west_deck';
+
+/** Default extension configuration for newly created containers */
+export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = 'all_deck';
 
 export interface ContainerRole {
   id: string;
@@ -607,6 +621,7 @@ export interface PricingEstimate {
     containers: number;
     modules: number;
     cuts: number;
+    sceneObjects?: number;
     total: number;
   };
 }

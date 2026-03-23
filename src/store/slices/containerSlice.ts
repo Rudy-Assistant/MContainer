@@ -55,6 +55,7 @@ import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from "@/types/containe
 import { type HotbarSlot, BLOCK_PRESETS, autoStairDir, autoStairAscending } from "../useStore";
 import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
+import { formRegistry } from "@/config/formRegistry";
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
@@ -595,28 +596,45 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     };
 
     if (config === 'none') {
-      // Reset all extensions to inactive default
+      // Retract extensions with reverse animation — keep active until animation completes.
+      // clearUnpackPhase will deactivate voxels when reverse animation finishes.
       set((s) => {
         const container = s.containers[containerId];
         if (!container?.voxelGrid) return {};
         const grid = [...container.voxelGrid];
+        let anyAnimated = false;
         for (let level = 0; level < VOXEL_LEVELS; level++) {
           for (let row = 0; row < VOXEL_ROWS; row++) {
             for (let col = 0; col < VOXEL_COLS; col++) {
               if (!isExtension(row, col)) continue;
               const idx = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col;
-              grid[idx] = {
-                ...grid[idx],
-                active: false,
-                moduleId: undefined,
-                moduleOrientation: undefined,
-                unpackPhase: undefined,
-                faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
-              };
+              const voxel = grid[idx];
+              if (voxel.active) {
+                // Determine which phase to reverse based on current faces
+                // Deck (top=Open) used wall_to_floor, interior (top=Solid_Steel) used wall_to_ceiling
+                const originalPhase: 'wall_to_floor' | 'wall_to_ceiling' = voxel.faces.top === 'Open' ? 'wall_to_floor' : 'wall_to_ceiling';
+                grid[idx] = {
+                  ...voxel,
+                  // Keep active: true — voxel stays visible during reverse animation
+                  moduleId: undefined,
+                  moduleOrientation: undefined,
+                  unpackPhase: 'reverse' as const,
+                  _reverseOriginalPhase: originalPhase,
+                };
+                anyAnimated = true;
+              } else if (voxel.moduleId || voxel.moduleOrientation || voxel.unpackPhase) {
+                // Already inactive but has stale fields — clear them
+                grid[idx] = {
+                  ...voxel,
+                  moduleId: undefined,
+                  moduleOrientation: undefined,
+                  unpackPhase: undefined,
+                  faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
+                };
+              }
             }
           }
         }
-        // Remove furniture from affected voxels
         return {
           containers: {
             ...s.containers,
@@ -702,12 +720,26 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       const grid = [...c.voxelGrid];
       const voxel = grid[voxelIndex];
       if (!voxel) return {};
-      grid[voxelIndex] = { ...voxel, unpackPhase: undefined };
+      // If this was a reverse animation completing, deactivate the extension voxel
+      const wasReverse = voxel.unpackPhase === 'reverse';
+      if (wasReverse) {
+        grid[voxelIndex] = {
+          ...voxel,
+          active: false,
+          unpackPhase: undefined,
+          _reverseOriginalPhase: undefined,
+          faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
+        };
+      } else {
+        grid[voxelIndex] = { ...voxel, unpackPhase: undefined, _reverseOriginalPhase: undefined };
+      }
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
     });
   },
 
   removeContainer: (id) => {
+    // Cascade-delete scene objects belonging to this container
+    get().removeObjectsByContainer(id);
 
     set((s) => {
       const removed = s.containers[id];
@@ -1202,7 +1234,15 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       }
     }
 
-    const total = containersCost + modulesCost + cutsCost;
+    // ── Scene object costs (doors, windows, lights, electrical) ──
+    let sceneObjectsCost = 0;
+    const sceneObjects = get().sceneObjects ?? {};
+    for (const obj of Object.values(sceneObjects)) {
+      const form = formRegistry.get((obj as { formId: string }).formId);
+      if (form) sceneObjectsCost += form.costEstimate;
+    }
+
+    const total = containersCost + modulesCost + cutsCost + sceneObjectsCost;
     return {
       low: Math.round(total * 0.85),
       high: Math.round(total * 1.15),
@@ -1210,6 +1250,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         containers: containersCost,
         modules: modulesCost,
         cuts: cutsCost,
+        sceneObjects: sceneObjectsCost,
         total,
       },
     };
