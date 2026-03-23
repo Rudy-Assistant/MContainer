@@ -55,7 +55,7 @@ Implementation: read `hoveredObjectId` from store; if truthy, return null early.
 
 ### PlacementGhost.tsx — SlotIndicator Child
 
-When `placementMode` is true and a wall face is hovered, render `N-1` thin vertical lines at slot boundary positions along the wall width. `N` = total slots on that wall (typically 4 for a standard voxel width).
+When `placementMode` is true and a wall face is hovered, render `N-1` thin vertical lines at slot boundary positions along the wall width. `N` = `FACE_SLOT_COUNT` from `src/utils/slotOccupancy.ts` (currently 3, so 2 divider lines).
 
 Implementation:
 - New `SlotIndicator` sub-component inside PlacementGhost.tsx
