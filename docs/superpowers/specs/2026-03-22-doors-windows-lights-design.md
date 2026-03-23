@@ -62,8 +62,27 @@ interface FormConstraints {
 }
 
 type FormCategory = "door" | "window" | "light" | "electrical";
-type AnchorType = "face" | "floor" | "ceiling" | "freestanding";
+type AnchorType = "face" | "floor" | "ceiling";
+
+// Wall face directions only — top/bottom are not valid for object placement
+type WallDirection = "n" | "s" | "e" | "w";
+
+type StyleId =
+  | "modern" | "industrial" | "japanese" | "desert_brutalist"
+  | "coastal" | "noir_glass" | "solarpunk" | "frontier_rustic"
+  | "retro_capsule" | "neo_tropical" | "cyberpunk" | "maker_raw"
+  | "art_deco" | "arctic_bunker" | "terra_adobe" | "memphis_pop"
+  | "stealth";
+
+type StyleEffectType =
+  | "patina_tint" | "paper_glow" | "heat_shimmer" | "salt_frost"
+  | "reflection_tint" | "moss_glow" | "ember_warmth" | "soft_bloom"
+  | "dappled_light" | "edge_glow" | "layer_lines" | "gold_gleam"
+  | "frost_rim" | "clay_warmth" | "color_punch" | "matte_absorb";
 ```
+
+> **Note on `freestanding`**: Removed from AnchorType. When furniture arrives, it will
+> use `"floor"` anchor with `offset` for positioning. No distinct freestanding type needed.
 
 ```typescript
 interface SceneObject {
@@ -78,7 +97,7 @@ interface ObjectAnchor {
   containerId: string;
   voxelIndex: number;
   type: AnchorType;
-  face?: Direction;        // for wall-mounted
+  face?: WallDirection;    // for wall-mounted (n/s/e/w only)
   slot?: number;           // 0 | 1 | 2 sub-face position
   offset?: [number, number]; // for floor/ceiling fine positioning
 }
@@ -100,6 +119,22 @@ Each wall face divides into 3 horizontal slots:
 - Narrow window (slotWidth=1): any single slot
 - Wide picture window (slotWidth=3): fills entire face
 - Empty slots render the base wall SurfaceType
+
+> **Sub-face grid applies to standard wall faces only** (n/s/e/w on body and extension
+> voxels). Actual face width varies by orientation and voxel position. The 3-slot
+> division is proportional (each slot = 1/3 of actual face width), not fixed to 2.44m.
+
+### Floor/Ceiling Object Collision
+
+Floor and ceiling anchored objects (lamps, lights) use bounding-box collision
+based on `FormDefinition.dimensions`. Two objects cannot overlap:
+
+```typescript
+function canPlaceFloorObject(form: FormDefinition, anchor: ObjectAnchor, existing: SceneObject[]): boolean {
+  // Check bounding box overlap using form.dimensions + anchor.offset
+  // against all existing floor objects in the same voxel
+}
+```
 
 ---
 
@@ -155,7 +190,10 @@ Static data, not in the Zustand store. Built from typed definition files per cat
 | `light_wall_sconce` | face | all | fixture, shade |
 | `light_strip_led` | face | modern, cyberpunk, noir_glass | housing |
 | `light_floor_lamp` | floor | all | base, shade |
-| `light_table_lamp` | floor | all | base, shade |
+| `light_table_lamp` | floor | all | base, shade | *
+
+> \* `light_table_lamp` uses floor anchor as simplification. When furniture surfaces
+> are added, table lamps will gain a `"surface"` anchor type for placement on tables/shelves.
 
 ### Electrical (4 Forms)
 
@@ -180,7 +218,8 @@ interface StyleDefinition {
   defaultMaterials: Record<string, string>; // skinSlot → materialId
   defaultWallSurface: SurfaceType;
   effects: StyleEffect[];
-  compatibleForms: string[];
+  // NOTE: No compatibleForms here. FormDefinition.styles is the single source of
+  // truth. Use getByStyle(styleId) to derive compatible forms at query time.
 }
 
 interface StyleEffect {
@@ -188,6 +227,14 @@ interface StyleEffect {
   targets?: string[];     // "sun_facing", "exterior", "edges", etc.
   color?: string;
   intensity?: number;
+}
+
+// Quick skin presets — 5 per style, each defines all skin slots at once
+interface QuickSkinPreset {
+  id: string;             // "industrial_dark"
+  styleId: StyleId;
+  label: string;          // "Dark Industrial"
+  slots: Record<string, string>; // { frame: "matte_black", glass: "smoked_glass", ... }
 }
 ```
 
@@ -428,12 +475,20 @@ interface SceneObjectSlice {
   duplicateObject: (objectId: string, newAnchor: ObjectAnchor) => void;
 }
 
-// Derived selectors
+  // Cascade: called by removeContainer in containerSlice
+  removeObjectsByContainer: (containerId: string) => void;
+}
+
+// Derived selectors (pure functions, no duplicated state)
 function getObjectsByContainer(containerId: string): SceneObject[];
-function getObjectsOnFace(containerId: string, voxelIndex: number, face: Direction): SceneObject[];
-function getOccupiedSlots(containerId: string, voxelIndex: number, face: Direction): Set<number>;
+function getObjectsOnFace(containerId: string, voxelIndex: number, face: WallDirection): SceneObject[];
+function getOccupiedSlots(containerId: string, voxelIndex: number, face: WallDirection): Set<number>;
 function getObjectsByCategory(category: FormCategory): SceneObject[];
 ```
+
+> **Slot occupancy is derived, not stored.** `getOccupiedSlots` computes which slots
+> are taken by filtering `sceneObjects` by anchor. No `occupiedSlots` field on
+> `VoxelFaces` or `Voxel` — single source of truth is the `sceneObjects` map.
 
 ### Store Location
 
@@ -447,22 +502,28 @@ Follows existing stack: `immer (inner) -> zundo -> persist (outer)`
 - persist: sceneObjects serialized to idb-keyval
 - zod: SceneObject schema validation on hydration
 
+**Required wiring:**
+- Add `sceneObjects` to `temporal.partialize` (alongside `containers`, `zones`, `furnitureIndex`)
+- Add `sceneObjects` to `persist.partialize`
+- Add `SceneObjectSchema` to `persistedStateSchema.ts`
+- Add `schemaVersion: number` to persisted state (start at `2`; current implicit version is `1`)
+- Migration guard: check `schemaVersion` on hydration; if `1`, run `migrateToSceneObjects`; if `2`, skip
+
 ### Voxel Face Coordination
 
 When a face-anchored object is placed/removed:
 
 **placeObject**:
-1. Validate: check getOccupiedSlots — enough free slots for slotWidth?
+1. Validate: check `getOccupiedSlots` — enough free slots for slotWidth?
 2. Create SceneObject in sceneObjects map
-3. Mark voxel face slots as occupied (lightweight `occupiedSlots?: number[]` on VoxelFaces)
-4. Invalidate render
+3. Invalidate render
+(No voxel mutation needed — occupancy is derived from sceneObjects)
 
 **removeObject**:
 1. Read anchor from SceneObject
 2. Delete from sceneObjects map
-3. Unmark voxel face slots
-4. Restore base wall SurfaceType
-5. Invalidate render
+3. Invalidate render
+(Wall re-appears automatically — it was always rendering behind the object)
 
 ### Migration from Current Systems
 
@@ -480,17 +541,37 @@ When a face-anchored object is placed/removed:
 | `LightPlacement[]` per container | `SceneObject` with `anchor.type: "ceiling"` |
 | `InteriorLights` component | Unified `SceneObjectRenderer` |
 
-One-time hydration transform: read old format -> create SceneObjects -> delete old fields. `FaceFinish` and `LightPlacement[]` become deprecated types.
+One-time hydration transform: read old format -> create SceneObjects -> delete old fields.
+`FaceFinish` and `LightPlacement[]` become deprecated types. Guarded by `schemaVersion`
+check (see Middleware section above).
+
+### Theme/Style Migration
+
+The existing codebase has 3 themes (`ThemeId = "industrial" | "japanese" | "desert"`)
+in `src/config/themes.ts`, referenced by `currentTheme` in the store and `_themeMats`
+in `materialCache.ts`.
+
+**`StyleId` replaces `ThemeId`.** Migration path:
+- `"industrial"` → `"industrial"` (same ID, expanded definition)
+- `"japanese"` → `"japanese"` (same ID)
+- `"desert"` → `"desert_brutalist"` (renamed for specificity)
+- `currentTheme` store field renamed to `activeStyle: StyleId`
+- `_themeMats` in materialCache refactored to read from `StyleDefinition.defaultMaterials`
+- Components reading `currentTheme` updated to read `activeStyle`
+- The 14 new styles are additive — no existing data breaks
 
 ### BOM Integration
 
-`bomCompute.ts` gains a new input:
+BOM computation is extended to include scene objects. If `bomCompute.ts` does not yet
+exist in V1, it is created as part of this sprint. The existing BomBar component (if
+present) is updated; if not, a BOM display is created as part of the bottom status bar.
 
 ```typescript
 function computeBOM(containers: ContainerState[], sceneObjects: Record<string, SceneObject>): BOMResult;
 ```
 
-Each FormDefinition carries `costEstimate`. BOM sums Form costs + Skin material cost modifiers across all placed objects, alongside existing structure/envelope costs.
+Each FormDefinition carries `costEstimate`. BOM sums Form costs + Skin material cost
+modifiers across all placed objects, alongside existing structure/envelope costs.
 
 ---
 
@@ -536,12 +617,15 @@ Object counts are low (a home might have 4-8 doors, 6-10 windows, 8-12 lights). 
 
 ### Wall Face Coordination
 
-Modified GlobalVoxelMeshes behavior:
+GlobalVoxelMeshes continues to render **all wall faces as-is** (no geometry splitting).
+Form geometry renders **in front of** the wall with proper depth ordering. The Form's
+self-contained geometry (which includes its own wall surround material) visually covers
+the wall behind it. This avoids splitting face geometry into sub-regions — the simplest
+correct approach.
 
-1. Check `occupiedSlots` for each voxel face
-2. No occupied slots: render full face (current behavior)
-3. Partially occupied: render wall geometry only for unoccupied slot regions (each slot = 1/3 face width)
-4. Fully occupied (slotWidth=3 object): skip face entirely — Form geometry covers it
+For fully occupied faces (slotWidth=3), GlobalVoxelMeshes skips the face to avoid
+z-fighting (the Form completely covers it anyway). This is the only modification to
+the existing instanced mesh pipeline.
 
 ### Light Source Rendering
 
@@ -629,6 +713,7 @@ Most are one-line material tweaks. Only `salt_frost`, `dappled_light`, `soft_blo
 - undo/redo covers place -> remove -> undo cycle
 - persist round-trip: serialize -> hydrate -> identical state
 - migration: old DoorConfig/FaceFinish/LightPlacement -> SceneObjects
+- removeObjectsByContainer cascades correctly (called from containerSlice.removeContainer)
 
 **Slot Occupancy**
 - slotWidth=1 occupies 1 slot
@@ -651,9 +736,9 @@ Most are one-line material tweaks. Only `salt_frost`, `dappled_light`, `soft_blo
 - BOM updates after each place/remove
 
 **Wall Coordination**
-- Partially occupied face: wall renders only unoccupied slots
-- Fully occupied face: wall skipped, form geometry covers it
-- Remove object -> wall re-renders in freed slots
+- Partially occupied face: wall still renders, form geometry covers occupied region
+- Fully occupied face (slotWidth=3): wall face skipped, form geometry covers it
+- Remove object -> wall was always there, no re-render needed
 
 **Stacking Interaction**
 - Objects on L0 ceiling vs L1 floor: no conflict
@@ -701,6 +786,8 @@ Extend existing `core-loop-canary.test.ts`:
 | GLB model creation | Need actual 3D models for each form | Art pipeline sprint |
 | Blueprint (BP) view object markers | Door swing arcs, window symbols in 2D | Blueprint view sprint |
 | Floorplan (FP) view integration | Object placement in floorplan mode | Floorplan view sprint |
+| Postprocessing style effects | `salt_frost`, `dappled_light`, `soft_bloom`, `color_punch` require custom shader passes or postprocessing pipeline changes | Effects polish sprint |
+| Table lamp surface anchor | `light_table_lamp` currently uses floor anchor; needs `"surface"` anchor when furniture arrives | Furniture sprint |
 
 ---
 
