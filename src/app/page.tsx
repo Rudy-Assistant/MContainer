@@ -21,6 +21,7 @@ import CustomHotbar from "@/components/ui/CustomHotbar";
 import VoxelContextMenu from "@/components/ui/VoxelContextMenu";
 import FaceContextMenu from "@/components/ui/FaceContextMenu";
 import MaterialPaletteModal from "@/components/ui/MaterialPaletteModal";
+import FormCatalog from "@/components/ui/FormCatalog";
 // Legacy GameHUD, Hotbar, StyleSelector removed in Phase 7
 
 const SceneCanvas = dynamic(
@@ -161,6 +162,9 @@ export default function Home() {
           {/* SmartHotbar replaced by RecentItemsBar (Task 6 — Sims-Style UI Overhaul Plan A)
               SmartHotbar.tsx kept for CssVoxelIcon export used by CustomHotbar and UserLibrary */}
           {!isPreviewMode && <RecentItemsBar />}
+
+          {/* Form catalog — placeable forms browser (Task 13) */}
+          {!isPreviewMode && <FormCatalog />}
 
           {/* Bottom dock — persistent in all modes except preview (screenshot) mode */}
           {!isPreviewMode && (
