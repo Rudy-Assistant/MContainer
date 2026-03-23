@@ -22,8 +22,7 @@ import {
 import IsoEditor from "@/components/ui/IsoEditor";
 import MatrixEditor from "@/components/ui/MatrixEditor";
 import { FrameInspector } from "@/components/ui/FrameInspector";
-import WallTypePicker from "@/components/ui/WallTypePicker";
-import FinishesPanel from "@/components/ui/FinishesPanel";
+import FinishesPanel from "@/components/ui/finishes/FinishesPanel";
 import SkinEditor from "@/components/ui/SkinEditor";
 import { useSelectionTarget } from "@/hooks/useSelectionTarget";
 import { CONTAINER_PRESETS } from "@/config/containerPresets";
@@ -504,12 +503,7 @@ function Inspector({
       <div style={{ flex: 1, overflowY: "auto", borderTop: "1px solid #1e293b", marginTop: "4px" }}>
         {selectedObjectId ? (
           <SkinEditor />
-        ) : (target.type === "voxel" || target.type === "bay") ? (
-          <WallTypePicker
-            containerId={containerId}
-            voxelIndex={target.type === "voxel" ? target.index : target.indices[0]}
-          />
-        ) : (target.type === "face" || target.type === "bay-face") ? (
+        ) : (target.type === "voxel" || target.type === "bay" || target.type === "face" || target.type === "bay-face") ? (
           <FinishesPanel />
         ) : (
           <div style={{ padding: "8px 12px" }}>
