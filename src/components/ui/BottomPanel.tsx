@@ -201,7 +201,8 @@ export default function BottomPanel() {
   }, []);
 
   const handleCardClick = useCallback((formId: string) => {
-    const { activePlacementFormId: current, setPlacementMode } = useStore.getState();
+    const { activePlacementFormId: current, setPlacementMode, setHoveredFormId } = useStore.getState();
+    setHoveredFormId(null);
     setPlacementMode(current === formId ? null : formId);
   }, []);
 
@@ -241,6 +242,14 @@ export default function BottomPanel() {
                 key={f.id}
                 style={cardStyle(isPlacing, isSelected)}
                 onClick={() => handleCardClick(f.id)}
+                onMouseEnter={() => {
+                  if (!useStore.getState().activePlacementFormId) {
+                    useStore.getState().setHoveredFormId(f.id);
+                  }
+                }}
+                onMouseLeave={() => {
+                  useStore.getState().setHoveredFormId(null);
+                }}
                 title={`${f.name} — $${f.costEstimate}`}
               >
                 <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? '#00bcd4' : 'rgba(255,255,255,0.5)' }}>
