@@ -926,8 +926,7 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* ── BOM Footer ──────────────────────────────────── */}
-      <SidebarBOMFooter />
+      {/* BOM Footer removed — cost total moved to TopToolbar */}
     </div>
   );
 }

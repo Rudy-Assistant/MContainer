@@ -164,10 +164,7 @@ export default function Home() {
           {/* Form picker strip — thin floating bar above status dock */}
           {!isPreviewMode && <BottomPanel />}
 
-          {/* Bottom dock — persistent status bar */}
-          {!isPreviewMode && (
-            <BottomDock onOpenBudget={() => setBudgetOpen(true)} />
-          )}
+          {/* Bottom dock removed — TOD, cost, compass moved to TopToolbar */}
 
           {/* Walkthrough overlay: crosshair + instructions */}
           {isWalkthrough && (

@@ -40,6 +40,8 @@ import {
 } from "lucide-react";
 import WarningBadge from './WarningBadge';
 import { useNarrowToolbar } from '@/hooks/useNarrowToolbar';
+import { Clock, Compass, DollarSign } from "lucide-react";
+import { formatUSD as fmtUSD } from "@/utils/formatters";
 import { THEMES, THEME_IDS, type ThemeId } from "@/config/themes";
 import { GROUND_PRESET_IDS, GROUND_PRESETS, type GroundPresetId } from "@/config/groundPresets";
 import { QUALITY_PRESET_IDS, type QualityPresetId } from "@/config/qualityPresets";
@@ -114,10 +116,41 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
     const id = setInterval(check, 500);
     return () => clearInterval(id);
   }, []);
+  const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const setTimeOfDay = useStore((s) => s.setTimeOfDay);
+  const northOffset = useStore((s) => s.environment.northOffset);
+  const setNorthOffset = useStore((s) => s.setNorthOffset);
+  const getEstimate = useStore((s) => s.getEstimate);
+  const containerCount = useStore((s) => Object.keys(s.containers).length);
+
   const [wallMenuOpen, setWallMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
+  const [todOpen, setTodOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
+  const [compassOpen, setCompassOpen] = useState(false);
+
+  const todRef = useRef<HTMLDivElement>(null);
+  const costRef = useRef<HTMLDivElement>(null);
+  const compassRef = useRef<HTMLDivElement>(null);
+
+  // Close popups on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (todOpen && todRef.current && !todRef.current.contains(e.target as Node)) setTodOpen(false);
+      if (costOpen && costRef.current && !costRef.current.contains(e.target as Node)) setCostOpen(false);
+      if (compassOpen && compassRef.current && !compassRef.current.contains(e.target as Node)) setCompassOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [todOpen, costOpen, compassOpen]);
+
+  const formatTime = (h: number) => {
+    const hr = Math.floor(h);
+    const mn = Math.floor((h - hr) * 60);
+    return `${hr.toString().padStart(2, '0')}:${mn.toString().padStart(2, '0')}`;
+  };
 
   const appearanceRef = useRef<HTMLDivElement>(null);
   const devToolsRef = useRef<HTMLDivElement>(null);
@@ -331,6 +364,134 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
         {/* Floor/Ceiling/Frame view toggle moved to MatrixEditor header (Phase 2 declutter) */}
 
         {/* Wall Visibility, Roof, Skin moved to Settings dropdown (Phase 1 declutter) */}
+
+        {/* ── Cost Total ── */}
+        {containerCount > 0 && (
+          <div ref={costRef} style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              onClick={() => { setCostOpen(!costOpen); setTodOpen(false); setCompassOpen(false); }}
+              style={{
+                ...btn(true),
+                gap: '4px', fontSize: '12px', fontWeight: 600, fontFamily: 'monospace',
+                borderColor: costOpen ? "var(--accent)" : undefined,
+                color: costOpen ? "var(--accent)" : undefined,
+              }}
+              title="Cost breakdown"
+            >
+              <DollarSign size={13} />
+              {fmtUSD(getEstimate().breakdown.total)}
+            </button>
+            {costOpen && (
+              <div style={{
+                position: "absolute", top: "100%", right: 0, marginTop: "4px",
+                background: "var(--modal-bg, #fff)", borderRadius: "10px",
+                boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
+                border: "1px solid var(--border)", padding: "12px 16px", minWidth: "200px", zIndex: 50,
+                color: "var(--text-main)",
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Cost Breakdown</div>
+                {(() => {
+                  const est = getEstimate();
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {[
+                        { label: "Steel", val: est.breakdown.containers },
+                        { label: "Glass", val: est.breakdown.modules },
+                        { label: "Cuts", val: est.breakdown.cuts },
+                      ].map(({ label, val }) => (
+                        <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                          <span style={{ color: "var(--text-muted)" }}>{label}</span>
+                          <span style={{ fontWeight: 600, fontFamily: "monospace" }}>{fmtUSD(val)}</span>
+                        </div>
+                      ))}
+                      <div style={{ height: 1, background: "var(--border-subtle)", margin: "2px 0" }} />
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}>
+                        <span>Total</span>
+                        <span style={{ color: "var(--accent)", fontFamily: "monospace" }}>{fmtUSD(est.breakdown.total)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Time of Day ── */}
+        <div ref={todRef} style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            onClick={() => { setTodOpen(!todOpen); setCostOpen(false); setCompassOpen(false); }}
+            style={{
+              ...btn(true),
+              gap: '4px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 600,
+              borderColor: todOpen ? "var(--accent)" : undefined,
+              color: todOpen ? "var(--accent)" : undefined,
+            }}
+            title="Time of Day"
+          >
+            <Clock size={13} />
+            {formatTime(timeOfDay)}
+          </button>
+          {todOpen && (
+            <div style={{
+              position: "absolute", top: "100%", right: 0, marginTop: "4px",
+              background: "var(--modal-bg, #fff)", borderRadius: "10px",
+              boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
+              border: "1px solid var(--border)", padding: "12px 16px", minWidth: "220px", zIndex: 50,
+              color: "var(--text-main)",
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Time of Day</div>
+              <input type="range" min={0} max={24} step={0.25} value={timeOfDay}
+                onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
+                style={{
+                  width: '100%', height: 6, borderRadius: 3, appearance: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(to right, #0f0a2e 0%, #e8845c 22%, #87ceeb 50%, #e8845c 78%, #0f0a2e 100%)',
+                }}
+              />
+              <div style={{ textAlign: "center", marginTop: 6, fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "var(--text-main)" }}>
+                {formatTime(timeOfDay)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Compass ── */}
+        <div ref={compassRef} style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            onClick={() => { setCompassOpen(!compassOpen); setTodOpen(false); setCostOpen(false); }}
+            style={{
+              ...btn(true),
+              gap: '4px', fontSize: '11px', fontWeight: 600, fontFamily: 'monospace',
+              borderColor: compassOpen ? "var(--accent)" : undefined,
+              color: compassOpen ? "var(--accent)" : undefined,
+            }}
+            title="North Direction"
+          >
+            <Compass size={13} />
+            {Math.round(northOffset)}°
+          </button>
+          {compassOpen && (
+            <div style={{
+              position: "absolute", top: "100%", right: 0, marginTop: "4px",
+              background: "var(--modal-bg, #fff)", borderRadius: "10px",
+              boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
+              border: "1px solid var(--border)", padding: "12px 16px", minWidth: "200px", zIndex: 50,
+              color: "var(--text-main)",
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>North Direction</div>
+              <input type="range" min={0} max={360} step={1} value={northOffset}
+                onChange={(e) => setNorthOffset(parseFloat(e.target.value))}
+                style={{
+                  width: '100%', height: 6, borderRadius: 3, appearance: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(to right, #dc2626, #f59e0b, #22c55e, #3b82f6, #8b5cf6, #dc2626)',
+                }}
+              />
+              <div style={{ textAlign: "center", marginTop: 6, fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "var(--text-main)" }}>
+                {Math.round(northOffset)}°
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Warning badge */}
         <WarningBadge />

@@ -1403,11 +1403,13 @@ function RealisticScene() {
       {/* 3D orientation gizmo */}
       <GizmoHelper alignment="top-right" margin={[60, 60]}>
         <GizmoViewport
-          axisColors={['#ef4444', '#22c55e', '#3b82f6']}
-          labelColor="#e2e8f0"
-          axisHeadScale={0.9}
-          font="11px system-ui"
-          labels={['X', 'Y', 'Z']}
+          axisColors={['#94a3b8', '#94a3b8', '#94a3b8']}
+          labelColor="transparent"
+          axisHeadScale={0.85}
+          hideNegativeAxes={false}
+          hideAxisHeads={false}
+          labels={['', '', '']}
+          font="1px system-ui"
         />
       </GizmoHelper>
     </>
