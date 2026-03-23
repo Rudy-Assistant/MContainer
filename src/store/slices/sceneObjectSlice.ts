@@ -100,11 +100,25 @@ export function createSceneObjectSlice(set: any, get: any): SceneObjectSlice {
       const form = formRegistry.get(source.formId);
       if (!form) return '';
 
-      // Validate new anchor slot
+      // Validate new anchor slot (face)
       if (newAnchor.type === 'face' && newAnchor.face != null) {
         const allObjects = Object.values(get().sceneObjects) as SceneObject[];
         const occupied = getOccupiedSlots(allObjects, newAnchor.containerId, newAnchor.voxelIndex, newAnchor.face, formRegistry);
         if (!canPlaceInSlot(occupied, newAnchor.slot ?? 0, form.slotWidth)) return '';
+      }
+
+      // Validate bounding-box collision (floor/ceiling)
+      if (newAnchor.type === 'floor' || newAnchor.type === 'ceiling') {
+        const allObjects = Object.values(get().sceneObjects) as SceneObject[];
+        const sameVoxelObjects = allObjects.filter(o =>
+          o.anchor.containerId === newAnchor.containerId &&
+          o.anchor.voxelIndex === newAnchor.voxelIndex &&
+          o.anchor.type === newAnchor.type
+        ).map(o => ({
+          dims: formRegistry.get(o.formId)?.dimensions ?? { w: 0, h: 0, d: 0 },
+          offset: o.anchor.offset ?? [0, 0] as [number, number],
+        }));
+        if (!canPlaceFloorObject(form.dimensions, newAnchor.offset ?? [0, 0], sameVoxelObjects)) return '';
       }
 
       const id = crypto.randomUUID();
