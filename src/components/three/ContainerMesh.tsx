@@ -2391,15 +2391,16 @@ export default function ContainerMesh({ container }: { container: Container }) {
       onPointerDown={(e) => {
         if (e.nativeEvent.button !== 0) return; // left-click only — let right-click through to camera
         e.stopPropagation();
-        if (isSelected && e.nativeEvent.shiftKey) {
-          // Shift+drag on selected container initiates move (distinct from camera orbit).
+        if (e.nativeEvent.shiftKey) {
+          // Shift+click: select if needed, then initiate drag in one gesture (Fix 4)
+          if (!isSelected) select(container.id);
           dragPendingRef.current = {
             id: container.id,
             clientX: e.nativeEvent.clientX,
             clientY: e.nativeEvent.clientY,
           };
         } else {
-          select(container.id, e.nativeEvent.shiftKey);
+          select(container.id, false);
         }
       }}
       onPointerOver={() => { if (!isWalkthrough) setHovered(true); }}
