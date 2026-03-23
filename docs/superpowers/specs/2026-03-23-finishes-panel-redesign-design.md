@@ -30,8 +30,12 @@ src/components/ui/finishes/
 ├── CeilingTab.tsx           (~100 lines)  — ceiling material + lighting fixtures + light color + Color
 ├── ElectricalTab.tsx        (~60 lines)   — switches/outlets/dimmers grid + Color
 ├── TextureSwatchGrid.tsx    (~100 lines)  — shared: 3-col grid of 64×64 texture swatches
+├── OptionCardGrid.tsx       (~60 lines)   — shared: grid for non-texture items (fixtures, doors, electrical)
+├── SwatchRow.tsx            (~40 lines)   — extracted from old FinishesPanel: color circle row + custom picker
 └── textureThumbnail.ts      (~60 lines)   — thumbnail URL resolver + canvas noise fallback
 ```
+
+**Note:** `SwatchRow` and the `ColorPicker` popup pattern are extracted from the old `FinishesPanel.tsx` (where they were private functions) into shared modules in this directory.
 
 ### Files Modified
 
@@ -41,14 +45,16 @@ src/components/ui/finishes/
 | `src/config/finishPresets.ts` | Add `textureFolder?: string` to `MaterialPreset`. Add mappings for existing PBR textures. |
 | `src/components/ui/VoxelPreview3D.tsx` | Wire face click to call `setSelectedFace(face)` in addition to surface cycling. |
 | `src/components/ui/WallTypePicker.tsx` | Stays for potential standalone use, but its grid entries are reused inside `WallsTab`. |
+| `src/types/container.ts` | Add `color?: string` to `FaceFinish` interface (universal tint field). |
 
 ### Files Unchanged
 
 | File | Reason |
 |------|--------|
 | `src/hooks/useSelectionTarget.ts` | Selection derivation logic unchanged. |
-| `src/config/wallTypes.ts` | Wall type data unchanged; consumed by WallsTab. |
+| `src/config/wallTypes.ts` | Wall type data unchanged; consumed by WallsTab via `getWallTypesForContext()`. |
 | `src/config/materialCache.ts` | PBR material singletons unchanged; thumbnails use raw color.jpg files directly. |
+| `src/components/ui/ColorPicker.tsx` | Existing custom color picker popup, reused as-is by SwatchRow. |
 | `src/store/slices/*` | Store actions (`setFaceFinish`, `clearFaceFinish`, `paintFace`, `setSelectedFace`) already exist. |
 
 ## Component Design
@@ -72,6 +78,10 @@ Local `useState` for active tab. `useEffect` syncs tab when `selectedFace` chang
 
 **Props flow:** FinishesPanel reads target from `useSelectionTarget()`, passes `{ containerId, voxelIndex, indices, face }` to the active tab component. Each tab reads voxel data from the store via its own atomic selectors.
 
+**Hooks ordering:** The new shell calls all store selectors unconditionally at the top level (no early returns before hooks). This resolves the Rules-of-Hooks violation in the old FinishesPanel where `useStore` calls appeared after a conditional `return null`.
+
+**Bay selections (multiple voxels):** When a bay is selected, the panel shows the first voxel's data (`indices[0]`) for display purposes. All `setFaceFinish`/`paintFace` calls iterate over `indices` to apply to every voxel in the bay. If voxels in a bay have different finishes on the same face, the UI shows the first voxel's state (no "mixed" indicator — consistent with current behavior).
+
 ### FinishesTabBar
 
 Horizontal row of 4 pill buttons. Dark background (`var(--surface-dark)`), subtle border. Active tab: accent highlight border + slightly lighter background. Matches concept art tab style.
@@ -90,7 +100,7 @@ Applies finish via `setFaceFinish(containerId, voxelIndex, 'bottom', { material 
 
 Content when `selectedFace in ['n','s','e','w']`:
 
-**Surface type picker** — always shown at top. Reuses `WALL_TYPES.filter(t => t.category === 'wall')` from wallTypes.ts. Grid of icon+label buttons (same layout as current WallTypePicker but styled to match concept art dark cards). Clicking changes the surface via `paintFace(containerId, voxelIndex, face, surface)`.
+**Surface type picker** — always shown at top. Uses `getWallTypesForContext(inspectorView, selectedFace)` from wallTypes.ts (same filtering function WallTypePicker uses, for consistency). Grid of icon+label OptionCardGrid buttons styled to match concept art dark cards. Clicking changes the surface via `paintFace(containerId, voxelIndex, face, surface)`. For bay selections, iterates over all `indices`.
 
 **Surface-dependent finishes** — shown below the surface type picker, content varies by current surface:
 - `Open` → nothing below the picker (this IS the fix — user sees the picker and can change surface)
@@ -115,6 +125,8 @@ Content when `selectedFace in ['n','s','e','w']`:
 - **Color**
 
 When `selectedFace` is `top` or `bottom`, shows: "Electrical is available on wall faces. Click a wall in the preview above."
+
+**Tab visibility:** All 4 tabs are always visible in the tab bar regardless of face direction. The Electrical tab shows a placeholder message for non-wall faces rather than being hidden.
 
 ### TextureSwatchGrid
 
@@ -178,7 +190,7 @@ Light fixtures, door styles, and electrical types use dark card format with:
 - Icon (existing emoji or SVG if available)
 - Label below
 
-Not TextureSwatchGrid — these are functional choices, not surface materials. Separate `OptionCardGrid` component or inline styled buttons.
+Not TextureSwatchGrid — these are functional choices, not surface materials. Rendered by the shared `OptionCardGrid` component (listed in file structure).
 
 ## VoxelPreview3D Changes
 
@@ -189,7 +201,7 @@ The existing `PreviewFace.onClick` currently calls `onCycle()` which cycles the 
 
 Right-click context menu behavior stays unchanged.
 
-The `activeBrush` integration (click applies active brush) should be preserved: if `activeBrush` is set, click applies it AND selects the face. If no brush, click just selects.
+The `activeBrush` integration (click applies active brush) should be preserved: if `activeBrush` is set, click applies it AND selects the face. If no brush, click just selects. When `activeBrush` is set and `bayGroupIndices` are provided, apply the brush to all voxels in the group (preserving current behavior).
 
 ## Sidebar Routing Change
 
@@ -216,9 +228,13 @@ The new FinishesPanel handles both cases:
 
 **Universal Color picker** replaces the old "Interior Paint" section. Available on every tab as the last section.
 
-Applies a `color` hex field to `FaceFinish`. The 3D renderer interprets this as a tint/multiply on the material. Uses the existing `SwatchRow` component (circle buttons for preset colors) + `ColorPicker` popup for custom hex.
+Adds a `color?: string` field to `FaceFinish` in `src/types/container.ts`. This is the one data model change in this sprint. The 3D renderer interprets this as a tint/multiply on the material (implementation of the renderer-side interpretation is out of scope — the field is stored but visual rendering of the tint is deferred).
+
+Uses the extracted `SwatchRow` component (circle buttons for preset colors) + `ColorPicker` popup for custom hex. Applied via `setFaceFinish(containerId, voxelIndex, face, { color: hex })`.
 
 Preset colors: the existing `PAINT_COLORS` array (14 colors: White through Carbon).
+
+**Note:** The `getFinishOptionsForFace` function does NOT need a `color` flag — Color is shown unconditionally on every tab.
 
 ## Open Wall Fix
 
@@ -252,10 +268,15 @@ All new components follow the concept art dark-theme aesthetic:
 5. **Integration tests**: TextureSwatchGrid renders correct number of items, fires onSelect
 6. **Existing tests**: `setFaceFinish`, `clearFaceFinish`, `paintFace` store actions — no changes needed
 
+## Texture Path Note
+
+Texture files live on disk at `/public/assets/materials/{folder}/color.jpg`. In Next.js, `/public/` is served at root, so runtime `<img>` src paths use `/assets/materials/{folder}/color.jpg` (no `/public/` prefix).
+
 ## Out of Scope
 
 - Voxel configuration presets (deferred to next sprint)
 - Standalone floating panel (stays in Sidebar)
 - New PBR texture assets (uses existing `/assets/materials/` files)
-- Changes to 3D material rendering pipeline
-- Changes to store actions or data model (uses existing `FaceFinish`, `setFaceFinish`, `paintFace`)
+- Changes to 3D material rendering pipeline (the new `color` field on FaceFinish is stored but renderer-side tint interpretation is deferred)
+- Stacked container ceiling/floor propagation (existing invariant `L0.top === L1.bottom` is unchanged; editing finishes on shared faces applies to the selected container only)
+- Bay mixed-finish indicator (when bay voxels have different finishes, first voxel's state is shown — matches current behavior)
