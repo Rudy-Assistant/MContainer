@@ -39,6 +39,7 @@ import {
   Wand2,
 } from "lucide-react";
 import WarningBadge from './WarningBadge';
+import { useNarrowToolbar } from '@/hooks/useNarrowToolbar';
 import { THEMES, THEME_IDS, type ThemeId } from "@/config/themes";
 import { GROUND_PRESET_IDS, GROUND_PRESETS, type GroundPresetId } from "@/config/groundPresets";
 import { QUALITY_PRESET_IDS, type QualityPresetId } from "@/config/qualityPresets";
@@ -153,6 +154,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
     grass: "#4a7a30", concrete: "#8a8a88", gravel: "#7a7568", dirt: "#6b5b3e",
   };
 
+  const narrow = useNarrowToolbar();
   const hasSelection = selection.length > 0;
   const isWalkthrough = viewMode === ViewMode.Walkthrough;
 
@@ -321,76 +323,14 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
               color: designMode === m ? "#fff" : "var(--text-muted, #6b7280)",
               transition: "all 100ms",
             }}>
-              {m === 'smart' ? 'Smart' : 'Manual'}
+              {narrow ? (m === 'smart' ? 'S' : 'M') : (m === 'smart' ? 'Smart' : 'Manual')}
             </button>
           ))}
         </div>
 
-        {/* ── Floor/Roof pill ── */}
-        <div style={{
-          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 6, overflow: "hidden",
-          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 11, fontWeight: 600,
-        }}>
-          {(['floor', 'ceiling'] as const).map((v) => (
-            <button key={v} onClick={() => setInspectorView(v)} style={{
-              padding: "5px 10px", border: "none", cursor: "pointer",
-              background: inspectorView === v ? "var(--accent, #2563eb)" : "transparent",
-              color: inspectorView === v ? "#fff" : "var(--text-muted, #6b7280)",
-              transition: "all 100ms",
-            }}>
-              {v === 'floor' ? 'Floor' : 'Roof'}
-            </button>
-          ))}
-        </div>
+        {/* Floor/Ceiling/Frame view toggle moved to MatrixEditor header (Phase 2 declutter) */}
 
-        {/* ── Frame toggle ── */}
-        <button
-          onClick={toggleFrameMode}
-          title="Toggle Frame Mode"
-          style={{
-            padding: "5px 10px",
-            border: `1px solid ${frameMode ? 'var(--accent, #2563eb)' : 'var(--btn-border, #e5e7eb)'}`,
-            borderRadius: 6,
-            cursor: "pointer",
-            background: frameMode ? "var(--accent, #2563eb)" : "transparent",
-            color: frameMode ? "#fff" : "var(--text-muted, #6b7280)",
-            fontSize: 11,
-            fontWeight: 600,
-            marginLeft: 4,
-            transition: "all 100ms",
-          }}
-        >
-          Frame
-        </button>
-
-        {/* ── Wall Visibility ── */}
-        <div style={{
-          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 6, overflow: "hidden",
-          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 11, fontWeight: 600,
-        }}>
-          {([
-            { mode: 'full' as const, label: '▮', title: 'Full Walls' },
-            { mode: 'half' as const, label: '▄', title: 'Half Walls' },
-            { mode: 'down' as const, label: '▁', title: 'Walls Down' },
-          ]).map(({ mode, label, title }) => (
-            <button key={mode} onClick={() => setWallCutMode(mode)} title={title} style={{
-              padding: "5px 8px", border: "none", cursor: "pointer",
-              background: wallCutMode === mode ? "var(--accent, #2563eb)" : "transparent",
-              color: wallCutMode === mode ? "#fff" : "var(--text-muted, #6b7280)",
-              transition: "all 100ms",
-            }}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Global Roof / Skin toggles ── */}
-        <button onClick={toggleHideRoof} title={hideRoof ? "Show Roof" : "Hide Roof"} style={toggleBtn(hideRoof)}>
-          Roof
-        </button>
-        <button onClick={toggleHideSkin} title={hideSkin ? "Show Skin" : "Hide Skin"} style={toggleBtn(hideSkin)}>
-          Skin
-        </button>
+        {/* Wall Visibility, Roof, Skin moved to Settings dropdown (Phase 1 declutter) */}
 
         {/* Warning badge */}
         <WarningBadge />
@@ -516,6 +456,42 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
               border: "1px solid var(--border, #e5e7eb)", padding: "6px", minWidth: "220px", zIndex: 50,
               color: "var(--text-main)",
             }}>
+              {/* Visibility */}
+              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 10px 2px" }}>Visibility</div>
+              <div style={{ display: "flex", gap: 2, padding: "2px 6px 4px" }}>
+                {([
+                  { mode: 'full' as const, label: '▮', title: 'Full Walls' },
+                  { mode: 'half' as const, label: '▄', title: 'Half Walls' },
+                  { mode: 'down' as const, label: '▁', title: 'Walls Down' },
+                ] as const).map(({ mode, label, title }) => (
+                  <button key={mode} onClick={() => setWallCutMode(mode)} title={title} style={{
+                    flex: 1, padding: "5px 0", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                    background: wallCutMode === mode ? "var(--accent)" : "var(--input-bg, #f3f4f6)",
+                    color: wallCutMode === mode ? "#fff" : "var(--text-muted)", transition: "all 100ms",
+                  }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 2, padding: "0 6px 6px" }}>
+                <button onClick={toggleHideRoof} style={{
+                  flex: 1, padding: "5px 0", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                  background: hideRoof ? "var(--accent)" : "var(--input-bg, #f3f4f6)",
+                  color: hideRoof ? "#fff" : "var(--text-muted)", transition: "all 100ms",
+                }}>
+                  {hideRoof ? "Roof Hidden" : "Hide Roof"}
+                </button>
+                <button onClick={toggleHideSkin} style={{
+                  flex: 1, padding: "5px 0", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                  background: hideSkin ? "var(--accent)" : "var(--input-bg, #f3f4f6)",
+                  color: hideSkin ? "#fff" : "var(--text-muted)", transition: "all 100ms",
+                }}>
+                  {hideSkin ? "Skin Hidden" : "Hide Skin"}
+                </button>
+              </div>
+
+              <div style={{ height: 1, background: "var(--border-subtle)", margin: "4px 0" }} />
+
               {/* Dark Mode */}
               <button onClick={toggleDarkMode} style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%",
@@ -530,21 +506,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                 <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{darkMode ? "ON" : "OFF"}</span>
               </button>
 
-              {/* Grid */}
-              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "6px 10px 2px" }}>Grid</div>
-              <div style={{ display: "flex", gap: 2, padding: "2px 6px 6px" }}>
-                {(['simple', 'detailed'] as const).map((m) => (
-                  <button key={m} onClick={() => setDesignComplexity(m)} style={{
-                    flex: 1, padding: "5px 0", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                    background: designComplexity === m ? "var(--accent)" : "var(--input-bg, #f3f4f6)",
-                    color: designComplexity === m ? "#fff" : "var(--text-muted)", transition: "all 100ms",
-                  }}>
-                    {m === 'simple' ? 'Simple' : 'Detail'}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ height: 1, background: "var(--border-subtle)", margin: "4px 0" }} />
+              {/* Grid complexity moved to MatrixEditor Bay/Block toggle */}
 
               {/* Container Actions */}
               <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 10px 2px" }}>Actions</div>

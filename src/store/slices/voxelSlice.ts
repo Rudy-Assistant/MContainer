@@ -55,6 +55,9 @@ export interface VoxelSlice {
   applyVerticalStairs: (containerId: string, voxelIndex: number, facing: 'n' | 's' | 'e' | 'w') => void;
   applySmartRailing: (containerId: string, voxelIndex: number) => void;
   removeStairs: (containerId: string, voxelIndex: number) => void;
+  /** Complete stair exit animation — does the actual stair data cleanup.
+   *  Called by StairTelescope onComplete when isExiting animation finishes. */
+  clearStairExit: (containerId: string, voxelIndex: number) => void;
   convertToPool: (containerId: string) => void;
   resetVoxelGrid: (containerId: string) => void;
   toggleVoxelLock: (containerId: string, voxelIndex: number) => void;
@@ -97,11 +100,29 @@ export function setVoxelStoreRef(ref: any) { _useStoreRef = ref; }
 //   compat with persisted data. Will be removed in a future migration sprint.
 // - stairPart ('lower'|'upper'|'single') identifies entry vs ascent voxel in 2-voxel pairs.
 //   BOM counts only 'lower'/'single' to avoid double-counting.
-const STAIR_FLIP: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
-const ASCEND_DELTA: Record<string, { dr: number; dc: number }> = {
+export const STAIR_FLIP: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
+export const ASCEND_DELTA: Record<string, { dr: number; dc: number }> = {
   n: { dr: -1, dc: 0 }, s: { dr: 1, dc: 0 },
   e: { dc: -1, dr: 0 }, w: { dc: 1, dr: 0 },
 };
+
+/** If voxelIndex is an upper stair voxel, return the lower voxel's index. Otherwise return voxelIndex unchanged.
+ *  Returns null if the redirect is invalid (out of bounds, no matching stair). */
+function resolveToLowerStair(grid: Voxel[], voxelIndex: number): number | null {
+  const voxel = grid[voxelIndex];
+  if (!voxel || voxel.voxelType !== 'stairs') return null;
+  if (voxel.stairPart !== 'upper' || !voxel.stairAscending) return voxelIndex;
+  const { dr, dc } = ASCEND_DELTA[voxel.stairAscending];
+  const col = voxelIndex % VOXEL_COLS;
+  const row = Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
+  const lowerRow = row - dr;
+  const lowerCol = col - dc;
+  if (lowerRow < 0 || lowerRow >= VOXEL_ROWS || lowerCol < 0 || lowerCol >= VOXEL_COLS) return null;
+  const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
+  const lowerIdx = level * (VOXEL_ROWS * VOXEL_COLS) + lowerRow * VOXEL_COLS + lowerCol;
+  if (grid[lowerIdx]?.voxelType !== 'stairs') return null;
+  return lowerIdx;
+}
 
 function buildStairFaces(isNS: boolean, part: 'lower' | 'upper' | 'single'): VoxelFaces {
   const isUpper = part === 'upper';
@@ -931,34 +952,44 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   removeStairs: (containerId, voxelIndex) => {
+    // Phase 1: Set _stairExiting flag to trigger exit animation.
+    // Stair data stays intact for rendering during animation.
+    // clearStairExit does the actual cleanup after animation completes.
     set((s: any) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
-      let voxel = grid[voxelIndex];
-      if (!voxel || voxel.voxelType !== 'stairs') return {};
 
-      // If this is the upper voxel, redirect to the lower voxel (which has _smartStairChanges)
-      if (voxel.stairPart === 'upper' && voxel.stairAscending) {
-        const ascending = voxel.stairAscending;
-        const { dr, dc } = ASCEND_DELTA[ascending];
-        const col = voxelIndex % VOXEL_COLS;
-        const row = Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
-        const lowerRow = row - dr;
-        const lowerCol = col - dc;
-        if (lowerRow >= 0 && lowerRow < VOXEL_ROWS && lowerCol >= 0 && lowerCol < VOXEL_COLS) {
-          const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
-          const lowerIdx = level * (VOXEL_ROWS * VOXEL_COLS) + lowerRow * VOXEL_COLS + lowerCol;
-          if (grid[lowerIdx]?.voxelType === 'stairs') {
-            voxelIndex = lowerIdx;
-            voxel = grid[voxelIndex];
-          } else {
-            return {};
-          }
-        } else {
-          return {};
+      // Resolve upper voxel to lower (which owns _smartStairChanges)
+      const resolved = resolveToLowerStair(grid, voxelIndex);
+      if (resolved === null) return {};
+      voxelIndex = resolved;
+
+      // Mark lower and upper stair voxels as exiting
+      grid[voxelIndex] = { ...grid[voxelIndex], _stairExiting: true };
+      const smartChanges = grid[voxelIndex]._smartStairChanges;
+      if (smartChanges?.upperVoxelIdx !== undefined) {
+        const uIdx = smartChanges.upperVoxelIdx;
+        if (uIdx >= 0 && uIdx < grid.length && grid[uIdx]?.voxelType === 'stairs') {
+          grid[uIdx] = { ...grid[uIdx], _stairExiting: true };
         }
       }
+
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+    });
+  },
+
+  clearStairExit: (containerId, voxelIndex) => {
+    // Phase 2: Actual stair data cleanup (called after exit animation completes).
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+
+      // Resolve upper voxel to lower (which owns _smartStairChanges)
+      const resolved = resolveToLowerStair(grid, voxelIndex);
+      if (resolved === null) return {};
+      voxelIndex = resolved;
 
       const smartChanges = grid[voxelIndex]._smartStairChanges;
       if (!smartChanges) {
@@ -995,6 +1026,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       delete grid[voxelIndex].stairDir;
       delete grid[voxelIndex].stairAscending;
       delete grid[voxelIndex].stairPart;
+      delete grid[voxelIndex]._stairExiting;
 
       // Revert upper stair voxel if it exists
       if (smartChanges.upperVoxelIdx !== undefined) {
@@ -1008,10 +1040,11 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           delete grid[uIdx].stairDir;
           delete grid[uIdx].stairAscending;
           delete grid[uIdx].stairPart;
+          delete grid[uIdx]._stairExiting;
         }
       }
 
-      // Recompute smart railings after stair removal (voxels may need auto-railings now)
+      // Recompute smart railings after stair removal
       const railingContainer: any = { ...c, _smartRailingChanges: c._smartRailingChanges };
       if (get().designMode !== 'manual') {
         recomputeSmartRailings(grid, railingContainer);

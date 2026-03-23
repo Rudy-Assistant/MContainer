@@ -1023,69 +1023,82 @@ export default function MatrixEditor({
   const setDesignComplexity = useStore((s) => s.setDesignComplexity);
 
   const frameMode = useStore((s) => s.frameMode);
+  const setFrameMode = useStore((s) => s.setFrameMode);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
 
-      {/* ── Section Header ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{
-          fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #64748b)",
-          textTransform: "uppercase", letterSpacing: "0.08em",
-        }}>
-          Container Grid
-        </div>
-        <div style={{ position: "relative" }}>
-          <button
-            onClick={() => setDeployMenuOpen(!deployMenuOpen)}
-            style={{
-              fontSize: 10, fontWeight: 600, padding: "3px 8px",
-              borderRadius: 6, border: "1px solid var(--border, #cbd5e1)",
-              background: "var(--btn-bg, #fff)", cursor: "pointer",
-              color: "var(--text-muted, #64748b)",
-            }}
-          >
-            Deploy ▾
-          </button>
-          {deployMenuOpen && (
-            <div style={{
-              position: "absolute", top: "100%", right: 0, zIndex: 30,
-              background: "var(--bg-panel, #fff)", borderRadius: 8,
-              border: "1px solid var(--border, #e2e8f0)",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-              minWidth: 160, marginTop: 4, overflow: "hidden",
+      {/* ── Floor / Ceiling / Frame view tabs ── */}
+      <div style={{
+        display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 6, overflow: "hidden",
+        border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 11, fontWeight: 600,
+      }}>
+        {(['floor', 'ceiling', 'frame'] as const).map((tab) => {
+          const active = tab === 'frame' ? frameMode : (!frameMode && inspectorView === tab);
+          return (
+            <button key={tab} onClick={() => {
+              if (tab === 'frame') {
+                setFrameMode(true);
+              } else {
+                setFrameMode(false);
+                setInspectorView(tab);
+              }
+            }} style={{
+              flex: 1, padding: "6px 0", border: "none", cursor: "pointer",
+              background: active ? "var(--accent, #2563eb)" : "transparent",
+              color: active ? "#fff" : "var(--text-muted, #6b7280)",
+              transition: "all 100ms",
             }}>
-              {([
-                { label: "All Extensions", config: "all_deck" as ExtensionConfig },
-                { label: "All + Interior", config: "all_interior" as ExtensionConfig },
-                { label: "North Decks", config: "north_deck" as ExtensionConfig },
-                { label: "South Decks", config: "south_deck" as ExtensionConfig },
-                { label: "Retract All", config: "none" as ExtensionConfig },
-              ]).map(item => (
-                <button
-                  key={item.config}
-                  onClick={() => {
-                    setAllExtensions(containerId, item.config);
-                    setDeployMenuOpen(false);
-                  }}
-                  style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    padding: "8px 12px", border: "none", cursor: "pointer",
-                    background: "transparent", fontSize: 12, fontWeight: 500,
-                    color: item.config === "none" ? "#ef4444" : "var(--text-main, #1e293b)",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--input-bg, #f1f5f9)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+              {tab === 'floor' ? 'Floor' : tab === 'ceiling' ? 'Ceiling' : 'Frame'}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Level selector moved to TopToolbar (inspectorView: floor/ceiling) */}
+      {/* ── Deploy bar (quick-access extension presets) ── */}
+      <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+        {([
+          { label: "All Deck", config: "all_deck" as ExtensionConfig },
+          { label: "Interior", config: "all_interior" as ExtensionConfig },
+          { label: "N Deck", config: "north_deck" as ExtensionConfig },
+          { label: "S Deck", config: "south_deck" as ExtensionConfig },
+          { label: "Retract", config: "none" as ExtensionConfig },
+        ]).map(item => (
+          <button
+            key={item.config}
+            onClick={() => setAllExtensions(containerId, item.config)}
+            style={{
+              flex: 1, minWidth: 0, padding: "4px 2px",
+              borderRadius: 4, border: "1px solid var(--border, #e2e8f0)",
+              cursor: "pointer", fontSize: 9, fontWeight: 600,
+              background: "var(--btn-bg, #fff)",
+              color: item.config === "none" ? "#ef4444" : "var(--text-muted, #64748b)",
+              transition: "all 100ms", whiteSpace: "nowrap",
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Bay / Block view toggle (only when not in frame mode) ── */}
+      {!frameMode && (
+        <div style={{
+          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 4, overflow: "hidden",
+          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 10, fontWeight: 600,
+        }}>
+          {(['simple', 'detailed'] as const).map((m) => (
+            <button key={m} onClick={() => setDesignComplexity(m)} style={{
+              flex: 1, padding: "4px 0", border: "none", cursor: "pointer",
+              background: designComplexity === m ? "var(--accent, #2563eb)" : "transparent",
+              color: designComplexity === m ? "#fff" : "var(--text-muted, #6b7280)",
+              transition: "all 100ms",
+            }}>
+              {m === 'simple' ? 'Bay' : 'Block'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Frame Grid, Bay Grid, or Voxel Grid ── */}
       {frameMode ? (

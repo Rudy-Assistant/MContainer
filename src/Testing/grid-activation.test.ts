@@ -47,14 +47,23 @@ describe('Deploy All Extensions', () => {
     }
   });
 
-  it('setAllExtensions("none") deactivates all extension voxels', () => {
+  it('setAllExtensions("none") sets reverse phase, then deactivates after clearUnpackPhase', () => {
     const s = useStore.getState();
     s.setAllExtensions(containerId, 'all_deck');
     s.setAllExtensions(containerId, 'none');
-    const grid = useStore.getState().containers[containerId].voxelGrid!;
     const extIndices = [0,1,2,3,4,5,6,7, 8, 15, 16, 23, 24,25,26,27,28,29,30,31];
+    // Voxels stay active during reverse animation
+    const grid1 = useStore.getState().containers[containerId].voxelGrid!;
     for (const i of extIndices) {
-      expect(grid[i].active).toBe(false);
+      if (grid1[i].unpackPhase === 'reverse') expect(grid1[i].active).toBe(true);
+    }
+    // Simulate animation completion
+    for (const i of extIndices) {
+      useStore.getState().clearUnpackPhase(containerId, i);
+    }
+    const grid2 = useStore.getState().containers[containerId].voxelGrid!;
+    for (const i of extIndices) {
+      expect(grid2[i].active).toBe(false);
     }
   });
 });

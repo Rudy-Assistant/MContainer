@@ -174,10 +174,8 @@ export default function FaceContextMenu() {
             background: "transparent",
             border: "none",
             cursor: "pointer",
-            transition: "background 80ms",
           }}
-          onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "#eff6ff"; }}
-          onMouseLeave={(e) => { (e.target as HTMLElement).style.background = "transparent"; }}
+          className="hover-row"
         >
           {a.label}
         </button>

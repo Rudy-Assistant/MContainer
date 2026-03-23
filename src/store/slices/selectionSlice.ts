@@ -107,19 +107,26 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
       const newCtx = newSel.length > 0
         ? { containerId: id, subPart: ctx?.containerId === id ? ctx.subPart : undefined }
         : null;
-      return { selection: newSel, selectionContext: newCtx };
+      // Clear single voxel selection; preserve multi-select (bay groups set from 2D grid)
+      const sameContainer = s.selection.length === 1 && s.selection[0] === id;
+      return {
+        selection: newSel,
+        selectionContext: newCtx,
+        selectedVoxel: null,
+        selectedVoxels: sameContainer ? s.selectedVoxels : null,
+      };
     }),
 
-  selectMultiple: (ids) => set({ selection: ids }),
+  selectMultiple: (ids) => set({ selection: ids, selectedVoxel: null, selectedFace: null, selectedVoxels: null, selectionContext: null }),
 
   clearSelection: () => set({ selection: [], selectionContext: null, selectedVoxel: null, selectedFace: null, selectedVoxels: null, hoveredVoxel: null, faceContext: null }),
 
   setSelectionContext: (ctx) => set({ selectionContext: ctx }),
 
-  setSelectedVoxel: (v) => set({ selectedVoxel: v }),
+  setSelectedVoxel: (v) => set({ selectedVoxel: v, selectedVoxels: null }),
   setSelectedFace: (f) => set({ selectedFace: f }),
 
-  setSelectedVoxels: (v) => set({ selectedVoxels: v }),
+  setSelectedVoxels: (v) => set({ selectedVoxels: v, selectedVoxel: null }),
 
   toggleVoxelInSelection: (containerId, index) => set((state: any) => {
     const cur = state.selectedVoxels;

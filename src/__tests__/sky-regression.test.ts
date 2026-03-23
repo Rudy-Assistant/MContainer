@@ -10,10 +10,10 @@ describe('Sky regression guard', () => {
     expect(params.turbidity).toBeLessThan(3.0);
   });
 
-  it('midday rayleigh provides blue saturation', () => {
+  it('midday rayleigh provides deep blue saturation', () => {
     const params = getSkyParams(12);
-    expect(params.rayleigh).toBeGreaterThanOrEqual(1.5);
-    expect(params.rayleigh).toBeLessThanOrEqual(2.5);
+    expect(params.rayleigh).toBeGreaterThanOrEqual(2.5);
+    expect(params.rayleigh).toBeLessThanOrEqual(4.0);
   });
 
   it('golden hour turbidity exceeds midday', () => {

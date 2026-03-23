@@ -6,7 +6,7 @@
  * and exterior walls are set based on the room's architectural intent.
  */
 
-import type { ContainerRole } from '@/types/container';
+import { DEFAULT_EXTENSION_CONFIG, type ContainerRole } from '@/types/container';
 
 export const CONTAINER_ROLES: ContainerRole[] = [
   {
@@ -66,7 +66,7 @@ export const CONTAINER_ROLES: ContainerRole[] = [
     description: 'Open-air deck with railings — no walls, outdoor flooring',
     bodyModuleId: 'deck_open',
     bodyOrientation: 'n',
-    extensionConfig: 'all_deck',
+    extensionConfig: DEFAULT_EXTENSION_CONFIG,
   },
   {
     id: 'utility',
@@ -95,7 +95,7 @@ export const CONTAINER_ROLES: ContainerRole[] = [
     description: 'Glass-enclosed body with wraparound deck on all sides',
     bodyModuleId: 'living_room',
     bodyOrientation: 'n',
-    extensionConfig: 'all_deck',
+    extensionConfig: DEFAULT_EXTENSION_CONFIG,
     wallOverrides: { n: 'Glass_Pane', s: 'Glass_Pane', e: 'Glass_Pane', w: 'Glass_Pane' },
   },
 ];

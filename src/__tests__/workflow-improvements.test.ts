@@ -61,7 +61,7 @@ describe('Rooftop Deck toggle', () => {
     expect(after.voxelGrid[bodyIdx].faces.n).not.toBe('Railing_Cable');
   });
 
-  it('DECK-3: removeRooftopDeck deactivates deck extensions', () => {
+  it('DECK-3: removeRooftopDeck deactivates deck extensions after reverse animation', () => {
     const id = addC();
     useStore.getState().generateRooftopDeck(id);
 
@@ -70,7 +70,16 @@ describe('Rooftop Deck toggle', () => {
     expect(useStore.getState().containers[id].voxelGrid[extIdx].active).toBe(true);
 
     useStore.getState().removeRooftopDeck(id);
-    // Extension voxels should be deactivated
+    // Voxel stays active during reverse animation
+    expect(useStore.getState().containers[id].voxelGrid[extIdx].unpackPhase).toBe('reverse');
+
+    // Simulate animation completion
+    const grid = useStore.getState().containers[id].voxelGrid!;
+    grid.forEach((v, i) => {
+      if (v.unpackPhase === 'reverse') useStore.getState().clearUnpackPhase(id, i);
+    });
+
+    // Now extension voxels should be deactivated
     expect(useStore.getState().containers[id].voxelGrid[extIdx].active).toBe(false);
   });
 });

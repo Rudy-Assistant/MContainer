@@ -26,6 +26,33 @@ export interface BayGroup {
  *   - 2 extension end pairs (2 voxels each, cols 0 and 7)
  *   - 3 body quads (4 voxels each, the 2×2 body interior)
  */
+/**
+ * Reverse lookup: given a base voxel index (level-0, 0-31), return its bay group.
+ * Strips level offset automatically.
+ */
+let _reverseMap: Map<number, BayGroup> | null = null;
+export function getBayGroupForVoxel(voxelIndex: number, voxelsPerLevel = 32): BayGroup | undefined {
+  if (!_reverseMap) {
+    _reverseMap = new Map();
+    for (const g of computeBayGroups()) {
+      for (const idx of g.voxelIndices) _reverseMap.set(idx, g);
+    }
+  }
+  const baseIdx = voxelIndex % voxelsPerLevel;
+  return _reverseMap.get(baseIdx);
+}
+
+/**
+ * Get level-adjusted bay group indices for a voxel. Returns null if not in Simple mode
+ * or if no bay group found. Combines getBayGroupForVoxel + level-offset mapping.
+ */
+export function getBayIndicesForVoxel(voxelIndex: number, voxelsPerLevel = 32): number[] | null {
+  const group = getBayGroupForVoxel(voxelIndex, voxelsPerLevel);
+  if (!group) return null;
+  const lvl = Math.floor(voxelIndex / voxelsPerLevel);
+  return group.voxelIndices.map((i) => lvl * voxelsPerLevel + i);
+}
+
 export function computeBayGroups(): BayGroup[] {
   const COLS = 8;
   const idx = (row: number, col: number) => row * COLS + col;

@@ -226,8 +226,9 @@ describe('Smart Staircase: Removal Cascade', () => {
     useStore.getState().applyStairsFromFace(id, 10, 'e');
     expect(getVoxel(id, 9).faces.w).toBe('Open'); // smart-cleared
 
-    // Remove stairs
+    // Remove stairs (sets _stairExiting) + simulate animation completion
     useStore.getState().removeStairs(id, 10);
+    useStore.getState().clearStairExit(id, 10);
 
     // Entry wall should be RESTORED to original
     expect(getVoxel(id, 9).faces.w).toBe('Solid_Steel');
@@ -245,8 +246,9 @@ describe('Smart Staircase: Removal Cascade', () => {
     expect(getVoxel(id, 42).faces.bottom).toBe('Open');
     expect(getVoxel(id, 42).faces.n).toBe('Railing_Cable');
 
-    // Remove stairs
+    // Remove stairs + simulate animation completion
     useStore.getState().removeStairs(id, 10);
+    useStore.getState().clearStairExit(id, 10);
 
     // Upper hole should be restored
     expect(getVoxel(id, 42).faces.bottom).toBe(originalBottom);
@@ -260,7 +262,10 @@ describe('Smart Staircase: Removal Cascade', () => {
     expect(getVoxel(id, 10).voxelType).toBe('stairs');
     expect(getVoxel(id, 18).voxelType).toBe('stairs'); // upper stair voxel (row 2, col 2)
 
+    // removeStairs sets _stairExiting; clearStairExit does the actual cleanup
     useStore.getState().removeStairs(id, 10);
+    expect(getVoxel(id, 10)._stairExiting).toBe(true);
+    useStore.getState().clearStairExit(id, 10);
 
     // Both voxels revert to standard
     expect(getVoxel(id, 10).voxelType).not.toBe('stairs');
@@ -277,6 +282,7 @@ describe('Smart Staircase: Removal Cascade', () => {
 
     // Remove from upper voxel (should find the pair and revert both)
     useStore.getState().removeStairs(id, 18);
+    useStore.getState().clearStairExit(id, 18);
 
     expect(getVoxel(id, 10).voxelType).not.toBe('stairs');
     expect(getVoxel(id, 18).voxelType).not.toBe('stairs');

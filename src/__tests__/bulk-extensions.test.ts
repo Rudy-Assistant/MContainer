@@ -50,14 +50,25 @@ describe('setAllExtensions', () => {
     expect(grid[idx].faces.n).toBe('Solid_Steel'); // row 0 → north is outward
   });
 
-  it('EXT-3: none resets all extensions to inactive', () => {
+  it('EXT-3: none resets all extensions to inactive after reverse animation completes', () => {
     const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
     // First activate extensions
     useStore.getState().setAllExtensions(id, 'all_deck');
-    // Then reset
+    // Then reset — triggers reverse animation
     useStore.getState().setAllExtensions(id, 'none');
-    const grid = useStore.getState().containers[id].voxelGrid!;
 
+    // Simulate animation completion (clearUnpackPhase deactivates on reverse)
+    for (let level = 0; level < VOXEL_LEVELS; level++) {
+      for (let row = 0; row < VOXEL_ROWS; row++) {
+        for (let col = 0; col < VOXEL_COLS; col++) {
+          if (!isExtension(row, col)) continue;
+          const idx = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col;
+          useStore.getState().clearUnpackPhase(id, idx);
+        }
+      }
+    }
+
+    const grid = useStore.getState().containers[id].voxelGrid!;
     for (let level = 0; level < VOXEL_LEVELS; level++) {
       for (let row = 0; row < VOXEL_ROWS; row++) {
         for (let col = 0; col < VOXEL_COLS; col++) {

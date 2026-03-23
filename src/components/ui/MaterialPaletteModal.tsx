@@ -75,10 +75,10 @@ export default function MaterialPaletteModal({ open, onClose }: Props) {
 
   return (
     <div
+      className="modal-backdrop"
       style={{
         position: "fixed", inset: 0, zIndex: 1000,
         display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(0,0,0,0.4)",
       }}
       onClick={onClose}
     >

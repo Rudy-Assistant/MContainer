@@ -10,6 +10,17 @@ This is **V1** (codebase: `C:\MHome\MContainer\`). V2 exists at `C:\MHome\` for 
 
 **Store:** `src/store/useStore.ts` (252 lines — middleware chain only). All business logic lives in `src/store/slices/` (7 files, ~3700 lines total).
 
+## Quick Start
+
+```bash
+npm run dev          # Next.js dev server
+npm run test         # vitest run (307 tests)
+npx tsc --noEmit     # Type check
+npm run gates        # Acceptance gates
+npm run quality      # Generate quality assessment
+npm run baselines    # Recapture visual baselines
+```
+
 ## Ground Rules
 
 1. **Do NOT make changes without browser verification.** `tsc` + `vitest` passing is NOT equivalent to "done." Every user-facing change must be confirmed in the browser before reporting complete.
@@ -90,57 +101,15 @@ Do not modify V2 files. Read them for reference only.
 | `src/components/three/Scene.tsx` | Main scene graph (~1700 lines) |
 | `src/components/ui/SmartHotbar.tsx` | 10-slot hotbar + room/material rows (~1400 lines) |
 
-## Keyboard Controls Reference (V1 current)
+## Keyboard Controls
 
-### Hotbar
-| Key | Action |
-|-----|--------|
-| 1–9 | Hotbar slots 1–9 |
-| 0 | Hotbar slot 10 |
-| = | Next hotbar row |
-| - | Previous hotbar row |
-| Tab | Toggle hotbar row |
-
-### View Modes
-| Key | Action |
-|-----|--------|
-| Alt+3 | 3D view |
-| Alt+4 | Blueprint view |
-| F | Walkthrough (FP) |
-| V | Cycle all views |
-
-### Container Manipulation
-| Key | Action |
-|-----|--------|
-| Left-drag (selected) | Move container (drag to reposition, ghost follows cursor) |
-| G | Group selected into zone |
-| R | Rotate module / rotate container |
-| Q | Rotate stamp faces / rotate container |
-| Delete | Delete container (or clear voxel if face selected) |
-
-### Painting
-| Key | Action |
-|-----|--------|
-| Alt+click | Eyedropper — pick face material |
-| Space | Repeat last stamp (or cycle edges) |
-| C | Clear hovered face/block |
-| E | Apply active hotbar stamp to hovered block |
-
-### UI
-| Key | Action |
-|-----|--------|
-| [ | Toggle sidebar collapse |
-| Scroll | Camera zoom (always — no material cycling) |
-
-### Reserved (do not rebind)
-| Key | Reserved for |
-|-----|-------------|
-| W/A/S/D | FP movement |
-| Q/Z | FP fly up/down |
-| P | Toggle preview mode |
-| B | Toggle build mode (Frame Builder) |
-| Ctrl+Z/Y | Undo/Redo |
-| PgUp/PgDn | Level slicer |
+Full reference in `MODUHOME-V1-ARCHITECTURE-v2.md` §5. Key bindings to remember:
+- **1-9/0**: Hotbar slots | **Tab/-/=**: Row switching
+- **Alt+3/4, F, V**: View modes (3D/Blueprint/Walk/Cycle)
+- **Left-drag**: Move container | **R/Q**: Rotate | **Delete**: Remove
+- **Alt+click**: Eyedropper | **C**: Clear face | **E**: Apply stamp
+- **W/A/S/D, Q/Z**: Reserved for FP movement — do not rebind
+- **Ctrl+Z/Y**: Undo/Redo | **PgUp/PgDn**: Level slicer
 
 ## UI Change Policy
 
@@ -158,7 +127,7 @@ during cleanup sprints. When in doubt, move to a secondary location rather than 
 Every sprint must complete ALL of these before being declared done:
 
 1. `npx tsc --noEmit` → 0 errors
-2. `npx vitest run` → all tests pass (288+ currently)
+2. `npx vitest run` → all tests pass (307 currently)
 3. `node acceptance-gates.mjs` → all gates pass, 0 FAIL
 4. `node generate-quality-assessment.mjs` → CURRENT-QUALITY-ASSESSMENT.md updated
 5. Read ALL gate screenshots with view tool — describe what each shows
@@ -181,41 +150,23 @@ Regressions that have occurred in past sprints. Check these specifically during 
 | Extension platforms/moats rendering | Extension top/bottom returned true from isExteriorFace | Extension top/bottom now return false | 10 |
 | Stale baselines cause visual gate failures | Scene changes without baseline recapture | Run `npm run baselines` after any visual change, commit PNGs | 8 |
 
+## Outstanding Issues (Sprint 17 Handoff)
+
+These bugs are unresolved. See `sprint17-handoff.md` in project memory for root cause analysis.
+
+| # | Issue | Root Cause | Suggested Fix |
+|---|-------|-----------|---------------|
+| 1 | Containers don't stack via UI | `stackContainer` works programmatically but no UI gesture triggers it | Add "Stack" button or drag-to-stack gesture |
+| 2 | Adjacent container removes entire wall | `mergeBoundaryVoxels` merges ALL boundary voxels, not just overlapping portions | Check actual geometric overlap before merging |
+| 3 | Sticky alignment not triggering | `STICKY_THRESHOLD=0.3` may not apply during `addContainer` smart placement | Verify snap logic runs on drag-and-drop placement |
+| 4 | Shift+click camera conflict | Both container drag and camera orbit respond to Shift+mouse | Disable CameraControls when Shift held |
+
 ## Camera Architecture
 
-Three mutually exclusive camera modes, switched by `viewMode` in store:
+Three mutually exclusive modes switched by `viewMode`: **Realistic3D** (orbit), **Blueprint** (ortho top-down), **Walkthrough** (pointer lock + WASD). Only one controller mounted at a time.
 
-| Mode | Controller | Mount Location | Input |
-|------|-----------|----------------|-------|
-| **Realistic3D** (Design) | drei `<CameraControls>` (orbit) | `RealisticScene` | Left-drag=rotate, Right-drag=TRUCK pan, Scroll=dolly |
-| **Blueprint** | `<OrthographicCamera>` + auto-fit | `CameraController` | Top-down only |
-| **Walkthrough** (Walk) | drei `<PointerLockControls>` + WASD | `WalkthroughScene` | Mouse look, WASD move, Q/Z fly, Shift sprint |
-
-### Orbit Mode Helper Components (RealisticScene only)
-
-| Component | Purpose | Key Invariant |
-|-----------|---------|---------------|
-| `CameraTargetLerp` | Smoothly moves orbit target when selection changes | **Settle-and-release**: lerps toward new target, then stops. Does NOT continuously override — user can freely TRUCK/WASD after settling. |
-| `CameraBroadcast` | Saves/restores 3D camera across view switches; broadcasts angles to store ~10Hz | Uses `controlsRef` pattern (not ref prop) — safe during React unmount cleanup. |
-| `CameraFloorGuard` | NaN recovery + `__camDiag` diagnostic exposure | Pure safety net — no user-visible constraints. |
-| `KeyboardPanControls` | WASD=horizontal pan, Arrows=orbit rotate in 3D mode | Only mounted when `viewMode !== Walkthrough`. Uses camera-controls API (setPosition/setTarget), not direct mutation. |
-
-### Camera Safety Layers (cameraConstants.ts)
-
-1. **Polar angle clamp**: `minPolarAngle`/`maxPolarAngle` on `<CameraControls>` props — prevents ground/sky fill
-2. **Distance clamp**: `minDistance=3` / `maxDistance=60`
-3. **Target Y clamp**: `CAMERA_TARGET_MIN_Y=0.3` enforced in CameraTargetLerp
-4. **NaN recovery**: CameraFloorGuard stores last-known-good, restores on NaN detection
-
-Mouse buttons configured via `CAMERA_MOUSE_BUTTONS` prop (not imperative useEffect):
-- Left: ROTATE (1), Right: TRUCK (2), Middle: TRUCK (2), Wheel: DOLLY (16)
-- truckSpeed: 0.5 (reduced from default 2.0)
-
-### Anti-Patterns (Camera-Specific)
-
-| Pattern | Why Broken | Correct Approach |
-|---------|-----------|-----------------|
-| `CameraTargetLerp` calling `setTarget()` every frame | Fights TRUCK/WASD — user can't pan | Settle-and-release: stop after reaching target |
-| Ref props for camera components | React 19 nulls refs during unmount → TypeError crashes canvas | `useThree().controls` + `controlsRef = useRef(controls)` pattern |
-| `boundaryEnclosesCamera = true` | Over-constrains TRUCK — camera position locked in box | Removed. Polar angle + distance constraints are sufficient |
-| Direct `camera.position` mutation in orbit mode | camera-controls overwrites from internal state next frame | Use `cc.setPosition()` / `cc.setTarget()` API |
+Full details in `MODUHOME-V1-ARCHITECTURE-v2.md`. Key anti-patterns:
+- Do NOT call `setTarget()` every frame in CameraTargetLerp (fights user TRUCK/pan)
+- Use `controlsRef` pattern, not ref props (React 19 nulls refs during unmount)
+- Do NOT set `boundaryEnclosesCamera = true` (over-constrains TRUCK)
+- Use `cc.setPosition()`/`cc.setTarget()` API, never direct `camera.position` mutation

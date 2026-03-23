@@ -6,89 +6,14 @@ import { resolveSkin } from '@/utils/skinResolver';
 import { getStyle } from '@/config/styleRegistry';
 import { getMaterial } from '@/config/materialRegistry';
 import { applyStyleEffects, applyEmberWarmth } from '@/utils/styleEffects';
-import { useMemo } from 'react';
+import { anchorToLocalPosition, anchorToLocalRotation, localToWorld, localRotToWorld } from '@/utils/anchorMath';
+import { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import type { SceneObject, StyleId, StyleEffect, FormDefinition } from '@/types/sceneObject';
-import {
-  VOXEL_COLS,
-  VOXEL_ROWS,
-  VOXEL_LEVELS,
-  CONTAINER_DIMENSIONS,
-  ContainerSize,
-} from '@/types/container';
 import type { Container } from '@/types/container';
 
-/**
- * Compute container-local position from a SceneObject's anchor.
- *
- * HALO ARCHITECTURE (matches ContainerSkin / WalkthroughControls / voxelSlice):
- *   colPitch = length / 6  (core cols 1-6; cols 0,7 are extension halos)
- *   rowPitch = width  / 2  (core rows 1-2; rows 0,3 are extension halos)
- *   X = -(col - 3.5) * colPitch   [NEGATED: col 0 = +X, col 7 = -X]
- *   Z = (row - 1.5) * rowPitch
- *   Y center = height / 2 per level
- */
-function anchorToPosition(
-  anchor: SceneObject['anchor'],
-  container: Container,
-): [number, number, number] {
-  const dims = CONTAINER_DIMENSIONS[container.size as ContainerSize];
-  const colPitch = dims.length / 6;
-  const rowPitch = dims.width / 2;
-  const vHeight = dims.height / VOXEL_LEVELS;
-
-  const col = anchor.voxelIndex % VOXEL_COLS;
-  const row = Math.floor(anchor.voxelIndex / VOXEL_COLS) % VOXEL_ROWS;
-  const level = Math.floor(anchor.voxelIndex / (VOXEL_COLS * VOXEL_ROWS));
-
-  // Voxel center in container-local coords (matching ContainerSkin math)
-  const cx = -(col - 3.5) * colPitch;
-  const cz = (row - 1.5) * rowPitch;
-  const cy = level * vHeight + vHeight / 2;
-
-  if (anchor.type === 'floor') {
-    return [
-      cx + (anchor.offset?.[0] ?? 0),
-      level * vHeight,
-      cz + (anchor.offset?.[1] ?? 0),
-    ];
-  }
-  if (anchor.type === 'ceiling') {
-    return [
-      cx + (anchor.offset?.[0] ?? 0),
-      level * vHeight + vHeight,
-      cz + (anchor.offset?.[1] ?? 0),
-    ];
-  }
-
-  // Face anchor: position at the face of the voxel
-  // slot offset: divide the face width into 3 equal slots (slot 0=left, 1=center, 2=right)
-  const slotOffset = anchor.slot != null ? (anchor.slot - 1) * (colPitch / 3) : 0;
-
-  switch (anchor.face) {
-    // N/S faces are along Z axis (container width)
-    case 'n': return [cx + slotOffset, cy, cz - rowPitch / 2];
-    case 's': return [cx + slotOffset, cy, cz + rowPitch / 2];
-    // E/W faces are along X axis (container length, but X is negated)
-    case 'e': return [cx + colPitch / 2, cy, cz + slotOffset];
-    case 'w': return [cx - colPitch / 2, cy, cz + slotOffset];
-    default: return [cx, cy, cz];
-  }
-}
-
-/**
- * Compute the Y-axis rotation for a face-anchored object so it faces outward.
- */
-function anchorToRotation(anchor: SceneObject['anchor']): [number, number, number] {
-  if (anchor.type !== 'face') return [0, 0, 0];
-  switch (anchor.face) {
-    case 'n': return [0, 0, 0];
-    case 's': return [0, Math.PI, 0];
-    case 'e': return [0, -Math.PI / 2, 0];
-    case 'w': return [0, Math.PI / 2, 0];
-    default: return [0, 0, 0];
-  }
-}
+// Module-level constant to avoid per-render allocation (Fix 6)
+const WHITE = new THREE.Color('#ffffff');
 
 // Suppress raycasts on non-interactive meshes (project anti-pattern rule)
 const nullRaycast = () => {};
@@ -108,6 +33,10 @@ export function SceneObjectRenderer() {
   );
 }
 
+/**
+ * Wrapper component: reads store, guards nulls, then delegates to SceneObjectMeshInner.
+ * This pattern ensures all hooks in the inner component run unconditionally (Fix 3).
+ */
 function SceneObjectMesh({ objectId, styleId }: { objectId: string; styleId: StyleId }) {
   const object = useStore((s) => s.sceneObjects[objectId]);
   const container = useStore((s) =>
@@ -121,14 +50,44 @@ function SceneObjectMesh({ objectId, styleId }: { objectId: string; styleId: Sty
   const form = formRegistry.get(object.formId);
   if (!form) return null;
 
+  return (
+    <SceneObjectMeshInner
+      object={object}
+      container={container}
+      form={form}
+      objectId={objectId}
+      styleId={styleId}
+      placementMode={placementMode}
+      selectObject={selectObject}
+    />
+  );
+}
+
+function SceneObjectMeshInner({
+  object,
+  container,
+  form,
+  objectId,
+  styleId,
+  placementMode,
+  selectObject,
+}: {
+  object: SceneObject;
+  container: Container;
+  form: FormDefinition;
+  objectId: string;
+  styleId: StyleId;
+  placementMode: boolean;
+  selectObject: (id: string | null) => void;
+}) {
   const style = getStyle(styleId);
   const resolvedSkin = resolveSkin(form.defaultSkin, object.skin, style?.defaultMaterials);
 
   const position = useMemo(
-    () => anchorToPosition(object.anchor, container),
+    () => anchorToLocalPosition(object.anchor, container),
     [object.anchor, container],
   );
-  const rotation = useMemo(() => anchorToRotation(object.anchor), [object.anchor]);
+  const rotation = useMemo(() => anchorToLocalRotation(object.anchor), [object.anchor]);
 
   // Look up material for the primary skin slot
   const primarySlot = form.skinSlots[0]?.id ?? 'frame';
@@ -147,21 +106,18 @@ function SceneObjectMesh({ objectId, styleId }: { objectId: string; styleId: Sty
     return mat;
   }, [matDef?.color, matDef?.metalness, matDef?.roughness, style?.effects]);
 
-  // Container world position + container rotation
-  const worldPosition = useMemo((): [number, number, number] => {
-    const cp = container.position;
-    const cosR = Math.cos(container.rotation);
-    const sinR = Math.sin(container.rotation);
-    // Apply container rotation to local position
-    const wx = cp.x + position[0] * cosR - position[2] * sinR;
-    const wy = cp.y + position[1];
-    const wz = cp.z + position[0] * sinR + position[2] * cosR;
-    return [wx, wy, wz];
-  }, [container.position, container.rotation, position]);
+  // Dispose material when it changes or component unmounts (Fix 4)
+  useEffect(() => () => { material.dispose(); }, [material]);
 
-  const worldRotation = useMemo((): [number, number, number] => {
-    return [rotation[0], rotation[1] + container.rotation, rotation[2]];
-  }, [rotation, container.rotation]);
+  const worldPosition = useMemo(
+    () => localToWorld(position, container),
+    [position, container],
+  );
+
+  const worldRotation = useMemo(
+    () => localRotToWorld(rotation, container),
+    [rotation, container],
+  );
 
   return (
     <group position={worldPosition} rotation={worldRotation}>
@@ -199,8 +155,8 @@ function LightSource({
   const brightness = (object.state?.brightness as number) ?? 75;
   const intensity = (brightness / 100) * 2; // 0-2 range
 
-  // Apply ember_warmth effect to light color and distance if present
-  const baseColor = new THREE.Color('#ffffff');
+  // Use module-level WHITE constant instead of allocating per render (Fix 6)
+  const baseColor = WHITE.clone();
   const ember = effects?.length ? applyEmberWarmth(effects, baseColor, 5) : null;
   const lightColor = ember?.color ?? baseColor;
 

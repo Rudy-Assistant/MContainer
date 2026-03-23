@@ -3,15 +3,11 @@
 import { useStore } from '@/store/useStore';
 import { formRegistry } from '@/config/formRegistry';
 import { getOccupiedSlots, getSlotsForPlacement } from '@/utils/slotOccupancy';
-import { useRef, useMemo } from 'react';
+import { anchorToLocalPosition, anchorToLocalRotation, localToWorld, localRotToWorld } from '@/utils/anchorMath';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { SceneObject, WallDirection } from '@/types/sceneObject';
-import {
-  VOXEL_COLS, VOXEL_ROWS, VOXEL_LEVELS,
-  CONTAINER_DIMENSIONS, ContainerSize,
-} from '@/types/container';
-import type { VoxelFaces } from '@/types/container';
+import type { SceneObject, WallDirection, ObjectAnchor } from '@/types/sceneObject';
 
 const VALID_COLOR = new THREE.Color('#22c55e');
 const INVALID_COLOR = new THREE.Color('#ef4444');
@@ -28,6 +24,10 @@ function PlacementGhostInner({ formId }: { formId: string }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
 
+  // Cache last hovered face key to avoid recomputing slot occupancy every frame (Fix 9)
+  const lastHoveredRef = useRef<string | null>(null);
+  const cachedSlotRef = useRef<{ slot: number; valid: boolean }>({ slot: 0, valid: true });
+
   // Create material once (lazy init via ref)
   if (!materialRef.current) {
     materialRef.current = new THREE.MeshStandardMaterial({
@@ -43,6 +43,9 @@ function PlacementGhostInner({ formId }: { formId: string }) {
     return new THREE.BoxGeometry(form.dimensions.w, form.dimensions.h, form.dimensions.d);
   }, [form]);
 
+  // Dispose geometry when it changes or component unmounts (Fix 4)
+  useEffect(() => () => { geometry.dispose(); }, [geometry]);
+
   // Read hoveredVoxelEdge in useFrame to avoid re-render storms
   useFrame(() => {
     const mesh = meshRef.current;
@@ -54,6 +57,7 @@ function PlacementGhostInner({ formId }: { formId: string }) {
 
     if (!hovered || !hovered.face) {
       mesh.visible = false;
+      lastHoveredRef.current = null;
       return;
     }
 
@@ -83,83 +87,47 @@ function PlacementGhostInner({ formId }: { formId: string }) {
       return;
     }
 
-    // For face-anchored forms, find valid slot
+    // For face-anchored forms, find valid slot — only recompute when hovered face changes (Fix 9)
     let slot = 0;
     let valid = true;
 
+    const hoveredKey = `${containerId}:${voxelIndex}:${face}`;
+
     if (form.anchorType === 'face' && isWallFace) {
-      const allObjects = Object.values(state.sceneObjects) as SceneObject[];
-      const occupied = getOccupiedSlots(allObjects, containerId, voxelIndex, face as WallDirection, formRegistry);
-      const validSlots = getSlotsForPlacement(occupied, form.slotWidth);
+      if (hoveredKey !== lastHoveredRef.current) {
+        const allObjects = Object.values(state.sceneObjects) as SceneObject[];
+        const occupied = getOccupiedSlots(allObjects, containerId, voxelIndex, face as WallDirection, formRegistry);
+        const validSlots = getSlotsForPlacement(occupied, form.slotWidth);
 
-      if (validSlots.length === 0) {
-        valid = false;
-        slot = 0;
-      } else {
-        slot = validSlots[0];
+        if (validSlots.length === 0) {
+          cachedSlotRef.current = { slot: 0, valid: false };
+        } else {
+          cachedSlotRef.current = { slot: validSlots[0], valid: true };
+        }
       }
+      slot = cachedSlotRef.current.slot;
+      valid = cachedSlotRef.current.valid;
     }
 
-    // Compute local position using same math as SceneObjectRenderer/anchorToPosition
-    const dims = CONTAINER_DIMENSIONS[container.size as ContainerSize];
-    const colPitch = dims.length / 6;
-    const rowPitch = dims.width / 2;
-    const vHeight = dims.height / VOXEL_LEVELS;
+    lastHoveredRef.current = hoveredKey;
 
-    const col = voxelIndex % VOXEL_COLS;
-    const row = Math.floor(voxelIndex / VOXEL_COLS) % VOXEL_ROWS;
-    const level = Math.floor(voxelIndex / (VOXEL_COLS * VOXEL_ROWS));
+    // Build a synthetic anchor for position calculation
+    const anchor: ObjectAnchor = form.anchorType === 'face'
+      ? { containerId, voxelIndex, type: 'face', face: face as WallDirection, slot }
+      : { containerId, voxelIndex, type: form.anchorType as 'floor' | 'ceiling' };
 
-    const cx = -(col - 3.5) * colPitch;
-    const cz = (row - 1.5) * rowPitch;
-    const cy = level * vHeight + vHeight / 2;
+    const localPos = anchorToLocalPosition(anchor, container);
+    const localRot = anchorToLocalRotation(anchor);
 
-    let localX: number, localY: number, localZ: number;
-    let rotX = 0, rotY = 0, rotZ = 0;
+    // Nudge floor/ceiling slightly to avoid z-fighting
+    if (form.anchorType === 'floor') localPos[1] += 0.01;
+    if (form.anchorType === 'ceiling') localPos[1] -= 0.01;
 
-    if (form.anchorType === 'floor') {
-      localX = cx;
-      localY = level * vHeight + 0.01;
-      localZ = cz;
-    } else if (form.anchorType === 'ceiling') {
-      localX = cx;
-      localY = level * vHeight + vHeight - 0.01;
-      localZ = cz;
-    } else {
-      // Face anchor with slot offset (slots 0,1,2 → offsets -1,0,+1 × colPitch/3)
-      const slotOffset = (slot - 1) * (colPitch / 3);
-      switch (face as WallDirection) {
-        case 'n':
-          localX = cx + slotOffset; localY = cy; localZ = cz - rowPitch / 2;
-          rotY = 0;
-          break;
-        case 's':
-          localX = cx + slotOffset; localY = cy; localZ = cz + rowPitch / 2;
-          rotY = Math.PI;
-          break;
-        case 'e':
-          localX = cx + colPitch / 2; localY = cy; localZ = cz + slotOffset;
-          rotY = -Math.PI / 2;
-          break;
-        case 'w':
-          localX = cx - colPitch / 2; localY = cy; localZ = cz + slotOffset;
-          rotY = Math.PI / 2;
-          break;
-        default:
-          localX = cx; localY = cy; localZ = cz;
-      }
-    }
+    const worldPos = localToWorld(localPos, container);
+    const worldRot = localRotToWorld(localRot, container);
 
-    // Apply container world transform (position + Y rotation)
-    const cp = container.position;
-    const cosR = Math.cos(container.rotation);
-    const sinR = Math.sin(container.rotation);
-    const wx = cp.x + localX * cosR - localZ * sinR;
-    const wy = cp.y + localY;
-    const wz = cp.z + localX * sinR + localZ * cosR;
-
-    mesh.position.set(wx, wy, wz);
-    mesh.rotation.set(rotX, rotY + container.rotation, rotZ);
+    mesh.position.set(worldPos[0], worldPos[1], worldPos[2]);
+    mesh.rotation.set(worldRot[0], worldRot[1], worldRot[2]);
     mesh.visible = true;
 
     // Green = valid placement, red = invalid

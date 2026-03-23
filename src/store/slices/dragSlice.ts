@@ -20,6 +20,7 @@ import {
 } from '@/types/container';
 import type { HotbarSlot } from '../useStore';
 import { checkOverlap, getFullFootprint } from '@/store/spatialEngine';
+import { scheduleAdjacency } from '@/store/slices/containerSlice';
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
@@ -190,7 +191,7 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
       getTemporalApi().resume();
       // stackContainer sets position (x, y, z), level, and stacking relationship
       get().stackContainer(dragMovingId, stackTargetId);
-      requestAnimationFrame(() => get().refreshAdjacency());
+      scheduleAdjacency(get);
       return;
     }
 
@@ -215,7 +216,7 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
         },
       },
     }));
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
   },
   cancelContainerDrag: () => {
     getTemporalApi().resume();

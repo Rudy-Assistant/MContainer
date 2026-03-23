@@ -19,13 +19,7 @@ function formatTime(hours: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+import { formatUSD as formatCurrency } from "@/utils/formatters";
 
 // ── Sky color interpolation for TOD glow ─────────────────────
 

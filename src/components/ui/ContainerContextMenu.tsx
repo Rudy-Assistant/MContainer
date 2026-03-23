@@ -10,7 +10,8 @@
 
 import { useEffect, useCallback } from "react";
 import { useStore } from "@/store/useStore";
-import { Frame, Layers } from "lucide-react";
+import { Frame, Layers, ArrowUpFromLine, Footprints } from "lucide-react";
+import { MAX_STACK_LEVEL, DEFAULT_EXTENSION_CONFIG } from "@/types/container";
 
 export default function ContainerContextMenu() {
   const ctx = useStore((s) => s.containerContextMenu);
@@ -53,6 +54,39 @@ export default function ContainerContextMenu() {
     openFloorDetail(ctx.containerId);
     closeMenu();
   }, [ctx, openFloorDetail, closeMenu]);
+
+  const handleStackAbove = useCallback(() => {
+    if (!ctx || !container) return;
+    const store = useStore.getState();
+    // stackContainer sets the correct Y position, so pass dummy Y here
+    const newId = store.addContainer(container.size, { x: container.position.x, y: 0, z: container.position.z }, (container.level ?? 0) + 1, true);
+    const success = store.stackContainer(newId, ctx.containerId);
+    if (!success) {
+      // Stacking failed — remove the orphaned container
+      store.removeContainer(newId);
+      closeMenu();
+      return;
+    }
+    store.setAllExtensions(newId, DEFAULT_EXTENSION_CONFIG, false);
+    store.setSelectedVoxel({ containerId: newId, index: 0 });
+    closeMenu();
+  }, [ctx, container, closeMenu]);
+
+  const handleAddStaircase = useCallback(() => {
+    if (!ctx || !container) return;
+    const store = useStore.getState();
+    store.setStaircasePlacementMode(true, ctx.containerId);
+    closeMenu();
+  }, [ctx, container, closeMenu]);
+
+  // Check if stacking is possible (not already at max level)
+  const canStack = container ? (container.level ?? 0) < MAX_STACK_LEVEL : false;
+
+  // Check if container has a stacked container above (needed for staircase placement)
+  const hasContainerAbove = container ? (container.supporting?.length ?? 0) > 0 : false;
+
+  // Check if container already has stairs placed
+  const hasStairs = container?.voxelGrid?.some((v) => v?.voxelType === 'stairs') ?? false;
 
   if (!ctx || !container) return null;
 
@@ -101,6 +135,34 @@ export default function ContainerContextMenu() {
             <Layers size={15} className="text-gray-400" />
             Configure Floor
           </button>
+          {canStack && (
+            <button
+              onClick={handleStackAbove}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+            >
+              <ArrowUpFromLine size={15} className="text-gray-400" />
+              Stack Container Above
+            </button>
+          )}
+          {hasContainerAbove && (
+            <>
+              <div className="border-t border-gray-100 mx-2" />
+              {hasStairs ? (
+                <div className="w-full flex items-center gap-3 px-3 py-2 text-xs text-gray-400 cursor-default">
+                  <Footprints size={15} className="text-gray-300" />
+                  Staircase Placed
+                </div>
+              ) : (
+                <button
+                  onClick={handleAddStaircase}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                >
+                  <Footprints size={15} className="text-gray-400" />
+                  Add Staircase
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -13,9 +13,10 @@ import { makeInteractable } from '@/utils/raycastLayers';
 
 // Reuse materials from ContainerMesh
 const steelExterior = new THREE.MeshStandardMaterial({
-  color: 0x8a9199,
-  metalness: 0.65,
-  roughness: 0.40,
+  color: 0xb8c0c8,
+  metalness: 0.45,
+  roughness: 0.60,
+  envMapIntensity: 1.0,
 });
 
 interface SharedWallConfig {
@@ -107,9 +108,20 @@ export function getSharedWallConfig(
  */
 export default function SharedWalls() {
   const containers = useStore((s) => s.containers);
+
+  // Derive a stable cache key from only the fields that affect shared walls.
+  // This prevents useMemo from recomputing on paint/furniture/voxelGrid changes.
+  const wallCacheKey = useMemo(() =>
+    Object.values(containers).map((c) =>
+      `${c.id}:${c.position.x},${c.position.y},${c.position.z}:${c.rotation}:${c.size}:${c.mergedWalls.join(';')}`
+    ).sort().join('|'),
+    [containers],
+  );
+
   const groupRef = useRef<THREE.Group>(null);
 
   // Collect all shared wall configs from adjacency data
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- wallCacheKey is a derived stable key
   const sharedWalls = useMemo(() => {
     const walls: SharedWallConfig[] = [];
     const processed = new Set<string>();
@@ -143,7 +155,7 @@ export default function SharedWalls() {
     });
 
     return walls;
-  }, [containers]);
+  }, [wallCacheKey]);
 
   // Make all shared walls interactable for raycasting
   useEffect(() => {

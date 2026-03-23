@@ -170,8 +170,9 @@ describe('Smart Staircase Lateral Railing', () => {
     useStore.getState().applyStairsFromFace(id, 9, 's');
     // Verify lateral railing exists (face 'e' → dc=-1 → col 0, inactive → railing)
     expect(getVoxel(id, 9).faces.e).toBe('Railing_Cable');
-    // Remove stairs
+    // Remove stairs + simulate exit animation completion
     useStore.getState().removeStairs(id, 9);
+    useStore.getState().clearStairExit(id, 9);
     // East face should be restored to original
     const voxel = getVoxel(id, 9);
     expect(voxel.faces.e).not.toBe('Railing_Cable');

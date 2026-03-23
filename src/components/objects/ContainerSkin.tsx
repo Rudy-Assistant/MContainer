@@ -76,10 +76,12 @@ import type { SceneObject, WallDirection } from "@/types/sceneObject";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/** Returns a Set of "containerId:voxelIndex:face" keys where a slotWidth=3 SceneObject fully occupies the face. */
-function getFullyOccupiedFaces(sceneObjects: Record<string, SceneObject>): Set<string> {
+/** Returns a Set of "containerId:voxelIndex:face" keys where a slotWidth=3 SceneObject fully occupies the face.
+ *  Scoped to a single container to avoid subscribing to the full sceneObjects map (Fix 5). */
+function getFullyOccupiedFaces(sceneObjects: Record<string, SceneObject>, containerId: string): Set<string> {
   const result = new Set<string>();
   for (const obj of Object.values(sceneObjects)) {
+    if (obj.anchor.containerId !== containerId) continue;
     if (obj.anchor.type !== 'face' || !obj.anchor.face) continue;
     const form = formRegistry.get(obj.formId);
     if (form && form.slotWidth === 3) {
@@ -87,6 +89,44 @@ function getFullyOccupiedFaces(sceneObjects: Record<string, SceneObject>): Set<s
     }
   }
   return result;
+}
+
+/**
+ * Intercept a click in placement mode and place a scene object if compatible.
+ * Returns true if the click was consumed (Fix 8 — extracted from duplicated blocks).
+ */
+function tryPlacementIntercept(containerId: string, voxelIndex: number, face: keyof VoxelFaces): boolean {
+  const st = useStore.getState();
+  if (!st.placementMode || !st.activePlacementFormId) return false;
+
+  const pFormId = st.activePlacementFormId;
+  const pForm = formRegistry.get(pFormId);
+  if (!pForm) return false;
+
+  const isWall = face === 'n' || face === 's' || face === 'e' || face === 'w';
+
+  if (pForm.anchorType === 'face' && isWall) {
+    const allObjs = Object.values(st.sceneObjects) as SceneObject[];
+    const occ = getOccupiedSlots(allObjs, containerId, voxelIndex, face as WallDirection, formRegistry);
+    const vs = getSlotsForPlacement(occ, pForm.slotWidth);
+    if (vs.length > 0) {
+      st.placeObject(pFormId, {
+        containerId, voxelIndex, type: 'face',
+        face: face as WallDirection, slot: vs[0],
+      });
+    }
+    return true;
+  }
+  if (pForm.anchorType === 'floor' && face === 'bottom') {
+    st.placeObject(pFormId, { containerId, voxelIndex, type: 'floor' });
+    return true;
+  }
+  if (pForm.anchorType === 'ceiling' && face === 'top') {
+    st.placeObject(pFormId, { containerId, voxelIndex, type: 'ceiling' });
+    return true;
+  }
+
+  return true; // Incompatible face — still consume the click in placement mode
 }
 
 // ── Constants ──────────────────────────────────────────────────
@@ -2091,8 +2131,15 @@ export default function ContainerSkin({
   );
 
   const brushStampVoxel  = useStore((s) => s.brushStampVoxel);
-  const sceneObjects     = useStore((s) => s.sceneObjects);
-  const fullyOccupiedFaces = useMemo(() => getFullyOccupiedFaces(sceneObjects), [sceneObjects]);
+  // Narrow selector: count face objects for this container to trigger recompute only when relevant (Fix 5)
+  const containerFaceObjectCount = useStore((s) => {
+    let count = 0;
+    for (const obj of Object.values(s.sceneObjects)) {
+      if (obj.anchor.containerId === container.id && obj.anchor.type === 'face') count++;
+    }
+    return count;
+  });
+  const fullyOccupiedFaces = useMemo(() => getFullyOccupiedFaces(useStore.getState().sceneObjects, container.id), [containerFaceObjectCount, container.id]);
 
   // ★ Fix 2: Clear stale hoveredVoxelEdge + pending leave timer on unmount or container change
   useEffect(() => {
@@ -2214,37 +2261,11 @@ export default function ContainerSkin({
 
   const handleClick = useCallback(
     (voxelIndex: number, faceName: keyof VoxelFaces) => {
-      // ★ Object placement mode: intercept clicks to place scene objects (doors, windows, etc.)
-      const storeNow = useStore.getState();
-      if (storeNow.placementMode && storeNow.activePlacementFormId) {
-        const pFormId = storeNow.activePlacementFormId;
-        const pForm = formRegistry.get(pFormId);
-        if (pForm) {
-          const isWall = faceName === 'n' || faceName === 's' || faceName === 'e' || faceName === 'w';
-          if (pForm.anchorType === 'face' && isWall) {
-            const allObjects = Object.values(storeNow.sceneObjects) as SceneObject[];
-            const occupied = getOccupiedSlots(allObjects, container.id, voxelIndex, faceName as WallDirection, formRegistry);
-            const validSlots = getSlotsForPlacement(occupied, pForm.slotWidth);
-            if (validSlots.length > 0) {
-              storeNow.placeObject(pFormId, {
-                containerId: container.id, voxelIndex, type: 'face',
-                face: faceName as WallDirection, slot: validSlots[0],
-              });
-            }
-            return;
-          } else if (pForm.anchorType === 'floor' && faceName === 'bottom') {
-            storeNow.placeObject(pFormId, { containerId: container.id, voxelIndex, type: 'floor' });
-            return;
-          } else if (pForm.anchorType === 'ceiling' && faceName === 'top') {
-            storeNow.placeObject(pFormId, { containerId: container.id, voxelIndex, type: 'ceiling' });
-            return;
-          }
-          // Incompatible face for this form — ignore click
-          return;
-        }
-      }
+      // ★ Object placement mode: intercept clicks to place scene objects (Fix 8)
+      if (tryPlacementIntercept(container.id, voxelIndex, faceName)) return;
 
       // ★ Staircase placement mode: intercept wall clicks to place stairs
+      const storeNow = useStore.getState();
       if (storeNow.staircasePlacementMode && storeNow.staircasePlacementContainerId === container.id) {
         const validation = validateStaircasePlacement(container.voxelGrid, voxelIndex, faceName);
         if (!validation.valid) return;
@@ -2906,24 +2927,8 @@ export default function ContainerSkin({
               // (Empty→Deck→Room→Sunroom→Balcony). Edge clicks remain face-specific (MICRO).
               const onClickCenter = (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
-                // ★ Object placement mode: intercept center clicks for floor/ceiling placement
-                {
-                  const st = useStore.getState();
-                  if (st.placementMode && st.activePlacementFormId) {
-                    const pFormId = st.activePlacementFormId;
-                    const pForm = formRegistry.get(pFormId);
-                    if (pForm) {
-                      if (pForm.anchorType === 'floor') {
-                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'floor' });
-                        return;
-                      } else if (pForm.anchorType === 'ceiling') {
-                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'ceiling' });
-                        return;
-                      }
-                      return; // Center hitbox is floor/ceiling; incompatible with face-only forms
-                    }
-                  }
-                }
+                // ★ Object placement mode: intercept center clicks for floor/ceiling placement (Fix 8)
+                if (tryPlacementIntercept(container.id, idx, 'bottom')) return;
                 select(container.id);
                 setFaceContext('floor');
                 // ★ Multi-select bypass: if >1 voxels selected + tool equipped, stamp all immediately
@@ -2964,36 +2969,8 @@ export default function ContainerSkin({
               };
               const onClickEdge = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
-                // ★ Object placement mode: intercept edge clicks to place scene objects
-                {
-                  const st = useStore.getState();
-                  if (st.placementMode && st.activePlacementFormId) {
-                    const pFormId = st.activePlacementFormId;
-                    const pForm = formRegistry.get(pFormId);
-                    if (pForm) {
-                      const isWall = face === 'n' || face === 's' || face === 'e' || face === 'w';
-                      if (pForm.anchorType === 'face' && isWall) {
-                        const allObjs = Object.values(st.sceneObjects) as SceneObject[];
-                        const occ = getOccupiedSlots(allObjs, container.id, idx, face as WallDirection, formRegistry);
-                        const vs = getSlotsForPlacement(occ, pForm.slotWidth);
-                        if (vs.length > 0) {
-                          st.placeObject(pFormId, {
-                            containerId: container.id, voxelIndex: idx, type: 'face',
-                            face: face as WallDirection, slot: vs[0],
-                          });
-                        }
-                        return;
-                      } else if (pForm.anchorType === 'floor' && face === 'bottom') {
-                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'floor' });
-                        return;
-                      } else if (pForm.anchorType === 'ceiling' && face === 'top') {
-                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'ceiling' });
-                        return;
-                      }
-                      return; // Incompatible face
-                    }
-                  }
-                }
+                // ★ Object placement mode: intercept edge clicks to place scene objects (Fix 8)
+                if (tryPlacementIntercept(container.id, idx, face)) return;
                 // Alt+click = eyedropper: pick surface type from clicked face
                 if (e.nativeEvent.altKey) {
                   const voxel = useStore.getState().containers[container.id]?.voxelGrid?.[idx];

@@ -53,19 +53,41 @@ describe('Extension Unpack Animation State', () => {
     expect(g[0].faces.top).toBe('Solid_Steel');
   });
 
-  it('setAllExtensions("none") clears unpackPhase on deactivated extensions', () => {
+  it('setAllExtensions("none") sets reverse phase on active extensions (stays active during animation)', () => {
     const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
     useStore.getState().setAllExtensions(id, 'all_deck', true);
 
     // Verify phase is set
     expect(grid(id)[0].unpackPhase).toBe('wall_to_floor');
 
-    // Deactivate all
+    // Retract all — triggers reverse animation
     useStore.getState().setAllExtensions(id, 'none');
 
     const g = grid(id);
-    expect(g[0].active).toBe(false);
-    expect(g[0].unpackPhase).toBeUndefined();
+    // Voxel stays active during reverse animation
+    expect(g[0].active).toBe(true);
+    expect(g[0].unpackPhase).toBe('reverse');
+    expect(g[0]._reverseOriginalPhase).toBe('wall_to_floor');
+
+    // After clearUnpackPhase (simulates animation completion), voxel deactivates
+    useStore.getState().clearUnpackPhase(id, 0);
+    const g2 = grid(id);
+    expect(g2[0].active).toBe(false);
+    expect(g2[0].unpackPhase).toBeUndefined();
+  });
+
+  it('setAllExtensions("none") on interior uses wall_to_ceiling reverse', () => {
+    const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    useStore.getState().setAllExtensions(id, 'all_interior', true);
+
+    expect(grid(id)[0].unpackPhase).toBe('wall_to_ceiling');
+
+    useStore.getState().setAllExtensions(id, 'none');
+
+    const g = grid(id);
+    expect(g[0].active).toBe(true);
+    expect(g[0].unpackPhase).toBe('reverse');
+    expect(g[0]._reverseOriginalPhase).toBe('wall_to_ceiling');
   });
 
   it('clearUnpackPhase removes the phase from a specific voxel', () => {
@@ -136,25 +158,95 @@ describe('Phase Chaining (unpackAnimations)', () => {
   });
 });
 
-describe('Persistence Safety — unpackPhase stripped', () => {
-  it('partialize strips unpackPhase from voxels', () => {
+describe('Reverse Phase — _reverseOriginalPhase', () => {
+  beforeEach(() => resetStore());
+
+  it('clearUnpackPhase clears both unpackPhase and _reverseOriginalPhase', () => {
     const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
     useStore.getState().setAllExtensions(id, 'all_deck', true);
 
-    // Verify phase is set in live state
+    // Manually set reverse state (simulates what UI/store would do)
+    useStore.setState((s: any) => {
+      const c = s.containers[id];
+      const g = [...c.voxelGrid!];
+      g[0] = { ...g[0], unpackPhase: 'reverse', _reverseOriginalPhase: 'wall_to_floor' };
+      return { containers: { ...s.containers, [id]: { ...c, voxelGrid: g } } };
+    });
+
+    expect(grid(id)[0].unpackPhase).toBe('reverse');
+    expect(grid(id)[0]._reverseOriginalPhase).toBe('wall_to_floor');
+
+    useStore.getState().clearUnpackPhase(id, 0);
+
+    expect(grid(id)[0].unpackPhase).toBeUndefined();
+    expect(grid(id)[0]._reverseOriginalPhase).toBeUndefined();
+  });
+
+  it('_reverseOriginalPhase can be set to wall_to_ceiling for ceiling reverse', () => {
+    const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    useStore.getState().setAllExtensions(id, 'all_interior', true);
+
+    // Simulate reverse of ceiling deploy
+    useStore.setState((s: any) => {
+      const c = s.containers[id];
+      const g = [...c.voxelGrid!];
+      g[0] = { ...g[0], unpackPhase: 'reverse', _reverseOriginalPhase: 'wall_to_ceiling' };
+      return { containers: { ...s.containers, [id]: { ...c, voxelGrid: g } } };
+    });
+
+    expect(grid(id)[0]._reverseOriginalPhase).toBe('wall_to_ceiling');
+  });
+});
+
+describe('Animation Constants', () => {
+  it('element-specific animation speeds are exported and positive', async () => {
+    const mod = await import('@/config/unpackAnimations');
+    expect(mod.STAIR_TELESCOPE_SPEED).toBeGreaterThan(0);
+    expect(mod.STAIR_TELESCOPE_EXIT_SPEED).toBeGreaterThan(0);
+    expect(mod.RAILING_FOLD_SPEED).toBeGreaterThan(0);
+    expect(mod.RAILING_FOLD_EXIT_SPEED).toBeGreaterThan(0);
+    expect(mod.PILLAR_FOLD_SPEED).toBeGreaterThan(0);
+    expect(mod.PILLAR_FOLD_EXIT_SPEED).toBeGreaterThan(0);
+  });
+
+  it('exit durations are exported and reasonable (200-1000ms)', async () => {
+    const mod = await import('@/config/unpackAnimations');
+    for (const dur of [mod.STAIR_EXIT_DURATION, mod.RAILING_EXIT_DURATION, mod.PILLAR_EXIT_DURATION]) {
+      expect(dur).toBeGreaterThanOrEqual(200);
+      expect(dur).toBeLessThanOrEqual(1000);
+    }
+  });
+});
+
+describe('Persistence Safety — unpackPhase stripped', () => {
+  it('partialize strips unpackPhase and _reverseOriginalPhase from voxels', () => {
+    const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+    useStore.getState().setAllExtensions(id, 'all_deck', true);
+
+    // Manually add _reverseOriginalPhase to test stripping
+    useStore.setState((s: any) => {
+      const c = s.containers[id];
+      const g = [...c.voxelGrid!];
+      g[0] = { ...g[0], _reverseOriginalPhase: 'wall_to_floor' };
+      return { containers: { ...s.containers, [id]: { ...c, voxelGrid: g } } };
+    });
+
+    // Verify fields are set in live state
     expect(grid(id)[0].unpackPhase).toBe('wall_to_floor');
+    expect(grid(id)[0]._reverseOriginalPhase).toBe('wall_to_floor');
 
     // Access partialize function from persist options
     const storeOptions = (useStore as any).persist;
-    // The partialize fn is on the persist API — we test via getOptions
     const opts = storeOptions?.getOptions?.();
     if (opts?.partialize) {
       const partialized = opts.partialize(useStore.getState());
       const pGrid = partialized.containers[id].voxelGrid;
-      // Extension voxel should have NO unpackPhase in persisted data
+      // Both ephemeral fields should be stripped in persisted data
       expect(pGrid[0].unpackPhase).toBeUndefined();
-      // Body voxels should also have no unpackPhase (they never had one)
+      expect(pGrid[0]._reverseOriginalPhase).toBeUndefined();
+      // Body voxels should also have no ephemeral fields
       expect(pGrid[9].unpackPhase).toBeUndefined();
+      expect(pGrid[9]._reverseOriginalPhase).toBeUndefined();
     }
   });
 });

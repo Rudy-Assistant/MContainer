@@ -1,12 +1,76 @@
 @import "tailwindcss";
 
+/* ═══ Light Mode (default) ═══ */
 :root {
   --background: #f4f6f8;
   --foreground: #37474f;
-  --accent: #1565c0;
+  --accent: #2563eb;
+  --accent-hover: #3b82f6;
   --surface: #ffffff;
-  --border: #cfd8dc;
+  --surface-alt: #f8fafc;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --panel-bg: rgba(255, 255, 255, 0.85);
+  --panel-border: rgba(0, 0, 0, 0.08);
+  --panel-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  --input-bg: #f8fafc;
+  --input-border: #e2e8f0;
+  --btn-bg: #ffffff;
+  --btn-border: #e5e7eb;
+  --btn-hover: #f9fafb;
+  --dock-bg: rgba(15, 23, 42, 0.55);
+  --dock-text: rgba(255, 255, 255, 0.6);
+  --dock-active: #93c5fd;
+  --hotbar-bg: rgba(255, 255, 255, 0.92);
+  --hotbar-border: rgba(0, 0, 0, 0.06);
+  --modal-backdrop: rgba(0, 0, 0, 0.4);
+  --modal-bg: #ffffff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
 }
+
+/* ═══ Dark Mode — Engineering HUD ═══ */
+[data-theme="dark"] {
+  --background: #0d0f12;
+  --foreground: #f8fafc;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --surface: rgba(18, 22, 28, 0.85);
+  --surface-alt: #0f131a;
+  --border: rgba(59, 130, 246, 0.2);
+  --border-subtle: rgba(59, 130, 246, 0.08);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #475569;
+  --panel-bg: rgba(18, 22, 28, 0.88);
+  --panel-border: rgba(59, 130, 246, 0.25);
+  --panel-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --input-bg: #1e293b;
+  --input-border: #334155;
+  --btn-bg: #1e293b;
+  --btn-border: #334155;
+  --btn-hover: #334155;
+  --dock-bg: rgba(12, 15, 20, 0.75);
+  --dock-text: rgba(148, 163, 184, 0.8);
+  --dock-active: #60a5fa;
+  --hotbar-bg: rgba(18, 22, 28, 0.92);
+  --hotbar-border: rgba(59, 130, 246, 0.15);
+  --modal-backdrop: rgba(0, 0, 0, 0.7);
+  --modal-bg: #12161c;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+/* Dark mode scrollbar */
+[data-theme="dark"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-theme="dark"] ::-webkit-scrollbar-track { background: #0f131a; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
 @theme inline {
   --color-background: var(--background);
@@ -32,7 +96,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Range slider styling — prismatic day-arc gradient track */
+/* ═══ Modal backdrop (shared across all modals) ═══ */
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--modal-backdrop, rgba(0, 0, 0, 0.4));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ═══ Range slider ═══ */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -52,21 +125,60 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--accent, #2563eb);
   cursor: pointer;
-  border: 2px solid #1565c0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  border: 2px solid var(--surface, #fff);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  transition: transform 150ms ease;
 }
 
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* ═══ Hover utility classes (replace inline onMouseEnter/Leave handlers) ═══ */
+.hover-row { transition: background 80ms; }
+.hover-row:hover { background: var(--hover-row-bg, #eff6ff) !important; }
+
+.hover-row-subtle { transition: background 80ms; }
+.hover-row-subtle:hover { background: var(--border-subtle, #f1f5f9) !important; }
+
+.hover-close-btn { transition: all 150ms; }
+.hover-close-btn:hover { background: var(--border-subtle, #f1f5f9) !important; color: var(--text-muted, #475569) !important; }
+
+.hover-accent-ghost { transition: background 80ms; }
+.hover-accent-ghost:hover { background: rgba(37, 99, 235, 0.03) !important; }
+
+.hover-accent-icon { transition: all 120ms ease; }
+.hover-accent-icon:hover { background: rgba(37, 99, 235, 0.06) !important; color: var(--accent, #2563eb) !important; }
+
+.hover-surface-alt { transition: background 80ms; }
+.hover-surface-alt:hover { background: var(--surface-alt, #f8fafc) !important; }
+
+.hover-dark-btn { transition: background 80ms; }
+.hover-dark-btn:hover { background: #1e293b !important; }
+
+.hover-toolbar-btn { transition: background 80ms; }
+.hover-toolbar-btn:hover { background: var(--btn-hover, #f9fafb) !important; }
+
+.hover-danger { transition: background 80ms; }
+.hover-danger:hover { background: rgba(239, 68, 68, 0.08) !important; }
+
+.hover-rename { transition: border-color 80ms; }
+.hover-rename:hover { border-color: #cbd5e1 !important; }
+
+.hover-accent-text { transition: all 80ms; }
+.hover-accent-text:hover { color: #f59e0b !important; border-color: #f59e0b !important; }
+
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--accent, #2563eb);
   cursor: pointer;
-  border: 2px solid #1565c0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  border: 2px solid var(--surface, #fff);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
 }

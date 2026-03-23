@@ -113,14 +113,21 @@ describe('Extension Overlap Prevention', () => {
     // East/west may also be true since row 0 includes corners (col 0, col 7)
   });
 
-  it('OVR-7: deactivating extensions (none) always succeeds', () => {
+  it('OVR-7: deactivating extensions (none) always succeeds after reverse animation', () => {
     const id = useStore.getState().addContainer(ContainerSize.Standard40);
     useStore.getState().setAllExtensions(id, 'all_deck');
     const extBefore = getActiveExtensions(useStore.getState().containers[id]);
     expect(extBefore.north || extBefore.south || extBefore.east || extBefore.west).toBe(true);
 
-    // Deactivation should always work regardless of neighbors
+    // Deactivation triggers reverse animation — voxels stay active during animation
     useStore.getState().setAllExtensions(id, 'none');
+
+    // Simulate animation completion for all extension voxels
+    const grid = useStore.getState().containers[id].voxelGrid!;
+    grid.forEach((v, i) => {
+      if (v.unpackPhase === 'reverse') useStore.getState().clearUnpackPhase(id, i);
+    });
+
     const extAfter = getActiveExtensions(useStore.getState().containers[id]);
     expect(extAfter.north).toBe(false);
     expect(extAfter.south).toBe(false);

@@ -161,6 +161,14 @@ export const MODULE_PRESETS: ModulePreset[] = [
     faces: { inward: 'Open', outward: 'Open', left: 'Solid_Steel', right: 'Solid_Steel', floor: 'Deck_Wood', ceiling: 'Open' },
     description: 'Staircase — delegates to applyStairsFromFace',
   },
+  {
+    id: 'entry_door',
+    label: 'Entry Door',
+    category: 'utility',
+    icon: '🚪',
+    faces: { inward: 'Open', outward: 'Door', left: 'Solid_Steel', right: 'Solid_Steel', floor: 'Deck_Wood', ceiling: 'Solid_Steel' },
+    description: 'Entry door — places Door on outward face with smart config',
+  },
 ];
 
 /** Look up a module preset by ID. */

@@ -20,7 +20,8 @@ import {
 import { createDefaultVoxelGrid } from '@/types/factories';
 import defaultPricing from '@/config/pricing_config.json';
 import { getModelHome } from '@/config/modelHomes';
-import type { ExtensionConfig } from '@/types/container';
+import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from '@/types/container';
+import { scheduleAdjacency } from '@/store/slices/containerSlice';
 import type { HotbarSlot } from '../useStore';
 
 // Use a lazy StoreState reference to avoid circular imports.
@@ -239,7 +240,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     }
 
     t?.resume();
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
     return containerIds;
   },
 
@@ -378,7 +379,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     // Auto-expand extensions on containers that don't have explicit extensionConfig
     for (const [i, mc] of model.containers.entries()) {
       if (!mc.extensionConfig || mc.extensionConfig === 'none') {
-        get().setAllExtensions(containerIds[i], 'all_deck', false);
+        get().setAllExtensions(containerIds[i], DEFAULT_EXTENSION_CONFIG, false);
         t?.pause();
       }
     }
@@ -393,7 +394,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     }
 
     t?.resume();
-    requestAnimationFrame(() => get().refreshAdjacency());
+    scheduleAdjacency(get);
     return containerIds;
   },
 });

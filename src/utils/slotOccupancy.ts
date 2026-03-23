@@ -1,5 +1,8 @@
 import type { SceneObject, FormDefinition, WallDirection } from '@/types/sceneObject';
 
+/** Number of placement slots per wall face (Fix 7). */
+export const FACE_SLOT_COUNT = 3;
+
 export function getOccupiedSlots(
   objects: SceneObject[],
   containerId: string,
@@ -21,7 +24,7 @@ export function getOccupiedSlots(
 }
 
 export function canPlaceInSlot(occupied: Set<number>, startSlot: number, slotWidth: number): boolean {
-  if (startSlot + slotWidth > 3) return false;
+  if (startSlot + slotWidth > FACE_SLOT_COUNT) return false;
   for (let i = 0; i < slotWidth; i++) {
     if (occupied.has(startSlot + i)) return false;
   }
@@ -30,7 +33,7 @@ export function canPlaceInSlot(occupied: Set<number>, startSlot: number, slotWid
 
 export function getSlotsForPlacement(occupied: Set<number>, slotWidth: number): number[] {
   const valid: number[] = [];
-  for (let s = 0; s <= 3 - slotWidth; s++) {
+  for (let s = 0; s <= FACE_SLOT_COUNT - slotWidth; s++) {
     if (canPlaceInSlot(occupied, s, slotWidth)) valid.push(s);
   }
   return valid;

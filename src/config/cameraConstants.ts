@@ -17,13 +17,11 @@
 /** Minimum polar angle — prevents pure top-down view (camera directly above target) */
 export const CAMERA_MIN_POLAR_ANGLE = 0.2;  // ~11.5° from vertical
 
-/** Maximum polar angle — prevents looking above the horizon.
- * π/2 - 0.44 ≈ 65° from vertical ≈ 25° below horizon.
- * With 48° FOV, the top of the viewport is at 25° - 24° = 1° below horizon.
- * Sky mesh may be barely visible at the very top edge — this is natural.
- * Previous value (π/2 - 0.08 ≈ 85.4°) allowed near-horizontal views where
- * 40%+ of the viewport was sky, causing user-reported "blue screen." */
-export const CAMERA_MAX_POLAR_ANGLE = Math.PI / 2 - 0.44;
+/** Maximum polar angle — allows near-horizon views for ground-level feel.
+ * π/2 - 0.18 ≈ 79.7° from vertical ≈ 10.3° below horizon.
+ * Relaxed from 0.44 to allow more immersive views while still preventing
+ * the camera from looking above the horizon (sky fill regression). */
+export const CAMERA_MAX_POLAR_ANGLE = Math.PI / 2 - 0.18;
 
 export const CAMERA_MIN_DISTANCE = 3;
 
@@ -32,11 +30,13 @@ export const CAMERA_MIN_DISTANCE = 3;
  * 60m is generous for any multi-container layout. */
 export const CAMERA_MAX_DISTANCE = 60;
 
-/** Minimum camera Y position (floor guard clamps below this) */
-export const CAMERA_FLOOR_Y = 0.5;
+/** Minimum camera Y position (floor guard clamps below this).
+ * Set to 0.05 — ground is the floor, camera can go nearly to ground level. */
+export const CAMERA_FLOOR_Y = 0.05;
 
-/** Minimum orbit target Y — prevents looking through the ground */
-export const CAMERA_TARGET_MIN_Y = 0.3;
+/** Minimum orbit target Y — allows near-ground views.
+ * Set to 0.0 — ground plane is at Y=-0.01, so target can reach floor level. */
+export const CAMERA_TARGET_MIN_Y = 0.0;
 
 /** Maximum downward viewing angle in radians (~70°). Prevents ground-filling viewport after TRUCK. */
 export const CAMERA_MAX_DOWNWARD_ANGLE = 70 * (Math.PI / 180);
@@ -69,6 +69,11 @@ export const CAMERA_MAX_Y = 10;
  * is 15° + 24° = 39° above horizontal, which still shows plenty of sky.
  * 15° is enough for natural-feeling views without sky domination. */
 export const CAMERA_MAX_UPWARD_ANGLE = 15 * (Math.PI / 180);
+
+/** Initial camera position — 2:1 dimetric (game-standard isometric).
+ * X=Z gives 45° azimuth (equal foreshortening); Y chosen so elevation ≈ arctan(0.5) ≈ 26.565°.
+ * atan(10 / sqrt(14² + 14²)) = atan(10/19.8) ≈ 26.8° — matches hotbar icon angle. */
+export const CAMERA_INITIAL_POSITION: [number, number, number] = [14, 10, 14];
 
 /** Maximum distance the orbit target can drift from origin XZ before clamping.
  * Prevents right-drag TRUCK from panning camera out of sight of the scene.

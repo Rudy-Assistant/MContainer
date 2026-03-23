@@ -35,11 +35,11 @@ function safeExitPointerLock() {
 function safeRequestPointerLock() {
   try {
     const canvas = document.querySelector('canvas');
-    if (canvas && !document.pointerLockElement) {
-      canvas.requestPointerLock();
-    }
+    if (!canvas || !(canvas as Element).isConnected || !document.hasFocus()) return;
+    if (document.pointerLockElement) return;
+    canvas.requestPointerLock();
   } catch {
-    // Ignore errors
+    // Ignore errors — element may have been detached between check and call
   }
 }
 
@@ -469,6 +469,8 @@ export default function WalkthroughControls() {
               // Open faces are passable — no collision
               const surface = voxel.faces[f.dir];
               if (surface === 'Open') continue;
+              // Door faces are passable when toggled open
+              if (surface === 'Door' && voxel.openFaces?.[f.dir]) continue;
               // Railing types: collision only up to railing height
               const fH = (surface === 'Railing_Cable' || surface === 'Railing_Glass') ? 1.0 : h;
               boxes.push(localBoxToWorld(f.cx, f.cz, f.hw, f.hd, fH));

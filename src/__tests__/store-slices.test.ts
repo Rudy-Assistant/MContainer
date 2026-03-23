@@ -98,7 +98,7 @@ describe('hotbar controls', () => {
   it('activeHotbarTab cycles with cycleHotbarTab', () => {
     const before = useStore.getState().activeHotbarTab;
     useStore.getState().cycleHotbarTab(1);
-    expect(useStore.getState().activeHotbarTab).toBe((before + 1) % 2);
+    expect(useStore.getState().activeHotbarTab).toBe((before + 1) % 4);
     useStore.getState().cycleHotbarTab(-1);
     expect(useStore.getState().activeHotbarTab).toBe(before);
   });
@@ -232,8 +232,8 @@ describe('generateRooftopDeck', () => {
 });
 
 describe('designComplexity', () => {
-  it('defaults to detailed', () => {
-    expect(useStore.getState().designComplexity).toBe('detailed');
+  it('defaults to simple', () => {
+    expect(useStore.getState().designComplexity).toBe('simple');
   });
 
   it('updates with setDesignComplexity', () => {

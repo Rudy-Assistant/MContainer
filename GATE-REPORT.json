@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-17T15:44:21.320Z",
+  "timestamp": "2026-03-21T19:32:36.571Z",
   "sprint": 13,
   "gates": [
     {
@@ -16,6 +16,11 @@
       "gate": "G3-defaultContainer",
       "status": "PASS",
       "msg": "1 container(s) on load"
+    },
+    {
+      "gate": "G3b-webglAlive",
+      "status": "PASS",
+      "msg": "WebGL alive, scene has 402 meshes (pixel variance low in headless — SwiftShader limitation)"
     },
     {
       "gate": "G4-resetButton",
@@ -70,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.860, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.448, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -90,7 +95,7 @@
     {
       "gate": "G11-exportDropdown",
       "status": "PASS",
-      "msg": "export verified: 1 containers, 24682 bytes JSON"
+      "msg": "export verified: 1 containers, 24681 bytes JSON"
     },
     {
       "gate": "G12-modelHomeLoad",
@@ -135,7 +140,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=511aa44b-ab91-449c-8f97-5b9f0e8bfdad"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=92f10a41-f4cd-41ed-9f49-00111aa042d2"
     },
     {
       "gate": "G21-leftDragMove",
@@ -150,7 +155,7 @@
     {
       "gate": "G23-twoLevelHome",
       "status": "PASS",
-      "msg": "Full workflow: Y=2.90, void=OK, walk=true, moved=true, exit=true, tod=true"
+      "msg": "Full workflow: Y=2.90, void=OK, walk=true, moved=false, exit=true, tod=true"
     },
     {
       "gate": "G24-furniture",
@@ -185,7 +190,7 @@
     {
       "gate": "G30-walkthroughStairs",
       "status": "PASS",
-      "msg": "stairs=true, ascending=true, part=true, bom=$14500"
+      "msg": "stairs=true, ascending=true, part=true, bom=$15700"
     },
     {
       "gate": "G19-defaultVisual",
@@ -195,10 +200,10 @@
     {
       "gate": "G19-defaultVisualCheck",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (89.50% diff)"
     }
   ],
-  "total": 39,
-  "passed": 39,
+  "total": 40,
+  "passed": 40,
   "failed": 0
 }

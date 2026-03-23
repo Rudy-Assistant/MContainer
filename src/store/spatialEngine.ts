@@ -8,6 +8,7 @@
 import {
   type Container,
   type ContainerSize,
+  type Voxel,
   type VoxelFaces,
   type SurfaceType,
   CONTAINER_DIMENSIONS,
@@ -16,6 +17,7 @@ import {
   VOXEL_ROWS,
   VOXEL_LEVELS,
   WallSide,
+  isRailingSurface,
 } from "@/types/container";
 
 // ── Types ───────────────────────────────────────────────────
@@ -443,6 +445,7 @@ export function findAdjacentPairs(
     for (let j = i + 1; j < ids.length; j++) {
       const a = containers[ids[i]];
       const b = containers[ids[j]];
+      if (!a?.position || !b?.position) continue;
 
       // Must be on the same level
       if (Math.abs(a.position.y - b.position.y) > 0.1) continue;
@@ -546,20 +549,40 @@ export function computeGlobalCulling(
 ): Set<string> {
   const cullSet = new Set<string>();
 
-  function isRailing(s: SurfaceType | undefined): boolean {
-    return s === 'Railing_Glass' || s === 'Railing_Cable';
-  }
   const SOLID_SURFACES: SurfaceType[] = ['Solid_Steel', 'Concrete', 'Glass_Pane'];
 
   function shouldMelt(aSurface: SurfaceType | undefined, bSurface: SurfaceType | undefined): boolean {
     if (aSurface === undefined || bSurface === undefined) return false;
     // Same surface → melt
     if (aSurface === bSurface) return true;
-    // Both railing variants → melt
-    if (isRailing(aSurface) && isRailing(bSurface)) return true;
-    // Solid surfaces against any active → melt (internal walls inside assemblies)
-    if (SOLID_SURFACES.includes(aSurface)) return true;
+    // Both railing variants → melt (Smart: unified deck perimeter)
+    if (isRailingSurface(aSurface) && isRailingSurface(bSurface)) return true;
+    // Solid surfaces against other solids → melt (internal walls inside assemblies)
+    if (SOLID_SURFACES.includes(aSurface) && SOLID_SURFACES.includes(bSurface)) return true;
     return false;
+  }
+
+  /** Smart override: skip culling if EITHER side was explicitly user-painted */
+  function isUserPainted(voxel: Voxel | undefined, face: keyof VoxelFaces): boolean {
+    return !!(voxel?.userPaintedFaces?.[face]);
+  }
+
+  /** Try to cull a single voxel pair across the boundary */
+  function tryCullPair(
+    a: Container, aIdx: number, aBound: ReturnType<typeof wallSideToBoundary>,
+    b: Container, bIdx: number, bBound: ReturnType<typeof wallSideToBoundary>,
+  ) {
+    const aVox = a.voxelGrid?.[aIdx];
+    const bVox = b.voxelGrid?.[bIdx];
+    if (aVox?.active && bVox?.active) {
+      const aSurface = aVox.faces[aBound.face];
+      const bSurface = bVox.faces[bBound.face];
+      if (shouldMelt(aSurface, bSurface)) {
+        // Smart: preserve user-painted faces (override auto-removal)
+        if (!isUserPainted(aVox, aBound.face)) cullSet.add(`${a.id}:${aIdx}:${aBound.face}`);
+        if (!isUserPainted(bVox, bBound.face)) cullSet.add(`${b.id}:${bIdx}:${bBound.face}`);
+      }
+    }
   }
 
   for (const pair of pairs) {
@@ -577,30 +600,18 @@ export function computeGlobalCulling(
       if (!aBound.isRowBoundary) {
         // Col-based boundary (Front/Back) — iterate over rows
         for (let row = 0; row < VOXEL_ROWS; row++) {
-          const aIdx = lvlOff + row * VOXEL_COLS + aBound.index;
-          const bIdx = lvlOff + row * VOXEL_COLS + bBound.index;
-          if (a.voxelGrid[aIdx]?.active && b.voxelGrid[bIdx]?.active) {
-            const aSurface = a.voxelGrid[aIdx]?.faces[aBound.face];
-            const bSurface = b.voxelGrid[bIdx]?.faces[bBound.face];
-            if (shouldMelt(aSurface, bSurface)) {
-              cullSet.add(`${a.id}:${aIdx}:${aBound.face}`);
-              cullSet.add(`${b.id}:${bIdx}:${bBound.face}`);
-            }
-          }
+          tryCullPair(
+            a, lvlOff + row * VOXEL_COLS + aBound.index, aBound,
+            b, lvlOff + row * VOXEL_COLS + bBound.index, bBound,
+          );
         }
       } else {
         // Row-based boundary (Left/Right) — iterate over cols
         for (let col = 0; col < VOXEL_COLS; col++) {
-          const aIdx = lvlOff + aBound.index * VOXEL_COLS + col;
-          const bIdx = lvlOff + bBound.index * VOXEL_COLS + col;
-          if (a.voxelGrid[aIdx]?.active && b.voxelGrid[bIdx]?.active) {
-            const aSurface = a.voxelGrid[aIdx]?.faces[aBound.face];
-            const bSurface = b.voxelGrid[bIdx]?.faces[bBound.face];
-            if (shouldMelt(aSurface, bSurface)) {
-              cullSet.add(`${a.id}:${aIdx}:${aBound.face}`);
-              cullSet.add(`${b.id}:${bIdx}:${bBound.face}`);
-            }
-          }
+          tryCullPair(
+            a, lvlOff + aBound.index * VOXEL_COLS + col, aBound,
+            b, lvlOff + bBound.index * VOXEL_COLS + col, bBound,
+          );
         }
       }
     }

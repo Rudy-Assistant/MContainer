@@ -147,7 +147,8 @@ function matColor(matId: string): string {
 
 export default function SkinEditor() {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const sceneObjects = useStore((s) => s.sceneObjects);
+  // Narrow selector: subscribe to only the selected object, not the full map (Fix 5)
+  const obj = useStore((s) => selectedObjectId ? s.sceneObjects[selectedObjectId] : null);
   const activeStyle = useStore((s) => s.activeStyle);
   const selectObject = useStore((s) => s.selectObject);
   const updateSkin = useStore((s) => s.updateSkin);
@@ -156,8 +157,7 @@ export default function SkinEditor() {
   const removeObject = useStore((s) => s.removeObject);
   const duplicateObject = useStore((s) => s.duplicateObject);
 
-  // Derive the selected object and its form definition
-  const obj = selectedObjectId ? sceneObjects[selectedObjectId] : null;
+  // Derive form definition from the selected object
   const form: FormDefinition | undefined = obj ? formRegistry.get(obj.formId) : undefined;
   const styleDef = getStyle(activeStyle);
   const quickSkins = useMemo(() => getQuickSkins(activeStyle), [activeStyle]);

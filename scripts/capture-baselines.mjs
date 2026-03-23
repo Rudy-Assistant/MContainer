@@ -65,6 +65,8 @@ async function run() {
   console.log('Captured: baseline-golden-hour.png');
 
   // 4. baseline-japanese-theme.png — Japanese theme via UI click
+  await page.click('[data-testid="btn-palette"]');
+  await page.waitForTimeout(300);
   await page.click('[data-testid="theme-japanese"]');
   await waitForRender(page);
   await page.screenshot({ path: `${DIR}/baseline-japanese-theme.png`, clip: CLIP });

@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import type { StyleEffect } from '@/types/sceneObject';
 
+// Module-level color constants to avoid per-call allocations (Fix 6)
+const EMBER_COLOR = new THREE.Color('#ff8c00');
+
 /**
  * Apply style effects to a material. Mutates the material in-place.
  * Called once per material creation (not per frame).
@@ -105,6 +108,6 @@ export function applyEmberWarmth(
 ): { color: THREE.Color; distance: number } | null {
   const ember = effects.find((e) => e.type === 'ember_warmth');
   if (!ember) return null;
-  const warmColor = baseColor.clone().lerp(new THREE.Color('#ff8c00'), ember.intensity ?? 0.3);
+  const warmColor = baseColor.clone().lerp(EMBER_COLOR, ember.intensity ?? 0.3);
   return { color: warmColor, distance: baseDistance * 1.3 };
 }
