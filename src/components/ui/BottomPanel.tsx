@@ -177,7 +177,6 @@ export default function BottomPanel() {
   const [category, setCategory] = useState<FormCategory>('door');
   const activePlacementFormId = useStore((s) => s.activePlacementFormId);
   const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
-  const selectedObjectId = useStore((s) => s.selectedObjectId);
   const selectedFormId = useStore((s) =>
     s.selectedObjectId ? s.sceneObjects[s.selectedObjectId]?.formId ?? null : null
   );
@@ -193,31 +192,21 @@ export default function BottomPanel() {
     }
   }, [selectedFormId]);
 
-  // Re-compute left position on resize
-  const [winWidth, setWinWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
-  useEffect(() => {
-    const handler = () => setWinWidth(window.innerWidth);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
-
   const handleCardClick = useCallback((formId: string) => {
     const { activePlacementFormId: current, setPlacementMode, setHoveredFormId } = useStore.getState();
     setHoveredFormId(null);
     setPlacementMode(current === formId ? null : formId);
   }, []);
 
-  const panelPositionStyle = useMemo(() => ({
+  // CSS calc centers the bar over the canvas area (viewport minus sidebar)
+  const panelPositionStyle = useMemo<CSSProperties>(() => ({
     ...wrapperStyle,
-    left: sidebarWidth + (winWidth - sidebarWidth) / 2,
-  }), [sidebarWidth, winWidth]);
-
-  // Determine the selected object's formId (for highlighting its card)
-  const selectedObjFormId = selectedFormId;
+    left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+  }), [sidebarWidth]);
 
   // Badge logic: placing takes priority over selection
   const placingForm = activePlacementFormId ? formRegistry.get(activePlacementFormId) : null;
-  const selectedForm = selectedObjFormId ? formRegistry.get(selectedObjFormId) : null;
+  const selectedForm = selectedFormId ? formRegistry.get(selectedFormId) : null;
 
   return (
     <div style={panelPositionStyle}>
@@ -240,7 +229,7 @@ export default function BottomPanel() {
         <div style={cardScrollStyle}>
           {forms.map((f) => {
             const isPlacing = activePlacementFormId === f.id;
-            const isSelected = !isPlacing && selectedObjFormId === f.id;
+            const isSelected = !isPlacing && selectedFormId === f.id;
             return (
               <button
                 key={f.id}
