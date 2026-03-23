@@ -2,10 +2,10 @@
 
 import { useStore } from '@/store/useStore';
 import { ELECTRICAL_TYPES, PAINT_COLORS } from '@/config/finishPresets';
-import type { FaceFinish } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import OptionCardGrid from './OptionCardGrid';
 import SwatchRow from './SwatchRow';
+import { useApplyFinish } from './useApplyFinish';
 
 interface Props {
   containerId: string;
@@ -15,10 +15,9 @@ interface Props {
 }
 
 export default function ElectricalTab({ containerId, voxelIndex, indices, face }: Props) {
-  // Hooks must be called unconditionally (Rules of Hooks)
   const currentFinish = useStore((s) => s.containers[containerId]?.voxelGrid?.[voxelIndex]?.faceFinishes?.[face]);
-  const setFaceFinish = useStore((s) => s.setFaceFinish);
   const addRecentItem = useStore((s) => s.addRecentItem);
+  const applyFinish = useApplyFinish(containerId, indices, face);
 
   const isWallFace = face !== 'top' && face !== 'bottom';
 
@@ -31,10 +30,6 @@ export default function ElectricalTab({ containerId, voxelIndex, indices, face }
       </div>
     );
   }
-
-  const applyFinish = (patch: Partial<FaceFinish>) => {
-    for (const idx of indices) setFaceFinish(containerId, idx, face, patch);
-  };
 
   return (
     <div style={{ padding: '8px 12px' }}>

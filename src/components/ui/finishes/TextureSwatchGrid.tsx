@@ -34,11 +34,12 @@ function SwatchButton({ item, active, onSelect }: {
 }) {
   const [useFallback, setUseFallback] = useState(false);
   const textureSrc = getSwatchSrc(item);
-  const fallbackSrc = generateNoiseSwatch(item.id, item.color);
+  const needsFallback = !textureSrc || useFallback;
+  const fallbackSrc = needsFallback ? generateNoiseSwatch(item.id, item.color) : null;
 
   const handleError = useCallback(() => setUseFallback(true), []);
 
-  const imgSrc = (textureSrc && !useFallback) ? textureSrc : fallbackSrc;
+  const imgSrc = needsFallback ? fallbackSrc! : textureSrc;
 
   return (
     <button

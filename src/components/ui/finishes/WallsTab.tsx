@@ -1,16 +1,18 @@
 "use client";
 
+import { useMemo } from 'react';
 import { useStore } from '@/store/useStore';
 import {
   EXTERIOR_MATERIALS, GLASS_TINTS, FRAME_COLORS, DOOR_STYLES, PAINT_COLORS,
   getFinishOptionsForFace,
 } from '@/config/finishPresets';
 import { getWallTypesForContext } from '@/config/wallTypes';
-import type { SurfaceType, FaceFinish } from '@/types/container';
+import type { SurfaceType } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import OptionCardGrid from './OptionCardGrid';
 import SwatchRow from './SwatchRow';
+import { useApplyFinish } from './useApplyFinish';
 
 interface Props {
   containerId: string;
@@ -27,19 +29,18 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
     s.containers[containerId]?.voxelGrid?.[voxelIndex]?.faceFinishes?.[face]
   );
   const inspectorView = useStore((s) => s.inspectorView);
-  const setFaceFinish = useStore((s) => s.setFaceFinish);
   const paintFace = useStore((s) => s.paintFace);
   const addRecentItem = useStore((s) => s.addRecentItem);
+  const applyFinish = useApplyFinish(containerId, indices, face);
 
-  const wallTypes = getWallTypesForContext(inspectorView, face);
+  const wallTypes = useMemo(
+    () => getWallTypesForContext(inspectorView, face),
+    [inspectorView, face],
+  );
 
   const handleSurfaceChange = (newSurface: SurfaceType) => {
     for (const idx of indices) paintFace(containerId, idx, face, newSurface);
     addRecentItem({ type: 'wallType', value: newSurface, label: newSurface.replace(/_/g, ' ') });
-  };
-
-  const applyFinish = (patch: Partial<FaceFinish>) => {
-    for (const idx of indices) setFaceFinish(containerId, idx, face, patch);
   };
 
   const opts = surface ? getFinishOptionsForFace(surface, face) : null;

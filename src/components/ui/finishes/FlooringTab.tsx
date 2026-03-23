@@ -2,10 +2,10 @@
 
 import { useStore } from '@/store/useStore';
 import { FLOOR_MATERIALS, PAINT_COLORS } from '@/config/finishPresets';
-import type { FaceFinish } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import SwatchRow from './SwatchRow';
+import { useApplyFinish } from './useApplyFinish';
 
 interface Props {
   containerId: string;
@@ -16,12 +16,8 @@ interface Props {
 
 export default function FlooringTab({ containerId, voxelIndex, indices, face }: Props) {
   const currentFinish = useStore((s) => s.containers[containerId]?.voxelGrid?.[voxelIndex]?.faceFinishes?.[face]);
-  const setFaceFinish = useStore((s) => s.setFaceFinish);
   const addRecentItem = useStore((s) => s.addRecentItem);
-
-  const applyFinish = (patch: Partial<FaceFinish>) => {
-    for (const idx of indices) setFaceFinish(containerId, idx, face, patch);
-  };
+  const applyFinish = useApplyFinish(containerId, indices, face);
 
   return (
     <div style={{ padding: '8px 12px' }}>

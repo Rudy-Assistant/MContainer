@@ -31,11 +31,13 @@ export default function OptionCardGrid({ items, activeId, onSelect, label }: Pro
               color: 'var(--text-main, #e2e8f0)', transition: 'border-color 100ms',
             }}
           >
-            <div style={{
-              width: 16, height: 16, borderRadius: '50%',
-              background: item.color, border: '1px solid rgba(255,255,255,0.1)',
-            }} />
-            {item.icon && <span style={{ fontSize: 16 }}>{item.icon}</span>}
+            {item.icon
+              ? <span style={{ fontSize: 16 }}>{item.icon}</span>
+              : <div style={{
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: item.color, border: '1px solid rgba(255,255,255,0.1)',
+                }} />
+            }
             <span style={{ textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
           </button>
         ))}

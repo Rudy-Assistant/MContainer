@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { useSelectionTarget, type FaceKey } from '@/hooks/useSelectionTarget';
 import VoxelPreview3D from '@/components/ui/VoxelPreview3D';
@@ -14,13 +14,10 @@ export default function FinishesPanel() {
   const target = useSelectionTarget();
   const selectedFace = useStore((s) => s.selectedFace) as FaceKey | null;
 
-  const [activeTab, setActiveTab] = useState<FinishTab>('walls');
-
-  // Auto-select tab when face changes
-  useEffect(() => {
-    const tab = faceToTab(selectedFace);
-    if (tab) setActiveTab(tab);
-  }, [selectedFace]);
+  // Derived tab from face; manual override when user clicks a tab directly
+  const derivedTab = faceToTab(selectedFace);
+  const [manualTab, setManualTab] = useState<FinishTab>('walls');
+  const activeTab = derivedTab ?? manualTab;
 
   // Derive containerId, voxelIndex, indices from target
   let containerId = '';
@@ -73,7 +70,7 @@ export default function FinishesPanel() {
       {/* Tab bar */}
       <FinishesTabBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={setManualTab}
         disabled={!hasFace}
       />
 

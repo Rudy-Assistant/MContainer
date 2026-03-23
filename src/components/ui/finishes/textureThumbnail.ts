@@ -15,7 +15,8 @@ const _cache = new Map<string, string>();
 
 /** Generate a canvas data URL with noise pattern from a hex color. Cached by id. */
 export function generateNoiseSwatch(id: string, hex: string, size = 64): string {
-  const cached = _cache.get(id);
+  const key = `${id}:${hex}`;
+  const cached = _cache.get(key);
   if (cached) return cached;
 
   const canvas = typeof document !== 'undefined'
@@ -26,7 +27,7 @@ export function generateNoiseSwatch(id: string, hex: string, size = 64): string 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     const fallback = `data:image/png;base64,`;
-    _cache.set(id, fallback);
+    _cache.set(key, fallback);
     return fallback;
   }
 
@@ -46,6 +47,6 @@ export function generateNoiseSwatch(id: string, hex: string, size = 64): string 
   ctx.putImageData(imageData, 0, 0);
 
   const dataUrl = canvas.toDataURL('image/png');
-  _cache.set(id, dataUrl);
+  _cache.set(key, dataUrl);
   return dataUrl;
 }
