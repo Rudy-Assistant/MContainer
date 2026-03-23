@@ -43,11 +43,12 @@ src/__tests__/placement-flow.test.ts
 ### Modified Files
 
 ```
-src/types/container.ts                — Add activeStyle to AppState, deprecate FaceFinish/LightPlacement
+src/types/container.ts                — Add sceneObjects field to PricingEstimate.breakdown, deprecate FaceFinish/LightPlacement
 src/store/useStore.ts                 — Add sceneObjectSlice, update partialize (temporal + persist), add schemaVersion
 src/store/persistSchema.ts            — Add sceneObjectSchema, schemaVersion field
 src/store/slices/containerSlice.ts    — removeContainer cascades removeObjectsByContainer; extend getEstimate()
-src/store/slices/uiSlice.ts           — Add placementMode, activePlacementFormId, activeStyle (replaces currentTheme)
+src/store/slices/uiSlice.ts           — Add placementMode, activePlacementFormId
+src/store/slices/environmentSlice.ts  — Add activeStyle (replaces currentTheme), setActiveStyle action
 src/config/themes.ts                  — Retain for backward compat; add THEME_TO_STYLE_MAP
 src/config/materialCache.ts           — Read from StyleDefinition.defaultMaterials (new path)
 src/components/three/Scene.tsx        — Mount SceneObjectRenderer
@@ -64,32 +65,34 @@ src/components/ui/BottomDock.tsx      — Mount FormCatalog
 ```
 Task 1 (Types) ─────────────────────────────────┐
 Task 2 (Materials) ──┐                          │
-Task 3 (Styles) ─────┼── Task 5 (Form Registry) │
-Task 4a-d (Forms) ───┘                          │
+Task 3 (Styles) ─────┼── Task 4 (Form Registry) │
+Task 4 (Forms) ──────┘                          │
                                                  │
-Task 1 ──── Task 6 (Slot Occupancy) ────────────┤
-Task 1 ──── Task 7 (Skin Resolver) ────────────┤
+Task 1 ──── Task 5 (Slot Occupancy) ────────────┤
+Task 1 ──── Task 6 (Skin Resolver) ────────────┤
                                                  │
-Task 1 + 5 + 6 + 7 ── Task 8 (Store Slice) ────┤
-Task 8 ──── Task 9 (Store Integration) ─────────┤
-Task 9 ──── Task 10 (Migration) ────────────────┤
+Task 1 + 4 + 5 + 6 ── Task 7 (Store Slice) ────┤
+Task 7 ──── Task 8 (Persist Schema & Migration) ┤
+Task 7 ──── Task 9 (Theme→Style Migration) ─────┤
                                                  │
-Task 8 ──── Task 11 (SceneObjectRenderer) ──────┤
-Task 11 ─── Task 12 (PlacementGhost) ───────────┤
-Task 11 ─── Task 13 (Wall Coordination) ────────┤
+Task 7 ──── Task 10 (SceneObjectRenderer) ──────┤
+Task 10 ─── Task 11 (Wall Coordination) ────────┤
+Task 10 ─── Task 12 (PlacementGhost) ───────────┤
                                                  │
-Task 8 ──── Task 14 (FormCatalog UI) ───────────┤
-Task 8 ──── Task 15 (SkinEditor UI) ────────────┤
-Task 14+15─ Task 16 (Placement Flow Wiring) ────┤
+Task 7 ──── Task 13 (FormCatalog UI) ───────────┤
+Task 7 ──── Task 14 (SkinEditor UI) ────────────┤
+Task 12+13+14 ── Task 15 (Placement Flow) ──────┤
                                                  │
-Task 8 ──── Task 17 (BOM Integration) ──────────┤
-Task 9 ──── Task 18 (Theme→Style Migration) ────┘
+Task 7 ──── Task 16 (BOM Integration) ──────────┤
+Task 7 ──── Task 17 (Container Remove Cascade) ─┤
+Task 7 ──── Task 18 (Core Loop Canary) ─────────┤
+Task all ── Task 19 (Final Verification) ────────┘
 ```
 
 **Parallelizable groups:**
 - Tasks 1-4 (types + config data) — all independent
-- Tasks 6, 7 (utils) — independent of each other, depend only on Task 1
-- Tasks 14, 15 (UI panels) — independent of each other, depend on Task 8
+- Tasks 5, 6 (utils) — independent of each other, depend only on Task 1
+- Tasks 13, 14 (UI panels) — independent of each other, depend on Task 7
 
 ---
 
@@ -1120,7 +1123,7 @@ Expected: FAIL — sceneObjects not on store, actions not found
 // src/store/slices/sceneObjectSlice.ts
 import type { SceneObject, ObjectAnchor } from '@/types/sceneObject';
 import { formRegistry } from '@/config/formRegistry';
-import { getOccupiedSlots, canPlaceInSlot } from '@/utils/slotOccupancy';
+import { getOccupiedSlots, canPlaceInSlot, canPlaceFloorObject } from '@/utils/slotOccupancy';
 import { v4 as uuid } from 'uuid';
 
 export interface SceneObjectSlice {
@@ -1148,6 +1151,20 @@ export function createSceneObjectSlice(set: any, get: any): SceneObjectSlice {
         const allObjects = Object.values(get().sceneObjects) as SceneObject[];
         const occupied = getOccupiedSlots(allObjects, anchor.containerId, anchor.voxelIndex, anchor.face, formRegistry);
         if (!canPlaceInSlot(occupied, anchor.slot ?? 0, form.slotWidth)) return '';
+      }
+
+      // Validate bounding-box collision for floor/ceiling objects
+      if (anchor.type === 'floor' || anchor.type === 'ceiling') {
+        const allObjects = Object.values(get().sceneObjects) as SceneObject[];
+        const sameVoxelObjects = allObjects.filter(o =>
+          o.anchor.containerId === anchor.containerId &&
+          o.anchor.voxelIndex === anchor.voxelIndex &&
+          o.anchor.type === anchor.type
+        ).map(o => ({
+          dims: formRegistry.get(o.formId)?.dimensions ?? { w: 0, h: 0, d: 0 },
+          offset: o.anchor.offset ?? [0, 0] as [number, number],
+        }));
+        if (!canPlaceFloorObject(form.dimensions, anchor.offset ?? [0, 0], sameVoxelObjects)) return '';
       }
 
       const id = uuid();
@@ -1252,7 +1269,10 @@ Modify `src/store/useStore.ts`:
 - Line ~186 (StoreState type): add `& SceneObjectSlice`
 - Line ~200 (store creator): add `...createSceneObjectSlice(setState, getState)`
 - Line ~205 (temporal partialize): add `sceneObjects: s.sceneObjects`
+- Line ~207-210 (temporal equality): add `sceneObjects` to the equality check (currently checks `containers`, `zones`, `furnitureIndex`)
 - Line ~218 (persist partialize): add `sceneObjects: s.sceneObjects`
+
+**IMPORTANT: invalidate() calls.** The codebase uses `frameloop="demand"`. All mutating actions in the slice (`placeObject`, `removeObject`, `updateSkin`, `applyQuickSkin`, `moveObject`, `duplicateObject`, `removeObjectsByContainer`) must call `invalidate()` after mutation. Import from `@react-three/fiber` and call at end of each `set()` callback, OR add `sceneObjects` to the existing `StoreInvalidator` component that watches store fields and calls `invalidate()` on change.
 
 - [ ] **Step 5: Run tests**
 
@@ -1398,7 +1418,7 @@ git commit -m "feat: add schema migration stub for SceneObject hydration"
 
 **Files:**
 - Modify: `src/config/themes.ts`
-- Modify: `src/store/slices/uiSlice.ts` (or wherever `currentTheme` lives)
+- Modify: `src/store/slices/environmentSlice.ts` (owns `currentTheme`)
 - Test: update existing theme tests if any
 
 - [ ] **Step 1: Add THEME_TO_STYLE_MAP to themes.ts**
@@ -1412,14 +1432,21 @@ export const THEME_TO_STYLE_MAP: Record<ThemeId, StyleId> = {
   japanese: 'japanese',
   desert: 'desert_brutalist',
 };
+
+export const STYLE_TO_THEME_MAP: Partial<Record<StyleId, ThemeId>> = {
+  industrial: 'industrial',
+  japanese: 'japanese',
+  desert_brutalist: 'desert',
+};
 ```
 
-- [ ] **Step 2: Add activeStyle to UI state**
+- [ ] **Step 2: Add activeStyle to environment state**
 
-In `src/store/slices/uiSlice.ts` (or the slice that owns `currentTheme`):
+In `src/store/slices/environmentSlice.ts` (which owns `currentTheme`):
 - Add `activeStyle: StyleId` field (default: `'industrial'`)
 - Add `setActiveStyle: (style: StyleId) => void` action
-- Keep `currentTheme` for backward compat but derive it from `activeStyle` via reverse map
+- Keep `currentTheme` for backward compat but derive it from `activeStyle` via `STYLE_TO_THEME_MAP`
+- When `setActiveStyle` is called, also update `currentTheme` if a mapping exists (falls back to `'industrial'` for styles without a legacy theme)
 
 - [ ] **Step 3: Run full test suite**
 
@@ -1498,6 +1525,13 @@ function SceneObjectMesh({ object, styleId }: { object: SceneObject; styleId: st
   const position = useMemo(() => anchorToPosition(object.anchor), [object.anchor]);
 
   // Procedural geometry for now — GLB loading deferred to art pipeline sprint
+  // For light category forms, also attach a THREE.js light source:
+  // - ceiling anchor → <spotLight> pointing down
+  // - face anchor (sconces) → <spotLight> for wall wash
+  // - floor anchor (lamps) → <pointLight> omnidirectional
+  // Light intensity from object.state?.brightness ?? 75, color from object.state?.colorTemp
+  // Respect quality preset max shadow-casting lights cap
+
   const frameMat = useMemo(() => {
     const mat = getMaterial(resolvedSkin.frame ?? resolvedSkin.fixture ?? 'raw_steel');
     return new THREE.MeshStandardMaterial({
@@ -1531,7 +1565,7 @@ Expected: 0 errors, all tests pass
 Open dev server, place a container, use store action to place a SceneObject:
 ```javascript
 // In browser console:
-const store = window.__STORE__;
+const store = window.__store;
 store.getState().placeObject('door_single_swing', {
   containerId: Object.keys(store.getState().containers)[0],
   voxelIndex: 12,
@@ -1782,8 +1816,9 @@ it('BOM includes scene object costs', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-- [ ] **Step 3: Extend getEstimate()**
+- [ ] **Step 3: Update PricingEstimate type + extend getEstimate()**
 
+In `src/types/container.ts`, add `sceneObjects: number` to `PricingEstimate.breakdown` interface.
 In `containerSlice.ts`, inside `getEstimate()`, add scene object cost summation:
 
 ```typescript
@@ -1941,9 +1976,40 @@ Expected: All gates pass
 12. Undo → door removed; Redo → door restored
 13. Delete container → all placed objects removed
 
-- [ ] **Step 4: Commit any fixes from browser verification**
+- [ ] **Step 4: Add anti-pattern tests for renderer**
 
-- [ ] **Step 5: Update architecture doc**
+Add to `src/__tests__/placement-flow.test.ts` (or create if needed):
+
+```typescript
+// Anti-pattern tests per spec Section 8
+describe('SceneObject anti-patterns', () => {
+  it('SceneObjectRenderer non-interactive meshes have raycast disabled', () => {
+    // Verify JSX source of SceneObjectRenderer.tsx contains raycast={() => {}}
+    // on all <mesh> elements that are not interactive (placement targets)
+    // Use source grep or render test
+  });
+
+  it('setPlacementMode correctly updates store state', () => {
+    resetStore();
+    useStore.getState().setPlacementMode('door_single_swing');
+    expect(useStore.getState().placementMode).toBe(true);
+    expect(useStore.getState().activePlacementFormId).toBe('door_single_swing');
+    useStore.getState().setPlacementMode(null);
+    expect(useStore.getState().placementMode).toBe(false);
+    expect(useStore.getState().activePlacementFormId).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 5: Commit any fixes from browser verification**
+
+- [ ] **Step 6: Update architecture doc**
+
+> **Known gaps deferred to follow-up sprints:**
+> - 12 "one-line" style effects (patina_tint, paper_glow, etc.) — material tweaks in SceneObjectMesh
+> - 4 postprocessing style effects (salt_frost, dappled_light, soft_bloom, color_punch)
+> - GLB model creation for all 27 forms (currently procedural box placeholders)
+> - Full migration of old DoorConfig/FaceFinish/LightPlacement data (stub only)
 
 Add to `MODUHOME-V1-ARCHITECTURE-v2.md`:
 - SceneObject system summary
