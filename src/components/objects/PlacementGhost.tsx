@@ -5,6 +5,9 @@ import { formRegistry } from '@/config/formRegistry';
 import { getOccupiedSlots, getSlotsForPlacement } from '@/utils/slotOccupancy';
 import { anchorToLocalPosition, anchorToLocalRotation, localToWorld, localRotToWorld } from '@/utils/anchorMath';
 import { useRef, useMemo, useEffect } from 'react';
+import { Line } from '@react-three/drei';
+import { FACE_SLOT_COUNT } from '@/utils/slotOccupancy';
+import { CONTAINER_DIMENSIONS, VOXEL_COLS, type Container } from '@/types/container';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { SceneObject, WallDirection, ObjectAnchor } from '@/types/sceneObject';
@@ -137,12 +140,91 @@ function PlacementGhostInner({ formId }: { formId: string }) {
   if (!form) return null;
 
   return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={materialRef.current!}
-      visible={false}
-      raycast={() => {}}
+    <>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        material={materialRef.current!}
+        visible={false}
+        raycast={() => {}}
+      />
+      <SlotIndicatorWrapper formId={formId} />
+    </>
+  );
+}
+
+// ── Slot boundary indicators ──────────────────────────────────
+
+function SlotIndicatorWrapper({ formId }: { formId: string }) {
+  const hovered = useStore((s) => s.hoveredVoxelEdge);
+  const form = formRegistry.get(formId);
+  const container = useStore((s) => hovered ? s.containers[hovered.containerId] : undefined);
+
+  if (!hovered || !form || !container) return null;
+
+  const face = hovered.face;
+  const isWall = face === 'n' || face === 's' || face === 'e' || face === 'w';
+  if (form.anchorType !== 'face' || !isWall) return null;
+
+  return (
+    <SlotIndicator
+      containerId={hovered.containerId}
+      voxelIndex={hovered.voxelIndex}
+      face={face as WallDirection}
+      container={container}
     />
+  );
+}
+
+function SlotIndicator({
+  containerId,
+  voxelIndex,
+  face,
+  container,
+}: {
+  containerId: string;
+  voxelIndex: number;
+  face: WallDirection;
+  container: Container;
+}) {
+  const dims = CONTAINER_DIMENSIONS[container.size];
+  const voxW = dims.length / VOXEL_COLS;
+  const vHeight = dims.height;
+
+  const lines = useMemo(() => {
+    const result: [number, number, number][][] = [];
+    const slotW = voxW / FACE_SLOT_COUNT;
+
+    for (let i = 1; i < FACE_SLOT_COUNT; i++) {
+      const offset = -voxW / 2 + i * slotW;
+      result.push([
+        [offset, -vHeight / 2, 0],
+        [offset, vHeight / 2, 0],
+      ]);
+    }
+    return result;
+  }, [voxW, vHeight]);
+
+  const anchor: ObjectAnchor = { containerId, voxelIndex, type: 'face', face, slot: 0 };
+  const localPos = anchorToLocalPosition(anchor, container);
+  const localRot = anchorToLocalRotation(anchor);
+  const worldPos = localToWorld(localPos, container);
+  const worldRot = localRotToWorld(localRot, container);
+
+  return (
+    <group position={worldPos} rotation={worldRot}>
+      <group position={[0, 0, 0.002]}>
+        {lines.map((pts, i) => (
+          <Line
+            key={i}
+            points={pts}
+            color="white"
+            lineWidth={1}
+            transparent
+            opacity={0.3}
+          />
+        ))}
+      </group>
+    </group>
   );
 }
