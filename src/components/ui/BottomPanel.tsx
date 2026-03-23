@@ -30,6 +30,9 @@ const CATEGORIES: { id: FormCategory; label: string }[] = [
   { id: 'electrical', label: 'Electrical' },
 ];
 
+const COST_DOT_FILLED = '\u25CF';
+const COST_DOT_EMPTY = '\u25CB';
+
 /** Cost dots: 1 dot per $500 increment, capped at 5. */
 function costDots(cost: number): number {
   return Math.min(5, Math.ceil(cost / 500));
@@ -40,7 +43,11 @@ function matColor(matId: string): string {
   return materialRegistry.get(matId)?.color ?? '#555';
 }
 
-// ── Panel Styles ──────────────────────────────────────────────
+// ── Shared Styles ──────────────────────────────────────────────
+
+const FONT_SYSTEM: CSSProperties = {
+  fontFamily: 'system-ui, sans-serif',
+};
 
 const panelContainerStyle: CSSProperties = {
   position: 'relative',
@@ -77,7 +84,7 @@ const collapseToggleStyle: CSSProperties = {
   color: 'rgba(255,255,255,0.5)',
   fontSize: 10,
   fontWeight: 600,
-  fontFamily: 'system-ui, sans-serif',
+  ...FONT_SYSTEM,
   padding: 0,
   letterSpacing: '0.03em',
 };
@@ -99,9 +106,10 @@ const contentAreaStyle: CSSProperties = {
   scrollbarWidth: 'thin',
 };
 
-// ── Tab Button ────────────────────────────────────────────────
+// ── Shared PillButton ────────────────────────────────────────
+// Replaces both TabButton and CategoryTab (they were near-identical).
 
-function TabButton({
+function PillButton({
   label,
   active,
   disabled,
@@ -113,13 +121,13 @@ function TabButton({
   onClick: () => void;
 }) {
   const style: CSSProperties = {
-    padding: '4px 14px',
+    padding: '4px 12px',
     borderRadius: 6,
     border: 'none',
     cursor: disabled ? 'default' : 'pointer',
     fontSize: 11,
     fontWeight: 600,
-    fontFamily: 'system-ui, sans-serif',
+    ...FONT_SYSTEM,
     letterSpacing: '0.03em',
     color: disabled ? 'rgba(255,255,255,0.2)' : active ? '#93c5fd' : 'rgba(255,255,255,0.5)',
     background: active ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
@@ -143,7 +151,7 @@ const placingBadgeStyle: CSSProperties = {
   gap: 6,
   fontSize: 11,
   fontWeight: 600,
-  fontFamily: 'system-ui, sans-serif',
+  ...FONT_SYSTEM,
   color: '#fbbf24',
   background: 'rgba(251, 191, 36, 0.12)',
   borderRadius: 6,
@@ -164,57 +172,29 @@ const cancelBtnStyle: CSSProperties = {
 // ── Browse Content (FormCatalog) ─────────────────────────────
 // ══════════════════════════════════════════════════════════════
 
-const browseTabRowStyle: CSSProperties = {
+const scrollRowStyle: CSSProperties = {
   display: 'flex',
+  overflowX: 'auto',
+  scrollbarWidth: 'none',
+};
+
+const browseTabRowStyle: CSSProperties = {
+  ...scrollRowStyle,
   gap: 2,
   paddingBottom: 6,
 };
 
 const browseStyleRowStyle: CSSProperties = {
-  display: 'flex',
+  ...scrollRowStyle,
   gap: 6,
-  overflowX: 'auto',
   paddingBottom: 6,
-  scrollbarWidth: 'none',
 };
 
 const browseCardRowStyle: CSSProperties = {
-  display: 'flex',
+  ...scrollRowStyle,
   gap: 8,
-  overflowX: 'auto',
   paddingBottom: 4,
-  scrollbarWidth: 'none',
 };
-
-function CategoryTab({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const style: CSSProperties = {
-    padding: '4px 12px',
-    borderRadius: 6,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 11,
-    fontWeight: 600,
-    fontFamily: 'system-ui, sans-serif',
-    letterSpacing: '0.03em',
-    color: active ? '#93c5fd' : 'rgba(255,255,255,0.5)',
-    background: active ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-    borderBottom: active ? '2px solid #60a5fa' : '2px solid transparent',
-    transition: 'all 120ms ease',
-  };
-  return (
-    <button style={style} onClick={onClick}>
-      {label}
-    </button>
-  );
-}
 
 function StylePill({
   label,
@@ -232,7 +212,7 @@ function StylePill({
     cursor: 'pointer',
     fontSize: 10,
     fontWeight: 500,
-    fontFamily: 'system-ui, sans-serif',
+    ...FONT_SYSTEM,
     color: active ? '#93c5fd' : 'rgba(255,255,255,0.5)',
     background: active ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.04)',
     whiteSpace: 'nowrap',
@@ -245,6 +225,38 @@ function StylePill({
     </button>
   );
 }
+
+// ── FormCard styles (hoisted to avoid per-render allocation) ──
+
+const cardNameStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  textAlign: 'center',
+  lineHeight: 1.2,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  maxWidth: '100%',
+  ...FONT_SYSTEM,
+};
+
+const cardCostStyle: CSSProperties = {
+  fontSize: 10,
+  letterSpacing: '0.1em',
+};
+
+const cardPriceStyle: CSSProperties = {
+  fontSize: 9,
+  color: 'rgba(255,255,255,0.35)',
+  fontFamily: 'monospace',
+};
+
+const emptyStateStyle: CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.35)',
+  padding: '12px 0',
+  ...FONT_SYSTEM,
+};
 
 function FormCard({
   form,
@@ -274,39 +286,13 @@ function FormCard({
   };
   return (
     <button style={style} onClick={onClick} title={form.description}>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: isActive ? '#93c5fd' : 'rgba(255,255,255,0.75)',
-          textAlign: 'center',
-          lineHeight: 1.2,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          maxWidth: '100%',
-          fontFamily: 'system-ui, sans-serif',
-        }}
-      >
+      <span style={{ ...cardNameStyle, color: isActive ? '#93c5fd' : 'rgba(255,255,255,0.75)' }}>
         {form.name}
       </span>
-      <span
-        style={{
-          fontSize: 10,
-          color: isActive ? '#fbbf24' : 'rgba(255, 200, 50, 0.5)',
-          letterSpacing: '0.1em',
-        }}
-      >
-        {Array.from({ length: dots }, () => '\u25CF').join('')}
-        {Array.from({ length: 5 - dots }, () => '\u25CB').join('')}
+      <span style={{ ...cardCostStyle, color: isActive ? '#fbbf24' : 'rgba(255, 200, 50, 0.5)' }}>
+        {COST_DOT_FILLED.repeat(dots)}{COST_DOT_EMPTY.repeat(5 - dots)}
       </span>
-      <span
-        style={{
-          fontSize: 9,
-          color: 'rgba(255,255,255,0.35)',
-          fontFamily: 'monospace',
-        }}
-      >
+      <span style={cardPriceStyle}>
         ${form.costEstimate}
       </span>
     </button>
@@ -366,12 +352,8 @@ function BrowseContent() {
   }, []);
 
   const handleCardClick = useCallback((formId: string) => {
-    const store = useStore.getState();
-    if (store.activePlacementFormId === formId) {
-      store.setPlacementMode(null);
-    } else {
-      store.setPlacementMode(formId);
-    }
+    const { activePlacementFormId: current, setPlacementMode } = useStore.getState();
+    setPlacementMode(current === formId ? null : formId);
   }, []);
 
   return (
@@ -379,7 +361,7 @@ function BrowseContent() {
       {/* Category Tabs */}
       <div style={browseTabRowStyle}>
         {CATEGORIES.map((cat) => (
-          <CategoryTab
+          <PillButton
             key={cat.id}
             label={cat.label}
             active={selectedCategory === cat.id}
@@ -408,14 +390,7 @@ function BrowseContent() {
       {/* Form Cards */}
       <div style={browseCardRowStyle}>
         {forms.length === 0 ? (
-          <span
-            style={{
-              fontSize: 11,
-              color: 'rgba(255,255,255,0.35)',
-              padding: '12px 0',
-              fontFamily: 'system-ui, sans-serif',
-            }}
-          >
+          <span style={emptyStateStyle}>
             No forms match the selected filters.
           </span>
         ) : (
@@ -515,40 +490,96 @@ const removeBtnStyle: CSSProperties = {
   color: '#fca5a5',
 };
 
+const editEmptyStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '100%',
+  color: 'rgba(255,255,255,0.3)',
+  fontSize: 12,
+};
+
+const editColumnsStyle: CSSProperties = {
+  display: 'flex',
+  gap: 16,
+  height: '100%',
+};
+
+const editLeftColStyle: CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  overflowY: 'auto',
+  scrollbarWidth: 'thin',
+};
+
+const editRightColStyle: CSSProperties = {
+  width: 200,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  flexShrink: 0,
+  borderLeft: '1px solid rgba(255,255,255,0.08)',
+  paddingLeft: 16,
+};
+
+const editHeaderStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+};
+
+const colorSwatchStyle: CSSProperties = {
+  width: 14,
+  height: 14,
+  borderRadius: 4,
+  border: '1px solid rgba(255,255,255,0.2)',
+  flexShrink: 0,
+};
+
+const actionRowStyle: CSSProperties = {
+  marginTop: 'auto',
+  display: 'flex',
+  gap: 8,
+  paddingTop: 8,
+};
+
+const noControlsStyle: CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.3)',
+  paddingTop: 4,
+};
+
 function EditContent() {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const obj = useStore((s) => selectedObjectId ? s.sceneObjects[selectedObjectId] : null);
   const activeStyle = useStore((s) => s.activeStyle);
-  const selectObject = useStore((s) => s.selectObject);
-  const updateSkin = useStore((s) => s.updateSkin);
-  const applyQuickSkin = useStore((s) => s.applyQuickSkin);
-  const updateObjectState = useStore((s) => s.updateObjectState);
-  const removeObject = useStore((s) => s.removeObject);
-  const duplicateObject = useStore((s) => s.duplicateObject);
 
   const form: FormDefinition | undefined = obj ? formRegistry.get(obj.formId) : undefined;
   const styleDef = getStyle(activeStyle);
   const quickSkins = useMemo(() => getQuickSkins(activeStyle), [activeStyle]);
 
+  // Actions read from getState() in callbacks — no need to subscribe to stable function refs
   const handleSkinChange = useCallback(
     (slotId: string, materialId: string) => {
-      if (selectedObjectId) updateSkin(selectedObjectId, slotId, materialId);
+      if (selectedObjectId) useStore.getState().updateSkin(selectedObjectId, slotId, materialId);
     },
-    [selectedObjectId, updateSkin],
+    [selectedObjectId],
   );
 
   const handleQuickSkin = useCallback(
     (preset: QuickSkinPreset) => {
-      if (selectedObjectId) applyQuickSkin(selectedObjectId, preset.slots);
+      if (selectedObjectId) useStore.getState().applyQuickSkin(selectedObjectId, preset.slots);
     },
-    [selectedObjectId, applyQuickSkin],
+    [selectedObjectId],
   );
 
   const handleStateChange = useCallback(
     (key: string, value: unknown) => {
-      if (selectedObjectId) updateObjectState(selectedObjectId, key, value);
+      if (selectedObjectId) useStore.getState().updateObjectState(selectedObjectId, key, value);
     },
-    [selectedObjectId, updateObjectState],
+    [selectedObjectId],
   );
 
   const handleDuplicate = useCallback(() => {
@@ -557,18 +588,19 @@ function EditContent() {
       ...obj.anchor,
       slot: (obj.anchor.slot ?? 0) + (form.slotWidth ?? 1),
     };
-    duplicateObject(obj.id, newAnchor);
-  }, [obj, form, duplicateObject]);
+    useStore.getState().duplicateObject(obj.id, newAnchor);
+  }, [obj, form]);
 
   const handleRemove = useCallback(() => {
     if (!selectedObjectId) return;
-    removeObject(selectedObjectId);
-    selectObject(null);
-  }, [selectedObjectId, removeObject, selectObject]);
+    const store = useStore.getState();
+    store.removeObject(selectedObjectId);
+    store.selectObject(null);
+  }, [selectedObjectId]);
 
   if (!obj || !form) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
+      <div style={editEmptyStyle}>
         Select an object to edit its properties.
       </div>
     );
@@ -578,11 +610,11 @@ function EditContent() {
   const objState = obj.state ?? {};
 
   return (
-    <div style={{ display: 'flex', gap: 16, height: '100%' }}>
+    <div style={editColumnsStyle}>
       {/* Left column: header + materials */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', scrollbarWidth: 'thin' }}>
+      <div style={editLeftColStyle}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={editHeaderStyle}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 14 }}>{form.name}</div>
             {styleDef && (
@@ -600,16 +632,7 @@ function EditContent() {
           return (
             <div key={slot.id} style={slotRowStyle}>
               <span style={{ fontSize: 12, minWidth: 55 }}>{slot.label}</span>
-              <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 4,
-                  background: matColor(currentMat),
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  flexShrink: 0,
-                }}
-              />
+              <div style={{ ...colorSwatchStyle, background: matColor(currentMat) }} />
               <select
                 style={selectStyle}
                 value={currentMat}
@@ -654,78 +677,84 @@ function EditContent() {
       </div>
 
       {/* Right column: form controls + actions */}
-      <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.08)', paddingLeft: 16 }}>
-        {/* Form-specific controls */}
-        {form.category === 'door' && (
-          <>
-            <div style={sectionLabelStyle}>Door Controls</div>
-            <div style={controlRowStyle}>
-              <span style={{ fontSize: 12 }}>State</span>
-              <select
-                style={selectStyle}
-                value={(objState.doorState as string) ?? 'closed'}
-                onChange={(e) => handleStateChange('doorState', e.target.value)}
-              >
-                <option value="closed">Closed</option>
-                <option value="open">Open</option>
-              </select>
-            </div>
-            <div style={controlRowStyle}>
-              <span style={{ fontSize: 12 }}>Flip</span>
-              <input
-                type="checkbox"
-                checked={!!objState.flip}
-                onChange={(e) => handleStateChange('flip', e.target.checked)}
-                style={{ cursor: 'pointer' }}
-              />
-            </div>
-          </>
-        )}
-
-        {form.category === 'light' && (
-          <>
-            <div style={sectionLabelStyle}>Light Controls</div>
-            <div style={controlRowStyle}>
-              <span style={{ fontSize: 12, minWidth: 65 }}>Brightness</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={(objState.brightness as number) ?? 80}
-                onChange={(e) => handleStateChange('brightness', Number(e.target.value))}
-                style={{ flex: 1, cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 28, textAlign: 'right' }}>
-                {(objState.brightness as number) ?? 80}%
-              </span>
-            </div>
-            <div style={controlRowStyle}>
-              <span style={{ fontSize: 12, minWidth: 65 }}>Color Temp</span>
-              <input
-                type="range"
-                min={2700}
-                max={6500}
-                step={100}
-                value={(objState.colorTemp as number) ?? 4000}
-                onChange={(e) => handleStateChange('colorTemp', Number(e.target.value))}
-                style={{ flex: 1, cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 40, textAlign: 'right' }}>
-                {(objState.colorTemp as number) ?? 4000}K
-              </span>
-            </div>
-          </>
-        )}
-
-        {/* Window/Electrical — no extra controls, show placeholder */}
-        {(form.category === 'window' || form.category === 'electrical') && (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', paddingTop: 4 }}>
-            No additional controls for {form.category}.
-          </div>
-        )}
+      <div style={editRightColStyle}>
+        {/* Form-specific controls via switch for exhaustiveness */}
+        {(() => {
+          switch (form.category) {
+            case 'door':
+              return (
+                <>
+                  <div style={sectionLabelStyle}>Door Controls</div>
+                  <div style={controlRowStyle}>
+                    <span style={{ fontSize: 12 }}>State</span>
+                    <select
+                      style={selectStyle}
+                      value={(objState.doorState as string) ?? 'closed'}
+                      onChange={(e) => handleStateChange('doorState', e.target.value)}
+                    >
+                      <option value="closed">Closed</option>
+                      <option value="open">Open</option>
+                    </select>
+                  </div>
+                  <div style={controlRowStyle}>
+                    <span style={{ fontSize: 12 }}>Flip</span>
+                    <input
+                      type="checkbox"
+                      checked={!!objState.flip}
+                      onChange={(e) => handleStateChange('flip', e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </div>
+                </>
+              );
+            case 'light':
+              return (
+                <>
+                  <div style={sectionLabelStyle}>Light Controls</div>
+                  <div style={controlRowStyle}>
+                    <span style={{ fontSize: 12, minWidth: 65 }}>Brightness</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={(objState.brightness as number) ?? 80}
+                      onChange={(e) => handleStateChange('brightness', Number(e.target.value))}
+                      style={{ flex: 1, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 28, textAlign: 'right' }}>
+                      {(objState.brightness as number) ?? 80}%
+                    </span>
+                  </div>
+                  <div style={controlRowStyle}>
+                    <span style={{ fontSize: 12, minWidth: 65 }}>Color Temp</span>
+                    <input
+                      type="range"
+                      min={2700}
+                      max={6500}
+                      step={100}
+                      value={(objState.colorTemp as number) ?? 4000}
+                      onChange={(e) => handleStateChange('colorTemp', Number(e.target.value))}
+                      style={{ flex: 1, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 40, textAlign: 'right' }}>
+                      {(objState.colorTemp as number) ?? 4000}K
+                    </span>
+                  </div>
+                </>
+              );
+            case 'window':
+            case 'electrical':
+            default:
+              return (
+                <div style={noControlsStyle}>
+                  No additional controls for {form.category}.
+                </div>
+              );
+          }
+        })()}
 
         {/* Actions — pushed to bottom */}
-        <div style={{ marginTop: 'auto', display: 'flex', gap: 8, paddingTop: 8 }}>
+        <div style={actionRowStyle}>
           <button style={actionBtnStyle} onClick={handleDuplicate}>
             Duplicate
           </button>
@@ -766,7 +795,7 @@ export default function BottomPanel() {
         <div style={panelStyle}>
           {/* Tab strip */}
           <div style={tabStripStyle}>
-            <TabButton
+            <PillButton
               label="Browse"
               active={activeTab === 'browse'}
               onClick={() => {
@@ -774,7 +803,7 @@ export default function BottomPanel() {
                 if (selectedObjectId) useStore.getState().selectObject(null);
               }}
             />
-            <TabButton
+            <PillButton
               label="Edit"
               active={activeTab === 'edit'}
               disabled={!selectedObjectId}
