@@ -21,8 +21,8 @@ import CustomHotbar from "@/components/ui/CustomHotbar";
 import VoxelContextMenu from "@/components/ui/VoxelContextMenu";
 import FaceContextMenu from "@/components/ui/FaceContextMenu";
 import MaterialPaletteModal from "@/components/ui/MaterialPaletteModal";
-import FormCatalog from "@/components/ui/FormCatalog";
-import SkinEditor from "@/components/ui/SkinEditor";
+// FormCatalog and SkinEditor replaced by unified BottomPanel (Sims-style drawer)
+import BottomPanel from "@/components/ui/BottomPanel";
 // Legacy GameHUD, Hotbar, StyleSelector removed in Phase 7
 
 const SceneCanvas = dynamic(
@@ -131,79 +131,76 @@ export default function Home() {
       {/* Top Header Toolbar - Production Light Theme */}
       <TopToolbar onOpenBudget={() => setBudgetOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
 
-      {/* Workspace: Sidebar + Canvas */}
+      {/* Workspace: Sidebar + (Canvas + BottomPanel) */}
       <div className="flex flex-1 min-h-0">
         {/* Left Super-Sidebar (Library ↔ Inspector) — hidden in walkthrough and preview */}
         {!isWalkthrough && !isPreviewMode && <Sidebar />}
 
-        {/* Canvas Area — onContextMenu absolutely prevented */}
-        <div className="flex-1 relative" style={{ backgroundColor: "var(--background, #f4f6f8)", cursor: activeHotbarSlot !== null && !isWalkthrough ? 'crosshair' : 'default' }} onContextMenu={(e) => e.preventDefault()}>
-          <SceneCanvas />
+        {/* Main content column: Canvas (shrinks) + BottomPanel (fixed height) */}
+        <div className="flex flex-col flex-1 min-w-0">
+          {/* Canvas Area — onContextMenu absolutely prevented */}
+          <div className="flex-1 relative min-h-0" style={{ backgroundColor: "var(--background, #f4f6f8)", cursor: activeHotbarSlot !== null && !isWalkthrough ? 'crosshair' : 'default' }} onContextMenu={(e) => e.preventDefault()}>
+            <SceneCanvas />
 
-          {/* Canvas hint overlay — bottom-right, hidden in walkthrough (has its own instructions) */}
-          {!isWalkthrough && !isPreviewMode && <CanvasHintOverlay />}
+            {/* Canvas hint overlay — bottom-right, hidden in walkthrough (has its own instructions) */}
+            {!isWalkthrough && !isPreviewMode && <CanvasHintOverlay />}
 
-          {/* Grab mode overlay */}
-          <GrabModeOverlay />
+            {/* Grab mode overlay */}
+            <GrabModeOverlay />
 
-          {/* Bay context menu — available in all modes except preview */}
-          {!isPreviewMode && <BayContextMenu />}
+            {/* Bay context menu — available in all modes except preview */}
+            {!isPreviewMode && <BayContextMenu />}
 
-          {/* Voxel context menu — right-click on active voxel faces */}
-          {!isPreviewMode && <VoxelContextMenu />}
+            {/* Voxel context menu — right-click on active voxel faces */}
+            {!isPreviewMode && <VoxelContextMenu />}
 
-          {/* Face context menu — surface-aware right-click actions */}
-          {!isPreviewMode && <FaceContextMenu />}
+            {/* Face context menu — surface-aware right-click actions */}
+            {!isPreviewMode && <FaceContextMenu />}
 
-          {/* Level Selector — hidden in FPV where level navigation is irrelevant */}
-          {!isWalkthrough && <LevelSlicer />}
+            {/* Level Selector — hidden in FPV where level navigation is irrelevant */}
+            {!isWalkthrough && <LevelSlicer />}
 
-          {/* Hotbars — visible when container selected (not walkthrough, not preview) */}
-          {!isWalkthrough && !isPreviewMode && <CustomHotbar />}
-          {/* SmartHotbar replaced by RecentItemsBar (Task 6 — Sims-Style UI Overhaul Plan A)
-              SmartHotbar.tsx kept for CssVoxelIcon export used by CustomHotbar and UserLibrary */}
-          {!isPreviewMode && <RecentItemsBar />}
+            {/* Hotbars — visible when container selected (not walkthrough, not preview) */}
+            {!isWalkthrough && !isPreviewMode && <CustomHotbar />}
+            {/* SmartHotbar replaced by RecentItemsBar (Task 6 — Sims-Style UI Overhaul Plan A)
+                SmartHotbar.tsx kept for CssVoxelIcon export used by CustomHotbar and UserLibrary */}
+            {!isPreviewMode && <RecentItemsBar />}
 
-          {/* Form catalog — placeable forms browser (Task 13) */}
-          {!isPreviewMode && <FormCatalog />}
+            {/* Walkthrough overlay: crosshair + instructions */}
+            {isWalkthrough && (
+              <>
+                {/* Crosshair */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30">
+                  <div className="w-6 h-6 relative">
+                    <div className="absolute top-1/2 left-0 w-full h-px bg-white/60" />
+                    <div className="absolute left-1/2 top-0 h-full w-px bg-white/60" />
+                  </div>
+                </div>
 
-          {/* Skin editor — context-sensitive object editor (Task 14) */}
-          {!isPreviewMode && <SkinEditor />}
+                {/* Instructions */}
+                <div
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 rounded-lg px-4 py-2 pointer-events-none"
+                  style={{
+                    background: "rgba(0, 0, 0, 0.5)",
+                    backdropFilter: "blur(8px)",
+                  }}
+                >
+                  <span className="text-[11px] text-white/80">
+                    WASD move · Arrows look · Mouse look · Shift sprint · Q/Z fly up/down · Click/Space cycle panel · E preset · Right-click menu · T tour · ESC exit
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
 
-          {/* Bottom dock — persistent in all modes except preview (screenshot) mode */}
+          {/* Unified BottomPanel — FormCatalog browse + SkinEditor edit (Sims-style drawer) */}
+          {!isPreviewMode && <BottomPanel />}
+
+          {/* Bottom dock — persistent status bar below the panel */}
           {!isPreviewMode && (
             <BottomDock onOpenBudget={() => setBudgetOpen(true)} />
           )}
-
-          {/* Walkthrough overlay: crosshair + instructions */}
-          {isWalkthrough && (
-
-            <>
-              {/* Crosshair */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30">
-                <div className="w-6 h-6 relative">
-                  <div className="absolute top-1/2 left-0 w-full h-px bg-white/60" />
-                  <div className="absolute left-1/2 top-0 h-full w-px bg-white/60" />
-                </div>
-              </div>
-
-              {/* Instructions */}
-              <div
-                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 rounded-lg px-4 py-2 pointer-events-none"
-                style={{
-                  background: "rgba(0, 0, 0, 0.5)",
-                  backdropFilter: "blur(8px)",
-                }}
-              >
-                <span className="text-[11px] text-white/80">
-                  WASD move · Arrows look · Mouse look · Shift sprint · Q/Z fly up/down · Click/Space cycle panel · E preset · Right-click menu · T tour · ESC exit
-                </span>
-              </div>
-            </>
-          )}
         </div>
-
-        {/* Right sidebar removed — Inspector is now part of the unified Sidebar */}
       </div>
 
       {/* Budget Modal */}
