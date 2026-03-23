@@ -234,7 +234,7 @@ Uses the extracted `SwatchRow` component (circle buttons for preset colors) + `C
 
 Preset colors: the existing `PAINT_COLORS` array (14 colors: White through Carbon).
 
-**Note:** The `getFinishOptionsForFace` function does NOT need a `color` flag — Color is shown unconditionally on every tab.
+**Note:** The `getFinishOptionsForFace` function does NOT need a `color` flag — Color is shown on every tab unconditionally, except on the Walls tab when surface is `Open` (no surface to tint).
 
 ## Open Wall Fix
 
