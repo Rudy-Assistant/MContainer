@@ -6,6 +6,11 @@ export type FormCategory = 'door' | 'window' | 'light' | 'electrical';
 export type AnchorType = 'face' | 'floor' | 'ceiling';
 export type WallDirection = 'n' | 's' | 'e' | 'w';
 
+/** Type guard for wall direction strings. */
+export function isWallDirection(face: string): face is WallDirection {
+  return face === 'n' || face === 's' || face === 'e' || face === 'w';
+}
+
 export type StyleId =
   | 'modern' | 'industrial' | 'japanese' | 'desert_brutalist'
   | 'coastal' | 'noir_glass' | 'solarpunk' | 'frontier_rustic'

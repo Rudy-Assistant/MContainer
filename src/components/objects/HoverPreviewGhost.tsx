@@ -15,6 +15,7 @@ import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ObjectAnchor, WallDirection } from '@/types/sceneObject';
+import { isWallDirection } from '@/types/sceneObject';
 
 const PREVIEW_COLOR = new THREE.Color('#3b82f6');
 const PREVIEW_OPACITY = 0.25;
@@ -48,6 +49,10 @@ function HoverPreviewGhostInner({ formId }: { formId: string }) {
   }, [form]);
 
   useEffect(() => () => { geometry.dispose(); }, [geometry]);
+  useEffect(() => {
+    const mat = materialRef.current;
+    return () => { mat?.dispose(); };
+  }, []);
 
   useFrame(() => {
     const mesh = meshRef.current;
@@ -64,13 +69,9 @@ function HoverPreviewGhostInner({ formId }: { formId: string }) {
     const { containerId, voxelIndex, face } = hovered;
 
     // Check anchor type compatibility
-    const isWallFace = face === 'n' || face === 's' || face === 'e' || face === 'w';
-    const isFloor = face === 'bottom';
-    const isCeiling = face === 'top';
-
-    if (form.anchorType === 'face' && !isWallFace) { mesh.visible = false; return; }
-    if (form.anchorType === 'floor' && !isFloor) { mesh.visible = false; return; }
-    if (form.anchorType === 'ceiling' && !isCeiling) { mesh.visible = false; return; }
+    if (form.anchorType === 'face' && !isWallDirection(face)) { mesh.visible = false; return; }
+    if (form.anchorType === 'floor' && face !== 'bottom') { mesh.visible = false; return; }
+    if (form.anchorType === 'ceiling' && face !== 'top') { mesh.visible = false; return; }
 
     const container = state.containers[containerId];
     if (!container) { mesh.visible = false; return; }

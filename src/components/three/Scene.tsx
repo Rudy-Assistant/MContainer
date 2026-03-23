@@ -1705,19 +1705,18 @@ function StackTargetIndicator({
   ghostPos: RefObject<{ x: number; y: number; z: number; valid: boolean; snapped: boolean; stacking: boolean; stackTargetId: string | null }>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const [visible, setVisible] = useState(false);
 
   useFrame(() => {
     if (!ghostPos.current || !groupRef.current) return;
     const g = ghostPos.current;
     if (!g.stackTargetId) {
-      if (visible) setVisible(false);
+      groupRef.current.visible = false;
       return;
     }
     const containers = useStore.getState().containers;
     const target = containers[g.stackTargetId];
     if (!target) {
-      if (visible) setVisible(false);
+      groupRef.current.visible = false;
       return;
     }
     const targetDims = CONTAINER_DIMENSIONS[target.size];
@@ -1728,14 +1727,14 @@ function StackTargetIndicator({
     if (wireframe) {
       wireframe.scale.set(targetDims.length, 1, targetDims.width);
     }
-    if (!visible) setVisible(true);
+    groupRef.current.visible = true;
   });
 
   return (
-    <group ref={groupRef} visible={visible}>
+    <group ref={groupRef} visible={false}>
       <mesh raycast={() => {}}>
         <boxGeometry args={[1, 0.05, 1]} />
-        <meshBasicMaterial wireframe color="#00bcd4" transparent opacity={0.8} />
+        <meshBasicMaterial wireframe color={HIGHLIGHT_COLOR_SELECT} transparent opacity={0.8} />
       </mesh>
       <Html center position={[0, 0.5, 0]} style={{ pointerEvents: "none" }}>
         <span

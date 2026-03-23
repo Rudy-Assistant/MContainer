@@ -13,6 +13,7 @@ import { formRegistry, getByCategory } from '@/config/formRegistry';
 import type { FormCategory } from '@/types/sceneObject';
 import FormThumbnail from '@/components/ui/FormThumbnails';
 import { DoorOpen, AppWindow, Lightbulb, Plug } from 'lucide-react';
+import { HIGHLIGHT_COLOR_SELECT } from '@/config/highlightColors';
 
 // ── Constants ─────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
   flexShrink: 0,
   borderRadius: 6,
   border: isSelected
-    ? '1.5px solid #00bcd4'
+    ? `1.5px solid ${HIGHLIGHT_COLOR_SELECT}`
     : active
     ? '1.5px solid #60a5fa'
     : '1.5px solid rgba(255,255,255,0.08)',
@@ -156,7 +157,7 @@ const placingBadgeStyle: CSSProperties = {
 
 const selectedBadgeStyle: CSSProperties = {
   ...placingBadgeStyle,
-  color: '#00bcd4',
+  color: HIGHLIGHT_COLOR_SELECT,
   background: 'rgba(0, 188, 212, 0.12)',
 };
 
@@ -206,7 +207,10 @@ export default function BottomPanel() {
     setPlacementMode(current === formId ? null : formId);
   }, []);
 
-  const leftPos = sidebarWidth + (winWidth - sidebarWidth) / 2;
+  const panelPositionStyle = useMemo(() => ({
+    ...wrapperStyle,
+    left: sidebarWidth + (winWidth - sidebarWidth) / 2,
+  }), [sidebarWidth, winWidth]);
 
   // Determine the selected object's formId (for highlighting its card)
   const selectedObjFormId = selectedFormId;
@@ -216,7 +220,7 @@ export default function BottomPanel() {
   const selectedForm = selectedObjFormId ? formRegistry.get(selectedObjFormId) : null;
 
   return (
-    <div style={{ ...wrapperStyle, left: leftPos }}>
+    <div style={panelPositionStyle}>
       {/* Icon tab row */}
       <div style={tabRowStyle}>
         {CATEGORIES.map((cat) => (
@@ -252,10 +256,10 @@ export default function BottomPanel() {
                 }}
                 title={`${f.name} — $${f.costEstimate}`}
               >
-                <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? '#00bcd4' : 'rgba(255,255,255,0.5)' }}>
+                <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : 'rgba(255,255,255,0.5)' }}>
                   <FormThumbnail formId={f.id} size={28} />
                 </div>
-                <span style={{ ...cardNameStyle, color: isPlacing ? '#93c5fd' : isSelected ? '#00bcd4' : undefined }}>
+                <span style={{ ...cardNameStyle, color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : undefined }}>
                   {f.name}
                 </span>
                 <span style={{ ...cardCostStyle, color: isPlacing ? '#fbbf24' : undefined }}>

@@ -17,7 +17,8 @@ import type { Container } from '@/types/container';
 
 // Module-level constant to avoid per-render allocation (Fix 6)
 const WHITE = new THREE.Color('#ffffff');
-const HOVER_EMISSIVE = new THREE.Color('#00bcd4');
+import { HIGHLIGHT_COLOR_SELECT } from '@/config/highlightColors';
+const HOVER_EMISSIVE = new THREE.Color(HIGHLIGHT_COLOR_SELECT);
 const HOVER_EMISSIVE_INTENSITY = 0.15;
 const NO_EMISSIVE = new THREE.Color(0, 0, 0);
 
@@ -321,9 +322,12 @@ function GlbFormMesh({
     };
   }, [clonedScene]);
 
+  const wasHoveredRef = useRef(false);
   useFrame(() => {
     if (!clonedScene) return;
     const isHovered = useStore.getState().hoveredObjectId === objectId;
+    if (!isHovered && !wasHoveredRef.current) return; // fast path: skip traverse when not hovered
+    wasHoveredRef.current = isHovered;
     clonedScene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
