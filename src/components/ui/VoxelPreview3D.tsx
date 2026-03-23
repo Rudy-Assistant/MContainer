@@ -265,6 +265,7 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
   const containerSize = useStore((s) => s.containers[containerId]?.size);
   const setVoxelFace = useStore((s) => s.setVoxelFace);
   const activeBrush = useStore((s) => s.activeBrush);
+  const setSelectedFace = useStore((s) => s.setSelectedFace);
   const openVoxelContextMenu = useStore((s) => s.openVoxelContextMenu);
 
   // Dynamic voxel proportions — varies by position (body vs extension)
@@ -411,12 +412,15 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
             containerId={containerId}
             voxelIndex={voxelIndex}
             onCycle={() => {
-              const surface = activeBrush ?? cycleSurface(faces[config.face], 1);
-              // Bay group: apply to all voxels in the group
-              if (bayGroupIndices && bayGroupIndices.length > 1) {
-                for (const bi of bayGroupIndices) setVoxelFace(containerId, bi, config.face, surface);
-              } else {
-                setVoxelFace(containerId, voxelIndex, config.face, surface);
+              // Always select the face
+              setSelectedFace(config.face);
+              // If active brush, also apply it
+              if (activeBrush) {
+                if (bayGroupIndices && bayGroupIndices.length > 1) {
+                  for (const bi of bayGroupIndices) setVoxelFace(containerId, bi, config.face, activeBrush);
+                } else {
+                  setVoxelFace(containerId, voxelIndex, config.face, activeBrush);
+                }
               }
             }}
             onContextMenu={(e: ThreeEvent<MouseEvent>) => {
