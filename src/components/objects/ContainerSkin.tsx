@@ -57,13 +57,37 @@ import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
 import { type ThemeId, THEMES } from "@/config/themes";
 import { _themeMats, type ThemeMaterialSet, getMaterialForFace } from "@/config/materialCache";
 import type { FaceFinish } from "@/types/container";
-import { getNextPhase, PHASE_DAMP_SPEED } from "@/config/unpackAnimations";
+import { isRailingSurface } from "@/types/container";
+import {
+  getNextPhase, PHASE_DAMP_SPEED,
+  STAIR_TELESCOPE_SPEED, STAIR_TELESCOPE_EXIT_SPEED,
+  RAILING_FOLD_SPEED, RAILING_FOLD_EXIT_SPEED,
+  PILLAR_FOLD_SPEED,
+} from "@/config/unpackAnimations";
 import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
 import { computePolePositions } from "@/utils/smartPoles";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
 import { makePoleKey } from "@/config/frameMaterials";
 import LightFixture from './LightFixture';
 import ElectricalPlate from './ElectricalPlate';
+import { formRegistry } from "@/config/formRegistry";
+import type { SceneObject } from "@/types/sceneObject";
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+/** Returns a Set of "containerId:voxelIndex:face" keys where a slotWidth=3 SceneObject fully occupies the face. */
+function getFullyOccupiedFaces(sceneObjects: Record<string, SceneObject>): Set<string> {
+  const result = new Set<string>();
+  for (const obj of Object.values(sceneObjects)) {
+    if (obj.anchor.type !== 'face' || !obj.anchor.face) continue;
+    const form = formRegistry.get(obj.formId);
+    if (form && form.slotWidth === 3) {
+      result.add(`${obj.anchor.containerId}:${obj.anchor.voxelIndex}:${obj.anchor.face}`);
+    }
+  }
+  return result;
+}
+
 // ── Constants ──────────────────────────────────────────────────
 
 // Surface cycle for hotbar face editing (shared with MatrixEditor)
@@ -201,6 +225,7 @@ const mBaseplateWire = new THREE.LineBasicMaterial({
 });
 
 import { nullRaycast } from '@/utils/nullRaycast';
+import { validateStaircasePlacement } from '@/utils/staircaseValidation';
 
 // ── Frame mode highlight materials ────────────────────────────
 const frameHoverMat = new THREE.MeshStandardMaterial({
@@ -968,27 +993,54 @@ function SingleFace({
   // - Mount: initialize group at folded state → animate open
   // - Change: surface swap → fold-out animation
   // - Exit: surface → Open → reverse fold-in animation, then clear visual
+  // Railings use rotation-based fold (hinge at floor edge) instead of Y-scale.
   const groupRef      = useRef<THREE.Group>(null);
+  const innerRef      = useRef<THREE.Group>(null); // inner offset group for railing pivot
   const prevSurface   = useRef<SurfaceType | null>(null); // null = initial mount
   const animating     = useRef(false);
   const exitingRef    = useRef(false);   // true during reverse fold-in
+  // Track whether current/previous surface is a railing (for animation style selection)
+  const isRailing     = isRailingSurface(surface);
+  const wasRailingRef = useRef(false); // tracks display surface's railing status
   // "displaySurface" is what we RENDER — lags behind "surface" during exit animation
   const [displaySurface, setDisplaySurface] = useState<SurfaceType>(surface);
+  const displayIsRailing = isRailingSurface(displaySurface);
+
+  /** Initialize railing fold state: rotation at -PI/2 (lying flat in floor) */
+  const initRailingFold = (g: THREE.Group, inner: THREE.Group | null) => {
+    // Railing fold pivot: bottom edge of face. Outer rotates, inner offsets children.
+    const foldAxis = isNS ? 'x' : 'z';
+    const foldSign = (dir === 'n' || dir === 'e') ? 1 : -1;
+    g.rotation.set(0, 0, 0);
+    if (foldAxis === 'x') g.rotation.x = foldSign * (-Math.PI / 2);
+    else g.rotation.z = foldSign * (-Math.PI / 2);
+    g.scale.set(1, 1, 1);
+    g.position.set(0, -vHeight / 2, 0);
+    if (inner) inner.position.set(0, vHeight / 2, 0);
+  };
+
+  /** Initialize wall scale state: Y-scale 0 at floor */
+  const initWallScale = (g: THREE.Group) => {
+    g.scale.set(1, 0, 1);
+    g.position.y = -vHeight / 2;
+    g.rotation.set(0, 0, 0);
+  };
 
   useEffect(() => {
     if (prevSurface.current === null) {
       // ★ Fix B: INITIAL MOUNT — start folded, animate open
       prevSurface.current = surface;
+      wasRailingRef.current = isRailing;
       if (surface !== "Open" && groupRef.current) {
         animating.current = true;
         exitingRef.current = false;
         if (isHoriz) {
           groupRef.current.rotation.x = dir === "bottom" ? -Math.PI / 2 : Math.PI / 2;
           groupRef.current.scale.set(1, 1, 1);
+        } else if (isRailing) {
+          initRailingFold(groupRef.current, innerRef.current);
         } else {
-          groupRef.current.scale.set(1, 0, 1);
-          groupRef.current.position.y = -vHeight / 2;
-          groupRef.current.rotation.x = 0;
+          initWallScale(groupRef.current);
         }
       }
       setDisplaySurface(surface);
@@ -1003,29 +1055,35 @@ function SingleFace({
       // ★ Fix C: EXIT — keep rendering the OLD visual, play reverse animation
       exitingRef.current = true;
       animating.current = true;
+      wasRailingRef.current = isRailingSurface(prev);
       // displaySurface stays as the old visual (prev) — do NOT update it yet
-      // The useFrame will animate toward folded state and then setDisplaySurface("Open")
       return;
     }
 
     // Normal surface change (non-Open → non-Open, or Open → non-Open)
     exitingRef.current = false;
     animating.current = true;
+    wasRailingRef.current = isRailing;
     setDisplaySurface(surface);
     if (groupRef.current) {
       if (isHoriz) {
         groupRef.current.rotation.x = dir === "bottom" ? -Math.PI / 2 : Math.PI / 2;
         groupRef.current.scale.set(1, 1, 1);
+      } else if (isRailing) {
+        initRailingFold(groupRef.current, innerRef.current);
       } else {
-        groupRef.current.scale.set(1, 0, 1);
-        groupRef.current.position.y = -vHeight / 2;
-        groupRef.current.rotation.x = 0;
+        initWallScale(groupRef.current);
       }
     }
-  }, [surface, isHoriz, dir]);
+  }, [surface, isHoriz, dir, isRailing, vHeight]);
+
+  // Precompute direction-derived constants (stable for lifetime of this face)
+  const foldAxis = isNS ? 'x' as const : 'z' as const;
+  const foldSign = (dir === 'n' || dir === 'e') ? 1 : -1;
 
   useFrame((_, dt) => {
     if (!groupRef.current || !animating.current) return;
+    const useRailingAnim = exitingRef.current ? wasRailingRef.current : (isRailing || displayIsRailing);
 
     if (exitingRef.current) {
       // ★ REVERSE fold-in: animate AWAY from rest position
@@ -1040,7 +1098,23 @@ function SingleFace({
           exitingRef.current = false;
           setDisplaySurface("Open");
         }
+      } else if (useRailingAnim) {
+        // Railing fold-down: rotate back to -PI/2 (into floor)
+        const target = foldSign * (-Math.PI / 2);
+        const curAngle = foldAxis === 'x' ? groupRef.current.rotation.x : groupRef.current.rotation.z;
+        if (Math.abs(curAngle - target) > 0.01) {
+          const next = THREE.MathUtils.damp(curAngle, target, RAILING_FOLD_EXIT_SPEED, dt);
+          if (foldAxis === 'x') groupRef.current.rotation.x = next;
+          else groupRef.current.rotation.z = next;
+        } else {
+          if (foldAxis === 'x') groupRef.current.rotation.x = target;
+          else groupRef.current.rotation.z = target;
+          animating.current = false;
+          exitingRef.current = false;
+          setDisplaySurface("Open");
+        }
       } else {
+        // Wall scale-down
         const cur = groupRef.current.scale.y;
         if (cur > 0.01) {
           const next = THREE.MathUtils.damp(cur, 0, 10, dt);
@@ -1066,7 +1140,21 @@ function SingleFace({
         groupRef.current.rotation.x = 0;
         animating.current = false;
       }
+    } else if (useRailingAnim) {
+      // Railing fold-up: rotate from -PI/2 to 0 (hinge at floor edge)
+      const curAngle = foldAxis === 'x' ? groupRef.current.rotation.x : groupRef.current.rotation.z;
+      if (Math.abs(curAngle) > 0.01) {
+        const next = THREE.MathUtils.damp(curAngle, 0, RAILING_FOLD_SPEED, dt);
+        if (foldAxis === 'x') groupRef.current.rotation.x = next;
+        else groupRef.current.rotation.z = next;
+      } else {
+        groupRef.current.rotation.set(0, 0, 0);
+        groupRef.current.position.set(0, 0, 0);
+        if (innerRef.current) innerRef.current.position.set(0, 0, 0);
+        animating.current = false;
+      }
     } else {
+      // Wall scale-up
       const cur = groupRef.current.scale.y;
       if (cur < 0.999) {
         const next = THREE.MathUtils.damp(cur, 1, 8, dt);
@@ -1176,13 +1264,14 @@ function SingleFace({
   // Drawbridge pivot: horizontal faces hinge at the -Z edge (north boundary)
   // so rotation.x creates a true fold-out/fold-down effect instead of center-spin.
   // Walls use no offset (scale animation only).
+  // Railings use rotation pivot at floor edge — groupRef rotates, innerRef offsets children.
   const pivotZ  = isHoriz ? -halfRow : 0;
   const offsetZ = isHoriz ?  halfRow : 0;
 
   return (
     <group position={pos}>
       <group ref={groupRef} position={[0, 0, pivotZ]}>
-        <group position={[0, 0, offsetZ]}>
+        <group ref={innerRef} position={[0, 0, offsetZ]}>
           {renderVisual()}
         </group>
       </group>
@@ -1282,10 +1371,13 @@ interface ExtensionUnpackProps {
   vHeight: number;
   containerId: string;
   voxelIndex: number;
+  /** When phase='reverse', which original phase to reverse (determines hinge/animation style) */
+  reverseOriginalPhase?: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy';
 }
 
 function ExtensionUnpack({
   children, phase, col, row, colPitch, rowPitch, vHeight, containerId, voxelIndex,
+  reverseOriginalPhase,
 }: ExtensionUnpackProps) {
   const outerRef = useRef<THREE.Group>(null);
   const innerRef = useRef<THREE.Group>(null);
@@ -1444,21 +1536,50 @@ function ExtensionUnpack({
       state.invalidate();
 
     } else if (currentPhase === 'reverse') {
-      // Animate progress 1→0: reverse of wall_to_floor (swivels back up)
+      // Animate progress 1→0: reverse of the original phase
       progressRef.current = THREE.MathUtils.damp(progressRef.current, 0, dampSpeed, dt);
+      const orig = reverseOriginalPhase ?? 'wall_to_floor';
 
-      const angle = -progressRef.current * (Math.PI / 2);
-
-      innerRef.current.position.set(-pivotX, vHeight / 2, -pivotZ);
-
-      if (dir === 'n' || dir === 's') {
-        const sign = dir === 'n' ? 1 : -1;
-        outerRef.current.rotation.set(sign * angle, 0, 0);
+      if (orig === 'wall_to_ceiling') {
+        // Reverse ceiling: swivel back down from top hinge
+        const angle = progressRef.current * (Math.PI / 2);
+        innerRef.current.position.set(-pivotX, -vHeight / 2, -pivotZ);
+        if (dir === 'n' || dir === 's') {
+          const sign = dir === 'n' ? -1 : 1;
+          outerRef.current.rotation.set(sign * angle, 0, 0);
+        } else {
+          const sign = dir === 'e' ? 1 : -1;
+          outerRef.current.rotation.set(0, 0, sign * angle);
+        }
+        outerRef.current.position.set(pivotX, vHeight / 2, pivotZ);
+      } else if (orig === 'walls_deploy') {
+        // Reverse walls_deploy: scale Y back to 0
+        outerRef.current.scale.set(1, progressRef.current, 1);
+        outerRef.current.position.set(0, vHeight * (progressRef.current - 1) / 2, 0);
+        outerRef.current.rotation.set(0, 0, 0);
+        innerRef.current.position.set(0, 0, 0);
+      } else if (orig === 'floor_slide') {
+        // Reverse floor_slide: slide back inward
+        const slideOffset = progressRef.current;
+        if (dir === 'n') outerRef.current.position.set(0, 0, slideOffset * rowPitch);
+        else if (dir === 's') outerRef.current.position.set(0, 0, -slideOffset * rowPitch);
+        else if (dir === 'e') outerRef.current.position.set(-slideOffset * colPitch, 0, 0);
+        else outerRef.current.position.set(slideOffset * colPitch, 0, 0);
+        outerRef.current.rotation.set(0, 0, 0);
+        innerRef.current.position.set(0, 0, 0);
       } else {
-        const sign = dir === 'e' ? -1 : 1;
-        outerRef.current.rotation.set(0, 0, sign * angle);
+        // Default: reverse wall_to_floor (swivels back up from bottom hinge)
+        const angle = -progressRef.current * (Math.PI / 2);
+        innerRef.current.position.set(-pivotX, vHeight / 2, -pivotZ);
+        if (dir === 'n' || dir === 's') {
+          const sign = dir === 'n' ? 1 : -1;
+          outerRef.current.rotation.set(sign * angle, 0, 0);
+        } else {
+          const sign = dir === 'e' ? -1 : 1;
+          outerRef.current.rotation.set(0, 0, sign * angle);
+        }
+        outerRef.current.position.set(pivotX, -vHeight / 2, pivotZ);
       }
-      outerRef.current.position.set(pivotX, -vHeight / 2, pivotZ);
 
       if (progressRef.current < 0.005) {
         progressRef.current = 0;
@@ -1508,38 +1629,127 @@ function VoxelPopIn({ children, vHeight }: { children: ReactNode; vHeight: numbe
   return <group ref={ref} scale={[0.01, 0.01, 0.01]} position={[0, -vHeight / 2, 0]}>{children}</group>;
 }
 
-// ── StairBuildUp — treads rise sequentially from floor ────────
-// Stair voxels get a special animation: the group slides up from below
-// with a slight forward lean that corrects as it reaches full height,
-// giving a "construction" feel distinct from the standard pop-in.
+// ── StairTelescope — stairs telescope down from upper floor ───
+// Stair treads extend downward from the ceiling anchor point, creating a
+// "telescoping" effect. Top stays fixed at ceiling, bottom extends to floor.
+// Exit animation: treads retract upward back into the ceiling.
 
-function StairBuildUp({ children, vHeight }: { children: ReactNode; vHeight: number }) {
-  const ref = useRef<THREE.Group>(null);
-  const t = useRef(0);
+function StairTelescope({ children, vHeight, isExiting = false, onExitComplete }: {
+  children: ReactNode; vHeight: number; isExiting?: boolean;
+  onExitComplete?: () => void;
+}) {
+  const outerRef = useRef<THREE.Group>(null);
+  const progressRef = useRef(isExiting ? 1 : 0);
+  const doneRef = useRef(false);
+  const exitCallbackFired = useRef(false);
 
-  useFrame((_, dt) => {
-    if (t.current >= 1) return;
-    // Slower than VoxelPopIn (0.4s vs 0.25s) for dramatic stair construction feel
-    t.current = Math.min(t.current + dt / 0.4, 1);
-    // Ease-out with slight overshoot: cubic ease-out
-    const ease = 1 - Math.pow(1 - t.current, 3);
-    if (ref.current) {
-      // Scale up from floor, Y-axis leads
-      ref.current.scale.set(
-        0.3 + 0.7 * ease,  // X/Z expand from 30% to 100%
-        ease,               // Y: 0 → 1
-        0.3 + 0.7 * ease,
-      );
-      // Keep bottom at floor level
-      ref.current.position.y = vHeight * (ease - 1) / 2;
-      // Slight forward lean that corrects (rotation around X)
-      ref.current.rotation.x = (1 - ease) * 0.15;
+  // Reset when exiting state changes
+  useEffect(() => {
+    doneRef.current = false;
+    exitCallbackFired.current = false;
+    if (isExiting) progressRef.current = 1;
+  }, [isExiting]);
+
+  // Precompute constants — position is set via JSX, only scale changes per frame
+  const target = isExiting ? 0 : 1;
+  const speed = isExiting ? STAIR_TELESCOPE_EXIT_SPEED : STAIR_TELESCOPE_SPEED;
+  const threshold = isExiting ? 0.005 : 0.995;
+
+  useFrame((state, dt) => {
+    if (doneRef.current || !outerRef.current) return;
+
+    progressRef.current = THREE.MathUtils.damp(progressRef.current, target, speed, dt);
+    outerRef.current.scale.set(1, Math.max(progressRef.current, 0.001), 1);
+
+    const isDone = isExiting ? progressRef.current < threshold : progressRef.current > threshold;
+    if (isDone) {
+      progressRef.current = target;
+      outerRef.current.scale.set(1, Math.max(target, 0.001), 1);
+      doneRef.current = true;
+
+      // Fire exit completion callback (once) to trigger stair data cleanup
+      if (isExiting && onExitComplete && !exitCallbackFired.current) {
+        exitCallbackFired.current = true;
+        onExitComplete();
+      }
     }
+
+    state.invalidate();
   });
 
   return (
-    <group ref={ref} scale={[0.3, 0.01, 0.3]} position={[0, -vHeight / 2, 0]}>
-      {children}
+    <group ref={outerRef} scale={[1, 0.001, 1]} position={[0, vHeight / 2, 0]}>
+      <group position={[0, -vHeight / 2, 0]}>
+        {children}
+      </group>
+    </group>
+  );
+}
+
+// ── PillarFoldDown — support pole folds down from ceiling ────
+// Pole starts horizontal (tucked under ceiling), swings down to vertical.
+// Pivot at the top of the pole (ceiling attachment point).
+// All corners fold around Z axis: east corners (ne/se) fold toward +X,
+// west corners (nw/sw) fold toward -X. Each pole folds outward from center.
+
+function PillarFoldDown({ children, poleH, corner, isExiting = false }: {
+  children: ReactNode;
+  poleH: number;
+  corner: 'ne' | 'nw' | 'se' | 'sw';
+  isExiting?: boolean;
+}) {
+  const outerRef = useRef<THREE.Group>(null);
+  const progressRef = useRef(isExiting ? 1 : 0);
+  const doneRef = useRef(false);
+
+  // All poles fold around Z axis. East corners toward +X (sign=-1), west toward -X (sign=+1).
+  const foldSign = (corner === 'ne' || corner === 'se') ? -1 : 1;
+  const initAngle = foldSign * Math.PI / 2;
+
+  // Reset animation when isExiting changes
+  useEffect(() => {
+    doneRef.current = false;
+    if (isExiting) progressRef.current = 1;
+  }, [isExiting]);
+
+  const target = isExiting ? 0 : 1;
+  const speed = isExiting ? PILLAR_FOLD_SPEED * 1.5 : PILLAR_FOLD_SPEED; // exit slightly faster
+
+  useFrame((state, dt) => {
+    if (!outerRef.current || doneRef.current) return;
+
+    progressRef.current = THREE.MathUtils.damp(progressRef.current, target, speed, dt);
+    const angle = foldSign * (1 - progressRef.current) * (Math.PI / 2);
+    outerRef.current.rotation.set(0, 0, angle);
+
+    const isDone = isExiting
+      ? progressRef.current < 0.005
+      : progressRef.current > 0.995;
+
+    if (isDone) {
+      progressRef.current = target;
+      const finalAngle = isExiting ? initAngle : 0;
+      outerRef.current.rotation.set(0, 0, finalAngle);
+      doneRef.current = true;
+    }
+
+    state.invalidate();
+  });
+
+  // Initial rotation set imperatively via useEffect, NOT via JSX prop.
+  // JSX rotation props get re-applied on React re-render, overwriting useFrame mutations.
+  useEffect(() => {
+    if (outerRef.current) {
+      const startAngle = isExiting ? 0 : initAngle;
+      outerRef.current.rotation.set(0, 0, startAngle);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <group ref={outerRef} position={[0, poleH / 2, 0]}>
+      <group position={[0, -poleH / 2, 0]}>
+        {children}
+      </group>
     </group>
   );
 }
@@ -1793,6 +2003,7 @@ export default function ContainerSkin({
   const stampFromHotbar      = useStore((s) => s.stampFromHotbar);
   const getStampFaces        = useStore((s) => s.getStampFaces);
   const getStampFootprint    = useStore((s) => s.getStampFootprint);
+  const clearStairExit       = useStore((s) => s.clearStairExit);
   const stampArea            = useStore((s) => s.stampArea);
   const stampAreaSmart       = useStore((s) => s.stampAreaSmart);
   const isStaircaseMacro     = useStore((s) => s.isStaircaseMacro);
@@ -1879,6 +2090,8 @@ export default function ContainerSkin({
   );
 
   const brushStampVoxel  = useStore((s) => s.brushStampVoxel);
+  const sceneObjects     = useStore((s) => s.sceneObjects);
+  const fullyOccupiedFaces = useMemo(() => getFullyOccupiedFaces(sceneObjects), [sceneObjects]);
 
   // ★ Fix 2: Clear stale hoveredVoxelEdge + pending leave timer on unmount or container change
   useEffect(() => {
@@ -2000,6 +2213,18 @@ export default function ContainerSkin({
 
   const handleClick = useCallback(
     (voxelIndex: number, faceName: keyof VoxelFaces) => {
+      // ★ Staircase placement mode: intercept wall clicks to place stairs
+      const storeNow = useStore.getState();
+      if (storeNow.staircasePlacementMode && storeNow.staircasePlacementContainerId === container.id) {
+        const validation = validateStaircasePlacement(container.voxelGrid, voxelIndex, faceName);
+        if (!validation.valid) return;
+
+        storeNow.applyStairsFromFace(container.id, voxelIndex, faceName as 'n' | 's' | 'e' | 'w');
+        storeNow.setStaircasePlacementMode(false);
+        storeNow.setSelectedVoxel({ containerId: container.id, index: voxelIndex });
+        return;
+      }
+
       // ★ Paint Bucket mode: change only this face's texture, no structural changes
       if (bucketMode) {
         paintFace(container.id, voxelIndex, faceName, bucketSurface);
@@ -2392,6 +2617,9 @@ export default function ContainerSkin({
           // ★ Phase 4: Global adjacency culling — hide face if touching active voxel in adjacent container
           if (globalCullSet.has(`${container.id}:${idx}:${dir}`)) return null;
 
+          // ★ Task 11: Skip wall face when fully occupied by a slotWidth=3 SceneObject (avoids z-fighting)
+          if (fullyOccupiedFaces.has(`${container.id}:${idx}:${dir}`)) return null;
+
           // ★ Wall cut: hide ceiling when walls are cut (improves interior visibility)
           // Exception: keep ceiling if voxel has railings (platform/deck ceiling stays for context)
           if (hideCeiling && dir === 'top') {
@@ -2472,6 +2700,7 @@ export default function ContainerSkin({
                   vHeight={vHeight}
                   containerId={container.id}
                   voxelIndex={idx}
+                  reverseOriginalPhase={voxel._reverseOriginalPhase}
                 >{faceNodes}</ExtensionUnpack>
               : animated
                 ? <VoxelPopIn vHeight={vHeight}>{faceNodes}</VoxelPopIn>
@@ -2483,7 +2712,11 @@ export default function ContainerSkin({
             {voxel.voxelType === 'stairs' && (
               <>
                 {animated
-                  ? <StairBuildUp vHeight={vHeight}>
+                  ? <StairTelescope
+                      vHeight={vHeight}
+                      isExiting={!!voxel._stairExiting}
+                      onExitComplete={() => clearStairExit(container.id, idx)}
+                    >
                       <StairMesh
                         voxW={voxW}
                         voxD={voxD}
@@ -2492,7 +2725,7 @@ export default function ContainerSkin({
                         faces={voxel.faces}
                         stairPart={voxel.stairPart}
                       />
-                    </StairBuildUp>
+                    </StairTelescope>
                   : <StairMesh
                       voxW={voxW}
                       voxD={voxD}
@@ -3113,10 +3346,8 @@ export default function ContainerSkin({
         if (poleOverride?.visible === false) return null;
         const isSelectedPole = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === poleKey;
         const poleMat = isSelectedPole ? frameSelectMat : mFrame;
-        return (
+        const pillarMesh = (
           <mesh
-            key={`pillar_${i}`}
-            position={[px, poleYShift, pz]}
             geometry={getCyl(PILLAR_R, poleH)}
             material={poleMat}
             castShadow
@@ -3137,6 +3368,18 @@ export default function ContainerSkin({
             } : undefined}
             onClick={frameMode ? (e) => { e.stopPropagation(); setSelectedFrameElement({ containerId: container.id, key: poleKey, type: 'pole' }); } : undefined}
           />
+        );
+        // Check if the anchor voxel is in reverse animation (extension retracting)
+        const anchorIdx = row * VOXEL_COLS + col;
+        const anchorVoxel = grid[anchorIdx];
+        const isPoleExiting = anchorVoxel?.unpackPhase === 'reverse';
+        return (
+          <group key={`pillar_${i}`} position={[px, poleYShift, pz]}>
+            {animated
+              ? <PillarFoldDown poleH={poleH} corner={corner} isExiting={isPoleExiting}>{pillarMesh}</PillarFoldDown>
+              : pillarMesh
+            }
+          </group>
         );
       })}
 
