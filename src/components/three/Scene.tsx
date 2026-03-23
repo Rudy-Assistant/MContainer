@@ -1401,13 +1401,13 @@ function RealisticScene() {
       <PostProcessingStack />
 
       {/* 3D orientation gizmo */}
-      <GizmoHelper alignment="top-right" margin={[50, 50]}>
+      <GizmoHelper alignment="top-right" margin={[60, 60]}>
         <GizmoViewport
-          axisColors={['#94a3b8', '#94a3b8', '#94a3b8']}
-          labelColor="#64748b"
-          axisHeadScale={0.8}
-          hideNegativeAxes
+          axisColors={['#ef4444', '#22c55e', '#3b82f6']}
+          labelColor="#e2e8f0"
+          axisHeadScale={0.9}
           font="11px system-ui"
+          labels={['X', 'Y', 'Z']}
         />
       </GizmoHelper>
     </>

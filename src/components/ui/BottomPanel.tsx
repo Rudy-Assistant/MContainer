@@ -36,7 +36,7 @@ function costDots(cost: number): number {
 
 const wrapperStyle: CSSProperties = {
   position: 'fixed',
-  bottom: 48,
+  bottom: 8,
   // `left` is set dynamically via inline style override
   transform: 'translateX(-50%)',
   zIndex: 100,

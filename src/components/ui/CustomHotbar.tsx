@@ -193,7 +193,7 @@ export default function CustomHotbar() {
 
   return (
     <div style={{
-      position: "absolute", bottom: 92, left: "50%",
+      position: "absolute", bottom: 52, left: "50%",
       transform: hasSelection ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(10px)",
       zIndex: 24, display: "flex", alignItems: "center", gap: 3,
       padding: "5px 8px", borderRadius: 8,
