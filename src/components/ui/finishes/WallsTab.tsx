@@ -1,0 +1,141 @@
+"use client";
+
+import { useStore } from '@/store/useStore';
+import {
+  EXTERIOR_MATERIALS, GLASS_TINTS, FRAME_COLORS, DOOR_STYLES, PAINT_COLORS,
+  getFinishOptionsForFace,
+} from '@/config/finishPresets';
+import { getWallTypesForContext } from '@/config/wallTypes';
+import type { SurfaceType, FaceFinish } from '@/types/container';
+import type { FaceKey } from '@/hooks/useSelectionTarget';
+import TextureSwatchGrid from './TextureSwatchGrid';
+import OptionCardGrid from './OptionCardGrid';
+import SwatchRow from './SwatchRow';
+
+interface Props {
+  containerId: string;
+  voxelIndex: number;
+  indices: number[];
+  face: FaceKey;
+}
+
+export default function WallsTab({ containerId, voxelIndex, indices, face }: Props) {
+  const surface = useStore((s) =>
+    s.containers[containerId]?.voxelGrid?.[voxelIndex]?.faces[face] as SurfaceType | undefined
+  );
+  const currentFinish = useStore((s) =>
+    s.containers[containerId]?.voxelGrid?.[voxelIndex]?.faceFinishes?.[face]
+  );
+  const inspectorView = useStore((s) => s.inspectorView);
+  const setFaceFinish = useStore((s) => s.setFaceFinish);
+  const paintFace = useStore((s) => s.paintFace);
+  const addRecentItem = useStore((s) => s.addRecentItem);
+
+  const wallTypes = getWallTypesForContext(inspectorView, face);
+
+  const handleSurfaceChange = (newSurface: SurfaceType) => {
+    for (const idx of indices) paintFace(containerId, idx, face, newSurface);
+    addRecentItem({ type: 'wallType', value: newSurface, label: newSurface.replace(/_/g, ' ') });
+  };
+
+  const applyFinish = (patch: Partial<FaceFinish>) => {
+    for (const idx of indices) setFaceFinish(containerId, idx, face, patch);
+  };
+
+  const opts = surface ? getFinishOptionsForFace(surface, face) : null;
+
+  return (
+    <div style={{ padding: '8px 12px' }}>
+      {/* Surface type picker — always visible */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{
+          fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+          color: 'var(--text-dim, #64748b)', letterSpacing: '0.05em', marginBottom: 6,
+        }}>
+          Wall Surface
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          {wallTypes.map((entry) => (
+            <button
+              key={entry.surface + '-' + entry.category}
+              onClick={() => handleSurfaceChange(entry.surface)}
+              title={entry.label}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                padding: '8px 4px', borderRadius: 6, cursor: 'pointer', fontSize: 9,
+                border: `2px solid ${surface === entry.surface ? 'var(--accent, #3b82f6)' : 'var(--border-dark, #334155)'}`,
+                background: surface === entry.surface ? 'var(--accent-bg, rgba(59,130,246,0.08))' : 'var(--card-dark, #1e293b)',
+                color: 'var(--text-main, #e2e8f0)', transition: 'border-color 100ms',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{entry.icon}</span>
+              <span style={{ textAlign: 'center', lineHeight: 1.2 }}>{entry.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Surface-dependent finishes — only when surface is not Open */}
+      {opts?.exteriorMaterial && (
+        <TextureSwatchGrid
+          label="Exterior Material"
+          items={EXTERIOR_MATERIALS}
+          activeId={currentFinish?.material}
+          onSelect={(id, label) => {
+            applyFinish({ material: id });
+            addRecentItem({ type: 'finish', value: `material:${id}`, label });
+          }}
+        />
+      )}
+
+      {opts?.glassTint && (
+        <SwatchRow
+          label="Glass Tint"
+          colors={GLASS_TINTS}
+          activeHex={currentFinish?.tint}
+          onSelect={(hex, label) => {
+            applyFinish({ tint: hex });
+            addRecentItem({ type: 'finish', value: `tint:${hex}`, label });
+          }}
+        />
+      )}
+
+      {opts?.frameColor && (
+        <SwatchRow
+          label="Frame Color"
+          colors={FRAME_COLORS}
+          activeHex={currentFinish?.frameColor}
+          onSelect={(hex, label) => {
+            applyFinish({ frameColor: hex });
+            addRecentItem({ type: 'finish', value: `frame:${hex}`, label });
+          }}
+        />
+      )}
+
+      {opts?.doorStyle && (
+        <OptionCardGrid
+          label="Door Style"
+          items={DOOR_STYLES}
+          activeId={currentFinish?.doorStyle}
+          onSelect={(id, label) => {
+            applyFinish({ doorStyle: id });
+            addRecentItem({ type: 'finish', value: `door:${id}`, label });
+          }}
+        />
+      )}
+
+      {/* Color — universal, shown for any non-Open surface */}
+      {surface && surface !== 'Open' && (
+        <SwatchRow
+          label="Color"
+          colors={PAINT_COLORS}
+          activeHex={currentFinish?.color}
+          onSelect={(hex, label) => {
+            applyFinish({ color: hex });
+            addRecentItem({ type: 'finish', value: `color:${hex}`, label });
+          }}
+        />
+      )}
+    </div>
+  );
+}
