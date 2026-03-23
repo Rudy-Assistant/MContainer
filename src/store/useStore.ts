@@ -7,6 +7,7 @@ import { enableMapSet } from "immer";
 enableMapSet();
 import { idbStorage } from "./idbStorage";
 import { persistedStateSchema } from "./persistSchema";
+import { migrateToSceneObjects } from '@/utils/migration/migrateToSceneObjects';
 import {
   type AppState,
   type Container,
@@ -256,6 +257,10 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
       return;
     }
     if (state) {
+      const migrated = migrateToSceneObjects(state);
+      if (migrated !== state) {
+        useStore.setState(migrated);
+      }
       const result = persistedStateSchema.safeParse(state);
       if (!result.success) {
         console.warn('ModuHome: Invalid persisted state, using defaults:', result.error);
