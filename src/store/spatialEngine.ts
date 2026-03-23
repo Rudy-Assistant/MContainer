@@ -571,17 +571,23 @@ export function computeGlobalCulling(
   function tryCullPair(
     a: Container, aIdx: number, aBound: ReturnType<typeof wallSideToBoundary>,
     b: Container, bIdx: number, bBound: ReturnType<typeof wallSideToBoundary>,
+    aOverlaps: boolean, bOverlaps: boolean,
   ) {
     const aVox = a.voxelGrid?.[aIdx];
     const bVox = b.voxelGrid?.[bIdx];
-    if (aVox?.active && bVox?.active) {
-      const aSurface = aVox.faces[aBound.face];
-      const bSurface = bVox.faces[bBound.face];
-      if (shouldMelt(aSurface, bSurface)) {
-        // Smart: preserve user-painted faces (override auto-removal)
-        if (!isUserPainted(aVox, aBound.face)) cullSet.add(`${a.id}:${aIdx}:${aBound.face}`);
-        if (!isUserPainted(bVox, bBound.face)) cullSet.add(`${b.id}:${bIdx}:${bBound.face}`);
-      }
+
+    // Only cull faces where BOTH the voxel is active AND it geometrically overlaps
+    // the other container's grid extent. For same-size containers both always overlap.
+    const aActive = !!(aOverlaps && aVox?.active);
+    const bActive = !!(bOverlaps && bVox?.active);
+    if (!aActive && !bActive) return;
+
+    const aSurface = aActive ? aVox!.faces[aBound.face] : undefined;
+    const bSurface = bActive ? bVox!.faces[bBound.face] : undefined;
+
+    if (shouldMelt(aSurface, bSurface)) {
+      if (aActive && !isUserPainted(aVox!, aBound.face)) cullSet.add(`${a.id}:${aIdx}:${aBound.face}`);
+      if (bActive && !isUserPainted(bVox!, bBound.face)) cullSet.add(`${b.id}:${bIdx}:${bBound.face}`);
     }
   }
 
@@ -593,24 +599,60 @@ export function computeGlobalCulling(
     const aBound = wallSideToBoundary(pair.sideA);
     const bBound = wallSideToBoundary(pair.sideB);
 
+    // Compute pitch and grid extents for geometric overlap checks.
+    // Same math as refreshAdjacency: colPitch = body length / 6 body cols,
+    // rowPitch = body width / 2 body rows. Grid half-extent = (total cols or rows / 2) * pitch.
+    const aDims = CONTAINER_DIMENSIONS[a.size as ContainerSize];
+    const bDims = CONTAINER_DIMENSIONS[b.size as ContainerSize];
+    const aColPitch = aDims.length / 6;
+    const aRowPitch = aDims.width / 2;
+    const bColPitch = bDims.length / 6;
+    const bRowPitch = bDims.width / 2;
+
     // Iterate over both voxel levels (floor + roof)
     for (let level = 0; level < VOXEL_LEVELS; level++) {
       const lvlOff = level * VOXEL_ROWS * VOXEL_COLS;
 
       if (!aBound.isRowBoundary) {
-        // Col-based boundary (Front/Back) — iterate over rows
+        // Col-based boundary (Front/Back) — perpendicular axis is Z (rows)
+        const bHalfZ = (VOXEL_ROWS / 2) * bRowPitch;
+        const aHalfZ = (VOXEL_ROWS / 2) * aRowPitch;
+
         for (let row = 0; row < VOXEL_ROWS; row++) {
+          const aWorldZ = a.position.z + (row - 1.5) * aRowPitch;
+          const bWorldZ = b.position.z + (row - 1.5) * bRowPitch;
+          const aOvl = aWorldZ >= b.position.z - bHalfZ - aRowPitch / 2
+                    && aWorldZ <= b.position.z + bHalfZ + aRowPitch / 2;
+          const bOvl = bWorldZ >= a.position.z - aHalfZ - bRowPitch / 2
+                    && bWorldZ <= a.position.z + aHalfZ + bRowPitch / 2;
+
+          if (!aOvl && !bOvl) continue;
+
           tryCullPair(
             a, lvlOff + row * VOXEL_COLS + aBound.index, aBound,
             b, lvlOff + row * VOXEL_COLS + bBound.index, bBound,
+            aOvl, bOvl,
           );
         }
       } else {
-        // Row-based boundary (Left/Right) — iterate over cols
+        // Row-based boundary (Left/Right) — perpendicular axis is X (cols)
+        const bHalfX = (VOXEL_COLS / 2) * bColPitch;
+        const aHalfX = (VOXEL_COLS / 2) * aColPitch;
+
         for (let col = 0; col < VOXEL_COLS; col++) {
+          const aWorldX = a.position.x + -(col - 3.5) * aColPitch;
+          const bWorldX = b.position.x + -(col - 3.5) * bColPitch;
+          const aOvl = aWorldX >= b.position.x - bHalfX - aColPitch / 2
+                    && aWorldX <= b.position.x + bHalfX + aColPitch / 2;
+          const bOvl = bWorldX >= a.position.x - aHalfX - bColPitch / 2
+                    && bWorldX <= a.position.x + aHalfX + bColPitch / 2;
+
+          if (!aOvl && !bOvl) continue;
+
           tryCullPair(
             a, lvlOff + aBound.index * VOXEL_COLS + col, aBound,
             b, lvlOff + bBound.index * VOXEL_COLS + col, bBound,
+            aOvl, bOvl,
           );
         }
       }
