@@ -17,7 +17,7 @@ import {
 } from "@react-three/drei";
 import type CameraControlsImpl from "camera-controls";
 import { useStore } from "@/store/useStore";
-import { ViewMode, CONTAINER_DIMENSIONS, type Container } from "@/types/container";
+import { ViewMode, CONTAINER_DIMENSIONS, DEFAULT_EXTENSION_CONFIG, type Container } from "@/types/container";
 import {
   CAMERA_MIN_POLAR_ANGLE,
   CAMERA_MAX_POLAR_ANGLE,
@@ -44,9 +44,11 @@ import WarningOverlay from "./WarningOverlay";
 import { DevSceneExpose } from "./DevSceneExpose";
 import PostProcessingStack from './PostProcessingStack';
 import InteriorLights from './InteriorLights';
+import { SceneObjectRenderer } from '@/components/objects/SceneObjectRenderer';
 // pbrTextures.ts removed — texture loading consolidated into materialCache.ts via textureLoader.ts
 import GroundManager from "./GroundManager";
 import DebugOverlay from "./DebugOverlay";
+import StaircaseGhost from "./StaircaseGhost";
 // FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats, rebuildThemeMaterials } from "@/config/materialCache";
 import { initKTX2Loader } from '../../config/textureLoader';
@@ -683,9 +685,11 @@ function useKeyboardShortcuts() {
         }
       }
 
-      // Escape = Deselect / cancel drag
+      // Escape = Cancel staircase mode / deselect / cancel drag
       if (e.code === "Escape") {
-        if (store.dragContainer) {
+        if (store.staircasePlacementMode) {
+          store.setStaircasePlacementMode(false);
+        } else if (store.dragContainer) {
           store.setDragContainer(null);
         } else if (store.dragMovingId) {
           store.cancelContainerDrag();
@@ -1280,8 +1284,14 @@ function RealisticScene() {
 
       {/* FaceContextWidget removed — Materials hotbar replaces it */}
 
+      {/* Staircase placement ghost preview */}
+      <StaircaseGhost />
+
       {/* Interior lighting (ceiling spots + floor lamps) */}
       <InteriorLights />
+
+      {/* Unified placeable objects (doors, windows, lights) */}
+      <SceneObjectRenderer />
 
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
@@ -1407,7 +1417,7 @@ function DragGhost() {
         return;
       }
       const newId = useStore.getState().addContainer(dragContainer, { x: pos.x, y: pos.y, z: pos.z });
-      useStore.getState().setAllExtensions(newId, 'all_deck', false);
+      useStore.getState().setAllExtensions(newId, DEFAULT_EXTENSION_CONFIG, false);
       if (pos.stackTargetId) {
         useStore.getState().stackContainer(newId, pos.stackTargetId);
       }
@@ -1806,6 +1816,9 @@ function WalkthroughScene() {
       {/* Interior lighting (ceiling spots + floor lamps) */}
       <InteriorLights />
 
+      {/* Unified placeable objects (doors, windows, lights) */}
+      <SceneObjectRenderer />
+
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
     </>
@@ -1860,7 +1873,7 @@ function DragGhostBlueprint() {
         return;
       }
       const newId2 = useStore.getState().addContainer(dragContainer, { x: pos.x, y: 0, z: pos.z });
-      useStore.getState().setAllExtensions(newId2, 'all_deck', false);
+      useStore.getState().setAllExtensions(newId2, DEFAULT_EXTENSION_CONFIG, false);
       useStore.getState().setDragContainer(null);
     };
     window.addEventListener("mouseup", handleUp);
