@@ -45,6 +45,7 @@ import { DevSceneExpose } from "./DevSceneExpose";
 import PostProcessingStack from './PostProcessingStack';
 import InteriorLights from './InteriorLights';
 import { SceneObjectRenderer } from '@/components/objects/SceneObjectRenderer';
+import { PlacementGhost } from '@/components/objects/PlacementGhost';
 // pbrTextures.ts removed — texture loading consolidated into materialCache.ts via textureLoader.ts
 import GroundManager from "./GroundManager";
 import DebugOverlay from "./DebugOverlay";
@@ -1292,6 +1293,7 @@ function RealisticScene() {
 
       {/* Unified placeable objects (doors, windows, lights) */}
       <SceneObjectRenderer />
+      <PlacementGhost />
 
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
@@ -1818,6 +1820,7 @@ function WalkthroughScene() {
 
       {/* Unified placeable objects (doors, windows, lights) */}
       <SceneObjectRenderer />
+      <PlacementGhost />
 
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />

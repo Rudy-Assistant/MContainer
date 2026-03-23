@@ -149,6 +149,16 @@ export interface UiSlice {
   toggleHideRoof: () => void;
   hideSkin: boolean;
   toggleHideSkin: () => void;
+
+  // Staircase placement mode (F1 feature)
+  staircasePlacementMode: boolean;
+  staircasePlacementContainerId: string | null;
+  setStaircasePlacementMode: (on: boolean, containerId?: string | null) => void;
+
+  // Placement mode (Task 12: PlacementGhost)
+  placementMode: boolean;
+  activePlacementFormId: string | null;
+  setPlacementMode: (formId: string | null) => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -270,4 +280,20 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   toggleHideRoof: () => set((s: any) => ({ hideRoof: !s.hideRoof })),
   hideSkin: false,
   toggleHideSkin: () => set((s: any) => ({ hideSkin: !s.hideSkin })),
+
+  // Staircase placement mode
+  staircasePlacementMode: false,
+  staircasePlacementContainerId: null,
+  setStaircasePlacementMode: (on, containerId = null) => set({
+    staircasePlacementMode: on,
+    staircasePlacementContainerId: on ? containerId : null,
+  }),
+
+  // Placement mode (Task 12: PlacementGhost)
+  placementMode: false,
+  activePlacementFormId: null,
+  setPlacementMode: (formId) => set({
+    placementMode: formId != null,
+    activePlacementFormId: formId,
+  }),
 });
