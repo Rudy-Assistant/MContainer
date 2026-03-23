@@ -1983,6 +1983,9 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
   const selectedVoxel = useStore((s) => s.selectedVoxel);
   const selectedVoxels = useStore((s) => s.selectedVoxels);
   const selectedFace = useStore((s) => s.selectedFace);
+  const hoveredObjectId = useStore((s) => s.hoveredObjectId);
+  // Suppress voxel hover when a SceneObject is hovered (avoid competing highlights)
+  if (hoveredObjectId) return null;
   const dims = CONTAINER_DIMENSIONS[container.size];
   const vHeight = dims.height;
   const vOffset = vHeight / 2;

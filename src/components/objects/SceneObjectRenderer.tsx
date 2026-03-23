@@ -8,14 +8,18 @@ import { getMaterial } from '@/config/materialRegistry';
 import { applyStyleEffects, applyEmberWarmth } from '@/utils/styleEffects';
 import { anchorToLocalPosition, anchorToLocalRotation, localToWorld, localRotToWorld } from '@/utils/anchorMath';
 import { getProceduralGeometry } from '@/utils/proceduralGeometry';
-import { Suspense, useMemo, useEffect } from 'react';
+import { Suspense, useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import type { SceneObject, StyleId, StyleEffect, FormDefinition } from '@/types/sceneObject';
 import type { Container } from '@/types/container';
 
 // Module-level constant to avoid per-render allocation (Fix 6)
 const WHITE = new THREE.Color('#ffffff');
+const HOVER_EMISSIVE = new THREE.Color('#00bcd4');
+const HOVER_EMISSIVE_INTENSITY = 0.15;
+const NO_EMISSIVE = new THREE.Color(0, 0, 0);
 
 import { nullRaycast } from '@/utils/nullRaycast';
 
@@ -202,9 +206,26 @@ function ProceduralFormMesh({
     [form.id, form.category, form.dimensions],
   );
 
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    const mesh = meshRef.current;
+    if (!mesh || !mesh.material) return;
+    const mat = mesh.material as THREE.MeshStandardMaterial;
+    const isHovered = useStore.getState().hoveredObjectId === objectId;
+    if (isHovered) {
+      mat.emissive.copy(HOVER_EMISSIVE);
+      mat.emissiveIntensity = HOVER_EMISSIVE_INTENSITY;
+    } else if (mat.emissiveIntensity > 0) {
+      mat.emissive.copy(NO_EMISSIVE);
+      mat.emissiveIntensity = 0;
+    }
+  });
+
   return (
     <group position={worldPosition} rotation={worldRotation}>
       <mesh
+        ref={meshRef}
         geometry={geometry}
         material={material}
         castShadow
@@ -214,6 +235,15 @@ function ProceduralFormMesh({
           if (placementMode) return;
           e.stopPropagation();
           selectObject(objectId);
+        }}
+        onPointerOver={(e) => {
+          if (placementMode) return;
+          e.stopPropagation();
+          useStore.getState().setHoveredObjectId(objectId);
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation();
+          useStore.getState().setHoveredObjectId(null);
         }}
       />
     </group>
@@ -291,11 +321,38 @@ function GlbFormMesh({
     };
   }, [clonedScene]);
 
+  useFrame(() => {
+    if (!clonedScene) return;
+    const isHovered = useStore.getState().hoveredObjectId === objectId;
+    clonedScene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        if (mat.emissive) {
+          if (isHovered) {
+            mat.emissive.copy(HOVER_EMISSIVE);
+            mat.emissiveIntensity = HOVER_EMISSIVE_INTENSITY;
+          } else if (mat.emissiveIntensity > 0) {
+            mat.emissive.copy(NO_EMISSIVE);
+            mat.emissiveIntensity = 0;
+          }
+        }
+      }
+    });
+  });
+
   return (
     <group
       position={worldPosition}
       rotation={worldRotation}
       onClick={placementMode ? undefined : (e) => { e.stopPropagation(); selectObject(objectId); }}
+      onPointerOver={placementMode ? undefined : (e) => {
+        e.stopPropagation();
+        useStore.getState().setHoveredObjectId(objectId);
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        useStore.getState().setHoveredObjectId(null);
+      }}
       {...(placementMode ? { raycast: nullRaycast } : {})}
     >
       <primitive object={clonedScene} />
