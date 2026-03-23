@@ -140,9 +140,6 @@ export default function Home() {
         <div className="flex-1 relative" style={{ backgroundColor: "var(--background, #f4f6f8)", cursor: activeHotbarSlot !== null && !isWalkthrough ? 'crosshair' : 'default' }} onContextMenu={(e) => e.preventDefault()}>
           <SceneCanvas />
 
-          {/* Canvas hint overlay — bottom-right, hidden in walkthrough (has its own instructions) */}
-          {!isWalkthrough && !isPreviewMode && <CanvasHintOverlay />}
-
           {/* Grab mode overlay */}
           <GrabModeOverlay />
 

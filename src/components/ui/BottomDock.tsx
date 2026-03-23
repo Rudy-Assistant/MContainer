@@ -58,7 +58,7 @@ const TIME_GRADIENT = 'linear-gradient(to right, #0f0a2e 0%, #1a1145 8%, #4a2060
 
 // ── Gorgeous Time of Day Slider ───────────────────────────────
 
-function TimeOfDaySlider() {
+export function TimeOfDaySlider() {
   const timeOfDay = useStore((s) => s.environment.timeOfDay);
   const setTimeOfDay = useStore((s) => s.setTimeOfDay);
   const pct = (timeOfDay / 24) * 100;
@@ -319,77 +319,9 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
   });
 
   return (
-    <div ref={dockRef} className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center pointer-events-none"
-      style={{ paddingBottom: '10px' }}
+    <div ref={dockRef} className="absolute top-0 left-0 right-0 z-30 flex flex-col items-center pointer-events-none"
+      style={{ paddingTop: '10px' }}
     >
-      {/* ═══ Expanded Panel (floats above dock) ═══ */}
-      {activePanel && (
-        <div
-          className="mb-2 rounded-2xl shadow-2xl pointer-events-auto"
-          style={{
-            background: "var(--modal-bg, rgba(255,255,255,0.95))",
-            backdropFilter: "blur(20px) saturate(180%)",
-            border: "1px solid var(--border)",
-            color: "var(--text-main)",
-            padding: '20px 24px',
-            minWidth: '320px',
-            maxWidth: '440px',
-          }}
-        >
-          {activePanel === "compass" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-              {/* Degree + direction display */}
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-main, #111827)', lineHeight: 1 }}>
-                  {Math.round(northOffset)}°
-                </div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 2 }}>
-                  {getCompassDir(northOffset)} — North Direction
-                </div>
-              </div>
-              {/* Compass rose */}
-              <CompassRose northOffset={northOffset} onDrag={setNorthOffset} />
-              {/* Styled slider */}
-              <input type="range" min={0} max={360} step={1} value={northOffset}
-                onChange={(e) => setNorthOffset(parseFloat(e.target.value))}
-                style={{
-                  width: '100%', height: 6, borderRadius: 3, appearance: 'none',
-                  background: `linear-gradient(to right, #dc2626, #f59e0b, #22c55e, #3b82f6, #8b5cf6, #dc2626)`,
-                  cursor: 'pointer',
-                }} />
-            </div>
-          )}
-
-          {activePanel === "pricing" && estimate && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <LiveBOM />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Cost Estimate</span>
-                <button onClick={onOpenBudget} style={{ fontSize: '10px', color: '#1565c0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>Edit Rates</button>
-              </div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
-                {formatCurrency(estimate.low)} <span style={{ color: '#9ca3af', fontSize: '14px' }}>—</span> {formatCurrency(estimate.high)}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '12px', fontSize: '12px' }}>
-                <div><span style={{ color: '#6b7280', display: 'block' }}>Containers</span><span style={{ color: '#374151', fontWeight: 500 }}>{formatCurrency(estimate.breakdown.containers)}</span></div>
-                <div><span style={{ color: '#6b7280', display: 'block' }}>Modules</span><span style={{ color: '#374151', fontWeight: 500 }}>{formatCurrency(estimate.breakdown.modules)}</span></div>
-                <div><span style={{ color: '#6b7280', display: 'block' }}>Cuts</span><span style={{ color: '#374151', fontWeight: 500 }}>{formatCurrency(estimate.breakdown.cuts)}</span></div>
-              </div>
-            </div>
-          )}
-          {activePanel === "pricing" && !estimate && (
-            <p style={{ fontSize: '12px', color: '#6b7280' }}>Add containers to see pricing.</p>
-          )}
-
-          {activePanel === "project" && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Project</span>
-              <ExportImport />
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ═══ Floating Pill ═══ */}
       <div
         className="pointer-events-auto"
@@ -456,6 +388,71 @@ export default function BottomDock({ onOpenBudget }: BottomDockProps) {
           </svg>
         </button>
       </div>
+
+      {/* ═══ Expanded Panel (floats below pill) ═══ */}
+      {activePanel && (
+        <div
+          className="mt-2 rounded-2xl shadow-2xl pointer-events-auto"
+          style={{
+            background: "var(--modal-bg, rgba(255,255,255,0.95))",
+            backdropFilter: "blur(20px) saturate(180%)",
+            border: "1px solid var(--border)",
+            color: "var(--text-main)",
+            padding: '20px 24px',
+            minWidth: '320px',
+            maxWidth: '440px',
+          }}
+        >
+          {activePanel === "compass" && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-main, #111827)', lineHeight: 1 }}>
+                  {Math.round(northOffset)}°
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 2 }}>
+                  {getCompassDir(northOffset)} — North Direction
+                </div>
+              </div>
+              <CompassRose northOffset={northOffset} onDrag={setNorthOffset} />
+              <input type="range" min={0} max={360} step={1} value={northOffset}
+                onChange={(e) => setNorthOffset(parseFloat(e.target.value))}
+                style={{
+                  width: '100%', height: 6, borderRadius: 3, appearance: 'none',
+                  background: `linear-gradient(to right, #dc2626, #f59e0b, #22c55e, #3b82f6, #8b5cf6, #dc2626)`,
+                  cursor: 'pointer',
+                }} />
+            </div>
+          )}
+
+          {activePanel === "pricing" && estimate && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <LiveBOM />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Cost Estimate</span>
+                <button onClick={onOpenBudget} style={{ fontSize: '10px', color: '#1565c0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>Edit Rates</button>
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
+                {formatCurrency(estimate.low)} <span style={{ color: '#9ca3af', fontSize: '14px' }}>—</span> {formatCurrency(estimate.high)}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '12px', fontSize: '12px' }}>
+                <div><span style={{ color: '#6b7280', display: 'block' }}>Containers</span><span style={{ color: '#374151', fontWeight: 500 }}>{formatCurrency(estimate.breakdown.containers)}</span></div>
+                <div><span style={{ color: '#6b7280', display: 'block' }}>Modules</span><span style={{ color: '#374151', fontWeight: 500 }}>{formatCurrency(estimate.breakdown.modules)}</span></div>
+                <div><span style={{ color: '#6b7280', display: 'block' }}>Cuts</span><span style={{ color: '#374151', fontWeight: 500 }}>{formatCurrency(estimate.breakdown.cuts)}</span></div>
+              </div>
+            </div>
+          )}
+          {activePanel === "pricing" && !estimate && (
+            <p style={{ fontSize: '12px', color: '#6b7280' }}>Add containers to see pricing.</p>
+          )}
+
+          {activePanel === "project" && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Project</span>
+              <ExportImport />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
