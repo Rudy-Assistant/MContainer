@@ -303,5 +303,10 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   // Scene object selection (Task 14: SkinEditor)
   selectedObjectId: null,
-  selectObject: (id) => set({ selectedObjectId: id }),
+  selectObject: (id) => set({
+    selectedObjectId: id,
+    selectedVoxel: null,
+    selectedFace: null,
+    selectedVoxels: null,
+  }),
 });

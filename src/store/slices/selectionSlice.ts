@@ -114,19 +114,20 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
         selectionContext: newCtx,
         selectedVoxel: null,
         selectedVoxels: sameContainer ? s.selectedVoxels : null,
+        selectedObjectId: null,
       };
     }),
 
-  selectMultiple: (ids) => set({ selection: ids, selectedVoxel: null, selectedFace: null, selectedVoxels: null, selectionContext: null }),
+  selectMultiple: (ids) => set({ selection: ids, selectedVoxel: null, selectedFace: null, selectedVoxels: null, selectionContext: null, selectedObjectId: null }),
 
-  clearSelection: () => set({ selection: [], selectionContext: null, selectedVoxel: null, selectedFace: null, selectedVoxels: null, hoveredVoxel: null, faceContext: null }),
+  clearSelection: () => set({ selection: [], selectionContext: null, selectedVoxel: null, selectedFace: null, selectedVoxels: null, hoveredVoxel: null, faceContext: null, selectedObjectId: null }),
 
   setSelectionContext: (ctx) => set({ selectionContext: ctx }),
 
-  setSelectedVoxel: (v) => set({ selectedVoxel: v, selectedVoxels: null }),
+  setSelectedVoxel: (v) => set({ selectedVoxel: v, selectedVoxels: null, selectedObjectId: null }),
   setSelectedFace: (f) => set({ selectedFace: f }),
 
-  setSelectedVoxels: (v) => set({ selectedVoxels: v, selectedVoxel: null }),
+  setSelectedVoxels: (v) => set({ selectedVoxels: v, selectedVoxel: null, selectedObjectId: null }),
 
   toggleVoxelInSelection: (containerId, index) => set((state: any) => {
     const cur = state.selectedVoxels;
