@@ -5,9 +5,10 @@ import { formRegistry } from '@/config/formRegistry';
 import { resolveSkin } from '@/utils/skinResolver';
 import { getStyle } from '@/config/styleRegistry';
 import { getMaterial } from '@/config/materialRegistry';
+import { applyStyleEffects, applyEmberWarmth } from '@/utils/styleEffects';
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import type { SceneObject, StyleId, FormDefinition } from '@/types/sceneObject';
+import type { SceneObject, StyleId, StyleEffect, FormDefinition } from '@/types/sceneObject';
 import {
   VOXEL_COLS,
   VOXEL_ROWS,
@@ -135,12 +136,16 @@ function SceneObjectMesh({ objectId, styleId }: { objectId: string; styleId: Sty
   const matDef = getMaterial(matId);
 
   const material = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshStandardMaterial({
       color: matDef?.color ?? '#888888',
       metalness: matDef?.metalness ?? 0.5,
       roughness: matDef?.roughness ?? 0.5,
     });
-  }, [matDef?.color, matDef?.metalness, matDef?.roughness]);
+    if (style?.effects?.length) {
+      applyStyleEffects(mat, style.effects);
+    }
+    return mat;
+  }, [matDef?.color, matDef?.metalness, matDef?.roughness, style?.effects]);
 
   // Container world position + container rotation
   const worldPosition = useMemo((): [number, number, number] => {
@@ -176,43 +181,62 @@ function SceneObjectMesh({ objectId, styleId }: { objectId: string; styleId: Sty
       </mesh>
       {/* Light sources for light-category forms */}
       {form.category === 'light' && (
-        <LightSource object={object} form={form} />
+        <LightSource object={object} form={form} effects={style?.effects} />
       )}
     </group>
   );
 }
 
-function LightSource({ object, form }: { object: SceneObject; form: FormDefinition }) {
+function LightSource({
+  object,
+  form,
+  effects,
+}: {
+  object: SceneObject;
+  form: FormDefinition;
+  effects?: StyleEffect[];
+}) {
   const brightness = (object.state?.brightness as number) ?? 75;
   const intensity = (brightness / 100) * 2; // 0-2 range
 
+  // Apply ember_warmth effect to light color and distance if present
+  const baseColor = new THREE.Color('#ffffff');
+  const ember = effects?.length ? applyEmberWarmth(effects, baseColor, 5) : null;
+  const lightColor = ember?.color ?? baseColor;
+
   if (form.anchorType === 'ceiling') {
+    const dist = ember ? ember.distance : 5;
     return (
       <spotLight
+        color={lightColor}
         intensity={intensity}
         angle={Math.PI / 4}
         penumbra={0.5}
-        distance={5}
+        distance={dist}
         position={[0, -0.1, 0]}
       />
     );
   }
   if (form.anchorType === 'face') {
+    const dist = ember ? ember.distance * (4 / 5) : 4;
     return (
       <spotLight
+        color={lightColor}
         intensity={intensity}
         angle={Math.PI / 3}
         penumbra={0.7}
-        distance={4}
+        distance={dist}
         position={[0, 0, 0.1]}
       />
     );
   }
   // Floor lights (lamps)
+  const dist = ember ? ember.distance * (4 / 5) : 4;
   return (
     <pointLight
+      color={lightColor}
       intensity={intensity}
-      distance={4}
+      distance={dist}
       position={[0, form.dimensions.h, 0]}
     />
   );
