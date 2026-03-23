@@ -39,12 +39,12 @@ describe('collapsible sidebar state', () => {
     useStore.setState(initial, true);
   });
 
-  it('previewCollapsed defaults to false', () => {
-    expect(useStore.getState().previewCollapsed).toBe(false);
+  it('previewCollapsed defaults to true (collapsed)', () => {
+    expect(useStore.getState().previewCollapsed).toBe(true);
   });
 
-  it('gridCollapsed defaults to false', () => {
-    expect(useStore.getState().gridCollapsed).toBe(false);
+  it('gridCollapsed defaults to true (collapsed)', () => {
+    expect(useStore.getState().gridCollapsed).toBe(true);
   });
 
   it('setPreviewCollapsed toggles', () => {

@@ -274,9 +274,9 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   }),
 
   // Collapsible inspector sidebar sections
-  previewCollapsed: false,
+  previewCollapsed: true,
   setPreviewCollapsed: (v) => set({ previewCollapsed: v }),
-  gridCollapsed: false,
+  gridCollapsed: true,
   setGridCollapsed: (v) => set({ gridCollapsed: v }),
 
   // Global roof / skin visibility toggles
