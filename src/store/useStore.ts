@@ -22,6 +22,7 @@ import { createDragSlice, type DragSlice, setTemporalApiAccessor } from "./slice
 import { createLibrarySlice, type LibrarySlice, setLibraryTemporalAccessor } from "./slices/librarySlice";
 import { createVoxelSlice, type VoxelSlice, setVoxelStoreRef, recomputeSmartRailings } from "./slices/voxelSlice";
 import { createContainerSlice, type ContainerSlice, setContainerTemporalAccessor } from "./slices/containerSlice";
+import { createSceneObjectSlice, type SceneObjectSlice } from "./slices/sceneObjectSlice";
 import { THEMES } from "@/config/themes";
 
 // ── Voxel Target Union ─────────────────────────────────────
@@ -183,7 +184,7 @@ export function autoStairAscending(
 
 // ── Store ───────────────────────────────────────────────────
 
-export type StoreState = AppState & EnvironmentSlice & UiSlice & SelectionSlice & DragSlice & LibrarySlice & VoxelSlice & ContainerSlice & { _hasHydrated: boolean };
+export type StoreState = AppState & EnvironmentSlice & UiSlice & SelectionSlice & DragSlice & LibrarySlice & VoxelSlice & ContainerSlice & SceneObjectSlice & { _hasHydrated: boolean };
 
 export const useStore = create<StoreState>()(persist(temporal(immer((set, get) => ({
   // ── Slices ─────────────────────────────────────────────
@@ -194,6 +195,7 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
   ...createLibrarySlice(set as any, get as any, DEFAULT_HOTBAR),
   ...createVoxelSlice(set as any, get as any),
   ...createContainerSlice(set as any, get as any),
+  ...createSceneObjectSlice(set as any, get as any),
 
   // ── Initial State ───────────────────────────────────────
   _hasHydrated: false,
@@ -201,29 +203,30 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
 })), {
   limit: 50,
   partialize: (state) => {
-    const { containers, zones, furnitureIndex } = state;
-    return { containers, zones, furnitureIndex } as StoreState;
+    const { containers, zones, furnitureIndex, sceneObjects } = state;
+    return { containers, zones, furnitureIndex, sceneObjects } as StoreState;
   },
   equality: (pastState, currentState) =>
     (pastState as any).containers === (currentState as any).containers &&
     (pastState as any).zones === (currentState as any).zones &&
-    (pastState as any).furnitureIndex === (currentState as any).furnitureIndex,
+    (pastState as any).furnitureIndex === (currentState as any).furnitureIndex &&
+    (pastState as any).sceneObjects === (currentState as any).sceneObjects,
 }), {
   name: 'moduhome-project',
   storage: createJSONStorage(() => idbStorage),
   partialize: (state) => {
     const { containers, zones, environment, viewMode, pricing, furnitureIndex,
             libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-            palettes, activePaletteId, currentTheme } = state;
+            palettes, activePaletteId, currentTheme, sceneObjects } = state;
     // Strip ephemeral _preMergeWalls, _preExtensionDoors, _smartRailingChanges, and voxel unpackPhase from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
       const { _preMergeWalls, _preExtensionDoors, _smartRailingChanges, ...rest } = c;
-      // Strip ephemeral unpackPhase from voxels (animation-only, never persisted)
+      // Strip ephemeral unpackPhase, _reverseOriginalPhase, _stairExiting from voxels (animation-only, never persisted)
       if (rest.voxelGrid) {
         rest.voxelGrid = rest.voxelGrid.map(v => {
-          if (v.unpackPhase === undefined) return v;
-          const { unpackPhase: _, ...cleanVoxel } = v;
+          if (v.unpackPhase === undefined && v._reverseOriginalPhase === undefined && v._stairExiting === undefined) return v;
+          const { unpackPhase: _u, _reverseOriginalPhase: _r, _stairExiting: _se, ...cleanVoxel } = v;
           return cleanVoxel;
         });
       }
@@ -231,7 +234,7 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     }
     return { containers: cleanContainers, zones, environment, viewMode, pricing, furnitureIndex,
              libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-             palettes, activePaletteId, currentTheme } as StoreState;
+             palettes, activePaletteId, currentTheme, sceneObjects } as StoreState;
   },
   merge: (persistedState, currentState) => {
     if (!persistedState) return currentState as StoreState;
