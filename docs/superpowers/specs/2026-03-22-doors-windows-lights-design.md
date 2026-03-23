@@ -473,7 +473,6 @@ interface SceneObjectSlice {
   updateState: (objectId: string, key: string, value: unknown) => void;
   moveObject: (objectId: string, newAnchor: ObjectAnchor) => void;
   duplicateObject: (objectId: string, newAnchor: ObjectAnchor) => void;
-}
 
   // Cascade: called by removeContainer in containerSlice
   removeObjectsByContainer: (containerId: string) => void;
@@ -697,7 +696,7 @@ Most are one-line material tweaks. Only `salt_frost`, `dappled_light`, `soft_blo
 **Style Registry**
 - All styles have defaultMaterials for common slots (frame, glass, panel)
 - Effects reference valid effect types
-- compatibleForms reference valid form IDs
+- Every StyleId referenced in FormDefinition.styles exists in the style registry
 
 ### Store Tests
 
