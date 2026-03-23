@@ -1,0 +1,61 @@
+"use client";
+
+import { useStore } from '@/store/useStore';
+import { ELECTRICAL_TYPES, PAINT_COLORS } from '@/config/finishPresets';
+import type { FaceFinish } from '@/types/container';
+import type { FaceKey } from '@/hooks/useSelectionTarget';
+import OptionCardGrid from './OptionCardGrid';
+import SwatchRow from './SwatchRow';
+
+interface Props {
+  containerId: string;
+  voxelIndex: number;
+  indices: number[];
+  face: FaceKey;
+}
+
+export default function ElectricalTab({ containerId, voxelIndex, indices, face }: Props) {
+  // Hooks must be called unconditionally (Rules of Hooks)
+  const currentFinish = useStore((s) => s.containers[containerId]?.voxelGrid?.[voxelIndex]?.faceFinishes?.[face]);
+  const setFaceFinish = useStore((s) => s.setFaceFinish);
+  const addRecentItem = useStore((s) => s.addRecentItem);
+
+  const isWallFace = face !== 'top' && face !== 'bottom';
+
+  if (!isWallFace) {
+    return (
+      <div style={{ padding: '16px 12px', textAlign: 'center' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim, #64748b)' }}>
+          Electrical is available on wall faces. Click a wall in the preview above.
+        </div>
+      </div>
+    );
+  }
+
+  const applyFinish = (patch: Partial<FaceFinish>) => {
+    for (const idx of indices) setFaceFinish(containerId, idx, face, patch);
+  };
+
+  return (
+    <div style={{ padding: '8px 12px' }}>
+      <OptionCardGrid
+        label="Electrical"
+        items={ELECTRICAL_TYPES}
+        activeId={currentFinish?.electrical || 'none'}
+        onSelect={(id, label) => {
+          applyFinish({ electrical: id });
+          addRecentItem({ type: 'finish', value: `elec:${id}`, label });
+        }}
+      />
+      <SwatchRow
+        label="Color"
+        colors={PAINT_COLORS}
+        activeHex={currentFinish?.color}
+        onSelect={(hex, label) => {
+          applyFinish({ color: hex });
+          addRecentItem({ type: 'finish', value: `color:${hex}`, label });
+        }}
+      />
+    </div>
+  );
+}
