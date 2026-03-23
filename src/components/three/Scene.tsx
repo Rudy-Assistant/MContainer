@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { setExportScene } from "@/utils/exportGLB";
@@ -1690,7 +1690,70 @@ function DragMoveGhost() {
   if (!container) return null;
   const dims = CONTAINER_DIMENSIONS[container.size];
 
-  return <MoveGhostVisual dims={dims} ghostPos={ghostPos} container={container} />;
+  return (
+    <>
+      <MoveGhostVisual dims={dims} ghostPos={ghostPos} container={container} />
+      <StackTargetIndicator ghostPos={ghostPos} />
+    </>
+  );
+}
+
+/** Wireframe outline + "Stack Here" label shown at the target container's top face when stacking */
+function StackTargetIndicator({
+  ghostPos,
+}: {
+  ghostPos: RefObject<{ x: number; y: number; z: number; valid: boolean; snapped: boolean; stacking: boolean; stackTargetId: string | null }>;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const [visible, setVisible] = useState(false);
+
+  useFrame(() => {
+    if (!ghostPos.current || !groupRef.current) return;
+    const g = ghostPos.current;
+    if (!g.stackTargetId) {
+      if (visible) setVisible(false);
+      return;
+    }
+    const containers = useStore.getState().containers;
+    const target = containers[g.stackTargetId];
+    if (!target) {
+      if (visible) setVisible(false);
+      return;
+    }
+    const targetDims = CONTAINER_DIMENSIONS[target.size];
+    const topY = target.position.y + targetDims.height;
+    groupRef.current.position.set(target.position.x, topY, target.position.z);
+    // Update box scale to match target container dimensions
+    const wireframe = groupRef.current.children[0] as THREE.Mesh | undefined;
+    if (wireframe) {
+      wireframe.scale.set(targetDims.length, 1, targetDims.width);
+    }
+    if (!visible) setVisible(true);
+  });
+
+  return (
+    <group ref={groupRef} visible={visible}>
+      <mesh raycast={() => {}}>
+        <boxGeometry args={[1, 0.05, 1]} />
+        <meshBasicMaterial wireframe color="#00bcd4" transparent opacity={0.8} />
+      </mesh>
+      <Html center position={[0, 0.5, 0]} style={{ pointerEvents: "none" }}>
+        <span
+          style={{
+            color: "white",
+            fontSize: "12px",
+            fontWeight: 600,
+            background: "rgba(0,0,0,0.7)",
+            padding: "2px 8px",
+            borderRadius: "4px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Stack Here
+        </span>
+      </Html>
+    </group>
+  );
 }
 
 function MoveGhostVisual({
