@@ -83,11 +83,12 @@ export function applyStyleEffects(
         material.roughness = Math.min(1, material.roughness + 0.15);
         break;
       }
-      // Deferred to postprocessing sprint:
-      // salt_frost  — needs edge-detect shader
-      // soft_bloom  — needs per-fixture bloom threshold override
-      // dappled_light — needs gobo/cookie texture on sun shadow map
-      // edge_glow   — needs emissive channel on edge geometry UVs
+      // Screen-space / scene-level effects — handled by PostProcessingStack
+      // and DappleGobo components, not material-time mutations:
+      // salt_frost  — HueSaturation desaturation + BrightnessContrast + Outline (layer 11)
+      // soft_bloom  — Bloom luminanceThreshold lowered to 0.5
+      // dappled_light — procedural gobo plane casting leaf-shaped shadows
+      // edge_glow   — Outline with style color (layer 12)
       case 'salt_frost':
       case 'soft_bloom':
       case 'dappled_light':

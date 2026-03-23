@@ -59,6 +59,7 @@ import { applyPalette } from "@/utils/applyPalette";
 import type { MaterialPalette } from "@/store/slices/librarySlice";
 import { QUALITY_PRESETS } from "@/config/qualityPresets";
 import { QualityAutoDetect } from './QualityAutoDetect';
+import { getStyle } from '@/config/styleRegistry';
 
 
 // ── Sun Position Calculator ─────────────────────────────────
@@ -146,6 +147,82 @@ function SunLight() {
         args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.40, 0.20)]}
       />
     </>
+  );
+}
+
+// ── Dappled Light Gobo (leaf shadow pattern) ────────────────
+// When the active style has a dappled_light effect, a procedural
+// leaf-pattern plane is placed between the sun and the scene to
+// cast patterned shadows. The plane is nearly invisible to the
+// camera (opacity 0.01) but alphaTest makes shadow edges crisp.
+
+function DappleGobo() {
+  const activeStyle = useStore((s) => s.activeStyle);
+  const sunPos = useSunPosition();
+
+  const style = getStyle(activeStyle);
+  const hasDappled = style?.effects.some((e) => e.type === 'dappled_light') ?? false;
+
+  const texture = useMemo(() => {
+    if (!hasDappled) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // White background = full light pass-through
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Dark ellipses = leaf-shaped shadow blockers
+    ctx.fillStyle = '#000000';
+    // Deterministic seed via simple LCG for consistent pattern
+    let seed = 42;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed / 0x7fffffff; };
+
+    for (let i = 0; i < 120; i++) {
+      const x = rand() * 512;
+      const y = rand() * 512;
+      const rx = 8 + rand() * 25;
+      const ry = 4 + rand() * 15;
+      const angle = rand() * Math.PI;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(3, 3);
+    return tex;
+  }, [hasDappled]);
+
+  if (!hasDappled || !texture) return null;
+
+  // Position the gobo plane halfway between sun and scene origin, high up
+  const planePos: [number, number, number] = [
+    sunPos.x * 0.4,
+    Math.max(sunPos.y * 0.4, 18),
+    sunPos.z * 0.4,
+  ];
+
+  return (
+    <mesh position={planePos} castShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[60, 60]} />
+      <meshBasicMaterial
+        color="#000000"
+        alphaMap={texture}
+        transparent
+        opacity={0.01}
+        alphaTest={0.5}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
   );
 }
 
@@ -1186,6 +1263,7 @@ function RealisticScene() {
     <>
       <SkyDome />
       <SunLight />
+      <DappleGobo />
       <FollowLight />
       <GroundManager />
       {/* PBRTextureLoader removed — textures now loaded by materialCache at module init */}
@@ -1807,6 +1885,7 @@ function WalkthroughScene() {
       <WalkthroughEnvSuppressor />
       <SkyDome />
       <SunLight />
+      <DappleGobo />
       <GroundManager />
 
       {/* Phase 8: HDRI environment for PBR reflections */}
