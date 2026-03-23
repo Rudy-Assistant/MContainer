@@ -24,6 +24,7 @@ import MatrixEditor from "@/components/ui/MatrixEditor";
 import { FrameInspector } from "@/components/ui/FrameInspector";
 import WallTypePicker from "@/components/ui/WallTypePicker";
 import FinishesPanel from "@/components/ui/FinishesPanel";
+import SkinEditor from "@/components/ui/SkinEditor";
 import { useSelectionTarget } from "@/hooks/useSelectionTarget";
 import { CONTAINER_PRESETS } from "@/config/containerPresets";
 import { CONTAINER_ROLES } from "@/config/containerRoles";
@@ -350,6 +351,7 @@ function Inspector({
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(container.name || "");
 
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
   const target = useSelectionTarget();
 
   // Sync local name when selection changes
@@ -500,7 +502,9 @@ function Inspector({
 
       {/* ── Contextual area — fills remaining space ── */}
       <div style={{ flex: 1, overflowY: "auto", borderTop: "1px solid #1e293b", marginTop: "4px" }}>
-        {(target.type === "voxel" || target.type === "bay") ? (
+        {selectedObjectId ? (
+          <SkinEditor />
+        ) : (target.type === "voxel" || target.type === "bay") ? (
           <WallTypePicker
             containerId={containerId}
             voxelIndex={target.type === "voxel" ? target.index : target.indices[0]}
