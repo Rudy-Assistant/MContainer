@@ -112,6 +112,8 @@ function SceneObjectMesh({ objectId, styleId }: { objectId: string; styleId: Sty
   const container = useStore((s) =>
     object ? s.containers[object.anchor.containerId] : undefined,
   );
+  const placementMode = useStore((s) => s.placementMode);
+  const selectObject = useStore((s) => s.selectObject);
 
   if (!object || !container) return null;
 
@@ -159,7 +161,17 @@ function SceneObjectMesh({ objectId, styleId }: { objectId: string; styleId: Sty
   return (
     <group position={worldPosition} rotation={worldRotation}>
       {/* Procedural placeholder box — replaced with GLB models in art pipeline sprint */}
-      <mesh material={material} raycast={nullRaycast} castShadow receiveShadow>
+      <mesh
+        material={material}
+        castShadow
+        receiveShadow
+        {...(placementMode ? { raycast: nullRaycast } : {})}
+        onClick={(e) => {
+          if (placementMode) return;
+          e.stopPropagation();
+          selectObject(objectId);
+        }}
+      >
         <boxGeometry args={[form.dimensions.w, form.dimensions.h, form.dimensions.d]} />
       </mesh>
       {/* Light sources for light-category forms */}

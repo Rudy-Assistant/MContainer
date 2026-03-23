@@ -5,6 +5,7 @@ import type { RootState } from "@react-three/fiber";
 import * as THREE from "three";
 import { Component, type ReactNode, Suspense, useCallback, useRef } from "react";
 import Scene from "./Scene";
+import StaircaseModeIndicator from "@/components/ui/StaircaseModeIndicator";
 import { useStore } from "@/store/useStore";
 import { CAMERA_INITIAL_POSITION } from "@/config/cameraConstants";
 import "@/utils/bvhSetup";
@@ -62,7 +63,8 @@ const INITIAL_BG = new THREE.Color(0x2a4a20);
 export default function SceneCanvas() {
   const activeBrush = useStore((s) => s.activeBrush);
   const activeSlot = useStore((s) => s.activeHotbarSlot);
-  const cursor = (activeBrush || activeSlot !== null) ? 'crosshair' : 'default';
+  const staircaseMode = useStore((s) => s.staircasePlacementMode);
+  const cursor = (staircaseMode || activeBrush || activeSlot !== null) ? 'crosshair' : 'default';
   const containerRef = useRef<HTMLDivElement>(null);
 
   const onCreated = useCallback((state: RootState) => {
@@ -100,6 +102,7 @@ export default function SceneCanvas() {
           s.setSelectedVoxel(null);
           s.setSelectedVoxels(null);
           s.setFacePreview(null);
+          s.selectObject(null);
           document.body.style.cursor = 'auto';
         }}
         onContextMenu={(e) => e.preventDefault()}
@@ -109,6 +112,7 @@ export default function SceneCanvas() {
           <Scene />
         </Suspense>
       </Canvas>
+      <StaircaseModeIndicator />
       </div>
     </SceneErrorBoundary>
   );

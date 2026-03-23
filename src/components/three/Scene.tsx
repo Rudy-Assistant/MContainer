@@ -686,9 +686,11 @@ function useKeyboardShortcuts() {
         }
       }
 
-      // Escape = Cancel staircase mode / deselect / cancel drag
+      // Escape = Cancel placement mode / staircase mode / deselect / cancel drag
       if (e.code === "Escape") {
-        if (store.staircasePlacementMode) {
+        if (store.placementMode) {
+          store.setPlacementMode(null);
+        } else if (store.staircasePlacementMode) {
           store.setStaircasePlacementMode(false);
         } else if (store.dragContainer) {
           store.setDragContainer(null);
@@ -700,6 +702,7 @@ function useKeyboardShortcuts() {
           store.stopPaint();
           store.clearClipboard();
           store.setActiveHotbarSlot(null);
+          store.selectObject(null);
         }
       }
 
