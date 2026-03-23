@@ -128,3 +128,17 @@ export const THEMES: Record<ThemeId, ThemeConfig> = {
 };
 
 export const THEME_IDS: ThemeId[] = ['industrial', 'japanese', 'desert'];
+
+import type { StyleId } from '@/types/sceneObject';
+
+export const THEME_TO_STYLE_MAP: Record<ThemeId, StyleId> = {
+  industrial: 'industrial',
+  japanese: 'japanese',
+  desert: 'desert_brutalist',
+};
+
+export const STYLE_TO_THEME_MAP: Partial<Record<StyleId, ThemeId>> = {
+  industrial: 'industrial',
+  japanese: 'japanese',
+  desert_brutalist: 'desert',
+};

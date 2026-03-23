@@ -6,8 +6,9 @@
  */
 
 import { ViewMode } from '@/types/container';
-import { type ThemeId, THEMES } from '@/config/themes';
+import { type ThemeId, THEMES, STYLE_TO_THEME_MAP, THEME_TO_STYLE_MAP } from '@/config/themes';
 import { type QualityPresetId } from '@/config/qualityPresets';
+import type { StyleId } from '@/types/sceneObject';
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
@@ -28,6 +29,10 @@ export interface EnvironmentSlice {
   // Theme (persisted via currentTheme)
   currentTheme: ThemeId;
   setTheme: (theme: ThemeId) => void;
+
+  // Style (new unified system — persisted via activeStyle)
+  activeStyle: StyleId;
+  setActiveStyle: (style: StyleId) => void;
 
   // Camera orientation (ephemeral)
   cameraAzimuth: number;
@@ -52,6 +57,7 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
   environment: { timeOfDay: 15, northOffset: 0, groundPreset: 'grass' },
   viewMode: ViewMode.Realistic3D,
   currentTheme: 'industrial' as ThemeId,
+  activeStyle: 'industrial' as StyleId,
   cameraAzimuth: Math.PI / 4,
   cameraElevation: Math.PI / 4,
   savedCamera3D: null,
@@ -91,9 +97,22 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
     const themeConfig = THEMES[theme];
     set((s: any) => ({
       currentTheme: theme,
+      activeStyle: THEME_TO_STYLE_MAP[theme] ?? 'industrial',
       environment: { ...s.environment, groundPreset: themeConfig.groundPreset },
     }));
   },
+
+  setActiveStyle: (style) => set((s: any) => {
+    // Sync legacy currentTheme if a mapping exists
+    const legacyTheme = STYLE_TO_THEME_MAP[style];
+    // Update ground preset to match theme
+    const themeId = legacyTheme ?? 'industrial';
+    return {
+      activeStyle: style,
+      ...(legacyTheme ? { currentTheme: legacyTheme } : {}),
+      environment: { ...s.environment, groundPreset: THEMES[themeId]?.groundPreset ?? 'grass' },
+    };
+  }),
 
   setCameraAngles: (azimuth, elevation) => set({ cameraAzimuth: azimuth, cameraElevation: elevation }),
   saveCamera3D: (position, target) => set({ savedCamera3D: { position, target } }),

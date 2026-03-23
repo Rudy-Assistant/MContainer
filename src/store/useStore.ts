@@ -218,7 +218,7 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
   partialize: (state) => {
     const { containers, zones, environment, viewMode, pricing, furnitureIndex,
             libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-            palettes, activePaletteId, currentTheme, sceneObjects } = state;
+            palettes, activePaletteId, currentTheme, activeStyle, sceneObjects } = state;
     // Strip ephemeral _preMergeWalls, _preExtensionDoors, _smartRailingChanges, and voxel unpackPhase from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
@@ -235,7 +235,7 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     }
     return { containers: cleanContainers, zones, environment, viewMode, pricing, furnitureIndex,
              libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-             palettes, activePaletteId, currentTheme, sceneObjects } as StoreState;
+             palettes, activePaletteId, currentTheme, activeStyle, sceneObjects } as StoreState;
   },
   merge: (persistedState, currentState) => {
     if (!persistedState) return currentState as StoreState;
