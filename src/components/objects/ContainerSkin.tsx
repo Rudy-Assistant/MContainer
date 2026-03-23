@@ -129,6 +129,28 @@ function tryPlacementIntercept(containerId: string, voxelIndex: number, face: ke
   return true; // Incompatible face — still consume the click in placement mode
 }
 
+/** Find a placed SceneObject whose anchor matches the clicked voxel face. */
+function findObjectAtFace(
+  sceneObjects: Record<string, import('@/types/sceneObject').SceneObject>,
+  containerId: string,
+  voxelIndex: number,
+  face: keyof VoxelFaces,
+): string | null {
+  for (const [id, obj] of Object.entries(sceneObjects)) {
+    const a = obj.anchor;
+    if (
+      a.containerId === containerId &&
+      a.voxelIndex === voxelIndex &&
+      ((a.type === 'face' && a.face === face) ||
+       (a.type === 'floor' && face === 'bottom') ||
+       (a.type === 'ceiling' && face === 'top'))
+    ) {
+      return id;
+    }
+  }
+  return null;
+}
+
 // ── Constants ──────────────────────────────────────────────────
 
 // Surface cycle for hotbar face editing (shared with MatrixEditor)
@@ -2273,6 +2295,14 @@ export default function ContainerSkin({
         storeNow.applyStairsFromFace(container.id, voxelIndex, faceName as 'n' | 's' | 'e' | 'w');
         storeNow.setStaircasePlacementMode(false);
         storeNow.setSelectedVoxel({ containerId: container.id, index: voxelIndex });
+        return;
+      }
+
+      // ★ SceneObject selection: if clicked face has a placed object, select it
+      const sceneObjects = useStore.getState().sceneObjects;
+      const hitObjectId = findObjectAtFace(sceneObjects, container.id, voxelIndex, faceName);
+      if (hitObjectId) {
+        useStore.getState().selectObject(hitObjectId);
         return;
       }
 
