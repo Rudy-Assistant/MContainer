@@ -71,7 +71,8 @@ import { makePoleKey } from "@/config/frameMaterials";
 import LightFixture from './LightFixture';
 import ElectricalPlate from './ElectricalPlate';
 import { formRegistry } from "@/config/formRegistry";
-import type { SceneObject } from "@/types/sceneObject";
+import { getOccupiedSlots, getSlotsForPlacement } from "@/utils/slotOccupancy";
+import type { SceneObject, WallDirection } from "@/types/sceneObject";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -2213,8 +2214,37 @@ export default function ContainerSkin({
 
   const handleClick = useCallback(
     (voxelIndex: number, faceName: keyof VoxelFaces) => {
-      // ★ Staircase placement mode: intercept wall clicks to place stairs
+      // ★ Object placement mode: intercept clicks to place scene objects (doors, windows, etc.)
       const storeNow = useStore.getState();
+      if (storeNow.placementMode && storeNow.activePlacementFormId) {
+        const pFormId = storeNow.activePlacementFormId;
+        const pForm = formRegistry.get(pFormId);
+        if (pForm) {
+          const isWall = faceName === 'n' || faceName === 's' || faceName === 'e' || faceName === 'w';
+          if (pForm.anchorType === 'face' && isWall) {
+            const allObjects = Object.values(storeNow.sceneObjects) as SceneObject[];
+            const occupied = getOccupiedSlots(allObjects, container.id, voxelIndex, faceName as WallDirection, formRegistry);
+            const validSlots = getSlotsForPlacement(occupied, pForm.slotWidth);
+            if (validSlots.length > 0) {
+              storeNow.placeObject(pFormId, {
+                containerId: container.id, voxelIndex, type: 'face',
+                face: faceName as WallDirection, slot: validSlots[0],
+              });
+            }
+            return;
+          } else if (pForm.anchorType === 'floor' && faceName === 'bottom') {
+            storeNow.placeObject(pFormId, { containerId: container.id, voxelIndex, type: 'floor' });
+            return;
+          } else if (pForm.anchorType === 'ceiling' && faceName === 'top') {
+            storeNow.placeObject(pFormId, { containerId: container.id, voxelIndex, type: 'ceiling' });
+            return;
+          }
+          // Incompatible face for this form — ignore click
+          return;
+        }
+      }
+
+      // ★ Staircase placement mode: intercept wall clicks to place stairs
       if (storeNow.staircasePlacementMode && storeNow.staircasePlacementContainerId === container.id) {
         const validation = validateStaircasePlacement(container.voxelGrid, voxelIndex, faceName);
         if (!validation.valid) return;
@@ -2876,6 +2906,24 @@ export default function ContainerSkin({
               // (Empty→Deck→Room→Sunroom→Balcony). Edge clicks remain face-specific (MICRO).
               const onClickCenter = (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
+                // ★ Object placement mode: intercept center clicks for floor/ceiling placement
+                {
+                  const st = useStore.getState();
+                  if (st.placementMode && st.activePlacementFormId) {
+                    const pFormId = st.activePlacementFormId;
+                    const pForm = formRegistry.get(pFormId);
+                    if (pForm) {
+                      if (pForm.anchorType === 'floor') {
+                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'floor' });
+                        return;
+                      } else if (pForm.anchorType === 'ceiling') {
+                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'ceiling' });
+                        return;
+                      }
+                      return; // Center hitbox is floor/ceiling; incompatible with face-only forms
+                    }
+                  }
+                }
                 select(container.id);
                 setFaceContext('floor');
                 // ★ Multi-select bypass: if >1 voxels selected + tool equipped, stamp all immediately
@@ -2916,6 +2964,36 @@ export default function ContainerSkin({
               };
               const onClickEdge = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
+                // ★ Object placement mode: intercept edge clicks to place scene objects
+                {
+                  const st = useStore.getState();
+                  if (st.placementMode && st.activePlacementFormId) {
+                    const pFormId = st.activePlacementFormId;
+                    const pForm = formRegistry.get(pFormId);
+                    if (pForm) {
+                      const isWall = face === 'n' || face === 's' || face === 'e' || face === 'w';
+                      if (pForm.anchorType === 'face' && isWall) {
+                        const allObjs = Object.values(st.sceneObjects) as SceneObject[];
+                        const occ = getOccupiedSlots(allObjs, container.id, idx, face as WallDirection, formRegistry);
+                        const vs = getSlotsForPlacement(occ, pForm.slotWidth);
+                        if (vs.length > 0) {
+                          st.placeObject(pFormId, {
+                            containerId: container.id, voxelIndex: idx, type: 'face',
+                            face: face as WallDirection, slot: vs[0],
+                          });
+                        }
+                        return;
+                      } else if (pForm.anchorType === 'floor' && face === 'bottom') {
+                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'floor' });
+                        return;
+                      } else if (pForm.anchorType === 'ceiling' && face === 'top') {
+                        st.placeObject(pFormId, { containerId: container.id, voxelIndex: idx, type: 'ceiling' });
+                        return;
+                      }
+                      return; // Incompatible face
+                    }
+                  }
+                }
                 // Alt+click = eyedropper: pick surface type from clicked face
                 if (e.nativeEvent.altKey) {
                   const voxel = useStore.getState().containers[container.id]?.voxelGrid?.[idx];
