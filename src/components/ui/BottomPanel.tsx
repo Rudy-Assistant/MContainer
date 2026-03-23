@@ -1,78 +1,85 @@
 'use client';
 
 /**
- * BottomPanel.tsx — Thin form picker strip (64px, bottom of canvas).
+ * BottomPanel.tsx — Form picker strip (bottom of canvas, sidebar-aware).
  *
- * Category pills + horizontal card row. Click a card → enter placement mode.
- * No style filters, no edit tab — skin editing lives in the Sidebar Inspector.
+ * Icon tab row above scrollable card strip with SVG thumbnails.
+ * Auto-syncs active category when a SceneObject is selected in 3D.
  */
 
-import { useState, useMemo, useCallback, CSSProperties } from 'react';
+import { useState, useMemo, useCallback, useEffect, CSSProperties } from 'react';
 import { useStore } from '@/store/useStore';
 import { formRegistry, getByCategory } from '@/config/formRegistry';
-import type { FormCategory, FormDefinition } from '@/types/sceneObject';
+import type { FormCategory } from '@/types/sceneObject';
+import FormThumbnail from '@/components/ui/FormThumbnails';
+import { DoorOpen, AppWindow, Lightbulb, Plug } from 'lucide-react';
 
 // ── Constants ─────────────────────────────────────────────────
 
-const CATEGORIES: { id: FormCategory; label: string }[] = [
-  { id: 'door', label: 'Doors' },
-  { id: 'window', label: 'Windows' },
-  { id: 'light', label: 'Lights' },
-  { id: 'electrical', label: 'Elec' },
+const CATEGORIES: { id: FormCategory; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
+  { id: 'door', label: 'Doors', Icon: DoorOpen },
+  { id: 'window', label: 'Windows', Icon: AppWindow },
+  { id: 'light', label: 'Lights', Icon: Lightbulb },
+  { id: 'electrical', label: 'Electrical', Icon: Plug },
 ];
 
-const COST_DOT = '\u25CF';
+const SIDEBAR_WIDTH_EXPANDED = 384;
+const SIDEBAR_WIDTH_COLLAPSED = 48;
 
+const COST_DOT = '\u25CF';
 function costDots(cost: number): number {
   return Math.min(5, Math.ceil(cost / 500));
 }
 
 // ── Styles ────────────────────────────────────────────────────
 
-const barStyle: CSSProperties = {
+const wrapperStyle: CSSProperties = {
   position: 'fixed',
   bottom: 48,
-  left: '50%',
+  // `left` is set dynamically via inline style override
   transform: 'translateX(-50%)',
   zIndex: 100,
   display: 'flex',
+  flexDirection: 'column',
   alignItems: 'center',
-  gap: 6,
-  height: 56,
-  maxWidth: '90vw',
+  gap: 4,
+  userSelect: 'none',
+};
+
+const tabRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: 4,
+  justifyContent: 'center',
+};
+
+const tabBtnStyle = (active: boolean): CSSProperties => ({
+  width: 28,
+  height: 28,
+  borderRadius: 8,
+  border: 'none',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: active ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+  color: active ? '#93c5fd' : 'rgba(255,255,255,0.4)',
+  transition: 'all 100ms ease',
+});
+
+const cardBarStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  maxWidth: '80vw',
   background: 'rgba(0, 0, 0, 0.85)',
   borderRadius: 12,
-  padding: '0 10px',
+  padding: '6px 10px',
   boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
   border: '1px solid rgba(255,255,255,0.08)',
-  userSelect: 'none',
   backdropFilter: 'blur(12px)',
 };
 
-const pillStyle = (active: boolean): CSSProperties => ({
-  padding: '3px 8px',
-  borderRadius: 6,
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: 10,
-  fontWeight: 600,
-  fontFamily: 'system-ui, sans-serif',
-  letterSpacing: '0.03em',
-  color: active ? '#93c5fd' : 'rgba(255,255,255,0.5)',
-  background: active ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-  transition: 'all 100ms ease',
-  whiteSpace: 'nowrap',
-  flexShrink: 0,
-});
-
-const dividerLineStyle: CSSProperties = {
-  width: 1,
-  height: 32,
-  background: 'rgba(255,255,255,0.12)',
-  flexShrink: 0,
-};
-
-const cardRowStyle: CSSProperties = {
+const cardScrollStyle: CSSProperties = {
   display: 'flex',
   gap: 4,
   overflowX: 'auto',
@@ -81,20 +88,28 @@ const cardRowStyle: CSSProperties = {
   minWidth: 0,
 };
 
-const cardStyle = (active: boolean): CSSProperties => ({
-  minWidth: 68,
-  height: 40,
+const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
+  minWidth: 80,
+  height: 64,
   flexShrink: 0,
   borderRadius: 6,
-  border: active ? '1.5px solid #60a5fa' : '1.5px solid rgba(255,255,255,0.08)',
-  background: active ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.04)',
+  border: isSelected
+    ? '1.5px solid #00bcd4'
+    : active
+    ? '1.5px solid #60a5fa'
+    : '1.5px solid rgba(255,255,255,0.08)',
+  background: isSelected
+    ? 'rgba(0, 188, 212, 0.15)'
+    : active
+    ? 'rgba(59, 130, 246, 0.2)'
+    : 'rgba(255,255,255,0.04)',
   cursor: 'pointer',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 1,
-  padding: '2px 6px',
+  gap: 2,
+  padding: '4px 6px',
   transition: 'all 100ms ease',
 });
 
@@ -117,6 +132,13 @@ const cardCostStyle: CSSProperties = {
   letterSpacing: '0.05em',
 };
 
+const dividerStyle: CSSProperties = {
+  width: 1,
+  height: 40,
+  background: 'rgba(255,255,255,0.12)',
+  flexShrink: 0,
+};
+
 const placingBadgeStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -130,6 +152,12 @@ const placingBadgeStyle: CSSProperties = {
   padding: '3px 8px',
   flexShrink: 0,
   whiteSpace: 'nowrap',
+};
+
+const selectedBadgeStyle: CSSProperties = {
+  ...placingBadgeStyle,
+  color: '#00bcd4',
+  background: 'rgba(0, 188, 212, 0.12)',
 };
 
 const cancelBtnStyle: CSSProperties = {
@@ -147,67 +175,110 @@ const cancelBtnStyle: CSSProperties = {
 export default function BottomPanel() {
   const [category, setCategory] = useState<FormCategory>('door');
   const activePlacementFormId = useStore((s) => s.activePlacementFormId);
+  const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const selectedFormId = useStore((s) =>
+    s.selectedObjectId ? s.sceneObjects[s.selectedObjectId]?.formId ?? null : null
+  );
 
+  const sidebarWidth = sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
   const forms = useMemo(() => getByCategory(category), [category]);
+
+  // Auto-sync category when a SceneObject is selected
+  useEffect(() => {
+    if (selectedFormId) {
+      const form = formRegistry.get(selectedFormId);
+      if (form) setCategory(form.category);
+    }
+  }, [selectedFormId]);
+
+  // Re-compute left position on resize
+  const [winWidth, setWinWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  useEffect(() => {
+    const handler = () => setWinWidth(window.innerWidth);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const handleCardClick = useCallback((formId: string) => {
     const { activePlacementFormId: current, setPlacementMode } = useStore.getState();
     setPlacementMode(current === formId ? null : formId);
   }, []);
 
+  const leftPos = sidebarWidth + (winWidth - sidebarWidth) / 2;
+
+  // Determine the selected object's formId (for highlighting its card)
+  const selectedObjFormId = selectedFormId;
+
+  // Badge logic: placing takes priority over selection
+  const placingForm = activePlacementFormId ? formRegistry.get(activePlacementFormId) : null;
+  const selectedForm = selectedObjFormId ? formRegistry.get(selectedObjFormId) : null;
+
   return (
-    <div style={barStyle}>
-      {/* Category pills */}
-      {CATEGORIES.map((cat) => (
-        <button
-          key={cat.id}
-          style={pillStyle(category === cat.id)}
-          onClick={() => setCategory(cat.id)}
-        >
-          {cat.label}
-        </button>
-      ))}
-
-      <div style={dividerLineStyle} />
-
-      {/* Form cards */}
-      <div style={cardRowStyle}>
-        {forms.map((f) => {
-          const active = activePlacementFormId === f.id;
-          const dots = costDots(f.costEstimate);
-          return (
-            <button
-              key={f.id}
-              style={cardStyle(active)}
-              onClick={() => handleCardClick(f.id)}
-              title={`${f.name} — $${f.costEstimate}`}
-            >
-              <span style={{ ...cardNameStyle, color: active ? '#93c5fd' : undefined }}>
-                {f.name}
-              </span>
-              <span style={{ ...cardCostStyle, color: active ? '#fbbf24' : undefined }}>
-                {COST_DOT.repeat(dots)}
-              </span>
-            </button>
-          );
-        })}
+    <div style={{ ...wrapperStyle, left: leftPos }}>
+      {/* Icon tab row */}
+      <div style={tabRowStyle}>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            style={tabBtnStyle(category === cat.id)}
+            onClick={() => setCategory(cat.id)}
+            title={cat.label}
+          >
+            <cat.Icon size={16} />
+          </button>
+        ))}
       </div>
 
-      {/* Placing badge */}
-      {activePlacementFormId && (
-        <>
-          <div style={dividerLineStyle} />
-          <div style={placingBadgeStyle}>
-            {formRegistry.get(activePlacementFormId)?.name ?? 'Placing'}
-            <button
-              onClick={() => useStore.getState().setPlacementMode(null)}
-              style={cancelBtnStyle}
-            >
-              ✕
-            </button>
-          </div>
-        </>
-      )}
+      {/* Card bar */}
+      <div style={cardBarStyle}>
+        <div style={cardScrollStyle}>
+          {forms.map((f) => {
+            const isPlacing = activePlacementFormId === f.id;
+            const isSelected = !isPlacing && selectedObjFormId === f.id;
+            return (
+              <button
+                key={f.id}
+                style={cardStyle(isPlacing, isSelected)}
+                onClick={() => handleCardClick(f.id)}
+                title={`${f.name} — $${f.costEstimate}`}
+              >
+                <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? '#00bcd4' : 'rgba(255,255,255,0.5)' }}>
+                  <FormThumbnail formId={f.id} size={28} />
+                </div>
+                <span style={{ ...cardNameStyle, color: isPlacing ? '#93c5fd' : isSelected ? '#00bcd4' : undefined }}>
+                  {f.name}
+                </span>
+                <span style={{ ...cardCostStyle, color: isPlacing ? '#fbbf24' : undefined }}>
+                  {COST_DOT.repeat(costDots(f.costEstimate))}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Badge area: placing or selected */}
+        {(placingForm || (selectedForm && !activePlacementFormId)) && (
+          <>
+            <div style={dividerStyle} />
+            {placingForm ? (
+              <div style={placingBadgeStyle}>
+                {placingForm.name}
+                <button
+                  onClick={() => useStore.getState().setPlacementMode(null)}
+                  style={cancelBtnStyle}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : selectedForm ? (
+              <div style={selectedBadgeStyle}>
+                ● {selectedForm.name}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   );
 }
