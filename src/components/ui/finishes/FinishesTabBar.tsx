@@ -27,7 +27,7 @@ export default function FinishesTabBar({ activeTab, onTabChange, disabled }: Pro
   return (
     <div style={{
       display: 'flex', gap: 2, padding: '4px 8px',
-      borderBottom: '1px solid var(--border-dark, #334155)',
+      borderBottom: '1px solid var(--border)',
     }}>
       {FINISH_TABS.map((tab) => (
         <button
@@ -37,16 +37,16 @@ export default function FinishesTabBar({ activeTab, onTabChange, disabled }: Pro
             flex: 1, padding: '6px 4px', fontSize: 10, fontWeight: 600,
             borderRadius: 6, cursor: disabled ? 'default' : 'pointer',
             border: activeTab === tab.id
-              ? '1px solid var(--accent, #3b82f6)'
+              ? '1px solid var(--accent)'
               : '1px solid transparent',
             background: activeTab === tab.id
-              ? 'var(--accent-bg, rgba(59,130,246,0.08))'
+              ? 'var(--border-subtle)'
               : 'transparent',
             color: disabled
-              ? 'var(--text-dim, #475569)'
+              ? 'var(--text-dim)'
               : activeTab === tab.id
-                ? 'var(--accent, #3b82f6)'
-                : 'var(--text-main, #e2e8f0)',
+                ? 'var(--accent)'
+                : 'var(--text-main)',
             opacity: disabled ? 0.5 : 1,
             transition: 'all 100ms',
             textTransform: 'uppercase',

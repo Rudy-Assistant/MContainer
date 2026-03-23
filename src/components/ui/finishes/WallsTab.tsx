@@ -51,7 +51,7 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
       <div style={{ marginBottom: 12 }}>
         <div style={{
           fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-          color: 'var(--text-dim, #64748b)', letterSpacing: '0.05em', marginBottom: 6,
+          color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 6,
         }}>
           Wall Surface
         </div>
@@ -64,9 +64,9 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 padding: '8px 4px', borderRadius: 6, cursor: 'pointer', fontSize: 9,
-                border: `2px solid ${surface === entry.surface ? 'var(--accent, #3b82f6)' : 'var(--border-dark, #334155)'}`,
-                background: surface === entry.surface ? 'var(--accent-bg, rgba(59,130,246,0.08))' : 'var(--card-dark, #1e293b)',
-                color: 'var(--text-main, #e2e8f0)', transition: 'border-color 100ms',
+                border: `2px solid ${surface === entry.surface ? 'var(--accent)' : 'var(--border)'}`,
+                background: surface === entry.surface ? 'var(--border-subtle)' : 'var(--btn-bg)',
+                color: 'var(--text-main)', transition: 'border-color 100ms',
               }}
             >
               <span style={{ fontSize: 16 }}>{entry.icon}</span>

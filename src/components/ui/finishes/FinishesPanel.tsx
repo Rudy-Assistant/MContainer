@@ -78,7 +78,7 @@ export default function FinishesPanel() {
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {!hasFace ? (
           <div style={{ padding: '16px 12px', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim, #64748b)' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
               Click a face in the preview to edit finishes
             </div>
           </div>

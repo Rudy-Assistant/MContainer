@@ -24,7 +24,7 @@ export default function ElectricalTab({ containerId, voxelIndex, indices, face }
   if (!isWallFace) {
     return (
       <div style={{ padding: '16px 12px', textAlign: 'center' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-dim, #64748b)' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
           Electrical is available on wall faces. Click a wall in the preview above.
         </div>
       </div>

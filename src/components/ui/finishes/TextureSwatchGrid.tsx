@@ -16,7 +16,7 @@ export default function TextureSwatchGrid({ items, activeId, onSelect, label }: 
     <div style={{ marginBottom: 12 }}>
       <div style={{
         fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-        color: 'var(--text-dim, #64748b)', letterSpacing: '0.05em', marginBottom: 6,
+        color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 6,
       }}>
         {label}
       </div>
@@ -47,8 +47,8 @@ function SwatchButton({ item, active, onSelect }: {
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: 4, borderRadius: 6, cursor: 'pointer',
-        border: `2px solid ${active ? 'var(--accent, #3b82f6)' : 'var(--border-dark, #334155)'}`,
-        background: active ? 'var(--accent-bg, rgba(59,130,246,0.08))' : 'var(--card-dark, #1e293b)',
+        border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+        background: active ? 'var(--border-subtle)' : 'var(--btn-bg)',
         transition: 'border-color 100ms',
       }}
     >
@@ -63,7 +63,7 @@ function SwatchButton({ item, active, onSelect }: {
         }}
       />
       <span style={{
-        fontSize: 9, textTransform: 'uppercase', color: 'var(--text-dim, #64748b)',
+        fontSize: 9, textTransform: 'uppercase', color: 'var(--text-dim)',
         lineHeight: 1.2, textAlign: 'center',
       }}>
         {item.label}

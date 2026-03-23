@@ -18,7 +18,7 @@ export default function SwatchRow({ colors, activeHex, onSelect, label }: Props)
     <div style={{ marginBottom: 12 }}>
       <div style={{
         fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-        color: 'var(--text-dim, #64748b)', letterSpacing: '0.05em', marginBottom: 6,
+        color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 6,
       }}>
         {label}
       </div>
@@ -41,7 +41,7 @@ export default function SwatchRow({ colors, activeHex, onSelect, label }: Props)
           style={{
             width: 24, height: 24, borderRadius: 4, cursor: 'pointer',
             background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
-            border: '2px solid var(--border-dark, #334155)', padding: 0,
+            border: '2px solid var(--border)', padding: 0,
             fontSize: 12, color: '#fff', fontWeight: 700, textShadow: '0 0 2px rgba(0,0,0,0.8)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
