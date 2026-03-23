@@ -46,6 +46,7 @@ import PostProcessingStack from './PostProcessingStack';
 import InteriorLights from './InteriorLights';
 import { SceneObjectRenderer } from '@/components/objects/SceneObjectRenderer';
 import { PlacementGhost } from '@/components/objects/PlacementGhost';
+import { HoverPreviewGhost } from '@/components/objects/HoverPreviewGhost';
 // pbrTextures.ts removed — texture loading consolidated into materialCache.ts via textureLoader.ts
 import GroundManager from "./GroundManager";
 import DebugOverlay from "./DebugOverlay";
@@ -787,6 +788,35 @@ function useKeyboardShortcuts() {
         const cur = store.viewLevel;
         store.setViewLevel(cur === null ? maxLvl : Math.max(-1, cur - 1));
       }
+
+      // Tab / Shift+Tab = cycle through placed SceneObjects in selected container
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const store = useStore.getState();
+        const containerId = store.selection[0] ?? store.selectedVoxel?.containerId ?? null;
+        if (!containerId) return;
+
+        const ids = Object.entries(store.sceneObjects)
+          .filter(([, obj]) => (obj as any).anchor.containerId === containerId)
+          .map(([id]) => id)
+          .sort();
+        if (ids.length === 0) return;
+
+        const currentId = store.selectedObjectId;
+        const currentIdx = currentId ? ids.indexOf(currentId) : -1;
+        const reverse = e.shiftKey;
+
+        let nextIdx: number;
+        if (currentIdx < 0) {
+          nextIdx = 0; // nothing selected or stale ID → start at first
+        } else if (reverse) {
+          nextIdx = (currentIdx - 1 + ids.length) % ids.length;
+        } else {
+          nextIdx = (currentIdx + 1) % ids.length;
+        }
+
+        store.selectObject(ids[nextIdx]);
+      }
     };
     window.addEventListener("keydown", handler);
 
@@ -1365,6 +1395,7 @@ function RealisticScene() {
       {/* Unified placeable objects (doors, windows, lights) */}
       <SceneObjectRenderer />
       <PlacementGhost />
+      <HoverPreviewGhost />
 
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
@@ -1893,6 +1924,7 @@ function WalkthroughScene() {
       {/* Unified placeable objects (doors, windows, lights) */}
       <SceneObjectRenderer />
       <PlacementGhost />
+      <HoverPreviewGhost />
 
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
