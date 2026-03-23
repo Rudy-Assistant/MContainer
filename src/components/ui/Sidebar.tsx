@@ -370,15 +370,14 @@ function Inspector({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Container badge */}
+      {/* Compact container header: editable name + icon row */}
       <div style={{
-        padding: "8px 10px", borderRadius: "8px", flexShrink: 0,
+        padding: "6px 10px", borderRadius: "8px", flexShrink: 0,
         background: CARD, border: `1px solid ${BORDER}`,
         boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        display: "flex", alignItems: "flex-start", gap: "8px",
-        marginBottom: "8px",
+        marginBottom: "6px",
       }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {editingName ? (
             <input
               autoFocus
@@ -390,7 +389,7 @@ function Inspector({
                 if (e.key === "Escape") { setNameValue(container.name || ""); setEditingName(false); }
               }}
               style={{
-                width: "100%", fontSize: "13px", fontWeight: 700, color: TEXT,
+                flex: 1, fontSize: "13px", fontWeight: 700, color: TEXT,
                 background: "#fff", border: `1px solid #3b82f6`, borderRadius: "4px",
                 padding: "1px 4px", outline: "none", boxSizing: "border-box",
               }}
@@ -399,9 +398,9 @@ function Inspector({
             <div
               onClick={() => { setEditingName(true); setNameValue(container.name || SIZE_LABEL[container.size]); }}
               style={{
-                fontSize: "13px", fontWeight: 700, color: TEXT, cursor: "text",
+                flex: 1, fontSize: "13px", fontWeight: 700, color: TEXT, cursor: "text",
                 padding: "1px 4px", borderRadius: "4px", border: "1px solid transparent",
-                transition: "border-color 100ms",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}
               className="hover-rename"
               title="Click to rename"
@@ -409,162 +408,95 @@ function Inspector({
               {containerName}
             </div>
           )}
-          <div style={{ fontSize: "9px", color: TEXT_DIM, marginTop: "2px", paddingLeft: "4px" }}>
-            {SIZE_LABEL[container.size]}
-            {" · "}Level {container.level}
-            {" · "}
-            {Object.values(container.walls).reduce((n, w) => n + w.bays.length, 0)} bays
-          </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+          {/* Icon row: save, preview toggle, grid toggle, stack/unstack */}
+          <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+            <button
+              onClick={() => saveContainerToLibrary(containerId, containerName)}
+              title="Save to library"
+              style={{
+                background: "none", border: "1px solid #e2e8f0", borderRadius: "4px",
+                cursor: "pointer", padding: "3px 4px",
+                color: "#64748b", display: "flex", alignItems: "center",
+              }}
+            >
+              <BookmarkPlus size={12} />
+            </button>
+            <button
+              onClick={() => setPreviewCollapsed(!previewCollapsed)}
+              title={previewCollapsed ? "Show preview" : "Hide preview"}
+              style={{
+                background: previewCollapsed ? "none" : "rgba(59,130,246,0.1)",
+                border: "1px solid #e2e8f0", borderRadius: "4px",
+                cursor: "pointer", padding: "3px 4px",
+                color: previewCollapsed ? "#64748b" : "#3b82f6", display: "flex", alignItems: "center",
+              }}
+            >
+              <Scan size={12} />
+            </button>
+            <button
+              onClick={() => setGridCollapsed(!gridCollapsed)}
+              title={gridCollapsed ? "Show grid" : "Hide grid"}
+              style={{
+                background: gridCollapsed ? "none" : "rgba(59,130,246,0.1)",
+                border: "1px solid #e2e8f0", borderRadius: "4px",
+                cursor: "pointer", padding: "3px 4px",
+                color: gridCollapsed ? "#64748b" : "#3b82f6", display: "flex", alignItems: "center",
+              }}
+            >
+              <Palette size={12} />
+            </button>
             {container.level === 0 && !hasContainerAbove && (
               <button
                 onClick={() => {
                   const newId = addContainer(container.size);
                   if (newId) stackContainer(newId, containerId);
                 }}
+                title="Stack container above"
                 style={{
-                  fontSize: 11, fontWeight: 600, padding: "4px 10px",
-                  borderRadius: 6, border: "1px solid var(--border, #cbd5e1)",
-                  background: "var(--accent, #3b82f6)", color: "#fff",
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                  background: "none", border: "1px solid #e2e8f0", borderRadius: "4px",
+                  cursor: "pointer", padding: "3px 4px",
+                  color: "#3b82f6", display: "flex", alignItems: "center",
+                  fontSize: 11, fontWeight: 700,
                 }}
               >
-                ⬆ Stack Above
+                ⬆
               </button>
             )}
             {container.level > 0 && container.stackedOn && (
               <button
-                onClick={() => {
-                  unstackContainer(containerId);
-                  removeContainer(containerId);
-                }}
+                onClick={() => { unstackContainer(containerId); removeContainer(containerId); }}
+                title="Unstack and remove"
                 style={{
-                  fontSize: 11, fontWeight: 600, padding: "4px 10px",
-                  borderRadius: 6, border: "1px solid #fca5a5",
-                  background: "#fef2f2", color: "#dc2626",
-                  cursor: "pointer",
+                  background: "none", border: "1px solid #fca5a5", borderRadius: "4px",
+                  cursor: "pointer", padding: "3px 4px",
+                  color: "#dc2626", display: "flex", alignItems: "center",
+                  fontSize: 11, fontWeight: 700,
                 }}
               >
-                ✕ Unstack
+                ✕
               </button>
             )}
-            <span style={{
-              fontSize: 10, color: "var(--text-muted, #94a3b8)",
-              alignSelf: "center",
-            }}>
-              {container.level === 0 ? "L0 (ground)" : `L${container.level} (stacked)`}
-            </span>
           </div>
         </div>
-        <button
-          onClick={() => saveContainerToLibrary(containerId, containerName)}
-          title="Save container to library"
-          style={{
-            background: "none", border: "1px solid #e2e8f0", borderRadius: "5px",
-            cursor: "pointer", padding: "4px 5px",
-            color: "#64748b", display: "flex", alignItems: "center",
-            transition: "all 100ms ease",
-          }}
-          className="hover-accent-text"
-        >
-          <BookmarkPlus size={13} />
-        </button>
       </div>
 
-      {/* Applied Template badge */}
-      {container.appliedPreset && (() => {
-        const preset = CONTAINER_PRESETS.find(p => p.id === container.appliedPreset);
-        return preset ? (
-          <div style={{
-            padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
-            background: "rgba(139, 92, 246, 0.12)", border: "1px solid rgba(139, 92, 246, 0.3)",
-            color: "#c4b5fd", display: "flex", alignItems: "center", gap: "4px",
-            marginBottom: "8px", flexShrink: 0,
-          }}>
-            {preset.icon} {preset.label}
-          </div>
-        ) : null;
-      })()}
+      {/* Preview — collapsed by default, toggle via icon button above */}
+      {!previewCollapsed && (
+        <div style={{ flexShrink: 0, marginBottom: "4px" }}>
+          <IsoEditor containerId={container.id} />
+        </div>
+      )}
 
-      {/* Applied Role badge */}
-      {container.appliedRole && (() => {
-        const role = CONTAINER_ROLES.find(r => r.id === container.appliedRole);
-        return role ? (
-          <div style={{
-            padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
-            background: "rgba(34, 197, 94, 0.12)", border: "1px solid rgba(34, 197, 94, 0.3)",
-            color: "#86efac", display: "flex", alignItems: "center", gap: "4px",
-            marginBottom: "8px", flexShrink: 0,
-          }}>
-            {role.icon} {role.label}
-          </div>
-        ) : null;
-      })()}
-
-      {/* ── Collapsible Preview Section ── */}
-      <div style={{ flexShrink: 0, marginBottom: "4px" }}>
-        {/* Preview section header */}
-        <button
-          onClick={() => setPreviewCollapsed(!previewCollapsed)}
-          style={{
-            display: "flex", alignItems: "center", gap: "6px",
-            width: "100%", padding: "6px 8px", borderRadius: "6px",
-            background: "none", border: `1px solid ${BORDER}`,
-            cursor: "pointer", color: TEXT_DIM, fontSize: "11px", fontWeight: 600,
-            transition: "background 100ms",
-          }}
-          className="hover-accent-ghost"
-        >
-          <span style={{ fontSize: "9px" }}>{previewCollapsed ? "▶" : "▼"}</span>
-          <span>Preview</span>
-          {previewCollapsed && (
-            <span style={{ fontSize: "10px", color: TEXT_DIM, marginLeft: 4, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              — {containerName}
-            </span>
+      {/* Grid — collapsed by default, toggle via icon button above */}
+      {!gridCollapsed && (
+        <div style={{ flexShrink: 0, marginBottom: "4px" }}>
+          {frameMode ? (
+            <FrameInspector containerId={containerId} />
+          ) : (
+            <MatrixEditor container={container} containerId={containerId} />
           )}
-        </button>
-        {/* Controls always visible regardless of collapse state */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 2px 2px" }}>
-          {/* These slots are reserved for Hide Roof / Hide Skin / Synced badge —
-              rendered by IsoEditor itself; kept here as structural placeholder */}
         </div>
-        {/* IsoEditor — shown only when not collapsed */}
-        {!previewCollapsed && (
-          <div style={{ marginTop: "6px" }}>
-            <IsoEditor containerId={container.id} />
-          </div>
-        )}
-      </div>
-
-      <Divider />
-
-      {/* ── Collapsible Grid Section ── */}
-      <div style={{ flexShrink: 0, marginTop: "4px", marginBottom: "4px" }}>
-        <button
-          onClick={() => setGridCollapsed(!gridCollapsed)}
-          style={{
-            display: "flex", alignItems: "center", gap: "6px",
-            width: "100%", padding: "6px 8px", borderRadius: "6px",
-            background: "none", border: `1px solid ${BORDER}`,
-            cursor: "pointer", color: TEXT_DIM, fontSize: "11px", fontWeight: 600,
-            transition: "background 100ms",
-          }}
-          className="hover-accent-ghost"
-        >
-          <span style={{ fontSize: "9px" }}>{gridCollapsed ? "▶" : "▼"}</span>
-          <span>{frameMode ? "Frame Inspector" : "Container Grid"}</span>
-        </button>
-        {/* MatrixEditor / FrameInspector — toggled by frameMode, hidden when gridCollapsed */}
-        {!gridCollapsed && (
-          <div style={{ marginTop: "6px" }}>
-            {frameMode ? (
-              <FrameInspector containerId={containerId} />
-            ) : (
-              <MatrixEditor container={container} containerId={containerId} />
-            )}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* ── Contextual area — fills remaining space ── */}
       <div style={{ flex: 1, overflowY: "auto", borderTop: "1px solid #1e293b", marginTop: "4px" }}>
