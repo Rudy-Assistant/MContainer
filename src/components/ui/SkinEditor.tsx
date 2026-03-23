@@ -3,10 +3,12 @@
 /**
  * SkinEditor.tsx — Context-sensitive left panel for editing SceneObject skins.
  *
- * Task 14: Appears when a SceneObject is selected (selectedObjectId in uiSlice).
- * Shows form name, style label, skin slot dropdowns, quick skin presets,
+ * Appears inside Sidebar Inspector when a SceneObject is selected (selectedObjectId).
+ * Shows form thumbnail, name, style label, skin slot dropdowns, quick skin presets,
  * form-specific controls (doors: state/flip, lights: brightness/color temp),
  * and duplicate/remove actions.
+ *
+ * All colors use CSS variables from globals.css for light/dark theme parity.
  */
 
 import { useMemo, useCallback, CSSProperties } from 'react';
@@ -15,6 +17,15 @@ import { formRegistry } from '@/config/formRegistry';
 import { materialRegistry } from '@/config/materialRegistry';
 import { getStyle, getQuickSkins } from '@/config/styleRegistry';
 import type { FormDefinition, QuickSkinPreset, StyleId } from '@/types/sceneObject';
+import FormThumbnail from '@/components/ui/FormThumbnails';
+
+// ── Theme-adaptive constants (mirrors Sidebar.tsx pattern) ────
+
+const TEXT     = "var(--text-main, #1e293b)";
+const TEXT_DIM = "var(--text-muted, #64748b)";
+const BORDER   = "var(--border, #e2e8f0)";
+const SURFACE  = "var(--surface-alt, #f8fafc)";
+const ACCENT   = "var(--accent, #2563eb)";
 
 // ── Styles ───────────────────────────────────────────────────
 
@@ -23,15 +34,14 @@ const panelStyle: CSSProperties = {
   flexDirection: 'column',
   gap: 10,
   padding: '8px 12px',
-  color: '#e2e8f0',
+  color: TEXT,
   fontSize: 13,
 };
-
 
 const sectionLabelStyle: CSSProperties = {
   fontSize: 10,
   fontWeight: 700,
-  color: '#94a3b8',
+  color: TEXT_DIM,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   padding: '4px 0 2px',
@@ -39,7 +49,7 @@ const sectionLabelStyle: CSSProperties = {
 
 const dividerStyle: CSSProperties = {
   height: 1,
-  background: 'rgba(255,255,255,0.1)',
+  background: BORDER,
   flexShrink: 0,
 };
 
@@ -52,10 +62,10 @@ const slotRowStyle: CSSProperties = {
 
 const selectStyle: CSSProperties = {
   flex: 1,
-  background: 'rgba(255,255,255,0.08)',
-  border: '1px solid rgba(255,255,255,0.15)',
+  background: SURFACE,
+  border: `1px solid ${BORDER}`,
   borderRadius: 6,
-  color: '#e2e8f0',
+  color: TEXT,
   fontSize: 12,
   padding: '4px 6px',
   cursor: 'pointer',
@@ -71,14 +81,14 @@ const quickBtnStyle: CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: 8,
-  border: '2px solid rgba(255,255,255,0.15)',
+  border: `2px solid ${BORDER}`,
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   fontSize: 10,
   fontWeight: 600,
-  color: '#e2e8f0',
+  color: TEXT,
   transition: 'border-color 0.15s',
 };
 
@@ -93,9 +103,9 @@ const actionBtnStyle: CSSProperties = {
   flex: 1,
   padding: '6px 10px',
   borderRadius: 6,
-  border: '1px solid rgba(255,255,255,0.15)',
-  background: 'rgba(255,255,255,0.06)',
-  color: '#e2e8f0',
+  border: `1px solid ${BORDER}`,
+  background: SURFACE,
+  color: TEXT,
   fontSize: 12,
   cursor: 'pointer',
   textAlign: 'center',
@@ -178,14 +188,19 @@ export default function SkinEditor() {
 
   return (
     <div style={panelStyle}>
-      {/* Header: form name */}
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{form.name}</div>
-        {styleDef && (
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-            {styleDef.label}
-          </div>
-        )}
+      {/* Header: thumbnail + form name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ color: ACCENT, flexShrink: 0 }}>
+          <FormThumbnail formId={form.id} size={36} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{form.name}</div>
+          {styleDef && (
+            <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
+              {styleDef.label}
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={dividerStyle} />
@@ -203,7 +218,7 @@ export default function SkinEditor() {
                 height: 16,
                 borderRadius: 4,
                 background: matColor(currentMat),
-                border: '1px solid rgba(255,255,255,0.2)',
+                border: `1px solid ${BORDER}`,
                 flexShrink: 0,
               }}
             />
@@ -293,7 +308,7 @@ export default function SkinEditor() {
               onChange={(e) => handleStateChange('brightness', Number(e.target.value))}
               style={{ flex: 1, cursor: 'pointer' }}
             />
-            <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 28, textAlign: 'right' }}>
+            <span style={{ fontSize: 11, color: TEXT_DIM, minWidth: 28, textAlign: 'right' }}>
               {(objState.brightness as number) ?? 80}%
             </span>
           </div>
@@ -308,7 +323,7 @@ export default function SkinEditor() {
               onChange={(e) => handleStateChange('colorTemp', Number(e.target.value))}
               style={{ flex: 1, cursor: 'pointer' }}
             />
-            <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 40, textAlign: 'right' }}>
+            <span style={{ fontSize: 11, color: TEXT_DIM, minWidth: 40, textAlign: 'right' }}>
               {(objState.colorTemp as number) ?? 4000}K
             </span>
           </div>
