@@ -35,10 +35,15 @@ export default function OrientationGizmo({ cameraQuaternionRef, onSnapToAxis }: 
     let raf: number;
     const tmpV = new THREE.Vector3();
     const tmpQ = new THREE.Quaternion();
+    const lastQ = new THREE.Quaternion();
 
     const update = () => {
       const q = cameraQuaternionRef.current;
       if (!q) { raf = requestAnimationFrame(update); return; }
+
+      // Skip re-render when camera hasn't moved
+      if (lastQ.equals(q)) { raf = requestAnimationFrame(update); return; }
+      lastQ.copy(q);
 
       tmpQ.copy(q).invert();
       const pts = AXES.map(axis => {

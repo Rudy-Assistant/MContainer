@@ -1457,15 +1457,14 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       };
 
       // Smart: sync opposite face on adjacent voxel — a door occupies both sides
-      const FLIP: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
-      const oppFace = FLIP[doorFace];
-      const row = Math.floor(voxelIndex / VOXEL_COLS);
+      const oppFace = STAIR_FLIP[doorFace];
+      const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
       const col = voxelIndex % VOXEL_COLS;
-      const dr = doorFace === 'n' ? -1 : doorFace === 's' ? 1 : 0;
-      const dc = doorFace === 'e' ? -1 : doorFace === 'w' ? 1 : 0;
+      const row = Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
+      const { dr, dc } = FACE_NEIGHBOR_DELTA[doorFace];
       const nr = row + dr, nc = col + dc;
       if (nr >= 0 && nr < VOXEL_ROWS && nc >= 0 && nc < VOXEL_COLS) {
-        const neighborIdx = nr * VOXEL_COLS + nc;
+        const neighborIdx = level * (VOXEL_ROWS * VOXEL_COLS) + nr * VOXEL_COLS + nc;
         const neighbor = grid[neighborIdx];
         if (neighbor?.active) {
           grid[neighborIdx] = {
