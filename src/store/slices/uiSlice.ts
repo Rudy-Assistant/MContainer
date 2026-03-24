@@ -171,6 +171,15 @@ export interface UiSlice {
   // Form card hover → 3D preview ghost (Feature 3)
   hoveredFormId: string | null;
   setHoveredFormId: (id: string | null) => void;
+
+  // Preset card hover → ghost preview of faces in 3D scene
+  ghostPreset: {
+    source: 'block' | 'container';
+    faces: VoxelFaces;
+    targetScope: 'voxel' | 'bay' | 'container';
+  } | null;
+  setGhostPreset: (g: { source: 'block' | 'container'; faces: VoxelFaces; targetScope: 'voxel' | 'bay' | 'container' } | null) => void;
+  clearGhostPreset: () => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -325,4 +334,9 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   // Form card hover → 3D preview ghost (Feature 3)
   hoveredFormId: null,
   setHoveredFormId: (id) => set({ hoveredFormId: id }),
+
+  // Preset card hover → ghost preview of faces in 3D scene
+  ghostPreset: null,
+  setGhostPreset: (g) => set({ ghostPreset: g }),
+  clearGhostPreset: () => set({ ghostPreset: null }),
 });
