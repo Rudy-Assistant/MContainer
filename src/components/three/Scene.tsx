@@ -1400,7 +1400,7 @@ function RealisticScene() {
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
 
-      {/* 3D orientation gizmo */}
+      {/* 3D orientation gizmo — grey, no labels, all ground axes visible */}
       <GizmoHelper alignment="top-right" margin={[60, 60]}>
         <GizmoViewport
           axisColors={['#94a3b8', '#94a3b8', '#94a3b8']}

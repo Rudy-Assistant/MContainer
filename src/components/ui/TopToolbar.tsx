@@ -381,7 +381,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
               }}
               title="Cost breakdown"
             >
-              {fmtUSD(getEstimate().breakdown.total).replace('$', '')}
+              {fmtUSD(getEstimate().breakdown.total)}
             </button>
             {costOpen && (
               <div style={{
