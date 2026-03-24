@@ -701,6 +701,20 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                 <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{darkMode ? "ON" : "OFF"}</span>
               </button>
 
+              {/* Debug wireframe overlay */}
+              <button onClick={toggleDebugMode} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, marginBottom: 4,
+                color: debugMode ? "#f59e0b" : "var(--text-main)",
+                background: debugMode ? "rgba(245,158,11,0.12)" : "transparent",
+                transition: "all 100ms",
+              }}>
+                <Bug size={13} />
+                Wireframe
+                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{debugMode ? "ON" : "OFF"}</span>
+              </button>
+
               {/* Grid complexity moved to MatrixEditor Bay/Block toggle */}
 
               {/* Container Actions */}
