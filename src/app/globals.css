@@ -24,13 +24,14 @@
   --dock-bg: rgba(15, 23, 42, 0.55);
   --dock-text: rgba(255, 255, 255, 0.6);
   --dock-active: #93c5fd;
-  --hotbar-bg: rgba(255, 255, 255, 0.92);
+  --hotbar-bg: rgba(255, 255, 255, 0.15);
   --hotbar-border: rgba(0, 0, 0, 0.06);
   --modal-backdrop: rgba(0, 0, 0, 0.4);
   --modal-bg: #ffffff;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --accent-muted: rgba(37, 99, 235, 0.5);
 }
 
 /* ═══ Dark Mode — Engineering HUD ═══ */
@@ -57,13 +58,14 @@
   --dock-bg: rgba(12, 15, 20, 0.75);
   --dock-text: rgba(148, 163, 184, 0.8);
   --dock-active: #60a5fa;
-  --hotbar-bg: rgba(18, 22, 28, 0.92);
+  --hotbar-bg: rgba(15, 23, 42, 0.15);
   --hotbar-border: rgba(59, 130, 246, 0.15);
   --modal-backdrop: rgba(0, 0, 0, 0.7);
   --modal-bg: #12161c;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --accent-muted: rgba(59, 130, 246, 0.5);
 }
 
 /* Dark mode scrollbar */
