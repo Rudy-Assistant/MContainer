@@ -62,17 +62,17 @@ describe('applyBlockConfig — bay boundary', () => {
     useStore.getState().applyBlockConfig(cid, [9, 10, 17, 18], 'railing');
     const grid = useStore.getState().containers[cid]!.voxelGrid!;
 
-    // Voxel 9 (row1, col1) — boundary: west(row=min), north(col=min)
-    expect(grid[9].faces.w).toBe('Railing_Cable');
-    expect(grid[9].faces.n).toBe('Railing_Cable');
-    expect(grid[9].faces.e).toBe('Open');
-    expect(grid[9].faces.s).toBe('Open');
+    // Voxel 9 (row1, col1) — boundary: north(row=min), west(col=min)
+    expect(grid[9].faces.n).toBe('Railing_Cable');  // north boundary (row=minRow)
+    expect(grid[9].faces.w).toBe('Railing_Cable');  // west boundary (col=minCol)
+    expect(grid[9].faces.s).toBe('Open');            // internal (not maxRow)
+    expect(grid[9].faces.e).toBe('Open');            // internal (not maxCol)
 
-    // Voxel 18 (row2, col2) — boundary: east(row=max), south(col=max)
-    expect(grid[18].faces.e).toBe('Railing_Cable');
-    expect(grid[18].faces.s).toBe('Railing_Cable');
-    expect(grid[18].faces.w).toBe('Open');
-    expect(grid[18].faces.n).toBe('Open');
+    // Voxel 18 (row2, col2) — boundary: south(row=max), east(col=max)
+    expect(grid[18].faces.s).toBe('Railing_Cable');  // south boundary (row=maxRow)
+    expect(grid[18].faces.e).toBe('Railing_Cable');  // east boundary (col=maxCol)
+    expect(grid[18].faces.n).toBe('Open');            // internal
+    expect(grid[18].faces.w).toBe('Open');            // internal
 
     // Top/bottom applied to all
     expect(grid[9].faces.top).toBe('Solid_Steel');

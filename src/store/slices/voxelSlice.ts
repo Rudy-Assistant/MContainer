@@ -1455,6 +1455,26 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         moduleId: 'entry_door',
         moduleOrientation: orientation,
       };
+
+      // Smart: sync opposite face on adjacent voxel — a door occupies both sides
+      const FLIP: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
+      const oppFace = FLIP[doorFace];
+      const row = Math.floor(voxelIndex / VOXEL_COLS);
+      const col = voxelIndex % VOXEL_COLS;
+      const dr = doorFace === 'n' ? -1 : doorFace === 's' ? 1 : 0;
+      const dc = doorFace === 'e' ? -1 : doorFace === 'w' ? 1 : 0;
+      const nr = row + dr, nc = col + dc;
+      if (nr >= 0 && nr < VOXEL_ROWS && nc >= 0 && nc < VOXEL_COLS) {
+        const neighborIdx = nr * VOXEL_COLS + nc;
+        const neighbor = grid[neighborIdx];
+        if (neighbor?.active) {
+          grid[neighborIdx] = {
+            ...neighbor,
+            faces: { ...neighbor.faces, [oppFace]: 'Open' },
+          };
+        }
+      }
+
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
     });
   },
@@ -1554,11 +1574,13 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       const faces = { ...preset.faces };
 
       // For multi-voxel bays: boundary walls get preset face, internal walls get Open
+      // Row axis = north/south (row 0=north, row max=south)
+      // Col axis = east/west (col 0=west, col max=east)
       if (!isSingle) {
-        faces.w = row === minRow ? preset.faces.w : 'Open';
-        faces.e = row === maxRow ? preset.faces.e : 'Open';
-        faces.n = col === minCol ? preset.faces.n : 'Open';
-        faces.s = col === maxCol ? preset.faces.s : 'Open';
+        faces.n = row === minRow ? preset.faces.n : 'Open';
+        faces.s = row === maxRow ? preset.faces.s : 'Open';
+        faces.w = col === minCol ? preset.faces.w : 'Open';
+        faces.e = col === maxCol ? preset.faces.e : 'Open';
       }
 
       grid[idx] = { ...voxel, active: preset.active, faces };
