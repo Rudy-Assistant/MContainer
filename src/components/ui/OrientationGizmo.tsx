@@ -15,8 +15,7 @@ const AXES = [
 const SIZE = 80;
 const CENTER = SIZE / 2;
 const AXIS_LEN = 28;
-const SPHERE_R_POS = 6;
-const SPHERE_R_NEG = 4;
+const SPHERE_R = 5; // uniform dot size for all axes
 const COLOR_DEFAULT = '#94a3b8';
 const COLOR_HOVER = '#ffffff';
 
@@ -63,20 +62,16 @@ export default function OrientationGizmo({ cameraQuaternionRef, onSnapToAxis }: 
     <div
       style={{
         position: 'absolute', top: 12, right: 12, width: SIZE, height: SIZE,
-        pointerEvents: 'auto', zIndex: 10, borderRadius: 8,
-        background: 'rgba(0,0,0,0.15)',
+        pointerEvents: 'auto', zIndex: 10,
       }}
     >
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-        {/* Center dot */}
-        <circle cx={CENTER} cy={CENTER} r={2.5} fill="#555" />
-
-        {/* Axes: lines + endpoint circles */}
+        {/* Axes: lines + endpoint circles (no center origin dot) */}
         {projections.map((pt) => {
           const isHovered = hoveredAxis === pt.id;
           const color = isHovered ? COLOR_HOVER : COLOR_DEFAULT;
-          const lineWidth = pt.positive ? (isHovered ? 2.5 : 2) : (isHovered ? 2 : 1.5);
-          const r = pt.positive ? (isHovered ? SPHERE_R_POS + 1 : SPHERE_R_POS) : (isHovered ? SPHERE_R_NEG + 1 : SPHERE_R_NEG);
+          const lineWidth = isHovered ? 2.5 : 1.5;
+          const r = isHovered ? SPHERE_R + 1 : SPHERE_R;
 
           return (
             <g key={pt.id}>
