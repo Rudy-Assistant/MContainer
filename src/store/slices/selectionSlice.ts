@@ -129,25 +129,58 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
       };
     }),
 
-  selectMultiple: (ids) => set({ selection: ids, selectedVoxel: null, selectedFace: null, selectedVoxels: null, selectionContext: null, selectedObjectId: null }),
+  selectMultiple: (ids) => set({ selection: ids, selectedVoxel: null, selectedFace: null, selectedVoxels: null, selectedElements: null, selectionContext: null, selectedObjectId: null }),
 
-  clearSelection: () => set({ selection: [], selectionContext: null, selectedVoxel: null, selectedFace: null, selectedVoxels: null, hoveredVoxel: null, faceContext: null, selectedObjectId: null }),
+  clearSelection: () => set({ selection: [], selectionContext: null, selectedVoxel: null, selectedFace: null, selectedVoxels: null, selectedElements: null, hoveredVoxel: null, faceContext: null, selectedObjectId: null }),
 
   setSelectionContext: (ctx) => set({ selectionContext: ctx }),
 
-  setSelectedVoxel: (v) => set({ selectedVoxel: v, selectedVoxels: null, selectedObjectId: null }),
-  setSelectedFace: (f) => set({ selectedFace: f }),
+  setSelectedVoxel: (v) => set((_s: any) => {
+    if (!v) return { selectedVoxel: null, selectedVoxels: null, selectedElements: null, selectedObjectId: null };
+    const id = 'index' in v ? String(v.index) : `ext_${v.col}_${v.row}`;
+    return {
+      selectedVoxel: v,
+      selectedVoxels: null,
+      selectedObjectId: null,
+      selectedElements: { type: 'voxel' as const, items: [{ containerId: v.containerId, id }] },
+    };
+  }),
 
-  setSelectedVoxels: (v) => set({ selectedVoxels: v, selectedVoxel: null, selectedObjectId: null }),
+  setSelectedFace: (f) => set((s: any) => {
+    if (!f) return { selectedFace: null };
+    // Determine element type from face direction
+    const faceType = (f === 'top') ? 'ceiling' : (f === 'bottom') ? 'floor' : 'wall';
+    const curr = s.selectedElements;
+    // Keep existing items but update type if needed
+    return { selectedFace: f, selectedElements: curr ? { ...curr, type: faceType } : null };
+  }),
+
+  setSelectedVoxels: (v) => set((_s: any) => {
+    if (!v) return { selectedVoxels: null, selectedVoxel: null, selectedElements: null, selectedObjectId: null };
+    return {
+      selectedVoxels: v,
+      selectedVoxel: null,
+      selectedObjectId: null,
+      selectedElements: { type: 'bay' as const, items: v.indices.map(i => ({ containerId: v.containerId, id: String(i) })) },
+    };
+  }),
 
   toggleVoxelInSelection: (containerId, index) => set((state: any) => {
     const cur = state.selectedVoxels;
     if (!cur || cur.containerId !== containerId) {
-      return { selectedVoxels: { containerId, indices: [index] } };
+      const newVoxels = { containerId, indices: [index] };
+      return {
+        selectedVoxels: newVoxels,
+        selectedElements: { type: 'bay' as const, items: [{ containerId, id: String(index) }] },
+      };
     }
     const exists = cur.indices.includes(index);
     const next = exists ? cur.indices.filter((i: number) => i !== index) : [...cur.indices, index];
-    return { selectedVoxels: next.length ? { containerId, indices: next } : null };
+    if (!next.length) return { selectedVoxels: null, selectedElements: null };
+    return {
+      selectedVoxels: { containerId, indices: next },
+      selectedElements: { type: 'bay' as const, items: next.map((i: number) => ({ containerId, id: String(i) })) },
+    };
   }),
 
   copyVoxel: (containerId, voxelIndex) => {
@@ -238,7 +271,31 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
     set({ styleBrush: { ...voxel.faces } });
   },
 
-  setSelectedElements: (sel) => set({ selectedElements: sel }),
+  setSelectedElements: (sel) => set((_s: any) => {
+    if (!sel) return { selectedElements: null, selectedVoxel: null, selectedVoxels: null, selectedFace: null };
+    // Reverse-sync to old fields for backward compat
+    if (sel.type === 'voxel' && sel.items.length === 1) {
+      const item = sel.items[0];
+      const index = parseInt(item.id);
+      return {
+        selectedElements: sel,
+        selectedVoxel: isNaN(index) ? null : { containerId: item.containerId, index },
+        selectedVoxels: null,
+        selectedFace: null,
+      };
+    }
+    if (sel.type === 'bay') {
+      const containerId = sel.items[0]?.containerId ?? '';
+      const indices = sel.items.map(it => parseInt(it.id)).filter(n => !isNaN(n));
+      return {
+        selectedElements: sel,
+        selectedVoxels: indices.length ? { containerId, indices } : null,
+        selectedVoxel: null,
+        selectedFace: null,
+      };
+    }
+    return { selectedElements: sel };
+  }),
 
   toggleElement: (containerId, id) => set((s: any) => {
     const curr = s.selectedElements;
