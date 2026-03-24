@@ -9,10 +9,12 @@ interface PresetCardProps {
   onClick: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  /** Set false to disable square aspect ratio (default: true) */
+  square?: boolean;
 }
 
 export function PresetCard({
-  content, label, active, onClick, onMouseEnter, onMouseLeave,
+  content, label, active, onClick, onMouseEnter, onMouseLeave, square = true,
 }: PresetCardProps) {
   return (
     <button
@@ -20,7 +22,7 @@ export function PresetCard({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       style={{
-        aspectRatio: '1',
+        aspectRatio: square ? '1' : undefined,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -33,6 +35,7 @@ export function PresetCard({
         padding: 4,
         transition: 'border-color 100ms',
         width: '100%',
+        minWidth: 0,
       }}
     >
       <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

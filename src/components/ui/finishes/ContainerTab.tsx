@@ -3,7 +3,6 @@
 import { useStore } from '@/store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Layers, Box } from 'lucide-react';
-import VoxelPreview3D from '@/components/ui/VoxelPreview3D';
 import { ContainerPresetRow } from './ContainerPresetRow';
 import { SpatialVoxelGrid } from './SpatialVoxelGrid';
 import { CONTAINER_LEVEL_PRESETS } from '@/config/containerTabPresets';
@@ -63,13 +62,7 @@ export function ContainerTab({ containerId }: Props) {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 10px' }}>
-      {/* VoxelPreview3D */}
-      <VoxelPreview3D
-        containerId={containerId}
-        voxelIndex={0}
-      />
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 10px', overflow: 'hidden' }}>
       {/* Mode toggle icons row */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         {/* Floor/Ceiling toggle */}

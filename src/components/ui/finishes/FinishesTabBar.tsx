@@ -8,7 +8,7 @@ export const FINISH_TABS: { id: FinishTab; label: string }[] = [
   { id: 'flooring', label: 'Flooring' },
   { id: 'walls', label: 'Walls' },
   { id: 'ceiling', label: 'Ceiling' },
-  { id: 'electrical', label: 'Electrical' },
+  { id: 'electrical', label: 'Elec.' },
 ];
 
 /** Maps a face key to the appropriate tab */
@@ -28,8 +28,9 @@ interface Props {
 export default function FinishesTabBar({ activeTab, onTabChange, disabled }: Props) {
   return (
     <div style={{
-      display: 'flex', gap: 0, padding: '0 12px',
+      display: 'flex', gap: 0, padding: '0 8px',
       borderBottom: '1px solid var(--border)',
+      overflow: 'hidden',
     }}>
       {FINISH_TABS.map((tab) => {
         const isActive = activeTab === tab.id;
@@ -38,7 +39,8 @@ export default function FinishesTabBar({ activeTab, onTabChange, disabled }: Pro
             key={tab.id}
             onClick={() => !disabled && onTabChange(tab.id)}
             style={{
-              padding: '8px 12px 6px', fontSize: 12, fontWeight: isActive ? 600 : 500,
+              padding: '8px 6px 6px', fontSize: 11, fontWeight: isActive ? 600 : 500,
+              flex: '1 1 0', minWidth: 0,
               cursor: disabled ? 'default' : 'pointer',
               border: 'none',
               borderBottom: isActive

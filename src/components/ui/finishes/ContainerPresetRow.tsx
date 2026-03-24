@@ -15,13 +15,14 @@ export function ContainerPresetRow({ containerId: _containerId, onApply }: Props
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, minWidth: 0 }}>
       {CONTAINER_LEVEL_PRESETS.map(p => (
         <PresetCard
           key={p.id}
-          content={<IsometricVoxelSVG faces={p.faces} size={48} />}
+          content={<IsometricVoxelSVG faces={p.faces} size={36} />}
           label={p.label}
           active={false}
+          square={false}
           onClick={() => onApply(p.id)}
           onMouseEnter={() => setGhostPreset({ source: 'container', faces: p.faces, targetScope: 'container' })}
           onMouseLeave={() => clearGhostPreset()}

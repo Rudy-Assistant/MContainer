@@ -133,73 +133,75 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
     setShiftHoverId(null);
   };
 
+  // Flat list of all cells for CSS Grid placement (15 cells in a 5×3 grid)
+  const allCells = GRID_ROWS.flat();
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {GRID_ROWS.map((row, rowIdx) => (
-        <div
-          key={rowIdx}
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}
-        >
-          {row.map((cell) => {
-            const cellId = cell.label;
-            const isSelectedByElements = selectedIds.has(cellId);
-            const isSelectedByLegacy = cell.indices.some(i => legacySelectedSet.has(i));
-            const isSelected = isSelectedByElements || isSelectedByLegacy;
-            const isMultiSelected = isSelected && (selectedElements?.items?.length ?? 0) > 1;
-            const isShiftPreview = shiftRangeIds.has(cellId) && !isSelected;
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '0.7fr 1.4fr 1.4fr 1.4fr 0.7fr',
+      gridTemplateRows: '0.6fr 1.4fr 0.6fr',
+      gap: 3,
+    }}>
+      {allCells.map((cell) => {
+        const cellId = cell.label;
+        const isSelectedByElements = selectedIds.has(cellId);
+        const isSelectedByLegacy = cell.indices.some(i => legacySelectedSet.has(i));
+        const isSelected = isSelectedByElements || isSelectedByLegacy;
+        const isMultiSelected = isSelected && (selectedElements?.items?.length ?? 0) > 1;
+        const isShiftPreview = shiftRangeIds.has(cellId) && !isSelected;
 
-            let border: string;
-            let background: string;
-            let color: string;
+        let border: string;
+        let background: string;
+        let color: string;
 
-            if (isShiftPreview) {
-              border = '1px dashed var(--accent)';
-              background = cell.ext ? 'var(--surface-dim, #2a2a2a)' : 'var(--surface)';
-              color = cell.ext ? 'var(--text-dim)' : 'var(--text-muted)';
-            } else if (isMultiSelected) {
-              border = '2px solid var(--accent-muted, #93c5fd)';
-              background = 'rgba(37, 99, 235, 0.08)';
-              color = 'var(--accent, #2563eb)';
-            } else if (isSelected) {
-              border = '2px solid var(--accent)';
-              background = 'rgba(37, 99, 235, 0.15)';
-              color = 'var(--accent, #2563eb)';
-            } else {
-              border = '1px solid var(--border)';
-              background = cell.ext ? 'var(--surface-dim, #2a2a2a)' : 'var(--surface)';
-              color = cell.ext ? 'var(--text-dim)' : 'var(--text-muted)';
-            }
+        if (isShiftPreview) {
+          border = '1px dashed var(--accent)';
+          background = cell.ext ? 'var(--surface-dim, #2a2a2a)' : 'var(--surface)';
+          color = cell.ext ? 'var(--text-dim)' : 'var(--text-muted)';
+        } else if (isMultiSelected) {
+          border = '2px solid var(--accent-muted, #93c5fd)';
+          background = 'rgba(37, 99, 235, 0.08)';
+          color = 'var(--accent, #2563eb)';
+        } else if (isSelected) {
+          border = '2px solid var(--accent)';
+          background = 'rgba(37, 99, 235, 0.15)';
+          color = 'var(--accent, #2563eb)';
+        } else {
+          border = '1px solid var(--border)';
+          background = cell.ext ? 'var(--surface-dim, #2a2a2a)' : 'var(--surface)';
+          color = cell.ext ? 'var(--text-dim)' : 'var(--text-muted)';
+        }
 
-            return (
-              <button
-                key={cell.label}
-                onClick={(e) => handleCellClick(e, cellId, cell.indices)}
-                onMouseEnter={(e) => handleMouseEnter(e, cellId)}
-                onMouseLeave={handleMouseLeave}
-                style={{
-                  padding: '6px 2px',
-                  fontSize: cell.ext ? 9 : 10,
-                  fontWeight: isSelected ? 600 : 400,
-                  border,
-                  borderRadius: 4,
-                  background,
-                  color,
-                  cursor: 'pointer',
-                  lineHeight: 1.3,
-                  textAlign: 'center',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  opacity: cell.ext ? 0.7 : 1,
-                  transition: 'background 100ms, border-color 100ms',
-                }}
-              >
-                {cell.label}
-              </button>
-            );
-          })}
-        </div>
-      ))}
+        return (
+          <button
+            key={cell.label}
+            onClick={(e) => handleCellClick(e, cellId, cell.indices)}
+            onMouseEnter={(e) => handleMouseEnter(e, cellId)}
+            onMouseLeave={handleMouseLeave}
+            style={{
+              padding: '4px 2px',
+              fontSize: cell.ext ? 8 : 10,
+              fontWeight: isSelected ? 600 : 400,
+              border,
+              borderRadius: 4,
+              background,
+              color,
+              cursor: 'pointer',
+              lineHeight: 1.2,
+              textAlign: 'center',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              opacity: cell.ext ? 0.7 : 1,
+              transition: 'background 100ms, border-color 100ms',
+              minWidth: 0,
+            }}
+          >
+            {cell.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
