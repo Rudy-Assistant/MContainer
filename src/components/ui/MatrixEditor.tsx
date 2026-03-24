@@ -21,7 +21,6 @@ import {
   CONTAINER_DIMENSIONS,
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
-import FaceStrip from "@/components/ui/FaceStrip";
 import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
 import { HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
 import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
@@ -1015,7 +1014,6 @@ export default function MatrixEditor({
   const gridLevel = inspectorView === 'ceiling' ? 1 : 0;
 
   const designComplexity = useStore((s) => s.designComplexity);
-  const setDesignComplexity = useStore((s) => s.setDesignComplexity);
 
   const frameMode = useStore((s) => s.frameMode);
   const setFrameMode = useStore((s) => s.setFrameMode);
