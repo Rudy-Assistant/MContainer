@@ -30,6 +30,7 @@ import {
   createOpenVoid,
 } from '@/types/factories';
 import { getCycleForFace } from '@/config/surfaceCycles';
+import { BLOCK_PRESETS, type BlockPresetId } from '@/config/blockPresets';
 import { getModulePreset, resolveModuleFaces, ORIENT_ROTATION } from '@/config/moduleCatalog';
 import { getContainerPreset } from '@/config/containerPresets';
 import { v4 as uuid } from 'uuid';
@@ -76,6 +77,7 @@ export interface VoxelSlice {
   getDoorConstraints: (containerId: string, voxelIndex: number, face: keyof VoxelFaces) => DoorConstraints;
   setFaceFinish: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, finish: Partial<FaceFinish>) => void;
   clearFaceFinish: (containerId: string, voxelIndex: number, face: keyof VoxelFaces) => void;
+  applyBlockConfig: (containerId: string, indices: number[], presetId: import('@/config/blockPresets').BlockPresetId) => void;
 }
 
 export interface DoorConstraints {
@@ -1516,6 +1518,54 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         faceFinishes: Object.keys(newFinishes).length === 0 ? undefined : newFinishes,
       };
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+    });
+  },
+
+  applyBlockConfig: (containerId, indices, presetId) => {
+    const state = get();
+    const c = state.containers[containerId];
+    if (!c?.voxelGrid) return;
+
+    const preset = BLOCK_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+
+    const grid = [...c.voxelGrid];
+    const lockedVoxels = state.lockedVoxels ?? {};
+
+    // Compute bay boundary (min/max row/col)
+    const rowsCols = indices.map(i => ({
+      row: Math.floor(i / VOXEL_COLS),
+      col: i % VOXEL_COLS,
+    }));
+    const minRow = Math.min(...rowsCols.map(rc => rc.row));
+    const maxRow = Math.max(...rowsCols.map(rc => rc.row));
+    const minCol = Math.min(...rowsCols.map(rc => rc.col));
+    const maxCol = Math.max(...rowsCols.map(rc => rc.col));
+
+    for (const idx of indices) {
+      if (lockedVoxels[`${containerId}_${idx}`]) continue;
+      const voxel = grid[idx];
+      if (!voxel) continue;
+
+      const row = Math.floor(idx / VOXEL_COLS);
+      const col = idx % VOXEL_COLS;
+      const isSingle = indices.length === 1;
+
+      const faces = { ...preset.faces };
+
+      // For multi-voxel bays: boundary walls get preset face, internal walls get Open
+      if (!isSingle) {
+        faces.w = row === minRow ? preset.faces.w : 'Open';
+        faces.e = row === maxRow ? preset.faces.e : 'Open';
+        faces.n = col === minCol ? preset.faces.n : 'Open';
+        faces.s = col === maxCol ? preset.faces.s : 'Open';
+      }
+
+      grid[idx] = { ...voxel, active: preset.active, faces };
+    }
+
+    set({
+      containers: { ...state.containers, [containerId]: { ...c, voxelGrid: grid } },
     });
   },
 });
