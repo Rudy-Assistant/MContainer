@@ -365,49 +365,51 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
 
         {/* Wall Visibility, Roof, Skin moved to Settings dropdown (Phase 1 declutter) */}
 
-        {/* ── Cost Total ── */}
+        {/* ── Cost Total (frameless, green hover) ── */}
         {containerCount > 0 && (
           <div ref={costRef} style={{ position: "relative", flexShrink: 0 }}>
             <button
               onClick={() => { setCostOpen(!costOpen); setTodOpen(false); setCompassOpen(false); }}
+              onMouseEnter={(e) => { if (!costOpen) e.currentTarget.style.color = '#16a34a'; }}
+              onMouseLeave={(e) => { if (!costOpen) e.currentTarget.style.color = 'var(--text-muted)'; }}
               style={{
-                ...btn(true),
-                gap: '4px', fontSize: '12px', fontWeight: 600, fontFamily: 'monospace',
-                borderColor: costOpen ? "var(--accent)" : undefined,
-                color: costOpen ? "var(--accent)" : undefined,
+                display: 'flex', alignItems: 'center', gap: '3px',
+                background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
+                fontSize: '13px', fontWeight: 700, fontFamily: 'monospace',
+                color: costOpen ? '#16a34a' : 'var(--text-muted)',
+                transition: 'color 120ms',
               }}
               title="Cost breakdown"
             >
-              <DollarSign size={13} />
-              {fmtUSD(getEstimate().breakdown.total)}
+              {fmtUSD(getEstimate().breakdown.total).replace('$', '')}
             </button>
             {costOpen && (
               <div style={{
-                position: "absolute", top: "100%", right: 0, marginTop: "4px",
-                background: "var(--modal-bg, #fff)", borderRadius: "10px",
-                boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
-                border: "1px solid var(--border)", padding: "12px 16px", minWidth: "200px", zIndex: 50,
+                position: "absolute", top: "100%", right: 0, marginTop: "6px",
+                background: "var(--modal-bg, #fff)", borderRadius: "14px",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
+                border: "none", padding: "16px 20px", minWidth: "240px", zIndex: 50,
                 color: "var(--text-main)",
               }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Cost Breakdown</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Cost Breakdown</div>
                 {(() => {
                   const est = getEstimate();
                   return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {[
-                        { label: "Steel", val: est.breakdown.containers },
-                        { label: "Glass", val: est.breakdown.modules },
-                        { label: "Cuts", val: est.breakdown.cuts },
-                      ].map(({ label, val }) => (
-                        <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-                          <span style={{ color: "var(--text-muted)" }}>{label}</span>
-                          <span style={{ fontWeight: 600, fontFamily: "monospace" }}>{fmtUSD(val)}</span>
+                        { label: "Containers", val: est.breakdown.containers, color: "#64748b" },
+                        { label: "Glass & Windows", val: est.breakdown.modules, color: "#64748b" },
+                        { label: "Structural Cuts", val: est.breakdown.cuts, color: "#64748b" },
+                      ].map(({ label, val, color }) => (
+                        <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12 }}>
+                          <span style={{ color }}>{label}</span>
+                          <span style={{ fontWeight: 600, fontFamily: "monospace", fontSize: 13 }}>{fmtUSD(val)}</span>
                         </div>
                       ))}
-                      <div style={{ height: 1, background: "var(--border-subtle)", margin: "2px 0" }} />
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}>
-                        <span>Total</span>
-                        <span style={{ color: "var(--accent)", fontFamily: "monospace" }}>{fmtUSD(est.breakdown.total)}</span>
+                      <div style={{ height: 1, background: "var(--border-subtle, #e5e7eb)", margin: "4px 0" }} />
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 14 }}>
+                        <span style={{ fontWeight: 700 }}>Total</span>
+                        <span style={{ fontWeight: 800, fontFamily: "monospace", color: "#16a34a", fontSize: 16 }}>{fmtUSD(est.breakdown.total)}</span>
                       </div>
                     </div>
                   );
@@ -417,15 +419,18 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           </div>
         )}
 
-        {/* ── Time of Day ── */}
+        {/* ── Time of Day (frameless, blue hover) ── */}
         <div ref={todRef} style={{ position: "relative", flexShrink: 0 }}>
           <button
             onClick={() => { setTodOpen(!todOpen); setCostOpen(false); setCompassOpen(false); }}
+            onMouseEnter={(e) => { if (!todOpen) e.currentTarget.style.color = '#3b82f6'; }}
+            onMouseLeave={(e) => { if (!todOpen) e.currentTarget.style.color = 'var(--text-muted)'; }}
             style={{
-              ...btn(true),
-              gap: '4px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 600,
-              borderColor: todOpen ? "var(--accent)" : undefined,
-              color: todOpen ? "var(--accent)" : undefined,
+              display: 'flex', alignItems: 'center', gap: '4px',
+              background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
+              fontSize: '13px', fontWeight: 600, fontFamily: 'monospace',
+              color: todOpen ? '#3b82f6' : 'var(--text-muted)',
+              transition: 'color 120ms',
             }}
             title="Time of Day"
           >
@@ -434,36 +439,65 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           </button>
           {todOpen && (
             <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: "4px",
-              background: "var(--modal-bg, #fff)", borderRadius: "10px",
-              boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
-              border: "1px solid var(--border)", padding: "12px 16px", minWidth: "220px", zIndex: 50,
-              color: "var(--text-main)",
+              position: "absolute", top: "100%", right: 0, marginTop: "6px",
+              background: "linear-gradient(135deg, rgba(16,24,44,0.92), rgba(30,41,59,0.95))",
+              borderRadius: "16px",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08)",
+              border: "none", padding: "20px 24px", minWidth: "280px", zIndex: 50,
+              color: "#f4f8ff", backdropFilter: "blur(20px) saturate(140%)",
             }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Time of Day</div>
-              <input type="range" min={0} max={24} step={0.25} value={timeOfDay}
-                onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
-                style={{
-                  width: '100%', height: 6, borderRadius: 3, appearance: 'none', cursor: 'pointer',
-                  background: 'linear-gradient(to right, #0f0a2e 0%, #e8845c 22%, #87ceeb 50%, #e8845c 78%, #0f0a2e 100%)',
-                }}
-              />
-              <div style={{ textAlign: "center", marginTop: 6, fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "var(--text-main)" }}>
-                {formatTime(timeOfDay)}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(220,229,255,0.7)", textTransform: "uppercase", letterSpacing: "0.14em" }}>Time of Day</span>
+                <span style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", letterSpacing: "-0.04em", textShadow: "0 0 18px rgba(140,208,255,0.18)" }}>
+                  {formatTime(timeOfDay)}
+                </span>
+              </div>
+              <div style={{ position: "relative", padding: "10px 0 6px" }}>
+                {/* Ambient glow behind track */}
+                <div style={{
+                  position: "absolute", left: 0, right: 0, top: "50%", height: 32, transform: "translateY(-50%)",
+                  borderRadius: 999, filter: "blur(10px)", pointerEvents: "none",
+                  background: `radial-gradient(circle at ${((timeOfDay / 24) * 100)}% 50%, rgba(123,211,255,0.25), rgba(139,92,246,0.15) 30%, transparent 60%)`,
+                }} />
+                {/* Track background */}
+                <div style={{
+                  position: "absolute", left: 0, right: 0, top: "50%", height: 10, transform: "translateY(-50%)",
+                  borderRadius: 999, background: "rgba(10,16,34,0.6)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.12), inset 0 -1px 2px rgba(0,0,0,0.3)",
+                }} />
+                {/* Filled portion */}
+                <div style={{
+                  position: "absolute", left: 0, top: "50%", width: `${(timeOfDay / 24) * 100}%`, height: 10, transform: "translateY(-50%)",
+                  borderRadius: 999, pointerEvents: "none",
+                  background: "linear-gradient(90deg, #6ee7ff, #8b5cf6, #ff7cc8, #ffd166)",
+                  boxShadow: "0 0 8px rgba(110,231,255,0.35), 0 0 20px rgba(139,92,246,0.2)",
+                }} />
+                <input type="range" min={0} max={24} step={0.25} value={timeOfDay}
+                  onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
+                  style={{
+                    width: '100%', height: 30, appearance: 'none', background: 'transparent',
+                    cursor: 'pointer', position: 'relative', zIndex: 2, margin: 0,
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(233,239,255,0.5)", marginTop: 6, fontFamily: "monospace" }}>
+                <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── Compass ── */}
+        {/* ── Compass (frameless, purple hover) ── */}
         <div ref={compassRef} style={{ position: "relative", flexShrink: 0 }}>
           <button
             onClick={() => { setCompassOpen(!compassOpen); setTodOpen(false); setCostOpen(false); }}
+            onMouseEnter={(e) => { if (!compassOpen) e.currentTarget.style.color = '#8b5cf6'; }}
+            onMouseLeave={(e) => { if (!compassOpen) e.currentTarget.style.color = 'var(--text-muted)'; }}
             style={{
-              ...btn(true),
-              gap: '4px', fontSize: '11px', fontWeight: 600, fontFamily: 'monospace',
-              borderColor: compassOpen ? "var(--accent)" : undefined,
-              color: compassOpen ? "var(--accent)" : undefined,
+              display: 'flex', alignItems: 'center', gap: '3px',
+              background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
+              fontSize: '13px', fontWeight: 600, fontFamily: 'monospace',
+              color: compassOpen ? '#8b5cf6' : 'var(--text-muted)',
+              transition: 'color 120ms',
             }}
             title="North Direction"
           >
@@ -472,21 +506,21 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           </button>
           {compassOpen && (
             <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: "4px",
-              background: "var(--modal-bg, #fff)", borderRadius: "10px",
-              boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
-              border: "1px solid var(--border)", padding: "12px 16px", minWidth: "200px", zIndex: 50,
+              position: "absolute", top: "100%", right: 0, marginTop: "6px",
+              background: "var(--modal-bg, #fff)", borderRadius: "14px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
+              border: "none", padding: "16px 20px", minWidth: "220px", zIndex: 50,
               color: "var(--text-main)",
             }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>North Direction</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>North Direction</div>
               <input type="range" min={0} max={360} step={1} value={northOffset}
                 onChange={(e) => setNorthOffset(parseFloat(e.target.value))}
                 style={{
-                  width: '100%', height: 6, borderRadius: 3, appearance: 'none', cursor: 'pointer',
-                  background: 'linear-gradient(to right, #dc2626, #f59e0b, #22c55e, #3b82f6, #8b5cf6, #dc2626)',
+                  width: '100%', height: 8, borderRadius: 4, appearance: 'none', cursor: 'pointer',
+                  background: `linear-gradient(90deg, #8b5cf6 0%, #c084fc ${(northOffset / 360) * 100}%, var(--border-subtle, #e5e7eb) ${(northOffset / 360) * 100}%)`,
                 }}
               />
-              <div style={{ textAlign: "center", marginTop: 6, fontSize: 18, fontWeight: 700, fontFamily: "monospace", color: "var(--text-main)" }}>
+              <div style={{ textAlign: "center", marginTop: 8, fontSize: 22, fontWeight: 800, fontFamily: "monospace", color: "#8b5cf6" }}>
                 {Math.round(northOffset)}°
               </div>
             </div>
