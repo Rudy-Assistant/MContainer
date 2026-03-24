@@ -56,8 +56,6 @@ function PostProcessingEffects() {
   const activeStyle = useStore((s) => s.activeStyle);
   const config = QUALITY_PRESETS[qualityPreset];
 
-  if (!config.postProcessing) return null;
-
   const style = getStyle(activeStyle);
   const effects = style?.effects ?? EMPTY_EFFECTS;
 
@@ -82,6 +80,9 @@ function PostProcessingEffects() {
     () => saltFrostEffect ? new THREE.Color(saltFrostEffect.color ?? '#a8d8ff') : null,
     [saltFrostEffect?.color],
   );
+
+  // Early return AFTER all hooks to avoid "fewer hooks" error
+  if (!config.postProcessing) return null;
 
   const aoProps = {
     ...N8AO_CONFIG,
