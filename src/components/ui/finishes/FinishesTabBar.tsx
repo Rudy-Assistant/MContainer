@@ -1,8 +1,9 @@
 "use client";
 
-export type FinishTab = 'block' | 'flooring' | 'walls' | 'ceiling' | 'electrical';
+export type FinishTab = 'container' | 'block' | 'flooring' | 'walls' | 'ceiling' | 'electrical';
 
 export const FINISH_TABS: { id: FinishTab; label: string }[] = [
+  { id: 'container', label: 'Container' },
   { id: 'block', label: 'Block' },
   { id: 'flooring', label: 'Flooring' },
   { id: 'walls', label: 'Walls' },

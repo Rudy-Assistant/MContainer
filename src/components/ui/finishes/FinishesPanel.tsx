@@ -10,6 +10,7 @@ import WallsTab from './WallsTab';
 import CeilingTab from './CeilingTab';
 import ElectricalTab from './ElectricalTab';
 import BlockTab from './BlockTab';
+import { ContainerTab } from './ContainerTab';
 
 export default function FinishesPanel() {
   const target = useSelectionTarget();
@@ -17,7 +18,7 @@ export default function FinishesPanel() {
   const clearSelection = useStore((s) => s.clearSelection);
 
   // Auto-select tab on face change; manual clicks override freely
-  const [activeTab, setActiveTab] = useState<FinishTab>('block');
+  const [activeTab, setActiveTab] = useState<FinishTab>('container');
   const prevFace = useRef(selectedFace);
   useEffect(() => {
     if (selectedFace !== prevFace.current) {
@@ -108,7 +109,9 @@ export default function FinishesPanel() {
 
       {/* Tab content — scrollable */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {activeTab === 'block' ? (
+        {activeTab === 'container' ? (
+          <ContainerTab containerId={containerId} />
+        ) : activeTab === 'block' ? (
           <BlockTab containerId={containerId} voxelIndex={voxelIndex} indices={indices} />
         ) : !hasFace ? (
           <div style={{ padding: '24px 12px', textAlign: 'center' }}>
