@@ -3,6 +3,8 @@
 import { useStore } from '@/store/useStore';
 import { BLOCK_PRESETS, type BlockPresetId } from '@/config/blockPresets';
 import { Lock, Unlock, Copy, RotateCcw } from 'lucide-react';
+import { PresetCard } from './PresetCard';
+import { IsometricVoxelSVG } from '../svg/IsometricVoxelSVG';
 
 interface Props {
   containerId: string;
@@ -29,45 +31,25 @@ export default function BlockTab({ containerId, voxelIndex, indices }: Props) {
       )?.id ?? null
     : null;
 
-  const handlePreset = (id: BlockPresetId) => {
-    applyBlockConfig(containerId, indices, id);
-  };
-
   const handleReset = () => {
     applyBlockConfig(containerId, indices, 'floor_ceil');
   };
 
   return (
     <div style={{ padding: '6px 12px' }}>
-      {/* Preset grid — 4 columns */}
+      {/* Preset grid — 3 columns */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6,
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
       }}>
-        {BLOCK_PRESETS.map((preset) => {
-          const isActive = activePresetId === preset.id;
-          const Icon = preset.icon;
-          return (
-            <button
-              key={preset.id}
-              onClick={() => handlePreset(preset.id)}
-              style={{
-                display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-                gap: 2, padding: '8px 4px', borderRadius: 6,
-                border: isActive ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                background: isActive ? 'var(--accent-bg, rgba(0,188,212,0.08))' : 'var(--card-bg)',
-                cursor: 'pointer', transition: 'border-color 100ms',
-              }}
-            >
-              <Icon size={16} style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }} />
-              <span style={{
-                fontSize: 9, fontWeight: isActive ? 600 : 500,
-                color: isActive ? 'var(--accent)' : 'var(--text-main)',
-              }}>
-                {preset.label}
-              </span>
-            </button>
-          );
-        })}
+        {BLOCK_PRESETS.map((preset) => (
+          <PresetCard
+            key={preset.id}
+            content={<IsometricVoxelSVG faces={preset.faces} />}
+            label={preset.label}
+            active={activePresetId === preset.id}
+            onClick={() => applyBlockConfig(containerId, indices, preset.id)}
+          />
+        ))}
       </div>
 
       {/* Actions */}
