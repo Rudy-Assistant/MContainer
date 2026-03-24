@@ -1188,10 +1188,10 @@ function HotbarSlotButton({
       {/* Label — outside button frame for breathing room */}
       {slot.label && (
         <span style={{
-          fontSize: 7, fontWeight: 800,
-          color: isActive ? accent : "#6b7280",
-          lineHeight: 1, letterSpacing: 0.3,
-          textTransform: "uppercase",
+          fontSize: 10, fontWeight: 500,
+          color: "var(--text-main)",
+          lineHeight: 1, letterSpacing: "0.02em",
+          textShadow: "0 1px 3px rgba(0,0,0,0.3)",
           marginTop: 1, marginBottom: 2,
           whiteSpace: "nowrap",
         }}>
@@ -1224,6 +1224,14 @@ export default function SmartHotbar() {
   useHotbarAutoSwitch();
 
   const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const sidebarWidth = sidebarCollapsed ? 0 : 320;
+  const centerX = sidebarWidth + (viewportWidth - sidebarWidth) / 2;
 
   // ── Theme-aware icon materials ──────────────────────────────
   const currentTheme = useStore((s) => s.currentTheme) as ThemeId;
@@ -1415,11 +1423,11 @@ export default function SmartHotbar() {
         onMouseLeave={() => { setHotbarHovered(false); }}
         style={{
           position: "absolute", bottom: showHotbar ? 58 : 16,
-          left: "50%",
+          left: centerX,
           transform: showHotbar ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(10px)",
           zIndex: 25, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
           opacity: showHotbar ? 1 : 0,
-          transition: "opacity 150ms ease, transform 150ms ease, bottom 150ms ease",
+          transition: "opacity 150ms ease, transform 150ms ease, bottom 150ms ease, left 200ms ease",
           pointerEvents: showHotbar ? "auto" : "none",
         }}
       >
@@ -1486,11 +1494,11 @@ export default function SmartHotbar() {
             borderRadius: 12,
             width: 720,
             position: "relative",
-            background: "var(--hotbar-bg, rgba(255,255,255,0.78))",
-            border: "1px solid var(--hotbar-border, rgba(255,255,255,0.4))",
+            background: "var(--hotbar-bg)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
             boxShadow: "var(--panel-shadow, 0 8px 32px rgba(0,0,0,0.10))",
-            backdropFilter: "blur(16px) saturate(1.4)",
-            WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+            backdropFilter: "blur(20px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(20px) saturate(1.4)",
           }}
         >
           {/* Active slot underline bar — only indicator needed (clean, not busy) */}
@@ -1749,20 +1757,6 @@ export default function SmartHotbar() {
             ›
           </button>
 
-          {/* Page indicator dots */}
-          <div style={{ display: "flex", gap: 4, position: "absolute", bottom: 2, left: "50%", transform: "translateX(-50%)" }}>
-            {Array.from({ length: materialPageCount }, (_, i) => (
-              <div
-                key={i}
-                onClick={() => setMaterialPage(i)}
-                style={{
-                  width: 5, height: 5, borderRadius: "50%", cursor: "pointer",
-                  background: i === materialPage ? "#3b82f6" : "#cbd5e1",
-                  transition: "background 150ms ease",
-                }}
-              />
-            ))}
-          </div>
         </div>
 
         {/* ── Furniture Bar ── */}
