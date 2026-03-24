@@ -433,6 +433,113 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
             stairPart={voxel!.stairPart}
           />
         )}
+
+        {/* Bay internal subdivision lines */}
+        {bayGroupIndices && bayGroupIndices.length > 1 && (() => {
+          const indices = bayGroupIndices;
+          let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+          for (const idx of indices) {
+            const c = idx % VOXEL_COLS;
+            const r = Math.floor(idx / VOXEL_COLS) % VOXEL_ROWS;
+            if (c < minCol) minCol = c;
+            if (c > maxCol) maxCol = c;
+            if (r < minRow) minRow = r;
+            if (r > maxRow) maxRow = r;
+          }
+
+          const lines: React.JSX.Element[] = [];
+          const halfW = nW / 2;
+          const halfH = nH / 2;
+          const halfD = nD / 2;
+
+          // Vertical column divisions (along X/W axis)
+          let xAccum = -halfW;
+          for (let c = minCol; c < maxCol; c++) {
+            const colW = (c === 0 || c === VOXEL_COLS - 1) ? dims.height : bodyColPitch;
+            xAccum += colW;
+            const pts = [
+              new THREE.Vector3(xAccum, -halfH, -halfD),
+              new THREE.Vector3(xAccum, -halfH, halfD),
+              new THREE.Vector3(xAccum, halfH, halfD),
+              new THREE.Vector3(xAccum, halfH, -halfD),
+              new THREE.Vector3(xAccum, -halfH, -halfD),
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            lines.push(<lineLoop key={`col-${c}`} geometry={geo} material={mGhostEdge} />);
+          }
+
+          // Horizontal row divisions (along Z/D axis)
+          let zAccum = -halfD;
+          for (let r = minRow; r < maxRow; r++) {
+            const rowD = (r === 0 || r === VOXEL_ROWS - 1) ? dims.height : bodyRowPitch;
+            zAccum += rowD;
+            const pts = [
+              new THREE.Vector3(-halfW, -halfH, zAccum),
+              new THREE.Vector3(halfW, -halfH, zAccum),
+              new THREE.Vector3(halfW, halfH, zAccum),
+              new THREE.Vector3(-halfW, halfH, zAccum),
+              new THREE.Vector3(-halfW, -halfH, zAccum),
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            lines.push(<lineLoop key={`row-${r}`} geometry={geo} material={mGhostEdge} />);
+          }
+
+          return <>{lines}</>;
+        })()}
+
+        {/* Per-voxel click targets for drill-down into individual bay voxels */}
+        {bayGroupIndices && bayGroupIndices.length > 1 && (() => {
+          const indices = bayGroupIndices;
+          let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+          for (const idx of indices) {
+            const c = idx % VOXEL_COLS;
+            const r = Math.floor(idx / VOXEL_COLS) % VOXEL_ROWS;
+            if (c < minCol) minCol = c;
+            if (c > maxCol) maxCol = c;
+            if (r < minRow) minRow = r;
+            if (r > maxRow) maxRow = r;
+          }
+
+          const targets: React.JSX.Element[] = [];
+          const halfW = nW / 2;
+          const halfD = nD / 2;
+
+          let zOff = -halfD;
+          for (let r = minRow; r <= maxRow; r++) {
+            const rowD = (r === 0 || r === VOXEL_ROWS - 1) ? dims.height : bodyRowPitch;
+            let xOff = -halfW;
+            for (let c = minCol; c <= maxCol; c++) {
+              const colW = (c === 0 || c === VOXEL_COLS - 1) ? dims.height : bodyColPitch;
+              const voxelIdx = r * VOXEL_COLS + c;
+              if (indices.includes(voxelIdx)) {
+                targets.push(
+                  <mesh
+                    key={`vt-${voxelIdx}`}
+                    position={[xOff + colW / 2, nH / 2 + 0.15, zOff + rowD / 2]}
+                    geometry={getBox(colW * 0.9, 0.01, rowD * 0.9)}
+                    material={mHit}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      useStore.getState().setSelectedVoxel({ containerId, index: voxelIdx });
+                    }}
+                    onPointerEnter={(e) => {
+                      e.stopPropagation();
+                      document.body.style.cursor = 'pointer';
+                    }}
+                    onPointerLeave={(e) => {
+                      e.stopPropagation();
+                      document.body.style.cursor = 'auto';
+                    }}
+                  />
+                );
+              }
+              xOff += colW;
+            }
+            zOff += rowD;
+          }
+
+          return <>{targets}</>;
+        })()}
       </group>
 
       {/* Dimension labels (voxel cell dimensions) */}
