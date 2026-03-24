@@ -36,7 +36,7 @@ import {
   Refrigerator, Flame, Droplets, Microwave,
   Lamp, Monitor, WashingMachine, TreePine, Sofa,
   Tv, BookOpen, Coffee, Shirt,
-  Palette, Scan,
+  Palette, Scan, Grid2x2, Grid3x3,
 } from "lucide-react";
 import UserLibrary from "@/components/ui/UserLibrary";
 // Theme/Ground imports removed — selectors moved to TopToolbar Appearance popover
@@ -476,24 +476,20 @@ function Inspector({
                 ✕
               </button>
             )}
-            {/* Simple/Detail toggle */}
-            <div style={{ display: "flex", borderRadius: 4, overflow: "hidden", border: "1px solid #e2e8f0", marginLeft: 2 }}>
-              {(['simple', 'detailed'] as const).map(m => (
-                <button
-                  key={m}
-                  onClick={() => setDesignComplexity(m)}
-                  title={m === 'simple' ? 'Simple (Bay) mode' : 'Detailed (Block) mode'}
-                  style={{
-                    padding: "3px 6px", border: "none", cursor: "pointer",
-                    background: designComplexity === m ? "#3b82f6" : "transparent",
-                    color: designComplexity === m ? "#fff" : "#64748b",
-                    fontSize: 10, fontWeight: 700, lineHeight: 1,
-                  }}
-                >
-                  {m === 'simple' ? 'S' : 'D'}
-                </button>
-              ))}
-            </div>
+            {/* Simple/Detail toggle — icon button */}
+            <button
+              onClick={() => setDesignComplexity(designComplexity === 'simple' ? 'detailed' : 'simple')}
+              title={designComplexity === 'detailed' ? 'Switch to Simple' : 'Switch to Detail'}
+              style={{
+                background: "none", border: "1px solid #e2e8f0", borderRadius: 4,
+                cursor: "pointer", padding: "3px 4px",
+                display: "flex", alignItems: "center", marginLeft: 2,
+              }}
+            >
+              {designComplexity === 'detailed'
+                ? <Grid3x3 size={16} color="var(--accent)" />
+                : <Grid2x2 size={16} color="var(--text-muted)" />}
+            </button>
           </div>
         </div>
       </div>
