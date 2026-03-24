@@ -7,6 +7,8 @@
 import type { SurfaceType, VoxelFaces, WallSide } from '@/types/container';
 import type { VoxelPayload } from '../useStore';
 
+export type ElementType = 'frame' | 'wall' | 'floor' | 'ceiling' | 'voxel' | 'bay' | 'container';
+
 type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
 type Get = () => any;
 
@@ -72,6 +74,14 @@ export interface SelectionSlice {
   // Style brush
   styleBrush: VoxelFaces | null;
   copyVoxelStyle: (containerId: string, voxelIndex: number) => void;
+
+  // Typed element selection context (Task 18 — additive; legacy fields kept above)
+  selectedElements: {
+    type: ElementType;
+    items: Array<{ containerId: string; id: string }>;
+  } | null;
+  setSelectedElements: (sel: { type: ElementType; items: Array<{ containerId: string; id: string }> } | null) => void;
+  toggleElement: (containerId: string, id: string) => void;
 }
 
 export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
@@ -92,6 +102,7 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
   bucketMode: false,
   bucketSurface: 'Solid_Steel' as SurfaceType,
   styleBrush: null,
+  selectedElements: null,
 
   // ── Actions ────────────────────────────────────────────
 
@@ -226,4 +237,18 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
     if (!voxel) return;
     set({ styleBrush: { ...voxel.faces } });
   },
+
+  setSelectedElements: (sel) => set({ selectedElements: sel }),
+
+  toggleElement: (containerId, id) => set((s: any) => {
+    const curr = s.selectedElements;
+    if (!curr) return {};
+    const idx = curr.items.findIndex((it: any) => it.containerId === containerId && it.id === id);
+    if (idx >= 0) {
+      const items = [...curr.items];
+      items.splice(idx, 1);
+      return { selectedElements: items.length > 0 ? { ...curr, items } : null };
+    }
+    return { selectedElements: { ...curr, items: [...curr.items, { containerId, id }] } };
+  }),
 });
