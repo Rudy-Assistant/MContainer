@@ -9,6 +9,7 @@ import FlooringTab from './FlooringTab';
 import WallsTab from './WallsTab';
 import CeilingTab from './CeilingTab';
 import ElectricalTab from './ElectricalTab';
+import BlockTab from './BlockTab';
 
 export default function FinishesPanel() {
   const target = useSelectionTarget();
@@ -16,7 +17,7 @@ export default function FinishesPanel() {
   const clearSelection = useStore((s) => s.clearSelection);
 
   // Auto-select tab on face change; manual clicks override freely
-  const [activeTab, setActiveTab] = useState<FinishTab>('walls');
+  const [activeTab, setActiveTab] = useState<FinishTab>('block');
   const prevFace = useRef(selectedFace);
   useEffect(() => {
     if (selectedFace !== prevFace.current) {
@@ -103,12 +104,13 @@ export default function FinishesPanel() {
       <FinishesTabBar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        disabled={!hasFace}
       />
 
       {/* Tab content — scrollable */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {!hasFace ? (
+        {activeTab === 'block' ? (
+          <BlockTab containerId={containerId} voxelIndex={voxelIndex} indices={indices} />
+        ) : !hasFace ? (
           <div style={{ padding: '24px 12px', textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
               Click a face in the preview to edit finishes
