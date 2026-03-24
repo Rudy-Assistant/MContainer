@@ -27,11 +27,6 @@ const CATEGORIES: { id: FormCategory; label: string; Icon: React.ComponentType<{
 const SIDEBAR_WIDTH_EXPANDED = 384;
 const SIDEBAR_WIDTH_COLLAPSED = 48;
 
-const COST_DOT = '\u25CF';
-function costDots(cost: number): number {
-  return Math.min(5, Math.ceil(cost / 500));
-}
-
 // ── Styles ────────────────────────────────────────────────────
 
 const wrapperStyle: CSSProperties = {
@@ -71,13 +66,13 @@ const cardBarStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 4,
-  maxWidth: '80vw',
-  background: 'rgba(0, 0, 0, 0.85)',
+  maxWidth: '100%',
+  background: 'rgba(0, 0, 0, 0.45)',
   borderRadius: 12,
   padding: '6px 10px',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  backdropFilter: 'blur(12px)',
+  boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(16px)',
 };
 
 const cardScrollStyle: CSSProperties = {
@@ -115,22 +110,16 @@ const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
 });
 
 const cardNameStyle: CSSProperties = {
-  fontSize: 9,
+  fontSize: 10,
   fontWeight: 600,
-  color: 'rgba(255,255,255,0.75)',
+  color: 'rgba(255,255,255,0.95)',
   textAlign: 'center',
-  lineHeight: 1.1,
+  lineHeight: 1.2,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   maxWidth: '100%',
   fontFamily: 'system-ui, sans-serif',
-};
-
-const cardCostStyle: CSSProperties = {
-  fontSize: 8,
-  color: 'rgba(255, 200, 50, 0.5)',
-  letterSpacing: '0.05em',
 };
 
 const dividerStyle: CSSProperties = {
@@ -198,10 +187,11 @@ export default function BottomPanel() {
     setPlacementMode(current === formId ? null : formId);
   }, []);
 
-  // CSS calc centers the bar over the canvas area (viewport minus sidebar)
+  // Position bar within the canvas area (right of sidebar), constrained to not overlap
   const panelPositionStyle = useMemo<CSSProperties>(() => ({
     ...wrapperStyle,
     left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+    maxWidth: `calc(100vw - ${sidebarWidth}px - 24px)`,
   }), [sidebarWidth]);
 
   // Badge logic: placing takes priority over selection
@@ -250,9 +240,6 @@ export default function BottomPanel() {
                 </div>
                 <span style={{ ...cardNameStyle, color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : undefined }}>
                   {f.name}
-                </span>
-                <span style={{ ...cardCostStyle, color: isPlacing ? '#fbbf24' : undefined }}>
-                  {COST_DOT.repeat(costDots(f.costEstimate))}
                 </span>
               </button>
             );
