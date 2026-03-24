@@ -78,6 +78,8 @@ export interface VoxelSlice {
   setFaceFinish: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, finish: Partial<FaceFinish>) => void;
   clearFaceFinish: (containerId: string, voxelIndex: number, face: keyof VoxelFaces) => void;
   applyBlockConfig: (containerId: string, indices: number[], presetId: import('@/config/blockPresets').BlockPresetId) => void;
+  /** Set all six faces of a single voxel — convenience wrapper used by Container tab presets. */
+  setVoxelFaces: (containerId: string, voxelIndex: number, faces: VoxelFaces) => void;
 }
 
 export interface DoorConstraints {
@@ -1595,6 +1597,18 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
     set({
       containers: { ...state.containers, [containerId]: updatedContainer },
+    });
+  },
+
+  setVoxelFaces: (containerId, voxelIndex, faces) => {
+    set((s: any) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      const voxel = grid[voxelIndex];
+      if (!voxel) return {};
+      grid[voxelIndex] = { ...voxel, faces: { ...faces } };
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
     });
   },
 });
