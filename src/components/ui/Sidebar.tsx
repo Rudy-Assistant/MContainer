@@ -334,6 +334,8 @@ function Inspector({
   const saveContainerToLibrary = useStore((s) => s.saveContainerToLibrary);
   const renameContainer = useStore((s) => s.renameContainer);
   const frameMode = useStore((s) => s.frameMode);
+  const designComplexity = useStore((s) => s.designComplexity);
+  const setDesignComplexity = useStore((s) => s.setDesignComplexity);
   const previewCollapsed = useStore((s) => s.previewCollapsed);
   const setPreviewCollapsed = useStore((s) => s.setPreviewCollapsed);
   const gridCollapsed = useStore((s) => s.gridCollapsed);
@@ -371,12 +373,9 @@ function Inspector({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Compact container header: editable name + icon row */}
+      {/* Compact container header: editable name + icon row + S/D toggle */}
       <div style={{
-        padding: "6px 10px", borderRadius: "8px", flexShrink: 0,
-        background: CARD, border: `1px solid ${BORDER}`,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        marginBottom: "6px",
+        padding: "6px 10px 4px", flexShrink: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {editingName ? (
@@ -390,7 +389,7 @@ function Inspector({
                 if (e.key === "Escape") { setNameValue(container.name || ""); setEditingName(false); }
               }}
               style={{
-                flex: 1, fontSize: "13px", fontWeight: 700, color: TEXT,
+                flex: 1, fontSize: "15px", fontWeight: 700, color: TEXT,
                 background: "#fff", border: `1px solid #3b82f6`, borderRadius: "4px",
                 padding: "1px 4px", outline: "none", boxSizing: "border-box",
               }}
@@ -399,7 +398,7 @@ function Inspector({
             <div
               onClick={() => { setEditingName(true); setNameValue(container.name || SIZE_LABEL[container.size]); }}
               style={{
-                flex: 1, fontSize: "13px", fontWeight: 700, color: TEXT, cursor: "text",
+                flex: 1, fontSize: "15px", fontWeight: 700, color: TEXT, cursor: "text",
                 padding: "1px 4px", borderRadius: "4px", border: "1px solid transparent",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}
@@ -477,6 +476,24 @@ function Inspector({
                 ✕
               </button>
             )}
+            {/* Simple/Detail toggle */}
+            <div style={{ display: "flex", borderRadius: 4, overflow: "hidden", border: "1px solid #e2e8f0", marginLeft: 2 }}>
+              {(['simple', 'detailed'] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setDesignComplexity(m)}
+                  title={m === 'simple' ? 'Simple (Bay) mode' : 'Detailed (Block) mode'}
+                  style={{
+                    padding: "3px 6px", border: "none", cursor: "pointer",
+                    background: designComplexity === m ? "#3b82f6" : "transparent",
+                    color: designComplexity === m ? "#fff" : "#64748b",
+                    fontSize: 10, fontWeight: 700, lineHeight: 1,
+                  }}
+                >
+                  {m === 'simple' ? 'S' : 'D'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
