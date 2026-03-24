@@ -145,10 +145,6 @@ function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface,
 }) {
   const [hovered, setHovered] = useState(false);
   const setHoveredPreviewFace = useStore((s) => s.setHoveredPreviewFace);
-  const voxelContextMenu = useStore((s) => s.voxelContextMenu);
-  const isMenuHighlighted = voxelContextMenu?.containerId === containerId
-    && voxelContextMenu?.voxelIndex === voxelIndex
-    && voxelContextMenu?.faceDir === face;
 
   // Hitbox geometry (invisible but raycastable)
   const hitGeo = getBox(
@@ -221,7 +217,7 @@ function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface,
       )}
 
       {/* Hover outline — wireframe edge, no solid fill that would occlude geometry */}
-      {(hovered || isMenuHighlighted) && (
+      {hovered && (
         <lineSegments
           geometry={getEdges(
             (isNS ? nW : isEW ? PANEL_THICK : nW) + 0.04,
@@ -266,7 +262,6 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
   const setVoxelFace = useStore((s) => s.setVoxelFace);
   const activeBrush = useStore((s) => s.activeBrush);
   const setSelectedFace = useStore((s) => s.setSelectedFace);
-  const openVoxelContextMenu = useStore((s) => s.openVoxelContextMenu);
 
   // Dynamic voxel proportions — varies by position (body vs extension)
   const dims = containerSize ? CONTAINER_DIMENSIONS[containerSize] : { length: 12.19, width: 2.44, height: 2.90 };
@@ -424,11 +419,8 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
               }
             }}
             onContextMenu={(e: ThreeEvent<MouseEvent>) => {
-              openVoxelContextMenu(
-                (e.nativeEvent as MouseEvent).clientX,
-                (e.nativeEvent as MouseEvent).clientY,
-                containerId, voxelIndex, config.face
-              );
+              e.stopPropagation();
+              e.nativeEvent.preventDefault();
             }}
           />
         ))}

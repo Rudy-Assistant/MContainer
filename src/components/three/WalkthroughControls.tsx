@@ -302,18 +302,7 @@ export default function WalkthroughControls() {
   const containers = useStore((s) => s.containers);
   const viewLevel = useStore((s) => s.viewLevel);
   const setViewMode = useStore((s) => s.setViewMode);
-  const bayContextMenu = useStore((s) => s.bayContextMenu);
   const yawRef = useRef(0); // tracks current yaw for save/restore
-
-  // Re-acquire pointer lock when menu closes
-  useEffect(() => {
-    if (!bayContextMenu && isMenuOpen()) {
-      setMenuOpen(false);
-      // Small delay to let the menu DOM unmount before re-locking
-      const timer = setTimeout(() => safeRequestPointerLock(), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [bayContextMenu]);
 
   // Movement direction vector (reused)
   const moveDir = useMemo(() => new THREE.Vector3(), []);
@@ -769,19 +758,9 @@ export default function WalkthroughControls() {
           toggleTarget();
         }
       }
-      // E = open deep-edit menu (same as left-click)
+      // E = toggle target (was context menu, now direct toggle)
       if (e.code === "KeyE") {
-        const target = targetRef.current;
-        if (target) {
-          const store = useStore.getState();
-          const cx = window.innerWidth / 2;
-          const cy = window.innerHeight / 2;
-          if (target.kind === 'floor') {
-            store.openFloorContextMenu(cx, cy, target.containerId);
-            setMenuOpen(true);
-            safeExitPointerLock();
-          }
-        }
+        toggleTarget();
       }
       // T = toggle auto-tour (cycles: off → interior → exterior → off)
       if (e.code === "KeyT") {
@@ -825,30 +804,8 @@ export default function WalkthroughControls() {
       }
       if (!document.pointerLockElement) return;
 
-      const target = targetRef.current;
-      if (!target) return;
-
-      const store = useStore.getState();
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-
-      if (target.kind === 'bay') {
-        store.openBayContextMenu(cx, cy, target.containerId, target.wallSide, target.bayIndex);
-        setMenuOpen(true);
-        safeExitPointerLock();
-      } else if (target.kind === 'edge' || target.kind === 'railing') {
-        const wall = target.kind === 'railing' ? target.wallSide : target.wall;
-        store.openEdgeContextMenu(cx, cy, target.containerId, wall, target.bayIndex);
-        setMenuOpen(true);
-        safeExitPointerLock();
-      } else if (target.kind === 'floor') {
-        store.openFloorContextMenu(cx, cy, target.containerId);
-        setMenuOpen(true);
-        safeExitPointerLock();
-      } else {
-        // For structural/roof/corner — toggle immediately (no menu)
-        toggleTarget();
-      }
+      // All target kinds: toggle immediately (context menus removed)
+      toggleTarget();
     };
 
     // Right-click = IMMEDIATE state cycle (no menu, no pointer unlock)

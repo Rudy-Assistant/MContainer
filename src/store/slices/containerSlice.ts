@@ -2031,7 +2031,6 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     structureEditorTarget: containerId,
     // Mutual exclusivity: close siblings
     floorDetailTarget: null,
-    bayContextMenu: null,
     containerContextMenu: null,
   }),
   closeStructureEditor: () => set({ structureEditorTarget: null }),
@@ -2060,7 +2059,6 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     floorDetailTarget: containerId,
     // Mutual exclusivity: close siblings
     structureEditorTarget: null,
-    bayContextMenu: null,
     containerContextMenu: null,
   }),
   closeFloorDetail: () => set({ floorDetailTarget: null }),

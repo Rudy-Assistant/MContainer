@@ -2071,7 +2071,6 @@ export default function ContainerSkin({
   const stampAreaSmart       = useStore((s) => s.stampAreaSmart);
   const isStaircaseMacro     = useStore((s) => s.isStaircaseMacro);
   const stampStaircase       = useStore((s) => s.stampStaircase);
-  const openVoxelContextMenu = useStore((s) => s.openVoxelContextMenu);
   const setFaceContextMenuCtx = useStore((s) => s.setFaceContextMenuCtx);
   const dollhouseActive      = useStore((s) => s.dollhouseActive);
   const currentTheme         = useStore((s) => s.currentTheme);
@@ -2083,7 +2082,6 @@ export default function ContainerSkin({
   const bucketSurface        = useStore((s) => s.bucketSurface);
   const paintFace            = useStore((s) => s.paintFace);
   const hoveredPreviewFace   = useStore((s) => s.hoveredPreviewFace);
-  const voxelContextMenu     = useStore((s) => s.voxelContextMenu);
   const viewMode             = useStore((s) => s.viewMode);
   const isWalkthrough        = viewMode === ViewMode.Walkthrough;
   const isPreviewMode        = useStore((s) => s.isPreviewMode);
@@ -2395,13 +2393,8 @@ export default function ContainerSkin({
           screenY: nativeEvent.clientY,
         });
       }
-      // ★ Phase 8.5: Also open legacy VoxelContextMenu (Lock/Copy/Apply)
-      openVoxelContextMenu(
-        nativeEvent.clientX, nativeEvent.clientY,
-        container.id, voxelIndex, faceName
-      );
     },
-    [container.id, container.voxelGrid, setSelectedVoxel, openVoxelContextMenu, setFaceContextMenuCtx]
+    [container.id, container.voxelGrid, setSelectedVoxel, setFaceContextMenuCtx]
   );
 
   // ── Ctrl+Drag Paint — paint faces by dragging across them with Ctrl held ──
@@ -2600,11 +2593,6 @@ export default function ContainerSkin({
                   } else {
                     setSelectedVoxel({ containerId: container.id, isExtension: true, col, row });
                   }
-                  openVoxelContextMenu(
-                    (e.nativeEvent as MouseEvent).clientX,
-                    (e.nativeEvent as MouseEvent).clientY,
-                    container.id, idx
-                  );
                 }}
                 onClick={() => {
                   select(container.id);
@@ -2743,7 +2731,7 @@ export default function ContainerSkin({
               vOffset={vOffset}
               activeBrush={activeBrush}
               faceKey={faceKey}
-              isHovered={hovered === faceKey || (isSelected && hoveredPreviewFace === dir) || (voxelContextMenu?.voxelIndex === idx && voxelContextMenu?.containerId === container.id && voxelContextMenu?.faceDir === dir)}
+              isHovered={hovered === faceKey || (isSelected && hoveredPreviewFace === dir)}
               isVoxelSelected={isSelected}
               connectedStart={cStart}
               connectedEnd={cEnd}
@@ -2924,13 +2912,6 @@ export default function ContainerSkin({
                       screenY: (e.nativeEvent as MouseEvent).clientY,
                     });
                   }
-                } else {
-                  // Center right-click → VoxelContextMenu (block-level actions)
-                  openVoxelContextMenu(
-                    (e.nativeEvent as MouseEvent).clientX,
-                    (e.nativeEvent as MouseEvent).clientY,
-                    container.id, idx, undefined
-                  );
                 }
               };
 

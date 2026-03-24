@@ -4,12 +4,8 @@
  * Decouples menu controls from browser-reserved keys.
  * ESC is RESERVED for browser (Pointer Lock exit).
  *
- * Menu Controls:
- * - Open: Right-Click (or Spacebar on hover)
- * - Close: Click-Outside OR Right-Click toggle
- *
  * Edge Cycling:
- * - Spacebar: When hovering overlapping edges (menu must be closed)
+ * - Spacebar: When hovering overlapping edges
  */
 
 import { useEffect, useRef } from 'react';
@@ -17,8 +13,6 @@ import { useStore } from '@/store/useStore';
 import { ViewMode } from '@/types/container';
 
 export function useInputHandler() {
-  const bayContextMenu = useStore((s) => s.bayContextMenu);
-  const closeBayContextMenu = useStore((s) => s.closeBayContextMenu);
   const overlappingEdges = useStore((s) => s.overlappingEdges);
   const cycleOverlappingEdges = useStore((s) => s.cycleOverlappingEdges);
 
@@ -27,13 +21,11 @@ export function useInputHandler() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Spacebar: Cycle edges OR close menu (context-dependent)
+      // Spacebar: Cycle edges or repeat last stamp
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault(); // Prevent page scroll
 
-        if (bayContextMenu) {
-          closeBayContextMenu();
-        } else if (overlappingEdges && overlappingEdges.length > 1) {
+        if (overlappingEdges && overlappingEdges.length > 1) {
           cycleOverlappingEdges();
         } else {
           // Fallback: repeat last stamp on hovered face
@@ -75,27 +67,12 @@ export function useInputHandler() {
       }
     }
 
-    function handleClickOutside(e: MouseEvent) {
-      // Close menu if click is outside menu container
-      if (!bayContextMenu) return;
-
-      // Check if click target is inside menu
-      const target = e.target as Node;
-      const menuElement = document.querySelector('[data-bay-context-menu]');
-
-      if (menuElement && !menuElement.contains(target)) {
-        closeBayContextMenu();
-      }
-    }
-
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('mousedown', handleClickOutside);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [bayContextMenu, overlappingEdges, closeBayContextMenu, cycleOverlappingEdges]);
+  }, [overlappingEdges, cycleOverlappingEdges]);
 
   return { menuRef };
 }

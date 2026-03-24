@@ -6,7 +6,6 @@ import { useStore } from "@/store/useStore";
 import { ContainerSize, ViewMode } from "@/types/container";
 import { useFrameStore } from "@/store/frameStore";
 import Sidebar from "@/components/ui/Sidebar";
-import BayContextMenu from "@/components/ui/BayContextMenu";
 import BottomDock from "@/components/ui/BottomDock";
 import BudgetModal from "@/components/ui/BudgetModal";
 import WizardModal from "@/components/ui/WizardModal";
@@ -18,7 +17,6 @@ import TopToolbar from "@/components/ui/TopToolbar";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
-import VoxelContextMenu from "@/components/ui/VoxelContextMenu";
 import FaceContextMenu from "@/components/ui/FaceContextMenu";
 import MaterialPaletteModal from "@/components/ui/MaterialPaletteModal";
 // FormCatalog and SkinEditor replaced by unified BottomPanel (Sims-style drawer)
@@ -142,12 +140,6 @@ export default function Home() {
 
           {/* Grab mode overlay */}
           <GrabModeOverlay />
-
-          {/* Bay context menu — available in all modes except preview */}
-          {!isPreviewMode && <BayContextMenu />}
-
-          {/* Voxel context menu — right-click on active voxel faces */}
-          {!isPreviewMode && <VoxelContextMenu />}
 
           {/* Face context menu — surface-aware right-click actions */}
           {!isPreviewMode && <FaceContextMenu />}

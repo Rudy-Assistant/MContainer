@@ -282,7 +282,6 @@ function VoxelGrid({
   const setSelectedVoxelGrid = useStore((s) => s.setSelectedVoxel);
   const hoveredPreviewFace = useStore((s) => s.hoveredPreviewFace);
   const selectedFace = useStore((s) => s.selectedFace);
-  const voxelContextMenu = useStore((s) => s.voxelContextMenu);
   const setVoxelActive = useStore((s) => s.setVoxelActive);
   const setVoxelAllFaces = useStore((s) => s.setVoxelAllFaces);
   const copyVoxel = useStore((s) => s.copyVoxel);
@@ -525,10 +524,6 @@ function VoxelGrid({
             const syncFace = isThisSelected
               ? (hoveredPreviewFace as string | null)
                 ?? (selectedFace as string | null)
-                ?? (voxelContextMenu?.containerId === containerId
-                    && voxelContextMenu?.voxelIndex === cell.voxelIndex
-                    ? (voxelContextMenu.faceDir ?? null)
-                    : null)
               : null;
             return (
               <GridCell

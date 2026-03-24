@@ -61,42 +61,10 @@ export interface DragSlice {
   commitContainerDrag: (x: number, z: number, stackTargetId?: string | null) => void;
   cancelContainerDrag: () => void;
 
-  // ── Bay context menu ────────────────────────────────────
-  bayContextMenu: {
-    visible: boolean;
-    x: number;
-    y: number;
-    containerId: string;
-    wall: WallSide;
-    bayIndex: number;
-    mode: 'bay' | 'floor' | 'corner' | 'edge';
-  } | null;
-  openBayContextMenu: (
-    x: number,
-    y: number,
-    containerId: string,
-    wall: WallSide,
-    bayIndex: number,
-  ) => void;
-  openFloorContextMenu: (x: number, y: number, containerId: string) => void;
-  openEdgeContextMenu: (
-    x: number,
-    y: number,
-    containerId: string,
-    wall: WallSide,
-    bayIndex: number,
-  ) => void;
-  closeBayContextMenu: () => void;
-
   // ── Container context menu ──────────────────────────────
   containerContextMenu: { x: number; y: number; containerId: string } | null;
   openContainerContextMenu: (x: number, y: number, containerId: string) => void;
   closeContainerContextMenu: () => void;
-
-  // ── Voxel context menu ──────────────────────────────────
-  voxelContextMenu: { x: number; y: number; containerId: string; voxelIndex: number; faceDir?: string } | null;
-  openVoxelContextMenu: (x: number, y: number, containerId: string, voxelIndex: number, faceDir?: string) => void;
-  closeVoxelContextMenu: () => void;
 
   // ── Face context menu ───────────────────────────────────
   faceContextMenuCtx: {
@@ -121,9 +89,7 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
   dragFurniture: null,
   libraryDragPayload: null,
   dragMovingId: null,
-  bayContextMenu: null,
   containerContextMenu: null,
-  voxelContextMenu: null,
   faceContextMenuCtx: null,
   hoveredEdge: null,
 
@@ -223,37 +189,11 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
     set({ dragMovingId: null });
   },
 
-  // Bay context menu
-  openBayContextMenu: (x, y, containerId, wall, bayIndex) =>
-    set((s: any) => ({
-      bayContextMenu: { visible: true, x, y, containerId, wall, bayIndex, mode: 'bay' },
-      selectionContext: { containerId, subPart: { type: 'wall', wallSide: wall, bayIndex } },
-      selection: s.selection.includes(containerId) ? s.selection : [containerId],
-    })),
-
-  openFloorContextMenu: (x, y, containerId) =>
-    set({
-      bayContextMenu: { visible: true, x, y, containerId, wall: WallSide.Front, bayIndex: 0, mode: 'floor' },
-    }),
-
-  openEdgeContextMenu: (x, y, containerId, wall, bayIndex) =>
-    set({
-      bayContextMenu: { visible: true, x, y, containerId, wall, bayIndex, mode: 'edge' },
-    }),
-
-  closeBayContextMenu: () => set({ bayContextMenu: null }),
-
   // Container context menu
   openContainerContextMenu: (x, y, containerId) => set({
     containerContextMenu: { x, y, containerId },
-    bayContextMenu: null,
   }),
   closeContainerContextMenu: () => set({ containerContextMenu: null }),
-
-  // Voxel context menu
-  openVoxelContextMenu: (x, y, containerId, voxelIndex, faceDir?) =>
-    set({ voxelContextMenu: { x, y, containerId, voxelIndex, faceDir } }),
-  closeVoxelContextMenu: () => set({ voxelContextMenu: null }),
 
   // Face context menu
   setFaceContextMenuCtx: (ctx) => set({ faceContextMenuCtx: ctx }),

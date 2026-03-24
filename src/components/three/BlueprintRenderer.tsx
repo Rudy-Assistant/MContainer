@@ -288,7 +288,6 @@ function BlueprintContainer({ container }: { container: Container }) {
   const select                  = useStore((s) => s.select);
   const startContainerDrag      = useStore((s) => s.startContainerDrag);
   const renameContainer         = useStore((s) => s.renameContainer);
-  const openFloorContextMenu    = useStore((s) => s.openFloorContextMenu);
   const openContainerContextMenu = useStore((s) => s.openContainerContextMenu);
   const dragMovingId            = useStore((s) => s.dragMovingId);
 
@@ -405,7 +404,7 @@ function BlueprintContainer({ container }: { container: Container }) {
         renderOrder={993}
         onClick={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
-          openFloorContextMenu(e.nativeEvent.clientX, e.nativeEvent.clientY, container.id);
+          select(container.id);
         }}
         onContextMenu={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();

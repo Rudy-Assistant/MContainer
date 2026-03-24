@@ -453,7 +453,6 @@ function InteractiveExtensionOverlay({
   containerId?: string; wallSide?: WallSide; bayIndex?: number;
 }) {
   const toggleBayOpen = useStore((s) => s.toggleBayOpen);
-  const openBayContextMenu = useStore((s) => s.openBayContextMenu);
   const [hovered, setHovered] = useState(false);
   const glowRef = useRef(0.05); // idle glow so deployed decks are visibly interactive
   const glowMeshRef = useRef<THREE.Mesh>(null);
@@ -485,10 +484,7 @@ function InteractiveExtensionOverlay({
   const handleContextMenu = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     e.nativeEvent.preventDefault();
-    if (!containerId || wallSide === undefined || bayIndex === undefined) return;
-    // Right-click = open fan menu at cursor
-    openBayContextMenu(e.nativeEvent.clientX, e.nativeEvent.clientY, containerId, wallSide, bayIndex);
-  }, [containerId, wallSide, bayIndex, openBayContextMenu]);
+  }, []);
 
   const outerZ = outwardSign * depth;
   const midZ = outerZ / 2;
@@ -1016,14 +1012,10 @@ function BayModule({
   foldFlip?: boolean;
   adjacentDeckAtFirst?: boolean; adjacentDeckAtLast?: boolean;
 }) {
-  const openBayContextMenu = useStore((s) => s.openBayContextMenu);
   const cycleBayModule = useStore((s) => s.cycleBayModule);
-  const bayCtx = useStore((s) => s.bayContextMenu);
   const mod = bay.module;
   const [hovered, setHovered] = useState(false);
-  // Keep highlight when this bay's context menu is open
-  const hasMenuOpen = bayCtx?.containerId === containerId && bayCtx?.wall === wallSide && bayCtx?.bayIndex === bayIndex;
-  const showHighlight = hovered || hasMenuOpen;
+  const showHighlight = hovered;
 
   // ── Exit animation for deployed HingedWall transitions ──
   // When a deployed HingedWall changes to another type, we keep the
@@ -1099,8 +1091,6 @@ function BayModule({
   const handleContextMenu = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     e.nativeEvent.preventDefault();
-    // Right-click opens the fan menu at exact cursor position
-    openBayContextMenu(e.nativeEvent.clientX, e.nativeEvent.clientY, containerId, wallSide, bayIndex);
   };
 
   // Attach userData for walkthrough raycasting identification

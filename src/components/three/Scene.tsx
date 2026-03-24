@@ -766,7 +766,6 @@ function useKeyboardShortcuts() {
           store.cancelContainerDrag();
         } else {
           store.clearSelection();
-          store.closeBayContextMenu();
           store.stopPaint();
           store.clearClipboard();
           store.setActiveHotbarSlot(null);
@@ -1355,7 +1354,6 @@ function RealisticScene() {
           e.stopPropagation();
           clearSelection();
           useStore.getState().setSelectedVoxel(null);
-          useStore.getState().closeBayContextMenu();
           if (frameMode) useStore.getState().setSelectedFrameElement(null);
         }}
       >
