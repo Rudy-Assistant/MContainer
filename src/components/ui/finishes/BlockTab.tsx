@@ -17,6 +17,8 @@ export default function BlockTab({ containerId, voxelIndex, indices }: Props) {
   const toggleLock = useStore((s) => s.toggleVoxelLock);
   const locked = useStore((s) => !!s.lockedVoxels?.[`${containerId}_${voxelIndex}`]);
   const copyStyle = useStore((s) => s.copyVoxelStyle);
+  const setGhostPreset = useStore((s) => s.setGhostPreset);
+  const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 
   // Detect active preset by comparing current faces
   const voxel = useStore((s) => s.containers[containerId]?.voxelGrid?.[voxelIndex]);
@@ -48,6 +50,12 @@ export default function BlockTab({ containerId, voxelIndex, indices }: Props) {
             label={preset.label}
             active={activePresetId === preset.id}
             onClick={() => applyBlockConfig(containerId, indices, preset.id)}
+            onMouseEnter={() => setGhostPreset({
+              source: 'block',
+              faces: preset.faces,
+              targetScope: indices.length > 1 ? 'bay' : 'voxel',
+            })}
+            onMouseLeave={() => clearGhostPreset()}
           />
         ))}
       </div>
