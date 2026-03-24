@@ -1076,25 +1076,6 @@ export default function MatrixEditor({
         ))}
       </div>
 
-      {/* ── Bay / Block view toggle (only when not in frame mode) ── */}
-      {!frameMode && (
-        <div style={{
-          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 4, overflow: "hidden",
-          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 10, fontWeight: 600,
-        }}>
-          {(['simple', 'detailed'] as const).map((m) => (
-            <button key={m} onClick={() => setDesignComplexity(m)} style={{
-              flex: 1, padding: "4px 0", border: "none", cursor: "pointer",
-              background: designComplexity === m ? "var(--accent, #2563eb)" : "transparent",
-              color: designComplexity === m ? "#fff" : "var(--text-muted, #6b7280)",
-              transition: "all 100ms",
-            }}>
-              {m === 'simple' ? 'Bay' : 'Block'}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* ── Frame Grid, Bay Grid, or Voxel Grid ── */}
       {frameMode ? (
         <FrameGridOverlay containerId={containerId} level={gridLevel} />
@@ -1104,34 +1085,9 @@ export default function MatrixEditor({
         <VoxelGrid container={container} containerId={containerId} level={gridLevel} />
       )}
 
-      {/* ── Grid Legend ── */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 2px" }}>
-        {([
-          ["#78909c", "Steel"],
-          ["#60a5fa", "Glass"],
-          ["#8d6e63", "Wood"],
-          ["#607d8b", "Rail"],
-        ] as const).map(([c, l]) => (
-          <div key={l} style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: c, border: "1px solid rgba(0,0,0,0.1)" }} />
-            <span style={{ fontSize: 8, color: "#94a3b8", fontWeight: 600 }}>{l}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── FaceStrip — Unified face editor ──── */}
+      {/* ── Door Configuration — single-select only ── */}
       {(isVoxelSelected || isBaySelected) && selIdx >= 0 && (
         <>
-          <div style={{ height: "1px", background: "#e2e8f0" }} />
-          <FaceStrip
-            containerId={containerId}
-            indices={
-              selectedVoxels?.containerId === containerId && selectedVoxels.indices.length > 1
-                ? selectedVoxels.indices
-                : [selIdx]
-            }
-          />
-
           {/* Door Configuration — single-select only */}
           {isSingleVoxelSelected && selVoxel && (() => {
             // Find any face on this voxel that is Door type and has doorConfig
