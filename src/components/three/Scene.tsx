@@ -12,8 +12,6 @@ import {
   CubeCamera,
   Stars,
   Html,
-  GizmoHelper,
-  GizmoViewport,
 } from "@react-three/drei";
 import type CameraControlsImpl from "camera-controls";
 import { useStore } from "@/store/useStore";
@@ -1185,7 +1183,7 @@ function FollowLight() {
 
 // ── 3D Realistic Scene ──────────────────────────────────────
 
-function RealisticScene() {
+function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.RefObject<THREE.Quaternion | null> }) {
   const containers = useStore((s) => s.containers);
   const viewLevel = useStore((s) => s.viewLevel);
   const clearSelection = useStore((s) => s.clearSelection);
@@ -1224,6 +1222,38 @@ function RealisticScene() {
       (window as any).__cameraControls = cameraControlsRef.current;
     }
   });
+
+  // Broadcast camera quaternion to HTML overlay gizmo each frame
+  useFrame(({ camera }) => {
+    if (cameraQuaternionRef?.current) {
+      cameraQuaternionRef.current.copy(camera.quaternion);
+    }
+  });
+
+  // Listen for gizmo-snap custom events and snap camera via camera-controls API
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { dir } = (e as CustomEvent).detail;
+      const controls = cameraControlsRef.current;
+      if (!controls) return;
+
+      // Get current orbit target and distance
+      const target = new THREE.Vector3();
+      controls.getTarget(target);
+      const pos = new THREE.Vector3();
+      controls.getPosition(pos);
+      const distance = pos.distanceTo(target);
+
+      // New position = target + dir * distance
+      const dirVec = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize();
+      const newPos = target.clone().add(dirVec.multiplyScalar(distance));
+
+      controls.setPosition(newPos.x, newPos.y, newPos.z, true);
+      controls.setTarget(target.x, target.y, target.z, true);
+    };
+    window.addEventListener('gizmo-snap', handler);
+    return () => window.removeEventListener('gizmo-snap', handler);
+  }, []);
 
   // Apply palette when active palette or theme changes
   useEffect(() => {
@@ -1398,18 +1428,6 @@ function RealisticScene() {
       {/* Phase 8: Post-processing — AO + Bloom + ToneMapping */}
       <PostProcessingStack />
 
-      {/* 3D orientation gizmo — grey, no labels, all ground axes visible */}
-      <GizmoHelper alignment="top-right" margin={[60, 60]}>
-        <GizmoViewport
-          axisColors={['#94a3b8', '#94a3b8', '#94a3b8']}
-          labelColor="transparent"
-          axisHeadScale={0.85}
-          hideNegativeAxes={false}
-          hideAxisHeads={false}
-          labels={['', '', '']}
-          font="1px system-ui"
-        />
-      </GizmoHelper>
     </>
   );
 }
@@ -2117,7 +2135,11 @@ function SceneExporter() {
 
 // DevSceneExpose imported from ./DevSceneExpose (standalone, with __inspectScene + __inspectStore)
 
-export default function Scene() {
+interface SceneProps {
+  cameraQuaternionRef?: React.RefObject<THREE.Quaternion | null>;
+}
+
+export default function Scene({ cameraQuaternionRef }: SceneProps) {
   const viewMode = useStore((s) => s.viewMode);
   useKeyboardShortcuts();
   useInputHandler(); // Click-outside menu close + Spacebar edge cycling (ESC reserved for pointer lock)
@@ -2135,7 +2157,7 @@ export default function Scene() {
       {viewMode === ViewMode.Blueprint && <DragGhostBlueprint />}
       {viewMode !== ViewMode.Walkthrough && <KeyboardPanControls />}
       {viewMode === ViewMode.Blueprint && <><BlueprintGrid /><BlueprintScene /></>}
-      {viewMode === ViewMode.Realistic3D && <RealisticScene />}
+      {viewMode === ViewMode.Realistic3D && <RealisticScene cameraQuaternionRef={cameraQuaternionRef} />}
       {viewMode === ViewMode.Walkthrough && <WalkthroughScene />}
     </>
   );

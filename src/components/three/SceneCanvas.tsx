@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { Component, type ReactNode, Suspense, useCallback, useRef } from "react";
 import Scene from "./Scene";
 import StaircaseModeIndicator from "@/components/ui/StaircaseModeIndicator";
+import OrientationGizmo from "@/components/ui/OrientationGizmo";
 import { useStore } from "@/store/useStore";
 import { CAMERA_INITIAL_POSITION } from "@/config/cameraConstants";
 import "@/utils/bvhSetup";
@@ -66,6 +67,11 @@ export default function SceneCanvas() {
   const staircaseMode = useStore((s) => s.staircasePlacementMode);
   const cursor = (staircaseMode || activeBrush || activeSlot !== null) ? 'crosshair' : 'default';
   const containerRef = useRef<HTMLDivElement>(null);
+  const cameraQuaternionRef = useRef<THREE.Quaternion | null>(new THREE.Quaternion());
+
+  const handleSnapToAxis = useCallback((dir: [number, number, number]) => {
+    window.dispatchEvent(new CustomEvent('gizmo-snap', { detail: { dir } }));
+  }, []);
 
   const onCreated = useCallback((state: RootState) => {
     // Set a neutral initial background before SkyDome takes over.
@@ -109,10 +115,14 @@ export default function SceneCanvas() {
         style={{ width: "100%", height: "100%", touchAction: "none", cursor }}
       >
         <Suspense fallback={null}>
-          <Scene />
+          <Scene cameraQuaternionRef={cameraQuaternionRef} />
         </Suspense>
       </Canvas>
       <StaircaseModeIndicator />
+      <OrientationGizmo
+        cameraQuaternionRef={cameraQuaternionRef}
+        onSnapToAxis={handleSnapToAxis}
+      />
       </div>
     </SceneErrorBoundary>
   );
