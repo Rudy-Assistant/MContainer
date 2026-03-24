@@ -27,6 +27,7 @@ export function FrameInspector({ containerId }: { containerId: string }) {
   const setFrameDefaults = useStore((s) => s.setFrameDefaults);
   const setFrameElementOverride = useStore((s) => s.setFrameElementOverride);
   const clearFrameElementOverride = useStore((s) => s.clearFrameElementOverride);
+  const setFrameMode = useStore((s) => s.setFrameMode);
 
   if (!container) return null;
 
@@ -55,6 +56,18 @@ export function FrameInspector({ containerId }: { containerId: string }) {
 
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
+      {/* Exit frame mode */}
+      <button
+        onClick={() => setFrameMode(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+          padding: '6px 8px', marginBottom: 8, borderRadius: 6,
+          border: '1px solid var(--border, #e2e8f0)', background: 'var(--btn-bg, #f8fafc)',
+          cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #64748b)',
+        }}
+      >
+        ← Exit Frame Mode
+      </button>
       {sel && label ? (
         <>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>{label}</div>

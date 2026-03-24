@@ -508,11 +508,8 @@ function Inspector({
       {/* Grid — collapsed by default, toggle via icon button above */}
       {!gridCollapsed && (
         <div style={{ flexShrink: 0, marginBottom: "4px" }}>
-          {frameMode ? (
-            <FrameInspector containerId={containerId} />
-          ) : (
-            <MatrixEditor container={container} containerId={containerId} />
-          )}
+          <MatrixEditor container={container} containerId={containerId} />
+          {frameMode && <FrameInspector containerId={containerId} />}
         </div>
       )}
 

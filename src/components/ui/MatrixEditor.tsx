@@ -667,13 +667,12 @@ function SimpleBayGrid({
   const gridCols = `${foldDepth}fr 2px repeat(6, ${coreWidth}fr) 2px ${foldDepth}fr`;
   const gridRows = `${foldDepth}fr 2px repeat(2, ${coreDepth}fr) 2px ${foldDepth}fr`;
 
-  const handleBayClick = useCallback((group: BayGroup) => {
+  const handleBayClick = useCallback((group: BayGroup, e: React.MouseEvent) => {
     const indices = group.voxelIndices.map((i) => level * VOXEL_ROWS * VOXEL_COLS + i);
 
     // If brush active, paint dominant face on all voxels in group
     if (activeBrush) {
       for (const idx of indices) {
-        // Paint all wall faces
         for (const face of ['n', 's', 'e', 'w'] as const) {
           setVoxelFace(containerId, idx, face, activeBrush);
         }
@@ -681,14 +680,29 @@ function SimpleBayGrid({
       return;
     }
 
-    // Select all voxels in group (store handles mutual exclusion)
+    // Ctrl/Cmd+Click: toggle bay voxels in/out of multi-select
+    if (e.ctrlKey || e.metaKey) {
+      const cur = useStore.getState().selectedVoxels;
+      if (!cur || cur.containerId !== containerId) {
+        setSelectedVoxels({ containerId, indices });
+      } else {
+        // Toggle: if all bay indices are already selected, remove them; else add them
+        const allSelected = indices.every(i => cur.indices.includes(i));
+        const next = allSelected
+          ? cur.indices.filter(i => !indices.includes(i))
+          : [...new Set([...cur.indices, ...indices])];
+        setSelectedVoxels(next.length ? { containerId, indices: next } : null);
+      }
+      setSelectedFace('s');
+      return;
+    }
+
+    // Plain click: select this bay group
     if (indices.length === 1) {
       setSelectedVoxel({ containerId, index: indices[0] });
     } else {
       setSelectedVoxels({ containerId, indices });
     }
-    // Set a default face so sidebar shows face configuration (FinishesPanel)
-    // Use 's' (south/front) as default — the face visible from the default camera angle
     setSelectedFace('s');
   }, [level, containerId, activeBrush, setVoxelFace, setSelectedVoxel, setSelectedVoxels, setSelectedFace]);
 
@@ -756,7 +770,7 @@ function SimpleBayGrid({
         return (
           <button
             key={group.id}
-            onClick={() => handleBayClick(group)}
+            onClick={(e) => handleBayClick(group, e)}
             onMouseEnter={() => handleBayHover(group)}
             onMouseLeave={handleBayLeave}
             style={{
