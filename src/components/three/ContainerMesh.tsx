@@ -1948,8 +1948,10 @@ const hlBayGroupMat = new THREE.LineBasicMaterial({
 function computeMergedAABB(indices: number[], dims: { length: number; width: number; height: number }) {
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const idx of indices) {
-    const row = Math.floor(idx / VOXEL_COLS);
-    const col = idx % VOXEL_COLS;
+    // Level-aware: strip level offset (4 rows × 8 cols = 32 per level)
+    const localIdx = idx % (4 * VOXEL_COLS);
+    const row = Math.floor(localIdx / VOXEL_COLS);
+    const col = localIdx % VOXEL_COLS;
     const layout = getVoxelLayout(col, row, dims);
     const halfW = layout.voxW / 2;
     const halfD = layout.voxD / 2;
@@ -2109,8 +2111,10 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
       )}
       {/* Individual voxel highlights (Detail mode or non-bay-group voxels) */}
       {individualHighlights.map(({ idx, isHover, isSelect }) => {
-        const row = Math.floor(idx / VOXEL_COLS);
-        const col = idx % VOXEL_COLS;
+        // Level-aware: strip level offset (4 rows × 8 cols = 32 per level)
+        const localIdx = idx % (4 * VOXEL_COLS);
+        const row = Math.floor(localIdx / VOXEL_COLS);
+        const col = localIdx % VOXEL_COLS;
         const layout = getVoxelLayout(col, row, dims);
 
         // Wall face overlay position + rotation for hovered edge
