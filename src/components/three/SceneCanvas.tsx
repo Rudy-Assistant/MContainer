@@ -109,6 +109,7 @@ export default function SceneCanvas() {
           s.setSelectedVoxels(null);
           s.setFacePreview(null);
           s.selectObject(null);
+          s.clearGhostPreset();
           document.body.style.cursor = 'auto';
         }}
         onContextMenu={(e) => e.preventDefault()}

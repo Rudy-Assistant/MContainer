@@ -16,6 +16,7 @@ export default function FinishesPanel() {
   const target = useSelectionTarget();
   const selectedFace = useStore((s) => s.selectedFace) as FaceKey | null;
   const clearSelection = useStore((s) => s.clearSelection);
+  const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 
   // Auto-select tab on face change; manual clicks override freely
   const [activeTab, setActiveTab] = useState<FinishTab>('container');
@@ -79,7 +80,7 @@ export default function FinishesPanel() {
           Interior Finishes
         </span>
         <button
-          onClick={() => clearSelection()}
+          onClick={() => { clearSelection(); clearGhostPreset(); }}
           title="Close"
           style={{
             width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
@@ -104,7 +105,7 @@ export default function FinishesPanel() {
       {/* Tab bar */}
       <FinishesTabBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => { setActiveTab(tab); clearGhostPreset(); }}
       />
 
       {/* Tab content — scrollable */}
