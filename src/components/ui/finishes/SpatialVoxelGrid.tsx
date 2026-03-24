@@ -117,7 +117,10 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
     }
 
     // Also call onCellClick for backward compat (ContainerTab uses it for voxel selection)
-    onCellClick(cellIndices);
+    // Only on plain click — Ctrl/Shift clicks are handled entirely via selectedElements
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      onCellClick(cellIndices);
+    }
   };
 
   const handleMouseEnter = (e: React.MouseEvent, cellId: string) => {
