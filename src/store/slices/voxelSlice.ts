@@ -1469,7 +1469,8 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         if (neighbor?.active) {
           grid[neighborIdx] = {
             ...neighbor,
-            faces: { ...neighbor.faces, [oppFace]: 'Open' },
+            faces: { ...neighbor.faces, [oppFace]: 'Door' as SurfaceType },
+            doorConfig: { ...neighbor.doorConfig, [oppFace]: smartConfig },
           };
         }
       }
@@ -1585,8 +1586,15 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       grid[idx] = { ...voxel, active: preset.active, faces };
     }
 
+    const updatedContainer = { ...c, voxelGrid: grid };
+
+    // Smart system: recompute auto-railings for newly-Open interior faces
+    if (get().designMode !== 'manual') {
+      recomputeSmartRailings(grid, updatedContainer);
+    }
+
     set({
-      containers: { ...state.containers, [containerId]: { ...c, voxelGrid: grid } },
+      containers: { ...state.containers, [containerId]: updatedContainer },
     });
   },
 });

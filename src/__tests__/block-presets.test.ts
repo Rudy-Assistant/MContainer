@@ -7,6 +7,8 @@ function resetStore() {
   const s = useStore.getState();
   Object.keys(s.containers).forEach(id => s.removeContainer(id));
   s.addContainer(ContainerSize.Standard20, { x: 0, y: 0, z: 0 });
+  // Use manual mode so smart railings don't alter faces after preset application
+  useStore.setState({ designMode: 'manual' });
 }
 
 function getContainerId(): string {

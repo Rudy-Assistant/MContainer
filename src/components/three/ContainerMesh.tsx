@@ -1982,6 +1982,12 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
   const vHeight = dims.height;
   const vOffset = vHeight / 2;
 
+  // Level-aware Y offset: level 1 voxels render one story higher
+  const levelYOffset = useCallback((idx: number) => {
+    const level = Math.floor(idx / (4 * VOXEL_COLS));
+    return level * vHeight;
+  }, [vHeight]);
+
   // Collect highlights: individual entries + merged AABB boxes for bay groups
   const { individualHighlights, mergedHoverBox, mergedSelectBox } = useMemo(() => {
     const result: { idx: number; isHover: boolean; isSelect: boolean }[] = [];
@@ -2062,7 +2068,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
       {/* Merged bay group selection: wireframe when no face selected, face overlay when face selected */}
       {mergedSelectBox && !selectedFace && (
         <lineSegments
-          position={[mergedSelectBox.cx, vOffset, mergedSelectBox.cz]}
+          position={[mergedSelectBox.cx, vOffset + (selectedVoxels ? levelYOffset(selectedVoxels.indices[0]) : 0), mergedSelectBox.cz]}
           geometry={getHlEdges(mergedSelectBox.w * 0.98, vHeight * 0.98, mergedSelectBox.d * 0.98)}
           material={hlBayGroupMat}
           renderOrder={10}
@@ -2074,16 +2080,17 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         const mBox = mergedSelectBox;
         const halfW = mBox.w / 2;
         const halfD = mBox.d / 2;
+        const mYLift = selectedVoxels ? levelYOffset(selectedVoxels.indices[0]) : 0;
         let wallPos: [number, number, number] | null = null;
         let wallSize: [number, number] | null = null;
         let wallRotY = 0;
         switch (selectedFace) {
-          case 'n': wallPos = [mBox.cx, vOffset, mBox.cz - halfD]; wallSize = [mBox.w, vHeight]; break;
-          case 's': wallPos = [mBox.cx, vOffset, mBox.cz + halfD]; wallSize = [mBox.w, vHeight]; break;
-          case 'e': wallPos = [mBox.cx + halfW, vOffset, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
-          case 'w': wallPos = [mBox.cx - halfW, vOffset, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
-          case 'top': wallPos = [mBox.cx, vHeight, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
-          case 'bottom': wallPos = [mBox.cx, 0, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
+          case 'n': wallPos = [mBox.cx, vOffset + mYLift, mBox.cz - halfD]; wallSize = [mBox.w, vHeight]; break;
+          case 's': wallPos = [mBox.cx, vOffset + mYLift, mBox.cz + halfD]; wallSize = [mBox.w, vHeight]; break;
+          case 'e': wallPos = [mBox.cx + halfW, vOffset + mYLift, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
+          case 'w': wallPos = [mBox.cx - halfW, vOffset + mYLift, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
+          case 'top': wallPos = [mBox.cx, vHeight + mYLift, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
+          case 'bottom': wallPos = [mBox.cx, mYLift, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
         }
         if (!wallPos || !wallSize) return null;
         const isHoriz = selectedFace === 'top' || selectedFace === 'bottom';
@@ -2102,7 +2109,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
       {/* Merged bay group hover wireframe */}
       {mergedHoverBox && (
         <lineSegments
-          position={[mergedHoverBox.cx, vOffset, mergedHoverBox.cz]}
+          position={[mergedHoverBox.cx, vOffset + (hoveredBayGroup ? levelYOffset(hoveredBayGroup.indices[0]) : 0), mergedHoverBox.cz]}
           geometry={getHlEdges(mergedHoverBox.w, vHeight, mergedHoverBox.d)}
           material={hlHoverMat}
           renderOrder={21}
@@ -2116,6 +2123,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         const row = Math.floor(localIdx / VOXEL_COLS);
         const col = localIdx % VOXEL_COLS;
         const layout = getVoxelLayout(col, row, dims);
+        const yLift = levelYOffset(idx);
 
         // Wall face overlay position + rotation for hovered edge
         let hoverWallPos: [number, number, number] | null = null;
@@ -2125,10 +2133,10 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           const halfW = layout.voxW / 2;
           const halfD = layout.voxD / 2;
           switch (hoveredFace) {
-            case 'n': hoverWallPos = [layout.px, vOffset, layout.pz - halfD]; hoverWallSize = [layout.voxW, vHeight]; break;
-            case 's': hoverWallPos = [layout.px, vOffset, layout.pz + halfD]; hoverWallSize = [layout.voxW, vHeight]; break;
-            case 'e': hoverWallPos = [layout.px + halfW, vOffset, layout.pz]; hoverWallSize = [layout.voxD, vHeight]; hoverWallRotY = Math.PI / 2; break;
-            case 'w': hoverWallPos = [layout.px - halfW, vOffset, layout.pz]; hoverWallSize = [layout.voxD, vHeight]; hoverWallRotY = Math.PI / 2; break;
+            case 'n': hoverWallPos = [layout.px, vOffset + yLift, layout.pz - halfD]; hoverWallSize = [layout.voxW, vHeight]; break;
+            case 's': hoverWallPos = [layout.px, vOffset + yLift, layout.pz + halfD]; hoverWallSize = [layout.voxW, vHeight]; break;
+            case 'e': hoverWallPos = [layout.px + halfW, vOffset + yLift, layout.pz]; hoverWallSize = [layout.voxD, vHeight]; hoverWallRotY = Math.PI / 2; break;
+            case 'w': hoverWallPos = [layout.px - halfW, vOffset + yLift, layout.pz]; hoverWallSize = [layout.voxD, vHeight]; hoverWallRotY = Math.PI / 2; break;
           }
         }
 
@@ -2141,12 +2149,12 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           const halfW = layout.voxW / 2;
           const halfD = layout.voxD / 2;
           switch (selectedFace) {
-            case 'n': selWallPos = [layout.px, vOffset, layout.pz - halfD]; selWallSize = [layout.voxW, vHeight]; break;
-            case 's': selWallPos = [layout.px, vOffset, layout.pz + halfD]; selWallSize = [layout.voxW, vHeight]; break;
-            case 'e': selWallPos = [layout.px + halfW, vOffset, layout.pz]; selWallSize = [layout.voxD, vHeight]; selWallRotY = Math.PI / 2; break;
-            case 'w': selWallPos = [layout.px - halfW, vOffset, layout.pz]; selWallSize = [layout.voxD, vHeight]; selWallRotY = Math.PI / 2; break;
-            case 'top': selWallPos = [layout.px, vHeight, layout.pz]; selWallSize = [layout.voxW, layout.voxD]; selIsHoriz = true; break;
-            case 'bottom': selWallPos = [layout.px, 0, layout.pz]; selWallSize = [layout.voxW, layout.voxD]; selIsHoriz = true; break;
+            case 'n': selWallPos = [layout.px, vOffset + yLift, layout.pz - halfD]; selWallSize = [layout.voxW, vHeight]; break;
+            case 's': selWallPos = [layout.px, vOffset + yLift, layout.pz + halfD]; selWallSize = [layout.voxW, vHeight]; break;
+            case 'e': selWallPos = [layout.px + halfW, vOffset + yLift, layout.pz]; selWallSize = [layout.voxD, vHeight]; selWallRotY = Math.PI / 2; break;
+            case 'w': selWallPos = [layout.px - halfW, vOffset + yLift, layout.pz]; selWallSize = [layout.voxD, vHeight]; selWallRotY = Math.PI / 2; break;
+            case 'top': selWallPos = [layout.px, vHeight + yLift, layout.pz]; selWallSize = [layout.voxW, layout.voxD]; selIsHoriz = true; break;
+            case 'bottom': selWallPos = [layout.px, yLift, layout.pz]; selWallSize = [layout.voxW, layout.voxD]; selIsHoriz = true; break;
           }
         }
 
@@ -2161,7 +2169,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           <group key={`hl_${idx}`}>
             {showVoxelWireframe && (
               <lineSegments
-                position={[layout.px, vOffset, layout.pz]}
+                position={[layout.px, vOffset + yLift, layout.pz]}
                 geometry={getHlEdges(layout.voxW * 0.98, vHeight * 0.98, layout.voxD * 0.98)}
                 material={hlSelectEdgeMat}
                 renderOrder={10}
@@ -2170,7 +2178,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
             )}
             {isHover && (
               <lineSegments
-                position={[layout.px, vOffset, layout.pz]}
+                position={[layout.px, vOffset + yLift, layout.pz]}
                 geometry={getHlEdges(layout.voxW, vHeight, layout.voxD)}
                 material={hlHoverMat}
                 renderOrder={21}
@@ -2329,13 +2337,8 @@ export default function ContainerMesh({ container }: { container: Container }) {
       if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_3D) {
         startContainerDrag(p.id);
         dragPendingRef.current = null;
-        // Early-registration safety: catch fast release before DragMoveGhost mounts
-        const earlyUp = () => {
-          if (useStore.getState().dragMovingId === p.id) {
-            useStore.getState().cancelContainerDrag();
-          }
-        };
-        gl.domElement.addEventListener("pointerup", earlyUp, { once: true });
+        // DragMoveGhost handles pointerup (commit or cancel).
+        // No early-release handler here — it raced with DragMoveGhost's handler.
       }
     };
     const handleUp = () => { dragPendingRef.current = null; };
