@@ -44,3 +44,32 @@ describe('selectedElements — typed selection context', () => {
     expect(useStore.getState().selectedElements).toBeNull();
   });
 });
+
+describe('selectWithFace — batched selection + face', () => {
+  beforeEach(resetStore);
+
+  it('sets both selectedElements and selectedFace in one call', () => {
+    const sel = { type: 'voxel' as const, items: [{ containerId: 'c1', id: '10' }] };
+    useStore.getState().selectWithFace(sel, 'n');
+    const state = useStore.getState();
+    expect(state.selectedElements).toEqual(sel);
+    expect(state.selectedFace).toBe('n');
+  });
+
+  it('clears both when sel is null', () => {
+    useStore.getState().selectWithFace(
+      { type: 'voxel' as const, items: [{ containerId: 'c1', id: '10' }] }, 'w'
+    );
+    useStore.getState().selectWithFace(null, null);
+    expect(useStore.getState().selectedElements).toBeNull();
+    expect(useStore.getState().selectedFace).toBeNull();
+  });
+
+  it('preserves existing selectedFace when face arg is null but sel is non-null', () => {
+    useStore.getState().setSelectedFace('e');
+    const sel = { type: 'voxel' as const, items: [{ containerId: 'c1', id: '10' }] };
+    useStore.getState().selectWithFace(sel, null);
+    expect(useStore.getState().selectedElements).toEqual(sel);
+    expect(useStore.getState().selectedFace).toBe('e');
+  });
+});

@@ -2361,12 +2361,10 @@ export default function ContainerSkin({
 
       if (!alreadySelected) {
         if (bayIndices) {
-          useStore.getState().setSelectedElements({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) });
+          useStore.getState().selectWithFace({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) }, faceName);
         } else {
-          setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(voxelIndex) }] });
+          useStore.getState().selectWithFace({ type: 'voxel', items: [{ containerId: container.id, id: String(voxelIndex) }] }, faceName);
         }
-        // Record which face was clicked so sidebar shows face configuration (FinishesPanel)
-        useStore.getState().setSelectedFace(faceName);
         return;
       }
 
@@ -2962,12 +2960,10 @@ export default function ContainerSkin({
                    bayIndices.every((i: number) => svs.indices.includes(i)));
                 if (!isSelected) {
                   if (bayIndices) {
-                    useStore.getState().setSelectedElements({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) });
+                    useStore.getState().selectWithFace({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) }, 'bottom');
                   } else {
-                    setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
+                    useStore.getState().selectWithFace({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] }, 'bottom');
                   }
-                  // Set floor face so sidebar shows face configuration
-                  useStore.getState().setSelectedFace('bottom');
                   return;
                 }
                 // Already focused: stamp or cycle preset
@@ -3021,11 +3017,10 @@ export default function ContainerSkin({
                   bayIndices.every((i: number) => multiSel.indices.includes(i));
                 if (!isAlreadySelected && !isBayAlreadySelected) {
                   if (bayIndices) {
-                    useStore.getState().setSelectedElements({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) });
+                    useStore.getState().selectWithFace({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) }, face);
                   } else {
-                    setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
+                    useStore.getState().selectWithFace({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] }, face);
                   }
-                  useStore.getState().setSelectedFace(face);
                   return;
                 }
                 // Already selected: stamp, or update face selection

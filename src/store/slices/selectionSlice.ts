@@ -74,6 +74,10 @@ export interface SelectionSlice {
     items: Array<{ containerId: string; id: string }>;
   } | null;
   setSelectedElements: (sel: { type: ElementType; items: Array<{ containerId: string; id: string }> } | null) => void;
+  selectWithFace: (
+    sel: { type: ElementType; items: Array<{ containerId: string; id: string }> } | null,
+    face: keyof VoxelFaces | null
+  ) => void;
   toggleElement: (containerId: string, id: string) => void;
 }
 
@@ -222,6 +226,11 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
     selectedElements: sel,
     // Only clear selectedFace when clearing selection entirely
     ...(sel === null ? { selectedFace: null } : {}),
+  }),
+
+  selectWithFace: (sel, face) => set({
+    selectedElements: sel,
+    ...(sel === null ? { selectedFace: null } : face !== null ? { selectedFace: face } : {}),
   }),
 
   toggleElement: (containerId, id) => set((s: any) => {

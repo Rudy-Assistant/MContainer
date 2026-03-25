@@ -18,21 +18,33 @@ export default function FinishesPanel() {
   const clearSelection = useStore((s) => s.clearSelection);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 
-  // Auto-select tab on face change; manual clicks override freely.
+  const selectedElType = useStore((s) => s.selectedElements?.type ?? null);
+
+  // Auto-select tab on face change or element type change; manual clicks override freely.
   // IMPORTANT: Initialize from current selectedFace because the panel may
   // mount AFTER setSelectedFace was already called (React batching). If we
   // always default to 'container', the effect won't fire when prevFace
   // already matches selectedFace on first render.
-  const initialTab = faceToTab(selectedFace) ?? 'container';
+  const initialTab = faceToTab(selectedFace)
+    ?? (selectedElType === 'bay' ? 'block' : 'container');
   const [activeTab, setActiveTab] = useState<FinishTab>(initialTab);
   const prevFace = useRef(selectedFace);
+  const prevElType = useRef(selectedElType);
   useEffect(() => {
-    if (selectedFace !== prevFace.current) {
-      prevFace.current = selectedFace;
+    const faceChanged = selectedFace !== prevFace.current;
+    const elTypeChanged = selectedElType !== prevElType.current;
+    prevFace.current = selectedFace;
+    prevElType.current = selectedElType;
+
+    if (faceChanged && selectedFace) {
       const tab = faceToTab(selectedFace);
       if (tab) setActiveTab(tab);
+    } else if (elTypeChanged && !selectedFace) {
+      if (selectedElType === 'bay') {
+        setActiveTab('block');
+      }
     }
-  }, [selectedFace]);
+  }, [selectedFace, selectedElType]);
 
   // Derive containerId, voxelIndex, indices from target
   let containerId = '';
