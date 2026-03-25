@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useStore } from '../store/useStore';
 import type { VoxelFaces } from '../types/container';
 import { VOXEL_COLS } from '../types/container';
@@ -82,18 +81,12 @@ function selectionTargetEqual(a: SelectionTarget, b: SelectionTarget): boolean {
 }
 
 export function useSelectionTarget(): SelectionTarget {
-  const prevRef = useRef<SelectionTarget>({ type: 'none' });
-
-  const target = useStore((s) => {
-    const next = deriveSelectionTarget({
+  return useStore(
+    (s) => deriveSelectionTarget({
       selectedElements: s.selectedElements,
       selectedFace: s.selectedFace,
       selection: s.selection,
-    });
-    if (selectionTargetEqual(prevRef.current, next)) return prevRef.current;
-    prevRef.current = next;
-    return next;
-  });
-
-  return target;
+    }),
+    selectionTargetEqual
+  );
 }

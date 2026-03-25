@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useStore } from '@/store/useStore';
 
 function deriveVoxels(sel: { type: string; items: Array<{ containerId: string; id: string }> } | null): { containerId: string; indices: number[] } | null {
@@ -10,28 +9,27 @@ function deriveVoxels(sel: { type: string; items: Array<{ containerId: string; i
   return { containerId, indices };
 }
 
-/** Derives legacy selectedVoxels shape from selectedElements (referentially stable) */
-export function useSelectedVoxels(): { containerId: string; indices: number[] } | null {
-  const prevRef = useRef<{ containerId: string; indices: number[] } | null>(null);
+function voxelsEqual(
+  a: { containerId: string; indices: number[] } | null,
+  b: { containerId: string; indices: number[] } | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.containerId !== b.containerId) return false;
+  if (a.indices.length !== b.indices.length) return false;
+  return a.indices.every((v, i) => v === b.indices[i]);
+}
 
-  return useStore((s) => {
-    const next = deriveVoxels(s.selectedElements);
-    // Return same reference if content unchanged
-    if (next === null && prevRef.current === null) return null;
-    if (next === null || prevRef.current === null) {
-      prevRef.current = next;
-      return next;
-    }
-    if (
-      next.containerId === prevRef.current.containerId &&
-      next.indices.length === prevRef.current.indices.length &&
-      next.indices.every((v, i) => v === prevRef.current!.indices[i])
-    ) {
-      return prevRef.current;
-    }
-    prevRef.current = next;
-    return next;
-  });
+/**
+ * Derives legacy selectedVoxels shape from selectedElements (bay type only).
+ * Uses Zustand's equalityFn for referential stability instead of
+ * mutating a ref inside the selector.
+ */
+export function useSelectedVoxels(): { containerId: string; indices: number[] } | null {
+  return useStore(
+    (s) => deriveVoxels(s.selectedElements),
+    voxelsEqual
+  );
 }
 
 /**

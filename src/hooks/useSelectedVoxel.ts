@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useStore } from '@/store/useStore';
 import type { VoxelPayload } from '@/store/useStore';
 
@@ -26,16 +25,17 @@ function voxelEqual(a: VoxelPayload | null, b: VoxelPayload | null): boolean {
   return false;
 }
 
-/** Derives legacy selectedVoxel shape from selectedElements (referentially stable) */
+/**
+ * Derives legacy selectedVoxel shape from selectedElements.
+ * Uses Zustand's equalityFn (2nd argument) for referential stability
+ * instead of mutating a ref inside the selector (which is unsafe in
+ * React concurrent mode).
+ */
 export function useSelectedVoxel(): VoxelPayload | null {
-  const prevRef = useRef<VoxelPayload | null>(null);
-
-  return useStore((s) => {
-    const next = deriveVoxel(s.selectedElements);
-    if (voxelEqual(next, prevRef.current)) return prevRef.current;
-    prevRef.current = next;
-    return next;
-  });
+  return useStore(
+    (s) => deriveVoxel(s.selectedElements),
+    voxelEqual
+  );
 }
 
 /**

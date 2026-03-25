@@ -1185,15 +1185,18 @@ function HotbarSlotButton({
         </div>
       )}
 
-      {/* Label — outside button frame for breathing room */}
+      {/* Label — white text for visibility on dark hotbar background */}
       {slot.label && (
         <span style={{
-          fontSize: 10, fontWeight: 500,
-          color: "var(--text-main)",
-          lineHeight: 1, letterSpacing: "0.02em",
-          textShadow: "0 1px 3px rgba(0,0,0,0.3)",
+          fontSize: 9, fontWeight: 600,
+          color: "rgba(255,255,255,0.95)",
+          lineHeight: 1.1, letterSpacing: "0.02em",
+          textShadow: "0 1px 4px rgba(0,0,0,0.6)",
           marginTop: 1, marginBottom: 2,
           whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: 80,
         }}>
           {slot.label}
         </span>
@@ -1478,7 +1481,7 @@ export default function SmartHotbar() {
           ))}
         </div>
 
-        {/* ── Hotbar Bar — 10 slots, flex-start, 720px ── */}
+        {/* ── Hotbar Bar — 10 slots, responsive width ── */}
         <div
           style={{
             display: hotbarMode === 'surfaces' ? "flex" : "none",
@@ -1486,8 +1489,9 @@ export default function SmartHotbar() {
             gap: 4,
             padding: "7px 10px 12px",
             borderRadius: 12,
-            width: 720,
+            maxWidth: 720,
             position: "relative",
+            overflow: "hidden",
             background: "var(--hotbar-bg)",
             border: "1px solid rgba(255, 255, 255, 0.12)",
             boxShadow: "var(--panel-shadow, 0 8px 32px rgba(0,0,0,0.10))",
@@ -1586,8 +1590,9 @@ export default function SmartHotbar() {
             gap: 4,
             padding: "7px 10px 12px",
             borderRadius: 12,
-            width: 720,
+            maxWidth: 720,
             position: "relative",
+            overflow: "hidden",
             background: "var(--hotbar-bg, rgba(255,255,255,0.78))",
             border: "1px solid var(--hotbar-border, rgba(255,255,255,0.4))",
             boxShadow: "var(--panel-shadow, 0 8px 32px rgba(0,0,0,0.10))",
