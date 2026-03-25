@@ -69,9 +69,10 @@ export function computeBayGroups(): BayGroup[] {
   for (let i = 0; i < 3; i++) {
     const c1 = 1 + i * 2;
     const c2 = c1 + 1;
+    const deckNum = 3 - i; // 3, 2, 1 (nearest to farthest)
     groups.push({
       id: `ext_n_${i}`,
-      label: `N Deck ${i + 1}`,
+      label: `N Deck ${deckNum}`,
       role: 'extension_side',
       voxelIndices: [idx(0, c1), idx(0, c2)],
       gridRow: 1,
@@ -81,7 +82,7 @@ export function computeBayGroups(): BayGroup[] {
     });
     groups.push({
       id: `ext_s_${i}`,
-      label: `S Deck ${i + 1}`,
+      label: `S Deck ${deckNum}`,
       role: 'extension_side',
       voxelIndices: [idx(3, c1), idx(3, c2)],
       gridRow: 4,

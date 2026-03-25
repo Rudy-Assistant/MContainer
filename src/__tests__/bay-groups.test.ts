@@ -34,4 +34,24 @@ describe('computeBayGroups', () => {
   it('returns 15 groups total', () => {
     expect(groups.length).toBe(15);
   });
+
+  it('S Deck 3 maps to nearest cols (1-2), S Deck 1 maps to farthest cols (5-6)', () => {
+    const groups = computeBayGroups();
+    const sDeck3 = groups.find(g => g.label === 'S Deck 3');
+    const sDeck1 = groups.find(g => g.label === 'S Deck 1');
+    expect(sDeck3).toBeDefined();
+    expect(sDeck1).toBeDefined();
+    expect(sDeck3!.voxelIndices).toEqual([25, 26]);
+    expect(sDeck1!.voxelIndices).toEqual([29, 30]);
+  });
+
+  it('N Deck 3 maps to nearest cols (1-2), N Deck 1 maps to farthest cols (5-6)', () => {
+    const groups = computeBayGroups();
+    const nDeck3 = groups.find(g => g.label === 'N Deck 3');
+    const nDeck1 = groups.find(g => g.label === 'N Deck 1');
+    expect(nDeck3).toBeDefined();
+    expect(nDeck1).toBeDefined();
+    expect(nDeck3!.voxelIndices).toEqual([1, 2]);
+    expect(nDeck1!.voxelIndices).toEqual([5, 6]);
+  });
 });

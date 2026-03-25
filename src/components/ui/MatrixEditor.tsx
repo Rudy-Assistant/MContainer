@@ -720,14 +720,25 @@ function SimpleBayGrid({
   // Brush preview color for ghost overlay
   const brushPreviewColor = activeBrush ? (SURFACE_COLORS[activeBrush] ?? "#78909c") : null;
 
+  const dirLabelStyle: React.CSSProperties = {
+    fontSize: 9,
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+    color: 'var(--text-dim)',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  };
+
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: gridCols,
-      gridTemplateRows: gridRows,
-      gap: "2px",
-      aspectRatio: `${dims.length + 2 * dims.height} / ${dims.width + 2 * dims.height}`,
-    }}>
+    <div>
+      <div style={dirLabelStyle}>Front</div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: gridCols,
+        gridTemplateRows: gridRows,
+        gap: "2px",
+        aspectRatio: `${dims.length + 2 * dims.height} / ${dims.width + 2 * dims.height}`,
+      }}>
       {BAY_GROUPS.map((group) => {
         // Compute dominant color from voxels in this group
         const colors = group.voxelIndices.map((i) => {
@@ -820,6 +831,8 @@ function SimpleBayGrid({
           </button>
         );
       })}
+      </div>
+      <div style={dirLabelStyle}>Back</div>
     </div>
   );
 }

@@ -13,13 +13,13 @@ interface CellDef {
 
 // Indices from computeBayGroups() in bayGroups.ts. idx(row,col) = row*8+col.
 // Column order matches MatrixEditor: col 0 (+X, nearest camera) on LEFT.
-// Numbering: Deck 1 = nearest to default camera, Deck 3 = farthest.
+// Deck 3 = nearest to default camera, Deck 1 = farthest.
 const GRID_ROWS: CellDef[][] = [
   [
     { label: 'NW Corner', indices: [0],       ext: true },
-    { label: 'N Deck 1',  indices: [1, 2],    ext: true },
+    { label: 'N Deck 3',  indices: [1, 2],    ext: true },
     { label: 'N Deck 2',  indices: [3, 4],    ext: false },
-    { label: 'N Deck 3',  indices: [5, 6],    ext: false },
+    { label: 'N Deck 1',  indices: [5, 6],    ext: false },
     { label: 'NE Corner', indices: [7],       ext: true },
   ],
   [
@@ -31,9 +31,9 @@ const GRID_ROWS: CellDef[][] = [
   ],
   [
     { label: 'SW Corner', indices: [24],      ext: true },
-    { label: 'S Deck 1',  indices: [25, 26],  ext: true },
+    { label: 'S Deck 3',  indices: [25, 26],  ext: true },
     { label: 'S Deck 2',  indices: [27, 28],  ext: false },
-    { label: 'S Deck 3',  indices: [29, 30],  ext: false },
+    { label: 'S Deck 1',  indices: [29, 30],  ext: false },
     { label: 'SE Corner', indices: [31],      ext: true },
   ],
 ];
@@ -126,13 +126,24 @@ export function SpatialVoxelGrid({ containerId }: Props) {
 
   // Use pre-computed flat list for CSS Grid placement (15 cells in a 5×3 grid)
 
+  const dirLabelStyle: React.CSSProperties = {
+    fontSize: 9,
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+    color: 'var(--text-dim)',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  };
+
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '0.7fr 1.4fr 1.4fr 1.4fr 0.7fr',
-      gridTemplateRows: '0.6fr 1.4fr 0.6fr',
-      gap: 3,
-    }}>
+    <div>
+      <div style={dirLabelStyle}>Front</div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '0.7fr 1.4fr 1.4fr 1.4fr 0.7fr',
+        gridTemplateRows: '0.6fr 1.4fr 0.6fr',
+        gap: 3,
+      }}>
       {ALL_CELLS.map((cell) => {
         const cellId = cell.label;
         const isSelectedByElements = selectedIds.has(cellId);
@@ -192,6 +203,8 @@ export function SpatialVoxelGrid({ containerId }: Props) {
           </button>
         );
       })}
+      </div>
+      <div style={dirLabelStyle}>Back</div>
     </div>
   );
 }
