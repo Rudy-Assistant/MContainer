@@ -24,8 +24,15 @@ const bodyMat = new THREE.MeshBasicMaterial({
   side: THREE.DoubleSide,
 });
 
-// Extension material kept for future use when extension fold positions are resolved
-const extMat = bodyMat;
+const extMat = new THREE.MeshBasicMaterial({
+  color: 0xff8800,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.4,
+  depthTest: false,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+});
 
 // Cache box geometries by dimension key
 const _geoCache = new Map<string, THREE.BoxGeometry>();
@@ -37,13 +44,12 @@ function getBox(w: number, h: number, d: number): THREE.BoxGeometry {
   return _geoCache.get(k)!;
 }
 
-// Corner debug dots at body corners (row 1-2, col 1 & 6)
-// idx(row,col) = row*8+col: NW=9, NE=14, SW=17, SE=22
+// Corner debug dots (NW=red, NE=blue, SW=green, SE=yellow)
 const CORNER_COLORS: Record<number, number> = {
-  9: 0xff4444,   // NW (row1, col1)
-  14: 0x4488ff,  // NE (row1, col6)
-  17: 0x00ff00,  // SW (row2, col1)
-  22: 0xffcc00,  // SE (row2, col6)
+  0: 0xff4444,   // NW
+  7: 0x4488ff,   // NE
+  24: 0x00ff00,  // SW
+  31: 0xffcc00,  // SE
 };
 
 function ContainerDebugWireframe({ container }: { container: Container }) {
@@ -69,13 +75,8 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
       const isBody = !isHaloCol && !isHaloRow;
 
-      // Skip extension voxels — they fold dynamically and their static positions
-      // extend far beyond the container body, appearing as a phantom second container.
-      // Only body voxels (rows 1-2, cols 1-6) get debug wireframes.
-      if (!isBody) continue;
-
-      const vW = coreW;
-      const vD = coreD;
+      const vW = isHaloCol ? foldDepth : coreW;
+      const vD = isHaloRow ? foldDepth : coreD;
 
       let px: number;
       if (col === 0)                   px = dims.length / 2 + foldDepth / 2;
@@ -87,7 +88,7 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       else if (row === VOXEL_ROWS - 1) pz = dims.width / 2 + foldDepth / 2;
       else                             pz = (row - 1.5) * coreD;
 
-      result.push({ px, py: vHeight / 2, pz, w: vW, h: vHeight, d: vD, isExt: false, idx: i });
+      result.push({ px, py: vHeight / 2, pz, w: vW, h: vHeight, d: vD, isExt: !isBody, idx: i });
     }
     return result;
   }, [grid, coreW, coreD, foldDepth, vHeight, dims.length, dims.width]);
