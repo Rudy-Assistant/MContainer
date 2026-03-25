@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { useStore } from '@/store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { VoxelPayload } from '@/store/useStore';
 
 function deriveVoxel(sel: { type: string; items: Array<{ containerId: string; id: string }> } | null): VoxelPayload | null {
@@ -27,20 +29,20 @@ function voxelEqual(a: VoxelPayload | null, b: VoxelPayload | null): boolean {
 
 /**
  * Derives legacy selectedVoxel shape from selectedElements.
- * Uses Zustand's equalityFn (2nd argument) for referential stability
- * instead of mutating a ref inside the selector (which is unsafe in
- * React concurrent mode).
+ * Uses useShallow to read selectedElements (stable subscription),
+ * then derives in component body with ref-based dedup.
  */
 export function useSelectedVoxel(): VoxelPayload | null {
-  return (useStore as any)(
-    (s: any) => deriveVoxel(s.selectedElements),
-    voxelEqual
-  );
+  const selectedElements = useStore(useShallow((s: any) => s.selectedElements));
+  const prevRef = useRef<VoxelPayload | null>(null);
+  const next = deriveVoxel(selectedElements);
+  if (voxelEqual(next, prevRef.current)) return prevRef.current!;
+  prevRef.current = next;
+  return next;
 }
 
 /**
  * Non-hook version for use in callbacks, event handlers, and store slices.
- * Reads directly from store state (no React subscription).
  */
 export function getSelectedVoxel(): VoxelPayload | null {
   return deriveVoxel(useStore.getState().selectedElements);

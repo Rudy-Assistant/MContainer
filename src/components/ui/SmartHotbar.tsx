@@ -1185,12 +1185,13 @@ function HotbarSlotButton({
         </div>
       )}
 
-      {/* Label — readable on slot button background */}
+      {/* Label — white for legibility on any background */}
       {slot.label && (
         <span style={{
-          fontSize: 9, fontWeight: 600,
-          color: "var(--text-main, #1e293b)",
+          fontSize: 9, fontWeight: 700,
+          color: "#fff",
           lineHeight: 1.1, letterSpacing: "0.01em",
+          textShadow: "0 1px 3px rgba(0,0,0,0.7)",
           marginTop: 1, marginBottom: 2,
           whiteSpace: "nowrap",
           overflow: "hidden",

@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { useStore } from '../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { VoxelFaces } from '../types/container';
 import { VOXEL_COLS } from '../types/container';
 import { getBayGroupForVoxel } from '../config/bayGroups';
@@ -80,13 +82,22 @@ function selectionTargetEqual(a: SelectionTarget, b: SelectionTarget): boolean {
   return false;
 }
 
+/**
+ * Derives SelectionTarget from store state.
+ * Uses useShallow for stable subscription to the 3 store fields,
+ * then derives + dedup in component body (not inside selector).
+ */
 export function useSelectionTarget(): SelectionTarget {
-  return (useStore as any)(
-    (s: any) => deriveSelectionTarget({
+  const { selectedElements, selectedFace, selection } = useStore(
+    useShallow((s: any) => ({
       selectedElements: s.selectedElements,
       selectedFace: s.selectedFace,
       selection: s.selection,
-    }),
-    selectionTargetEqual
+    }))
   );
+  const prevRef = useRef<SelectionTarget>({ type: 'none' });
+  const next = deriveSelectionTarget({ selectedElements, selectedFace, selection });
+  if (selectionTargetEqual(next, prevRef.current)) return prevRef.current;
+  prevRef.current = next;
+  return next;
 }

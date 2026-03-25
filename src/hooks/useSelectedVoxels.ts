@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { useStore } from '@/store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 
 function deriveVoxels(sel: { type: string; items: Array<{ containerId: string; id: string }> } | null): { containerId: string; indices: number[] } | null {
   if (!sel) return null;
@@ -22,19 +24,19 @@ function voxelsEqual(
 
 /**
  * Derives legacy selectedVoxels shape from selectedElements (bay type only).
- * Uses Zustand's equalityFn for referential stability instead of
- * mutating a ref inside the selector.
+ * Uses useShallow for stable subscription, derives in component body.
  */
 export function useSelectedVoxels(): { containerId: string; indices: number[] } | null {
-  return (useStore as any)(
-    (s: any) => deriveVoxels(s.selectedElements),
-    voxelsEqual
-  );
+  const selectedElements = useStore(useShallow((s: any) => s.selectedElements));
+  const prevRef = useRef<{ containerId: string; indices: number[] } | null>(null);
+  const next = deriveVoxels(selectedElements);
+  if (voxelsEqual(next, prevRef.current)) return prevRef.current!;
+  prevRef.current = next;
+  return next;
 }
 
 /**
  * Non-hook version for use in callbacks, event handlers, and store slices.
- * Reads directly from store state (no React subscription).
  */
 export function getSelectedVoxels(): { containerId: string; indices: number[] } | null {
   return deriveVoxels(useStore.getState().selectedElements);
