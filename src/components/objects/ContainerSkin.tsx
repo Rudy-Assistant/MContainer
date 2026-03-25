@@ -2516,8 +2516,9 @@ export default function ContainerSkin({
     }
   });
 
-  // Debug wireframe mode — suppress skin rendering; DebugOverlay handles visualization
-  if (debugMode) return null;
+  // Debug wireframe mode — hide visual skin but keep hitboxes for raycasting.
+  // DebugOverlay renders wireframe boxes; ContainerSkin still provides the interaction layer.
+  const hideVisuals = debugMode;
 
   // Global skin hide — skip ALL face rendering
   if (globalHideSkin) return null;
@@ -2547,6 +2548,8 @@ export default function ContainerSkin({
         const bayIndicesForVoxel = isSimpleMode ? getBayIndicesForVoxel(idx, VOXEL_ROWS * VOXEL_COLS) : null;
 
         // ── INACTIVE VOXEL → Phase 2 Baseplate + Phase 1 permanent face hitboxes ──
+        // In debug wireframe mode, skip inactive voxels entirely (DebugOverlay handles active voxels only)
+        if (!isActive && hideVisuals) return null;
         if (!isActive) {
           const baseKey = `base_${idx}`;
           return (
@@ -2764,6 +2767,8 @@ export default function ContainerSkin({
 
         return (
           <group key={idx} position={[px, py, pz]}>
+            {/* ── VISUAL GEOMETRY — hidden when debugMode is active (DebugOverlay renders wireframes) ── */}
+            {!hideVisuals && (<>
             {/* animated=true → pop-in from scale 0; animated=false → instant full scale (IsoEditor) */}
             {/* Extension voxels use ExtensionUnpack for cinematic "unpacking"; core voxels use VoxelPopIn */}
             {animated && isHaloVoxel && voxel.unpackPhase
@@ -2842,8 +2847,8 @@ export default function ContainerSkin({
                 />
               );
             })}
-
-            {/* Pillars now rendered via pre-computed pillarPositions below the voxel loop (WU-10) */}
+            </>)}
+            {/* ── END VISUAL GEOMETRY ── */}
 
             {/* ★ HITBOXES: 1 thin center (selection-only) + 4 edge rail hitboxes (100mm).
                 Center is inset from edges so it doesn't overlap edge rails.
@@ -3402,6 +3407,8 @@ export default function ContainerSkin({
         );
       })}
 
+      {/* ── VISUAL STRUCTURAL ELEMENTS — hidden in debug wireframe mode ── */}
+      {!hideVisuals && (<>
       {/* WU-10: Structural pillars at convex outer corners of active voxels.
           For L1+ containers, poles extend to ground (containerY below voxel origin).
           Suppress poles on topmost elevated container (no structural purpose — poles would extend upward into air). */}
@@ -3467,6 +3474,8 @@ export default function ContainerSkin({
         if (!isPool) return null;
         return <WaterPlane dims={dims} />;
       })()}
+      </>)}
+      {/* ── END VISUAL STRUCTURAL ELEMENTS ── */}
     </group>
   );
 }

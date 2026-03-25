@@ -764,7 +764,18 @@ function useKeyboardShortcuts() {
           store.setDragContainer(null);
         } else if (store.dragMovingId) {
           store.cancelContainerDrag();
+        } else if (store.selectedFace) {
+          // Escape cascade step 1: face selected → clear face, keep voxel/bay selection
+          store.setSelectedFace(null);
+        } else if (store.selectedElements) {
+          // Escape cascade step 2: voxel/bay selected → clear elements, select container
+          const containerId = store.selectedElements.items[0]?.containerId;
+          store.setSelectedElements(null);
+          if (containerId && !store.selection.includes(containerId)) {
+            store.select(containerId);
+          }
         } else {
+          // Escape cascade step 3: container selected → clear everything
           store.clearSelection();
           store.stopPaint();
           store.clearClipboard();
