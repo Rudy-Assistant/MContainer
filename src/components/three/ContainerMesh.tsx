@@ -2096,16 +2096,31 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         }
         if (!wallPos || !wallSize) return null;
         const isHoriz = selectedFace === 'top' || selectedFace === 'bottom';
+        const isWallFace = !isHoriz;
         return (
-          <mesh
-            position={wallPos}
-            rotation={isHoriz ? [-Math.PI / 2, 0, 0] : [0, wallRotY, 0]}
-            geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
-            material={hlWallSelectMat}
-            renderOrder={10}
-            raycast={nullRaycast}
-            frustumCulled={false}
-          />
+          <>
+            <mesh
+              position={wallPos}
+              rotation={isHoriz ? [-Math.PI / 2, 0, 0] : [0, wallRotY, 0]}
+              geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
+              material={hlWallSelectMat}
+              renderOrder={10}
+              raycast={nullRaycast}
+              frustumCulled={false}
+            />
+            {/* Floor portion for bay group wall selection */}
+            {isWallFace && (
+              <mesh
+                position={[mBox.cx, mYLift + 0.01, mBox.cz]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                geometry={getHlBox(mBox.w * 0.95, mBox.d * 0.95, 0.02)}
+                material={hlWallSelectMat}
+                renderOrder={10}
+                raycast={nullRaycast}
+                frustumCulled={false}
+              />
+            )}
+          </>
         );
       })()}
       {/* Merged bay group hover wireframe */}
@@ -2187,29 +2202,55 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                 raycast={nullRaycast}
               />
             )}
-            {/* §7.1 Amber wall face overlay on hover */}
+            {/* §7.1 Amber wall face overlay on hover + floor portion */}
             {isHover && hoverWallPos && hoverWallSize && (
-              <mesh
-                position={hoverWallPos}
-                rotation={[0, hoverWallRotY, 0]}
-                geometry={getHlBox(hoverWallSize[0] * 0.95, hoverWallSize[1] * 0.95, 0.04)}
-                material={hlWallMat}
-                renderOrder={11}
-                raycast={nullRaycast}
-                frustumCulled={false}
-              />
+              <>
+                <mesh
+                  position={hoverWallPos}
+                  rotation={[0, hoverWallRotY, 0]}
+                  geometry={getHlBox(hoverWallSize[0] * 0.95, hoverWallSize[1] * 0.95, 0.04)}
+                  material={hlWallMat}
+                  renderOrder={11}
+                  raycast={nullRaycast}
+                  frustumCulled={false}
+                />
+                {/* Floor portion: shows which bay/block the wall belongs to */}
+                <mesh
+                  position={[layout.px, yLift + 0.01, layout.pz]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  geometry={getHlBox(layout.voxW * 0.95, layout.voxD * 0.95, 0.02)}
+                  material={hlWallMat}
+                  renderOrder={11}
+                  raycast={nullRaycast}
+                  frustumCulled={false}
+                />
+              </>
             )}
-            {/* §7.2 Cyan face overlay on selection */}
+            {/* §7.2 Cyan face overlay on selection + floor portion */}
             {showFaceOverlay && selWallPos && selWallSize && (
-              <mesh
-                position={selWallPos}
-                rotation={selIsHoriz ? [-Math.PI / 2, 0, 0] : [0, selWallRotY, 0]}
-                geometry={getHlBox(selWallSize[0] * 0.95, selWallSize[1] * 0.95, 0.04)}
-                material={hlWallSelectMat}
-                renderOrder={10}
-                raycast={nullRaycast}
-                frustumCulled={false}
-              />
+              <>
+                <mesh
+                  position={selWallPos}
+                  rotation={selIsHoriz ? [-Math.PI / 2, 0, 0] : [0, selWallRotY, 0]}
+                  geometry={getHlBox(selWallSize[0] * 0.95, selWallSize[1] * 0.95, 0.04)}
+                  material={hlWallSelectMat}
+                  renderOrder={10}
+                  raycast={nullRaycast}
+                  frustumCulled={false}
+                />
+                {/* Floor portion for wall selection */}
+                {!selIsHoriz && (
+                  <mesh
+                    position={[layout.px, yLift + 0.01, layout.pz]}
+                    rotation={[-Math.PI / 2, 0, 0]}
+                    geometry={getHlBox(layout.voxW * 0.95, layout.voxD * 0.95, 0.02)}
+                    material={hlWallSelectMat}
+                    renderOrder={10}
+                    raycast={nullRaycast}
+                    frustumCulled={false}
+                  />
+                )}
+              </>
             )}
           </group>
         );
@@ -2219,6 +2260,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         const mBox = mergedHoverBox;
         const halfW = mBox.w / 2;
         const halfD = mBox.d / 2;
+        const isWallFace = hoveredFace === 'n' || hoveredFace === 's' || hoveredFace === 'e' || hoveredFace === 'w';
         let wallPos: [number, number, number] | null = null;
         let wallSize: [number, number] | null = null;
         let wallRotY = 0;
@@ -2229,16 +2271,31 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           case 'w': wallPos = [mBox.cx - halfW, vOffset, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
         }
         if (!wallPos || !wallSize) return null;
+        const mYLift = hoveredBayGroup ? levelYOffset(hoveredBayGroup.indices[0]) : 0;
         return (
-          <mesh
-            position={wallPos}
-            rotation={[0, wallRotY, 0]}
-            geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
-            material={hlWallMat}
-            renderOrder={11}
-            raycast={nullRaycast}
-            frustumCulled={false}
-          />
+          <>
+            <mesh
+              position={wallPos}
+              rotation={[0, wallRotY, 0]}
+              geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
+              material={hlWallMat}
+              renderOrder={11}
+              raycast={nullRaycast}
+              frustumCulled={false}
+            />
+            {/* Floor portion for bay group wall hover */}
+            {isWallFace && (
+              <mesh
+                position={[mBox.cx, mYLift + 0.01, mBox.cz]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                geometry={getHlBox(mBox.w * 0.95, mBox.d * 0.95, 0.02)}
+                material={hlWallMat}
+                renderOrder={11}
+                raycast={nullRaycast}
+                frustumCulled={false}
+              />
+            )}
+          </>
         );
       })()}
     </>

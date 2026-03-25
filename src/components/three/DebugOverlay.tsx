@@ -122,16 +122,16 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
     return result;
   }, [isSimpleMode, grid, dims]);
 
-  // ── Floor hitbox quads for ALL 32 voxels (both modes) ──
-  // These show the actual clickable regions at floor level
+  // ── Floor hitbox quads for body voxels only (rows 1-2, cols 1-6) ──
+  // Extension voxels are at fold-out positions and create visual noise.
+  // Body voxels have the active floor hitboxes in the default state.
   const floorHitboxes = useMemo(() => {
-    const TOTAL = VOXEL_ROWS * VOXEL_COLS;
     const result: { px: number; pz: number; voxW: number; voxD: number }[] = [];
-    for (let i = 0; i < TOTAL; i++) {
-      const row = Math.floor(i / VOXEL_COLS);
-      const col = i % VOXEL_COLS;
-      const layout = getVoxelLayout(col, row, dims);
-      result.push({ px: layout.px, pz: layout.pz, voxW: layout.voxW, voxD: layout.voxD });
+    for (let row = 1; row <= 2; row++) {
+      for (let col = 1; col <= 6; col++) {
+        const layout = getVoxelLayout(col, row, dims);
+        result.push({ px: layout.px, pz: layout.pz, voxW: layout.voxW, voxD: layout.voxD });
+      }
     }
     return result;
   }, [dims]);
