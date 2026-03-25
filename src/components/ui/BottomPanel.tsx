@@ -91,10 +91,10 @@ const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
   flexShrink: 0,
   borderRadius: 10,
   border: isSelected
-    ? `1.5px solid ${HIGHLIGHT_COLOR_SELECT}`
+    ? `2px solid ${HIGHLIGHT_COLOR_SELECT}`
     : active
-    ? '1.5px solid #60a5fa'
-    : '1px solid rgba(255,255,255,0.08)',
+    ? '2px solid #60a5fa'
+    : '1px solid rgba(255,255,255,0.12)',
   background: isSelected
     ? 'rgba(0, 188, 212, 0.15)'
     : active
@@ -259,10 +259,10 @@ export default function BottomPanel() {
                 }}
                 title={`${f.name} — $${f.costEstimate}`}
               >
-                <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : 'rgba(255,255,255,0.85)' }}>
+                <div style={{ borderRadius: '10px 10px 0 0', overflow: 'hidden', color: 'rgba(255,255,255,0.85)' }}>
                   <FormThumbnail formId={f.id} size={36} />
                 </div>
-                <span style={{ ...cardNameStyle, color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : '#fff' }}>
+                <span style={{ ...cardNameStyle, color: '#fff' }}>
                   {f.name}
                 </span>
               </button>
