@@ -111,7 +111,7 @@ const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
 });
 
 const cardNameStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 800,
   color: '#ffffff',
   textAlign: 'center',

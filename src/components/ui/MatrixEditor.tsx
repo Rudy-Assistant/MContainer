@@ -1062,31 +1062,8 @@ export default function MatrixEditor({
         })}
       </div>
 
-      {/* ── Deploy bar (quick-access extension presets) ── */}
-      <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-        {([
-          { label: "All Deck", config: "all_deck" as ExtensionConfig },
-          { label: "Interior", config: "all_interior" as ExtensionConfig },
-          { label: "N Deck", config: "north_deck" as ExtensionConfig },
-          { label: "S Deck", config: "south_deck" as ExtensionConfig },
-          { label: "Retract", config: "none" as ExtensionConfig },
-        ]).map(item => (
-          <button
-            key={item.config}
-            onClick={() => setAllExtensions(containerId, item.config)}
-            style={{
-              flex: 1, minWidth: 0, padding: "4px 2px",
-              borderRadius: 4, border: "1px solid var(--border, #e2e8f0)",
-              cursor: "pointer", fontSize: 9, fontWeight: 600,
-              background: "var(--btn-bg, #fff)",
-              color: item.config === "none" ? "#ef4444" : "var(--text-muted, #64748b)",
-              transition: "all 100ms", whiteSpace: "nowrap",
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      {/* Deploy bar removed — container presets (All Deck, Interior, etc.)
+          are now in the Container tab as PresetCards with isometric icons */}
 
       {/* ── Frame Grid, Bay Grid, or Voxel Grid ── */}
       {frameMode ? (

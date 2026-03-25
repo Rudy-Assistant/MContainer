@@ -476,20 +476,7 @@ function Inspector({
                 ✕
               </button>
             )}
-            {/* Simple/Detail toggle — icon button */}
-            <button
-              onClick={() => setDesignComplexity(designComplexity === 'simple' ? 'detailed' : 'simple')}
-              title={designComplexity === 'detailed' ? 'Switch to Simple' : 'Switch to Detail'}
-              style={{
-                background: "none", border: "1px solid #e2e8f0", borderRadius: 4,
-                cursor: "pointer", padding: "3px 4px",
-                display: "flex", alignItems: "center", marginLeft: 2,
-              }}
-            >
-              {designComplexity === 'detailed'
-                ? <Grid3x3 size={16} color="var(--accent)" />
-                : <Grid2x2 size={16} color="var(--text-muted)" />}
-            </button>
+            {/* Simple/Detail toggle moved to Settings dropdown in TopToolbar */}
           </div>
         </div>
       </div>

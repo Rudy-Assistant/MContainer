@@ -11,29 +11,30 @@ interface CellDef {
   ext: boolean;
 }
 
-// Column order mirrors 3D view: col 0 (+X) = east/nearest in default camera.
-// Left-to-right: NE→N Deck 3→2→1→NW matches 3D left-to-right from camera [14,10,14].
+// Indices from computeBayGroups() in bayGroups.ts. idx(row,col) = row*8+col.
+// Column order: left=col0 (NW), right=col7 (NE) — matches MatrixEditor grid.
+// Each deck/bay spans 2 columns. Corners are single voxels.
 const GRID_ROWS: CellDef[][] = [
   [
-    { label: 'NE Corner', indices: [7],  ext: true },
-    { label: 'N Deck 3',  indices: [3],  ext: false },
-    { label: 'N Deck 2',  indices: [2],  ext: false },
-    { label: 'N Deck 1',  indices: [1],  ext: true },
-    { label: 'NW Corner', indices: [0],  ext: true },
+    { label: 'NW Corner', indices: [0],       ext: true },
+    { label: 'N Deck 1',  indices: [1, 2],    ext: true },
+    { label: 'N Deck 2',  indices: [3, 4],    ext: false },
+    { label: 'N Deck 3',  indices: [5, 6],    ext: false },
+    { label: 'NE Corner', indices: [7],       ext: true },
   ],
   [
-    { label: 'E End',  indices: [16, 24],                  ext: false },
-    { label: 'Bay 3',  indices: [14, 15, 22, 23],          ext: false },
-    { label: 'Bay 2',  indices: [12, 13, 20, 21],          ext: false },
-    { label: 'Bay 1',  indices: [10, 11, 18, 19],          ext: false },
-    { label: 'W End',  indices: [9, 17],                   ext: false },
+    { label: 'W End',  indices: [8, 16],                     ext: false },
+    { label: 'Bay 1',  indices: [9, 10, 17, 18],             ext: false },
+    { label: 'Bay 2',  indices: [11, 12, 19, 20],            ext: false },
+    { label: 'Bay 3',  indices: [13, 14, 21, 22],            ext: false },
+    { label: 'E End',  indices: [15, 23],                    ext: false },
   ],
   [
-    { label: 'SE Corner', indices: [31], ext: true },
-    { label: 'S Deck 3',  indices: [27], ext: false },
-    { label: 'S Deck 2',  indices: [26], ext: false },
-    { label: 'S Deck 1',  indices: [25], ext: true },
-    { label: 'SW Corner', indices: [24], ext: true },
+    { label: 'SW Corner', indices: [24],      ext: true },
+    { label: 'S Deck 1',  indices: [25, 26],  ext: true },
+    { label: 'S Deck 2',  indices: [27, 28],  ext: false },
+    { label: 'S Deck 3',  indices: [29, 30],  ext: false },
+    { label: 'SE Corner', indices: [31],      ext: true },
   ],
 ];
 

@@ -16,6 +16,7 @@ import {
   Group,
   Download,
   Grid2x2,
+  Grid3x3,
   Box,
   Footprints,
   PanelTop,
@@ -715,7 +716,19 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                 <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{debugMode ? "ON" : "OFF"}</span>
               </button>
 
-              {/* Grid complexity moved to MatrixEditor Bay/Block toggle */}
+              {/* Grid complexity: Simple/Detail toggle */}
+              <button onClick={() => setDesignComplexity(designComplexity === 'simple' ? 'detailed' : 'simple')} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, marginBottom: 4,
+                color: designComplexity === 'detailed' ? "var(--accent)" : "var(--text-main)",
+                background: designComplexity === 'detailed' ? "rgba(37,99,235,0.12)" : "transparent",
+                transition: "all 100ms",
+              }}>
+                {designComplexity === 'detailed' ? <Grid3x3 size={13} /> : <Grid2x2 size={13} />}
+                {designComplexity === 'detailed' ? 'Detail Mode' : 'Simple Mode'}
+                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{designComplexity === 'detailed' ? 'D' : 'S'}</span>
+              </button>
 
               {/* Container Actions */}
               <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 10px 2px" }}>Actions</div>
