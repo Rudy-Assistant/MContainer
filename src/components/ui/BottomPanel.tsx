@@ -68,11 +68,11 @@ const cardBarStyle: CSSProperties = {
   alignItems: 'center',
   gap: 4,
   maxWidth: '100%',
-  background: 'rgba(0, 0, 0, 0.25)',
-  borderRadius: 12,
-  padding: '4px 8px',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(20, 25, 20, 0.75)',
+  borderRadius: 16,
+  padding: '6px 8px',
+  boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+  border: '1px solid rgba(255,255,255,0.06)',
   backdropFilter: 'blur(20px)',
 };
 
@@ -86,39 +86,40 @@ const cardScrollStyle: CSSProperties = {
 };
 
 const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
-  width: 80,
-  height: 80,
+  width: 110,
+  height: 90,
   flexShrink: 0,
-  borderRadius: 6,
+  borderRadius: 10,
   border: isSelected
     ? `1.5px solid ${HIGHLIGHT_COLOR_SELECT}`
     : active
     ? '1.5px solid #60a5fa'
-    : '1.5px solid rgba(255,255,255,0.10)',
+    : '1px solid rgba(255,255,255,0.08)',
   background: isSelected
     ? 'rgba(0, 188, 212, 0.15)'
     : active
     ? 'rgba(59, 130, 246, 0.2)'
-    : 'rgba(0,0,0,0.30)',
+    : 'rgba(30, 40, 30, 0.6)',
   cursor: 'pointer',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 2,
-  padding: '2px 4px',
+  gap: 4,
+  padding: '6px 4px 4px',
   transition: 'all 100ms ease',
 });
 
 const cardNameStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
+  fontSize: 12,
+  fontWeight: 600,
   color: '#fff',
   textAlign: 'center',
-  lineHeight: 1.15,
+  lineHeight: 1.2,
   overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical' as any,
   maxWidth: '100%',
   fontFamily: 'system-ui, sans-serif',
 };
@@ -259,7 +260,7 @@ export default function BottomPanel() {
                 title={`${f.name} — $${f.costEstimate}`}
               >
                 <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : 'rgba(255,255,255,0.85)' }}>
-                  <FormThumbnail formId={f.id} size={32} />
+                  <FormThumbnail formId={f.id} size={36} />
                 </div>
                 <span style={{ ...cardNameStyle, color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : '#fff' }}>
                   {f.name}
