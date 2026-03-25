@@ -180,6 +180,15 @@ export interface UiSlice {
   } | null;
   setGhostPreset: (g: { source: 'block' | 'container'; faces: VoxelFaces; targetScope: 'voxel' | 'bay' | 'container' } | null) => void;
   clearGhostPreset: () => void;
+
+  // Stamp mode ghost preview — green tint overlay on hovered face
+  stampPreview: {
+    surfaceType: SurfaceType;
+    containerId: string;
+    voxelIndex: number;
+  } | null;
+  setStampPreview: (p: { surfaceType: SurfaceType; containerId: string; voxelIndex: number } | null) => void;
+  clearStampPreview: () => void;
 }
 
 export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
@@ -338,4 +347,9 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   ghostPreset: null,
   setGhostPreset: (g) => set({ ghostPreset: g }),
   clearGhostPreset: () => set({ ghostPreset: null }),
+
+  // Stamp mode ghost preview
+  stampPreview: null,
+  setStampPreview: (p) => set({ stampPreview: p }),
+  clearStampPreview: () => set({ stampPreview: null }),
 });

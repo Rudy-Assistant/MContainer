@@ -36,6 +36,7 @@ export function HoverPreviewGhost() {
   const formId = useStore((s) => s.hoveredFormId);
   const placementActive = useStore((s) => s.activePlacementFormId);
   const ghostPreset = useStore((s) => s.ghostPreset);
+  const stampPreview = useStore((s) => s.stampPreview);
 
   return (
     <>
@@ -43,6 +44,8 @@ export function HoverPreviewGhost() {
       {formId && !placementActive && <HoverPreviewGhostInner formId={formId} />}
       {/* Preset hover ghost */}
       {ghostPreset && <PresetGhost />}
+      {/* Stamp mode ghost — green tint on hovered face */}
+      {stampPreview && <StampGhost />}
     </>
   );
 }
@@ -246,4 +249,92 @@ function PresetGhost() {
   }, []);
 
   return <group ref={groupRef} />;
+}
+
+// ── StampGhost — green transparent overlay on hovered face during stamp mode ──
+
+const STAMP_COLOR = new THREE.Color(0x22c55e);
+const STAMP_THICKNESS = 0.02;
+
+function StampGhost() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshBasicMaterial | null>(null);
+
+  if (!materialRef.current) {
+    materialRef.current = new THREE.MeshBasicMaterial({
+      color: STAMP_COLOR,
+      transparent: true,
+      opacity: 0.2,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+  }
+
+  useEffect(() => {
+    const mat = materialRef.current;
+    return () => { mat?.dispose(); };
+  }, []);
+
+  useFrame(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    const state = useStore.getState();
+    const { stampPreview, hoveredVoxelEdge, containers } = state;
+
+    if (!stampPreview || !hoveredVoxelEdge) {
+      mesh.visible = false;
+      return;
+    }
+
+    const { containerId, voxelIndex, face } = hoveredVoxelEdge;
+    const container = containers[containerId];
+    if (!container) { mesh.visible = false; return; }
+
+    const dims = CONTAINER_DIMENSIONS[container.size as ContainerSize];
+    const colPitch = dims.length / 6;
+    const rowPitch = dims.width / 2;
+    const vHeight = dims.height / VOXEL_LEVELS;
+
+    const col = voxelIndex % VOXEL_COLS;
+    const row = Math.floor(voxelIndex / VOXEL_COLS) % VOXEL_ROWS;
+    const level = Math.floor(voxelIndex / (VOXEL_COLS * VOXEL_ROWS));
+
+    // Voxel center in local space
+    const cx = -(col - 3.5) * colPitch;
+    const cy = level * vHeight + vHeight / 2;
+    const cz = (row - 1.5) * rowPitch;
+
+    // Offset to face center + geometry sizing
+    let lx = cx, ly = cy, lz = cz;
+    let gw = colPitch, gh = vHeight, gd = rowPitch; // face-sized defaults
+
+    switch (face) {
+      case 'n':  lz -= rowPitch / 2; gw = colPitch; gh = vHeight; gd = STAMP_THICKNESS; break;
+      case 's':  lz += rowPitch / 2; gw = colPitch; gh = vHeight; gd = STAMP_THICKNESS; break;
+      case 'e':  lx += colPitch / 2; gw = STAMP_THICKNESS; gh = vHeight; gd = rowPitch; break;
+      case 'w':  lx -= colPitch / 2; gw = STAMP_THICKNESS; gh = vHeight; gd = rowPitch; break;
+      case 'top':    ly += vHeight / 2; gw = colPitch; gh = STAMP_THICKNESS; gd = rowPitch; break;
+      case 'bottom': ly -= vHeight / 2; gw = colPitch; gh = STAMP_THICKNESS; gd = rowPitch; break;
+      default: mesh.visible = false; return;
+    }
+
+    const worldPos = localToWorld([lx, ly, lz], container);
+    mesh.position.set(worldPos[0], worldPos[1], worldPos[2]);
+    mesh.rotation.y = container.rotation;
+    mesh.scale.set(gw, gh, gd);
+    mesh.visible = true;
+  });
+
+  const unitBox = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
+
+  return (
+    <mesh
+      ref={meshRef}
+      geometry={unitBox}
+      material={materialRef.current!}
+      visible={false}
+      raycast={() => {}}
+    />
+  );
 }

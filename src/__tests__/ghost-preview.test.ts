@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@/store/useStore';
+import type { SurfaceType } from '@/types/container';
 
 function resetStore() {
   useStore.setState(useStore.getInitialState(), true);
@@ -30,5 +31,25 @@ describe('ghostPreset store', () => {
     });
     useStore.getState().clearGhostPreset();
     expect(useStore.getState().ghostPreset).toBeNull();
+  });
+});
+
+describe('stampPreview state', () => {
+  beforeEach(() => useStore.setState(useStore.getInitialState(), true));
+
+  it('starts null', () => {
+    expect(useStore.getState().stampPreview).toBeNull();
+  });
+
+  it('setStampPreview stores preview data', () => {
+    const preview = { surfaceType: 'Glass_Pane' as SurfaceType, containerId: 'c1', voxelIndex: 10 };
+    useStore.getState().setStampPreview(preview);
+    expect(useStore.getState().stampPreview).toEqual(preview);
+  });
+
+  it('clearStampPreview resets to null', () => {
+    useStore.getState().setStampPreview({ surfaceType: 'Glass_Pane' as SurfaceType, containerId: 'c1', voxelIndex: 10 });
+    useStore.getState().clearStampPreview();
+    expect(useStore.getState().stampPreview).toBeNull();
   });
 });

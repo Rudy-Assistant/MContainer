@@ -17,6 +17,7 @@ export default function FinishesPanel() {
   const selectedFace = useStore((s) => s.selectedFace) as FaceKey | null;
   const clearSelection = useStore((s) => s.clearSelection);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
+  const clearStampPreview = useStore((s) => s.clearStampPreview);
 
   const selectedElType = useStore((s) => s.selectedElements?.type ?? null);
 
@@ -97,7 +98,7 @@ export default function FinishesPanel() {
           Interior Finishes
         </span>
         <button
-          onClick={() => { clearSelection(); clearGhostPreset(); }}
+          onClick={() => { clearSelection(); clearGhostPreset(); clearStampPreview(); }}
           title="Close"
           style={{
             width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
@@ -122,7 +123,7 @@ export default function FinishesPanel() {
       {/* Tab bar — spatial grid is rendered by MatrixEditor above this panel */}
       <FinishesTabBar
         activeTab={activeTab}
-        onTabChange={(tab) => { setActiveTab(tab); clearGhostPreset(); }}
+        onTabChange={(tab) => { setActiveTab(tab); clearGhostPreset(); clearStampPreview(); }}
       />
 
       {/* Tab content — scrollable */}

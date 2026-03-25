@@ -1306,6 +1306,7 @@ export default function SmartHotbar() {
         setActiveModulePreset(null);
         useStore.getState().setActiveBrush(null);
         useStore.getState().setSelectedElements(null);
+        useStore.getState().clearStampPreview();
         return;
       }
 
@@ -1364,6 +1365,7 @@ export default function SmartHotbar() {
           const store = useStore.getState();
           if (store.activeBrush === swatch.surface) {
             store.setActiveBrush(null);
+            store.clearStampPreview();
           } else {
             store.setActiveBrush(swatch.surface);
             store.setActiveHotbarSlot(null);
@@ -1685,6 +1687,7 @@ export default function SmartHotbar() {
                     const store = useStore.getState();
                     if (store.activeBrush === swatch.surface) {
                       store.setActiveBrush(null);
+                      store.clearStampPreview();
                     } else {
                       store.setActiveBrush(swatch.surface);
                       store.setActiveHotbarSlot(null);
