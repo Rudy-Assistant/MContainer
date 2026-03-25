@@ -121,7 +121,6 @@ const cardNameStyle: CSSProperties = {
   whiteSpace: 'nowrap',
   maxWidth: '100%',
   fontFamily: 'system-ui, sans-serif',
-  textShadow: '0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.4)',
 };
 
 const dividerStyle: CSSProperties = {

@@ -56,8 +56,12 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
       const isBody = !isHaloCol && !isHaloRow;
 
-      const vW = isHaloCol ? foldDepth : coreW;
-      const vD = isHaloRow ? foldDepth : coreD;
+      // Skip extension voxels — their wireframes extend far beyond the
+      // container body and look like a phantom second container
+      if (!isBody) continue;
+
+      const vW = coreW;
+      const vD = coreD;
 
       // Position: match ContainerSkin's getVoxelLayout exactly (NEGATED X for cols)
       let px: number;
