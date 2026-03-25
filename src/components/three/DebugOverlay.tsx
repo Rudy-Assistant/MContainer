@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * DebugOverlay.tsx — Wireframe hitbox visualization for all 32 voxels
+ * DebugOverlay.tsx — Wireframe hitbox visualization for voxels and bay groups
  *
- * Ported from V2: renders MeshBasicMaterial({ wireframe: true }) directly,
- * not EdgesGeometry lineSegments. Body = red, extension = orange.
+ * Detail mode: one wireframe box per active voxel (32 max)
+ * Simple mode: one wireframe box per bay group (15 groups) using merged AABBs
+ * Body = red, extension = orange. Overlays on top of normal ContainerSkin.
  */
 
 import { useMemo } from "react";
@@ -12,6 +13,8 @@ import * as THREE from "three";
 import { useStore } from "@/store/useStore";
 import { CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS, type Container } from "@/types/container";
 import { nullRaycast } from "@/utils/nullRaycast";
+import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
+import { getVoxelLayout } from "@/components/objects/ContainerSkin";
 
 // Shared wireframe materials (module-level singletons)
 const bodyMat = new THREE.MeshBasicMaterial({
@@ -44,58 +47,85 @@ function getBox(w: number, h: number, d: number): THREE.BoxGeometry {
   return _geoCache.get(k)!;
 }
 
-// Corner debug dots (NW=red, NE=blue, SW=green, SE=yellow)
-const CORNER_COLORS: Record<number, number> = {
-  0: 0xff4444,   // NW
-  7: 0x4488ff,   // NE
-  24: 0x00ff00,  // SW
-  31: 0xffcc00,  // SE
-};
+// Bay groups — computed once at module level
+const BAY_GROUPS = computeBayGroups();
+
+/** Compute merged AABB for a bay group's voxel indices */
+function bayGroupAABB(group: BayGroup, dims: { length: number; width: number; height: number }) {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const idx of group.voxelIndices) {
+    const row = Math.floor(idx / VOXEL_COLS);
+    const col = idx % VOXEL_COLS;
+    const layout = getVoxelLayout(col, row, dims);
+    const halfW = layout.voxW / 2;
+    const halfD = layout.voxD / 2;
+    minX = Math.min(minX, layout.px - halfW);
+    maxX = Math.max(maxX, layout.px + halfW);
+    minZ = Math.min(minZ, layout.pz - halfD);
+    maxZ = Math.max(maxZ, layout.pz + halfD);
+  }
+  return {
+    cx: (minX + maxX) / 2,
+    cz: (minZ + maxZ) / 2,
+    w: maxX - minX,
+    d: maxZ - minZ,
+  };
+}
 
 function ContainerDebugWireframe({ container }: { container: Container }) {
   const dims = CONTAINER_DIMENSIONS[container.size];
   const grid = container.voxelGrid;
+  const isSimpleMode = useStore((s) => s.designComplexity === 'simple');
   if (!grid) return null;
 
   const vHeight = dims.height;
-  const coreW = dims.length / 6;
-  const coreD = dims.width / 2;
-  const foldDepth = dims.height;
 
+  // Simple mode: bay group wireframes
+  const bayBoxes = useMemo(() => {
+    if (!isSimpleMode) return null;
+    return BAY_GROUPS.map(group => {
+      // Check if ANY voxel in this group is active
+      const hasActive = group.voxelIndices.some(idx => grid[idx]?.active);
+      if (!hasActive) return null;
+      const aabb = bayGroupAABB(group, dims);
+      const isBody = group.role === 'body';
+      return { ...aabb, h: vHeight, isBody, id: group.id, label: group.label };
+    }).filter(Boolean) as { cx: number; cz: number; w: number; d: number; h: number; isBody: boolean; id: string; label: string }[];
+  }, [isSimpleMode, grid, dims, vHeight]);
+
+  // Detail mode: per-voxel wireframes
   const voxels = useMemo(() => {
+    if (isSimpleMode) return null;
     const result: { px: number; py: number; pz: number; w: number; h: number; d: number; isExt: boolean; idx: number }[] = [];
-
     for (let i = 0; i < grid.length; i++) {
       const v = grid[i];
       if (!v.active) continue;
-
       const row = Math.floor(i / VOXEL_COLS);
       const col = i % VOXEL_COLS;
+      const layout = getVoxelLayout(col, row, dims);
       const isHaloCol = col === 0 || col === VOXEL_COLS - 1;
       const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
       const isBody = !isHaloCol && !isHaloRow;
-
-      const vW = isHaloCol ? foldDepth : coreW;
-      const vD = isHaloRow ? foldDepth : coreD;
-
-      let px: number;
-      if (col === 0)                   px = dims.length / 2 + foldDepth / 2;
-      else if (col === VOXEL_COLS - 1) px = -(dims.length / 2 + foldDepth / 2);
-      else                             px = -(col - 3.5) * coreW;
-
-      let pz: number;
-      if (row === 0)                   pz = -(dims.width / 2 + foldDepth / 2);
-      else if (row === VOXEL_ROWS - 1) pz = dims.width / 2 + foldDepth / 2;
-      else                             pz = (row - 1.5) * coreD;
-
-      result.push({ px, py: vHeight / 2, pz, w: vW, h: vHeight, d: vD, isExt: !isBody, idx: i });
+      result.push({ px: layout.px, py: vHeight / 2, pz: layout.pz, w: layout.voxW, h: vHeight, d: layout.voxD, isExt: !isBody, idx: i });
     }
     return result;
-  }, [grid, coreW, coreD, foldDepth, vHeight, dims.length, dims.width]);
+  }, [isSimpleMode, grid, dims, vHeight]);
 
   return (
     <group position={[container.position.x, container.position.y, container.position.z]}>
-      {voxels.map((v, i) => (
+      {/* Simple mode: bay group wireframes */}
+      {bayBoxes && bayBoxes.map(box => (
+        <mesh
+          key={box.id}
+          position={[box.cx, box.h / 2, box.cz]}
+          geometry={getBox(box.w, box.h, box.d)}
+          material={box.isBody ? bodyMat : extMat}
+          renderOrder={100}
+          raycast={nullRaycast}
+        />
+      ))}
+      {/* Detail mode: per-voxel wireframes */}
+      {voxels && voxels.map((v, i) => (
         <mesh
           key={i}
           position={[v.px, v.py, v.pz]}
@@ -104,13 +134,6 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
           renderOrder={100}
           raycast={nullRaycast}
         />
-      ))}
-      {/* Corner debug dots at body corners (voxels 9, 14, 17, 22) */}
-      {voxels.filter(v => CORNER_COLORS[v.idx] !== undefined).map(v => (
-        <mesh key={`dot-${v.idx}`} position={[v.px, v.py + v.h / 2 + 0.2, v.pz]}>
-          <sphereGeometry args={[0.1, 8, 8]} />
-          <meshBasicMaterial color={CORNER_COLORS[v.idx]} depthTest={false} />
-        </mesh>
       ))}
     </group>
   );
