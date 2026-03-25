@@ -1,7 +1,7 @@
 'use client';
 
 import { useStore } from '@/store/useStore';
-import { PresetCard } from './PresetCard';
+import { ContainerPresetCard } from './ContainerPresetCard';
 import { IsometricVoxelSVG } from '../svg/IsometricVoxelSVG';
 import { CONTAINER_LEVEL_PRESETS } from '@/config/containerTabPresets';
 
@@ -15,11 +15,11 @@ export function ContainerPresetRow({ containerId: _containerId, onApply }: Props
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, minWidth: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, minWidth: 0 }}>
       {CONTAINER_LEVEL_PRESETS.map(p => (
-        <PresetCard
+        <ContainerPresetCard
           key={p.id}
-          content={<IsometricVoxelSVG faces={p.faces} size={36} />}
+          content={<IsometricVoxelSVG faces={p.faces} size={48} />}
           label={p.label}
           active={false}
           onClick={() => onApply(p.id)}
