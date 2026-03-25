@@ -1930,20 +1930,25 @@ const hlWallMat = new THREE.MeshBasicMaterial({
   color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.25,
   depthWrite: false, depthTest: false, side: THREE.DoubleSide,
 });
-// §7.2 Selection wall face overlay (cyan)
+// §7.2 Selection wall/floor face overlay (blue — matches select wireframe)
 const hlWallSelectMat = new THREE.MeshBasicMaterial({
-  color: 0x00bcd4, transparent: true, opacity: 0.3,
+  color: 0x3b82f6, transparent: true, opacity: 0.25,
   depthWrite: false, depthTest: false, side: THREE.DoubleSide,
 });
-// Selection: wireframe outline instead of floor glow (eliminates teal artifact)
+// Selection: wireframe outline (blue)
 const hlSelectEdgeMat = new THREE.LineBasicMaterial({
   color: 0x3b82f6, transparent: true, opacity: 0.8,
   depthTest: false,
 });
-// Bay group (multi-select) uses amber for high visibility
+// Bay group select: blue wireframe (matches individual voxel select)
 const hlBayGroupMat = new THREE.LineBasicMaterial({
-  color: 0xf59e0b, transparent: true, opacity: 0.9,
+  color: 0x3b82f6, transparent: true, opacity: 0.9,
   depthTest: false,
+});
+// Floor select highlight: blue floor portion for voxel/bay selection (no face)
+const hlFloorSelectMat = new THREE.MeshBasicMaterial({
+  color: 0x3b82f6, transparent: true, opacity: 0.15,
+  depthWrite: false, depthTest: false, side: THREE.DoubleSide,
 });
 
 /** Compute merged AABB for a set of voxel indices. Returns center + dimensions. */
@@ -2067,15 +2072,27 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
 
   return (
     <>
-      {/* Merged bay group selection: wireframe when no face selected, face overlay when face selected */}
+      {/* Merged bay group selection: blue wireframe + blue floor highlight when no face selected */}
       {mergedSelectBox && !selectedFace && (
-        <lineSegments
-          position={[mergedSelectBox.cx, vOffset + (selectedVoxels ? levelYOffset(selectedVoxels.indices[0]) : 0), mergedSelectBox.cz]}
-          geometry={getHlEdges(mergedSelectBox.w * 0.98, vHeight * 0.98, mergedSelectBox.d * 0.98)}
-          material={hlBayGroupMat}
-          renderOrder={10}
-          raycast={nullRaycast}
-        />
+        <>
+          <lineSegments
+            position={[mergedSelectBox.cx, vOffset + (selectedVoxels ? levelYOffset(selectedVoxels.indices[0]) : 0), mergedSelectBox.cz]}
+            geometry={getHlEdges(mergedSelectBox.w * 0.98, vHeight * 0.98, mergedSelectBox.d * 0.98)}
+            material={hlBayGroupMat}
+            renderOrder={10}
+            raycast={nullRaycast}
+          />
+          {/* Blue floor highlight showing selected bay footprint */}
+          <mesh
+            position={[mergedSelectBox.cx, (selectedVoxels ? levelYOffset(selectedVoxels.indices[0]) : 0) + 0.01, mergedSelectBox.cz]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            geometry={getHlBox(mergedSelectBox.w * 0.95, mergedSelectBox.d * 0.95, 0.02)}
+            material={hlFloorSelectMat}
+            renderOrder={10}
+            raycast={nullRaycast}
+            frustumCulled={false}
+          />
+        </>
       )}
       {/* §7.2 Merged bay group selection face overlay (cyan) when face is selected */}
       {mergedSelectBox && selectedFace && (() => {
@@ -2185,6 +2202,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         return (
           <group key={`hl_${idx}`}>
             {showVoxelWireframe && (
+              <>
               <lineSegments
                 position={[layout.px, vOffset + yLift, layout.pz]}
                 geometry={getHlEdges(layout.voxW * 0.98, vHeight * 0.98, layout.voxD * 0.98)}
@@ -2192,6 +2210,17 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                 renderOrder={10}
                 raycast={nullRaycast}
               />
+              {/* Blue floor highlight for voxel selection (no face) */}
+              <mesh
+                position={[layout.px, yLift + 0.01, layout.pz]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                geometry={getHlBox(layout.voxW * 0.95, layout.voxD * 0.95, 0.02)}
+                material={hlFloorSelectMat}
+                renderOrder={10}
+                raycast={nullRaycast}
+                frustumCulled={false}
+              />
+              </>
             )}
             {isHover && (
               <lineSegments
