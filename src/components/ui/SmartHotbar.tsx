@@ -1132,8 +1132,8 @@ function HotbarSlotButton({
       style={{
         width: 72,
         borderRadius: 8,
-        border: isActive ? `2px solid ${accent}` : `1px solid var(--btn-border, #e5e7eb)`,
-        background: isActive ? `${accent}08` : "var(--btn-bg, #ffffff)",
+        border: isActive ? `2px solid ${accent}` : `1px solid rgba(255,255,255,0.12)`,
+        background: isActive ? `${accent}20` : "rgba(0,0,0,0.35)",
         cursor: "pointer",
         position: "relative",
         display: "flex",
@@ -1156,7 +1156,7 @@ function HotbarSlotButton({
       <span style={{
         position: "absolute", top: 2, left: 4,
         fontSize: 9, fontWeight: 800,
-        color: isActive ? accent : "#9ca3af",
+        color: isActive ? accent : "rgba(255,255,255,0.5)",
         lineHeight: 1, fontFamily: "monospace", zIndex: 2,
       }}>
         {slot.key === 0 ? "0" : String(slot.key)}

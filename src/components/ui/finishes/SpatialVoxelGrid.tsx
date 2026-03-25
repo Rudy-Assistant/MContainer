@@ -11,27 +11,29 @@ interface CellDef {
   ext: boolean;
 }
 
+// Column order mirrors 3D view: col 0 (+X) = east/nearest in default camera.
+// Left-to-right: NE→N Deck 3→2→1→NW matches 3D left-to-right from camera [14,10,14].
 const GRID_ROWS: CellDef[][] = [
   [
-    { label: 'NW Corner', indices: [0],  ext: true },
-    { label: 'N Deck 1',  indices: [1],  ext: true },
-    { label: 'N Deck 2',  indices: [2],  ext: false },
-    { label: 'N Deck 3',  indices: [3],  ext: false },
     { label: 'NE Corner', indices: [7],  ext: true },
+    { label: 'N Deck 3',  indices: [3],  ext: false },
+    { label: 'N Deck 2',  indices: [2],  ext: false },
+    { label: 'N Deck 1',  indices: [1],  ext: true },
+    { label: 'NW Corner', indices: [0],  ext: true },
   ],
   [
-    { label: 'W End',  indices: [9, 17],                   ext: false },
-    { label: 'Bay 1',  indices: [10, 11, 18, 19],          ext: false },
-    { label: 'Bay 2',  indices: [12, 13, 20, 21],          ext: false },
-    { label: 'Bay 3',  indices: [14, 15, 22, 23],          ext: false },
     { label: 'E End',  indices: [16, 24],                  ext: false },
+    { label: 'Bay 3',  indices: [14, 15, 22, 23],          ext: false },
+    { label: 'Bay 2',  indices: [12, 13, 20, 21],          ext: false },
+    { label: 'Bay 1',  indices: [10, 11, 18, 19],          ext: false },
+    { label: 'W End',  indices: [9, 17],                   ext: false },
   ],
   [
-    { label: 'SW Corner', indices: [24], ext: true },
-    { label: 'S Deck 1',  indices: [25], ext: true },
-    { label: 'S Deck 2',  indices: [26], ext: false },
-    { label: 'S Deck 3',  indices: [27], ext: false },
     { label: 'SE Corner', indices: [31], ext: true },
+    { label: 'S Deck 3',  indices: [27], ext: false },
+    { label: 'S Deck 2',  indices: [26], ext: false },
+    { label: 'S Deck 1',  indices: [25], ext: true },
+    { label: 'SW Corner', indices: [24], ext: true },
   ],
 ];
 
