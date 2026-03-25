@@ -125,10 +125,7 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
 
   setSelectionContext: (ctx) => set({ selectionContext: ctx }),
 
-  setSelectedFace: (f) => set((_s: any) => {
-    if (!f) return { selectedFace: null };
-    return { selectedFace: f };
-  }),
+  setSelectedFace: (f) => set({ selectedFace: f ?? null }),
 
   copyVoxel: (containerId, voxelIndex) => {
     const c = get().containers[containerId];
@@ -221,9 +218,10 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
     set({ styleBrush: { ...voxel.faces } });
   },
 
-  setSelectedElements: (sel) => set((_s: any) => {
-    if (!sel) return { selectedElements: null, selectedFace: null };
-    return { selectedElements: sel, selectedFace: null };
+  setSelectedElements: (sel) => set({
+    selectedElements: sel,
+    // Only clear selectedFace when clearing selection entirely
+    ...(sel === null ? { selectedFace: null } : {}),
   }),
 
   toggleElement: (containerId, id) => set((s: any) => {

@@ -1224,14 +1224,9 @@ export default function SmartHotbar() {
   useHotbarAutoSwitch();
 
   const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
-  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
-  useEffect(() => {
-    const onResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  const sidebarWidth = sidebarCollapsed ? 0 : 320;
-  const centerX = sidebarWidth + (viewportWidth - sidebarWidth) / 2;
+  // Use CSS calc to center hotbar in remaining canvas area — no JS resize listener needed
+  const sidebarPx = sidebarCollapsed ? 0 : 320;
+  const hotbarLeft = `calc(${sidebarPx}px + (100vw - ${sidebarPx}px) / 2)`;
 
   // ── Theme-aware icon materials ──────────────────────────────
   const currentTheme = useStore((s) => s.currentTheme) as ThemeId;
@@ -1422,7 +1417,7 @@ export default function SmartHotbar() {
         onMouseLeave={() => { setHotbarHovered(false); }}
         style={{
           position: "absolute", bottom: showHotbar ? 58 : 16,
-          left: centerX,
+          left: hotbarLeft,
           transform: showHotbar ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(10px)",
           zIndex: 25, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
           opacity: showHotbar ? 1 : 0,
