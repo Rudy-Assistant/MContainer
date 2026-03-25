@@ -2516,9 +2516,21 @@ export default function ContainerSkin({
     }
   });
 
-  // Debug wireframe mode — DebugOverlay renders wireframe boxes on top of the normal skin.
-  // ContainerSkin renders normally (both visuals and hitboxes stay active).
-  // No suppression needed — wireframes overlay the scene additively.
+  // Debug wireframe mode — make invisible hitboxes visible by toggling mHit material.
+  // This shows the ACTUAL hitbox meshes (guaranteed alignment) instead of a parallel overlay.
+  useEffect(() => {
+    if (debugMode) {
+      mHit.colorWrite = true;
+      mHit.opacity = 0.15;
+      mHit.color = new THREE.Color(0x44aaff);
+      mHit.needsUpdate = true;
+    } else {
+      mHit.colorWrite = false;
+      mHit.opacity = 0.001;
+      mHit.color = new THREE.Color(0xffffff);
+      mHit.needsUpdate = true;
+    }
+  }, [debugMode]);
 
   // Global skin hide — skip ALL face rendering
   if (globalHideSkin) return null;
