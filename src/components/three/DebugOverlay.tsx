@@ -18,11 +18,10 @@ import { useStore } from "@/store/useStore";
 import { CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS, type Container } from "@/types/container";
 import { nullRaycast } from "@/utils/nullRaycast";
 import { computeBayGroups } from "@/config/bayGroups";
-import { getVoxelLayout } from "@/components/objects/ContainerSkin";
+import { getVoxelLayout, BASEPLATE_STRIP } from "@/components/objects/ContainerSkin";
 
 // Inset from tile edge to center zone — wall quadrant width
-// Matches BASEPLATE_STRIP in ContainerSkin for accurate visualization
-const EDGE_INSET = 0.53;
+const EDGE_INSET = BASEPLATE_STRIP;
 
 // Tile outline materials
 const tileBodyMat = new THREE.LineBasicMaterial({

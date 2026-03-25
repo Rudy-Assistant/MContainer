@@ -239,6 +239,9 @@ const mHit = new THREE.MeshBasicMaterial({
   colorWrite: false,
 });
 const mSelect = new THREE.LineBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, depthTest: false });
+// Pre-allocated colors for mHit debug toggle (avoids allocation per toggle)
+const _COLOR_DEBUG_HIT = new THREE.Color(0x44aaff);
+const _COLOR_DEBUG_OFF = new THREE.Color(0xffffff);
 // Yellow emissive hover — always visible "E-cycle" indicator
 const mHoverWire = new THREE.LineBasicMaterial({ color: HIGHLIGHT_COLOR_HOVER, depthTest: false, linewidth: 2 });
 // Voxel-level edge outlines — hover=yellow, selected=blue. No solid fill.
@@ -1898,7 +1901,7 @@ function FlushGhostPreview({
 // ── BaseplateCell — ground-level "Lego" tile for inactive voxels ─
 
 const BASEPLATE_FLOOR_Y = 0.05;    // Floor-level edge strips (matches active voxel paradigm)
-const BASEPLATE_STRIP = 0.53;      // Edge strip depth — wall selection quadrant width
+export const BASEPLATE_STRIP = 0.53;      // Edge strip depth — wall selection quadrant width
 
 function BaseplateCell({
   px, pz, colPitch, rowPitch, vHeight,
@@ -2522,12 +2525,12 @@ export default function ContainerSkin({
     if (debugMode) {
       mHit.colorWrite = true;
       mHit.opacity = 0.15;
-      mHit.color = new THREE.Color(0x44aaff);
+      mHit.color = _COLOR_DEBUG_HIT;
       mHit.needsUpdate = true;
     } else {
       mHit.colorWrite = false;
       mHit.opacity = 0.001;
-      mHit.color = new THREE.Color(0xffffff);
+      mHit.color = _COLOR_DEBUG_OFF;
       mHit.needsUpdate = true;
     }
   }, [debugMode]);

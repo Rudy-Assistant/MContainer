@@ -1925,6 +1925,17 @@ function getHlBox(w: number, h: number, d: number): THREE.BoxGeometry {
   return _hlBoxCache.get(k)!;
 }
 
+/** Compute floor quadrant strip for a given face. Returns position + size for the half of floor nearest the wall. */
+function getFloorQuadrant(face: string | null, cx: number, cz: number, w: number, d: number) {
+  const halfW = w / 2, halfD = d / 2;
+  let qx = cx, qz = cz, qw = w, qd = d;
+  if (face === 'n') { qz = cz - halfD / 2; qd = halfD; }
+  else if (face === 's') { qz = cz + halfD / 2; qd = halfD; }
+  else if (face === 'e') { qx = cx + halfW / 2; qw = halfW; }
+  else if (face === 'w') { qx = cx - halfW / 2; qw = halfW; }
+  return { qx, qz, qw, qd };
+}
+
 // §7.1 Hover wall face overlay (amber)
 const hlWallMat = new THREE.MeshBasicMaterial({
   color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.25,
@@ -2127,18 +2138,12 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
             />
             {/* Floor quadrant strip for bay group wall selection */}
             {isWallFace && (() => {
-              const sHalfW = mBox.w / 2;
-              const sHalfD = mBox.d / 2;
-              let sfX = mBox.cx, sfZ = mBox.cz, sfW = mBox.w, sfD = mBox.d;
-              if (selectedFace === 'n') { sfZ = mBox.cz - sHalfD / 2; sfD = sHalfD; }
-              else if (selectedFace === 's') { sfZ = mBox.cz + sHalfD / 2; sfD = sHalfD; }
-              else if (selectedFace === 'e') { sfX = mBox.cx + sHalfW / 2; sfW = sHalfW; }
-              else if (selectedFace === 'w') { sfX = mBox.cx - sHalfW / 2; sfW = sHalfW; }
+              const q = getFloorQuadrant(selectedFace, mBox.cx, mBox.cz, mBox.w, mBox.d);
               return (
                 <mesh
-                  position={[sfX, mYLift + 0.01, sfZ]}
+                  position={[q.qx, mYLift + 0.01, q.qz]}
                   rotation={[-Math.PI / 2, 0, 0]}
-                  geometry={getHlBox(sfW, sfD, 0.02)}
+                  geometry={getHlBox(q.qw, q.qd, 0.02)}
                   material={hlWallSelectMat}
                   renderOrder={10}
                   raycast={nullRaycast}
@@ -2242,14 +2247,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
             )}
             {/* §7.1 Amber wall face overlay on hover + floor quadrant strip */}
             {isHover && hoverWallPos && hoverWallSize && (() => {
-              // Floor quadrant: only the strip nearest the hovered wall (half the floor)
-              const halfW = layout.voxW / 2;
-              const halfD = layout.voxD / 2;
-              let fpX = layout.px, fpZ = layout.pz, fpW = layout.voxW, fpD = layout.voxD;
-              if (hoveredFace === 'n') { fpZ = layout.pz - halfD / 2; fpD = halfD; }
-              else if (hoveredFace === 's') { fpZ = layout.pz + halfD / 2; fpD = halfD; }
-              else if (hoveredFace === 'e') { fpX = layout.px + halfW / 2; fpW = halfW; }
-              else if (hoveredFace === 'w') { fpX = layout.px - halfW / 2; fpW = halfW; }
+              const fp = getFloorQuadrant(hoveredFace, layout.px, layout.pz, layout.voxW, layout.voxD);
               return (
               <>
                 <mesh
@@ -2263,9 +2261,9 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                 />
                 {/* Floor quadrant strip: half of floor nearest the hovered wall */}
                 <mesh
-                  position={[fpX, yLift + 0.01, fpZ]}
+                  position={[fp.qx, yLift + 0.01, fp.qz]}
                   rotation={[-Math.PI / 2, 0, 0]}
-                  geometry={getHlBox(fpW, fpD, 0.02)}
+                  geometry={getHlBox(fp.qw, fp.qd, 0.02)}
                   material={hlWallMat}
                   renderOrder={11}
                   raycast={nullRaycast}
@@ -2288,18 +2286,12 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                 />
                 {/* Floor quadrant strip for wall selection */}
                 {!selIsHoriz && (() => {
-                  const halfW = layout.voxW / 2;
-                  const halfD = layout.voxD / 2;
-                  let sfpX = layout.px, sfpZ = layout.pz, sfpW = layout.voxW, sfpD = layout.voxD;
-                  if (selectedFace === 'n') { sfpZ = layout.pz - halfD / 2; sfpD = halfD; }
-                  else if (selectedFace === 's') { sfpZ = layout.pz + halfD / 2; sfpD = halfD; }
-                  else if (selectedFace === 'e') { sfpX = layout.px + halfW / 2; sfpW = halfW; }
-                  else if (selectedFace === 'w') { sfpX = layout.px - halfW / 2; sfpW = halfW; }
+                  const sq = getFloorQuadrant(selectedFace, layout.px, layout.pz, layout.voxW, layout.voxD);
                   return (
                     <mesh
-                      position={[sfpX, yLift + 0.01, sfpZ]}
+                      position={[sq.qx, yLift + 0.01, sq.qz]}
                       rotation={[-Math.PI / 2, 0, 0]}
-                      geometry={getHlBox(sfpW, sfpD, 0.02)}
+                      geometry={getHlBox(sq.qw, sq.qd, 0.02)}
                       material={hlWallSelectMat}
                       renderOrder={10}
                       raycast={nullRaycast}
@@ -2342,18 +2334,12 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
             />
             {/* Floor quadrant strip for bay group wall hover */}
             {isWallFace && (() => {
-              const mHalfW = mBox.w / 2;
-              const mHalfD = mBox.d / 2;
-              let bfpX = mBox.cx, bfpZ = mBox.cz, bfpW = mBox.w, bfpD = mBox.d;
-              if (hoveredFace === 'n') { bfpZ = mBox.cz - mHalfD / 2; bfpD = mHalfD; }
-              else if (hoveredFace === 's') { bfpZ = mBox.cz + mHalfD / 2; bfpD = mHalfD; }
-              else if (hoveredFace === 'e') { bfpX = mBox.cx + mHalfW / 2; bfpW = mHalfW; }
-              else if (hoveredFace === 'w') { bfpX = mBox.cx - mHalfW / 2; bfpW = mHalfW; }
+              const bq = getFloorQuadrant(hoveredFace, mBox.cx, mBox.cz, mBox.w, mBox.d);
               return (
                 <mesh
-                  position={[bfpX, mYLift + 0.01, bfpZ]}
+                  position={[bq.qx, mYLift + 0.01, bq.qz]}
                   rotation={[-Math.PI / 2, 0, 0]}
-                  geometry={getHlBox(bfpW, bfpD, 0.02)}
+                  geometry={getHlBox(bq.qw, bq.qd, 0.02)}
                   material={hlWallMat}
                   renderOrder={11}
                   raycast={nullRaycast}
