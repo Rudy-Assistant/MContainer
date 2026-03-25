@@ -37,10 +37,12 @@ export default function FinishesPanel() {
     prevFace.current = selectedFace;
     prevElType.current = selectedElType;
 
-    if (faceChanged && selectedFace) {
+    // Face routing: always takes priority when a face is set
+    if (selectedFace) {
       const tab = faceToTab(selectedFace);
-      if (tab) setActiveTab(tab);
-    } else if (elTypeChanged && !selectedFace) {
+      if (tab && (faceChanged || elTypeChanged)) setActiveTab(tab);
+    } else if (elTypeChanged) {
+      // Element-type routing: only when no face is set
       if (selectedElType === 'bay') {
         setActiveTab('block');
       }
