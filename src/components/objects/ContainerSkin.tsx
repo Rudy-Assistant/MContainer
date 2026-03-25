@@ -2048,6 +2048,7 @@ export default function ContainerSkin({
   /** When true, disables all hitboxes (used for drag-move ghost preview). */
   ghostMode?: boolean;
 }) {
+  const debugMode         = useStore((s) => s.debugMode);
   const setSelectedElements = useStore((s) => s.setSelectedElements);
   const setVoxelActive    = useStore((s) => s.setVoxelActive);
   const activeBrush       = useStore((s) => s.activeBrush);
@@ -2514,6 +2515,9 @@ export default function ContainerSkin({
       forceRender(c => c + 1);
     }
   });
+
+  // Debug wireframe mode — suppress skin rendering; DebugOverlay handles visualization
+  if (debugMode) return null;
 
   // Global skin hide — skip ALL face rendering
   if (globalHideSkin) return null;
