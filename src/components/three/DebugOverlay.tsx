@@ -47,12 +47,10 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
   const vHeight = dims.height;
 
   // ── Simple mode: one wireframe per bay group (merged AABB) ──
+  // Renders ALL 15 bay groups regardless of active state — shows hitbox boundaries
   const bayBoxes = useMemo(() => {
     if (!isSimpleMode) return null;
     return BAY_GROUPS.map(group => {
-      const hasActive = group.voxelIndices.some(idx => grid[idx]?.active);
-      if (!hasActive) return null;
-
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const idx of group.voxelIndices) {
         const row = Math.floor(idx / VOXEL_COLS);
@@ -72,12 +70,13 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
     }).filter(Boolean) as { cx: number; cz: number; w: number; d: number; h: number; isBody: boolean; id: string }[];
   }, [isSimpleMode, grid, dims, vHeight]);
 
-  // ── Detail mode: one wireframe per active voxel ──
+  // ── Detail mode: one wireframe per voxel (all 32) ──
+  // Renders ALL voxels regardless of active state — shows complete hitbox grid
   const voxels = useMemo(() => {
     if (isSimpleMode) return null;
+    const TOTAL = VOXEL_ROWS * VOXEL_COLS; // 32
     const result: { px: number; pz: number; w: number; d: number; isExt: boolean; idx: number }[] = [];
-    for (let i = 0; i < grid.length; i++) {
-      if (!grid[i]?.active) continue;
+    for (let i = 0; i < TOTAL; i++) {
       const row = Math.floor(i / VOXEL_COLS);
       const col = i % VOXEL_COLS;
       const layout = getVoxelLayout(col, row, dims);
