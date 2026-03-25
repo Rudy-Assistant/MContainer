@@ -81,8 +81,8 @@ function selectionTargetEqual(a: SelectionTarget, b: SelectionTarget): boolean {
 }
 
 export function useSelectionTarget(): SelectionTarget {
-  return useStore(
-    (s) => deriveSelectionTarget({
+  return (useStore as any)(
+    (s: any) => deriveSelectionTarget({
       selectedElements: s.selectedElements,
       selectedFace: s.selectedFace,
       selection: s.selection,

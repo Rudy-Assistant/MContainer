@@ -85,8 +85,8 @@ const cardScrollStyle: CSSProperties = {
 };
 
 const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
-  minWidth: 80,
-  height: 64,
+  minWidth: 90,
+  height: 72,
   flexShrink: 0,
   borderRadius: 6,
   border: isSelected
@@ -110,9 +110,9 @@ const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
 });
 
 const cardNameStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 600,
-  color: 'rgba(255,255,255,0.95)',
+  fontSize: 11,
+  fontWeight: 700,
+  color: '#ffffff',
   textAlign: 'center',
   lineHeight: 1.2,
   overflow: 'hidden',
@@ -120,6 +120,7 @@ const cardNameStyle: CSSProperties = {
   whiteSpace: 'nowrap',
   maxWidth: '100%',
   fontFamily: 'system-ui, sans-serif',
+  textShadow: '0 1px 3px rgba(0,0,0,0.5)',
 };
 
 const dividerStyle: CSSProperties = {

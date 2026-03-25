@@ -26,8 +26,8 @@ function voxelsEqual(
  * mutating a ref inside the selector.
  */
 export function useSelectedVoxels(): { containerId: string; indices: number[] } | null {
-  return useStore(
-    (s) => deriveVoxels(s.selectedElements),
+  return (useStore as any)(
+    (s: any) => deriveVoxels(s.selectedElements),
     voxelsEqual
   );
 }

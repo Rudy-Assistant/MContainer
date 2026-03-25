@@ -32,8 +32,8 @@ function voxelEqual(a: VoxelPayload | null, b: VoxelPayload | null): boolean {
  * React concurrent mode).
  */
 export function useSelectedVoxel(): VoxelPayload | null {
-  return useStore(
-    (s) => deriveVoxel(s.selectedElements),
+  return (useStore as any)(
+    (s: any) => deriveVoxel(s.selectedElements),
     voxelEqual
   );
 }
