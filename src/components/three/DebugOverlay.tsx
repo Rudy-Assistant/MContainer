@@ -3,9 +3,9 @@
 /**
  * DebugOverlay.tsx — Wireframe hitbox visualization
  *
- * Renders wireframe boxes for all active voxels using getVoxelLayout positions.
+ * Uses EdgesGeometry + lineSegments for clean box outlines (12 edges per box).
  * Simple mode: merged bay-group AABBs (15 groups).
- * Detail mode: per-voxel wireframes (32 individual boxes).
+ * Detail mode: per-voxel wireframes (up to 32 individual boxes).
  * Body = red, extension = orange. Overlays on top of normal ContainerSkin.
  */
 
@@ -17,22 +17,22 @@ import { nullRaycast } from "@/utils/nullRaycast";
 import { computeBayGroups } from "@/config/bayGroups";
 import { getVoxelLayout } from "@/components/objects/ContainerSkin";
 
-// Shared wireframe materials
-const bodyMat = new THREE.MeshBasicMaterial({
-  color: 0xff2222, wireframe: true, transparent: true, opacity: 0.6,
-  depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+// Line materials — clean edges only, no triangle diagonals
+const bodyLineMat = new THREE.LineBasicMaterial({
+  color: 0xff2222, transparent: true, opacity: 0.8, depthTest: false,
 });
-const extMat = new THREE.MeshBasicMaterial({
-  color: 0xff8800, wireframe: true, transparent: true, opacity: 0.4,
-  depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+const extLineMat = new THREE.LineBasicMaterial({
+  color: 0xff8800, transparent: true, opacity: 0.6, depthTest: false,
 });
 
-// Geometry cache
-const _geoCache = new Map<string, THREE.BoxGeometry>();
-function getBox(w: number, h: number, d: number): THREE.BoxGeometry {
+// EdgesGeometry cache — produces only the 12 outer edges of each box
+const _edgeCache = new Map<string, THREE.EdgesGeometry>();
+function getEdges(w: number, h: number, d: number): THREE.EdgesGeometry {
   const k = `${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}`;
-  if (!_geoCache.has(k)) _geoCache.set(k, new THREE.BoxGeometry(w, h, d));
-  return _geoCache.get(k)!;
+  if (!_edgeCache.has(k)) {
+    _edgeCache.set(k, new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)));
+  }
+  return _edgeCache.get(k)!;
 }
 
 // Bay groups — computed once
@@ -53,7 +53,6 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       const hasActive = group.voxelIndices.some(idx => grid[idx]?.active);
       if (!hasActive) return null;
 
-      // Compute merged AABB from constituent voxel positions
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const idx of group.voxelIndices) {
         const row = Math.floor(idx / VOXEL_COLS);
@@ -91,24 +90,22 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
 
   return (
     <group position={[container.position.x, container.position.y, container.position.z]}>
-      {/* Simple mode: bay group wireframes */}
       {bayBoxes?.map(box => (
-        <mesh
+        <lineSegments
           key={box.id}
           position={[box.cx, box.h / 2, box.cz]}
-          geometry={getBox(box.w, box.h, box.d)}
-          material={box.isBody ? bodyMat : extMat}
+          geometry={getEdges(box.w, box.h, box.d)}
+          material={box.isBody ? bodyLineMat : extLineMat}
           renderOrder={100}
           raycast={nullRaycast}
         />
       ))}
-      {/* Detail mode: per-voxel wireframes */}
       {voxels?.map((v, i) => (
-        <mesh
+        <lineSegments
           key={i}
           position={[v.px, vHeight / 2, v.pz]}
-          geometry={getBox(v.w, vHeight, v.d)}
-          material={v.isExt ? extMat : bodyMat}
+          geometry={getEdges(v.w, vHeight, v.d)}
+          material={v.isExt ? extLineMat : bodyLineMat}
           renderOrder={100}
           raycast={nullRaycast}
         />
