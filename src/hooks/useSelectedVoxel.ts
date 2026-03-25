@@ -1,10 +1,10 @@
+import { useRef } from 'react';
 import { useStore } from '@/store/useStore';
 import type { VoxelPayload } from '@/store/useStore';
 
 function deriveVoxel(sel: { type: string; items: Array<{ containerId: string; id: string }> } | null): VoxelPayload | null {
   if (!sel || sel.type !== 'voxel' || sel.items.length !== 1) return null;
   const item = sel.items[0];
-  // Support extension voxels encoded as "ext_col_row"
   if (item.id.startsWith('ext_')) {
     const parts = item.id.split('_');
     const col = parseInt(parts[1]);
@@ -17,9 +17,25 @@ function deriveVoxel(sel: { type: string; items: Array<{ containerId: string; id
   return { containerId: item.containerId, index };
 }
 
-/** Derives legacy selectedVoxel shape from selectedElements */
+function voxelEqual(a: VoxelPayload | null, b: VoxelPayload | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.containerId !== b.containerId) return false;
+  if ('index' in a && 'index' in b) return a.index === b.index;
+  if ('isExtension' in a && 'isExtension' in b) return (a as any).col === (b as any).col && (a as any).row === (b as any).row;
+  return false;
+}
+
+/** Derives legacy selectedVoxel shape from selectedElements (referentially stable) */
 export function useSelectedVoxel(): VoxelPayload | null {
-  return useStore((s) => deriveVoxel(s.selectedElements));
+  const prevRef = useRef<VoxelPayload | null>(null);
+
+  return useStore((s) => {
+    const next = deriveVoxel(s.selectedElements);
+    if (voxelEqual(next, prevRef.current)) return prevRef.current;
+    prevRef.current = next;
+    return next;
+  });
 }
 
 /**

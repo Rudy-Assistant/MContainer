@@ -22,7 +22,6 @@ export function ContainerPresetRow({ containerId: _containerId, onApply }: Props
           content={<IsometricVoxelSVG faces={p.faces} size={36} />}
           label={p.label}
           active={false}
-          square={false}
           onClick={() => onApply(p.id)}
           onMouseEnter={() => setGhostPreset({ source: 'container', faces: p.faces, targetScope: 'container' })}
           onMouseLeave={() => clearGhostPreset()}

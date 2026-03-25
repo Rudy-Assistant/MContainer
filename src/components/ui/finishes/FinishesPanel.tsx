@@ -11,12 +11,14 @@ import CeilingTab from './CeilingTab';
 import ElectricalTab from './ElectricalTab';
 import BlockTab from './BlockTab';
 import { ContainerTab } from './ContainerTab';
+import { SpatialVoxelGrid } from './SpatialVoxelGrid';
 
 export default function FinishesPanel() {
   const target = useSelectionTarget();
   const selectedFace = useStore((s) => s.selectedFace) as FaceKey | null;
   const clearSelection = useStore((s) => s.clearSelection);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
 
   // Auto-select tab on face change; manual clicks override freely
   const [activeTab, setActiveTab] = useState<FinishTab>('container');
@@ -99,6 +101,16 @@ export default function FinishesPanel() {
           containerId={containerId}
           voxelIndex={voxelIndex}
           bayGroupIndices={bayGroupIndices}
+        />
+      </div>
+
+      {/* Spatial voxel grid — always visible above tabs */}
+      <div style={{ padding: '4px 8px 6px' }}>
+        <SpatialVoxelGrid
+          containerId={containerId}
+          onCellClick={(cellIndices) => {
+            setSelectedElements({ type: 'bay', items: cellIndices.map(i => ({ containerId, id: String(i) })) });
+          }}
         />
       </div>
 

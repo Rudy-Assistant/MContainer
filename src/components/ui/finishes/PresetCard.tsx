@@ -9,51 +9,63 @@ interface PresetCardProps {
   onClick: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  /** Set false to disable square aspect ratio (default: true) */
-  square?: boolean;
 }
 
+/**
+ * Shared preset card: square image area with highlight on image only.
+ * Text label sits below, outside the highlight border.
+ * Matches the aspirational Interior Finishes art direction.
+ */
 export function PresetCard({
-  content, label, active, onClick, onMouseEnter, onMouseLeave, square = true,
+  content, label, active, onClick, onMouseEnter, onMouseLeave,
 }: PresetCardProps) {
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
       style={{
-        aspectRatio: square ? '1' : undefined,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 2,
-        border: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
-        borderRadius: 6,
-        background: 'var(--surface)',
+        gap: 4,
         cursor: 'pointer',
-        padding: 4,
-        transition: 'border-color 100ms',
-        width: '100%',
         minWidth: 0,
       }}
     >
-      <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Image area — highlight border here only */}
+      <div style={{
+        aspectRatio: '1',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+        borderRadius: 6,
+        background: 'var(--surface)',
+        overflow: 'hidden',
+        transition: 'border-color 100ms',
+      }}>
         {content}
-      </span>
+      </div>
+
+      {/* Label — outside highlight, no border */}
       <span style={{
         fontSize: 10,
         color: active ? 'var(--text-main)' : 'var(--text-muted)',
         fontWeight: active ? 600 : 400,
-        lineHeight: 1.3,
+        lineHeight: 1.2,
         textAlign: 'center',
-        whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         maxWidth: '100%',
+        whiteSpace: 'nowrap',
       }}>
         {label}
       </span>
-    </button>
+    </div>
   );
 }

@@ -4,7 +4,6 @@ import { useStore } from '@/store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Layers, Box } from 'lucide-react';
 import { ContainerPresetRow } from './ContainerPresetRow';
-import { SpatialVoxelGrid } from './SpatialVoxelGrid';
 import { CONTAINER_LEVEL_PRESETS } from '@/config/containerTabPresets';
 
 interface Props {
@@ -21,11 +20,10 @@ export function ContainerTab({ containerId }: Props) {
     }))
   );
 
-  const { containers, stampArea, setSelectedElements } = useStore(
+  const { containers, stampArea } = useStore(
     useShallow((s: any) => ({
       containers: s.containers,
       stampArea: s.stampArea,
-      setSelectedElements: s.setSelectedElements,
     }))
   );
 
@@ -40,10 +38,6 @@ export function ContainerTab({ containerId }: Props) {
     if (activeIndices.length > 0) {
       stampArea(containerId, activeIndices, preset.faces);
     }
-  }
-
-  function handleCellClick(indices: number[]) {
-    setSelectedElements({ type: 'bay', items: indices.map(i => ({ containerId, id: String(i) })) });
   }
 
   const iconBtnStyle = (active: boolean, disabled?: boolean): React.CSSProperties => ({
@@ -93,12 +87,6 @@ export function ContainerTab({ containerId }: Props) {
       <div>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Presets</div>
         <ContainerPresetRow containerId={containerId} onApply={handleApplyPreset} />
-      </div>
-
-      {/* Spatial voxel grid */}
-      <div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Spatial Grid</div>
-        <SpatialVoxelGrid containerId={containerId} onCellClick={handleCellClick} />
       </div>
     </div>
   );

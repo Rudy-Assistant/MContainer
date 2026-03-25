@@ -161,6 +161,24 @@ These bugs are unresolved. See `sprint17-handoff.md` in project memory for root 
 | 3 | Sticky alignment not triggering | `STICKY_THRESHOLD=0.3` may not apply during `addContainer` smart placement | Verify snap logic runs on drag-and-drop placement |
 | 4 | Shift+click camera conflict | Both container drag and camera orbit respond to Shift+mouse | Disable CameraControls when Shift held |
 
+## Simple vs Detail Mode (Voxel Grouping)
+
+The MatrixEditor grid has two modes controlling voxel granularity:
+- **Detail mode**: Shows all 32 individual voxels in the 8×4 grid
+- **Simple mode**: Groups voxels into aggregate "blocks" that the Smart system operates on:
+  - Row 0 (extensions): corners + N Deck 1-3
+  - Rows 1-2 (body): W End, Bay 1 (v10+11+18+19), Bay 2 (v12+13+20+21), Bay 3 (v14+15+22+23), E End (v16+24)
+  - Row 3 (extensions): corners + S Deck 1-3
+- These same groups appear in the Container tab's spatial grid (NW Corner, N Deck 1, Bay 1, etc.)
+
+## Handoff Docs
+
+Sprint handoff docs live in `MContainer/docs/handoff/`, NOT `docs/handoff/` from MHome root.
+
+## UI Card Convention (PresetCard)
+
+All preset/swatch cards use shared PresetCard: square (~80px), isometric SVG or texture thumbnail content, label at bottom with same background (NO divider line above label). Used across Block tab, Container tab, Flooring, Walls, Ceiling, Electrical.
+
 ## Camera Architecture
 
 Three mutually exclusive modes switched by `viewMode`: **Realistic3D** (orbit), **Blueprint** (ortho top-down), **Walkthrough** (pointer lock + WASD). Only one controller mounted at a time.
