@@ -24,15 +24,8 @@ const bodyMat = new THREE.MeshBasicMaterial({
   side: THREE.DoubleSide,
 });
 
-const extMat = new THREE.MeshBasicMaterial({
-  color: 0xff8800,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.4,
-  depthTest: false,
-  depthWrite: false,
-  side: THREE.DoubleSide,
-});
+// Extension material kept for future use when extension fold positions are resolved
+const extMat = bodyMat;
 
 // Cache box geometries by dimension key
 const _geoCache = new Map<string, THREE.BoxGeometry>();
@@ -44,12 +37,13 @@ function getBox(w: number, h: number, d: number): THREE.BoxGeometry {
   return _geoCache.get(k)!;
 }
 
-// Corner debug dots (NW=red, NE=blue, SW=green, SE=yellow)
+// Corner debug dots at body corners (row 1-2, col 1 & 6)
+// idx(row,col) = row*8+col: NW=9, NE=14, SW=17, SE=22
 const CORNER_COLORS: Record<number, number> = {
-  0: 0xff4444,   // NW
-  7: 0x4488ff,   // NE
-  24: 0x00ff00,  // SW
-  31: 0xffcc00,  // SE
+  9: 0xff4444,   // NW (row1, col1)
+  14: 0x4488ff,  // NE (row1, col6)
+  17: 0x00ff00,  // SW (row2, col1)
+  22: 0xffcc00,  // SE (row2, col6)
 };
 
 function ContainerDebugWireframe({ container }: { container: Container }) {
@@ -75,8 +69,13 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
       const isBody = !isHaloCol && !isHaloRow;
 
-      const vW = isHaloCol ? foldDepth : coreW;
-      const vD = isHaloRow ? foldDepth : coreD;
+      // Skip extension voxels — they fold dynamically and their static positions
+      // extend far beyond the container body, appearing as a phantom second container.
+      // Only body voxels (rows 1-2, cols 1-6) get debug wireframes.
+      if (!isBody) continue;
+
+      const vW = coreW;
+      const vD = coreD;
 
       let px: number;
       if (col === 0)                   px = dims.length / 2 + foldDepth / 2;
@@ -88,7 +87,7 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       else if (row === VOXEL_ROWS - 1) pz = dims.width / 2 + foldDepth / 2;
       else                             pz = (row - 1.5) * coreD;
 
-      result.push({ px, py: vHeight / 2, pz, w: vW, h: vHeight, d: vD, isExt: !isBody, idx: i });
+      result.push({ px, py: vHeight / 2, pz, w: vW, h: vHeight, d: vD, isExt: false, idx: i });
     }
     return result;
   }, [grid, coreW, coreD, foldDepth, vHeight, dims.length, dims.width]);
@@ -105,7 +104,7 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
           raycast={nullRaycast}
         />
       ))}
-      {/* Corner debug dots — positioned at top of voxel box + small offset */}
+      {/* Corner debug dots at body corners (voxels 9, 14, 17, 22) */}
       {voxels.filter(v => CORNER_COLORS[v.idx] !== undefined).map(v => (
         <mesh key={`dot-${v.idx}`} position={[v.px, v.py + v.h / 2 + 0.2, v.pz]}>
           <sphereGeometry args={[0.1, 8, 8]} />
