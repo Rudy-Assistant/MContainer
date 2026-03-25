@@ -7,7 +7,8 @@
  * Auto-syncs active category when a SceneObject is selected in 3D.
  */
 
-import { useState, useMemo, useCallback, useEffect, CSSProperties } from 'react';
+import { useState, useMemo, useCallback, useEffect, type CSSProperties } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { formRegistry, getByCategory } from '@/config/formRegistry';
 import type { FormCategory } from '@/types/sceneObject';
@@ -67,7 +68,7 @@ const cardBarStyle: CSSProperties = {
   alignItems: 'center',
   gap: 4,
   maxWidth: '100%',
-  background: 'rgba(0, 0, 0, 0.45)',
+  background: 'rgba(0, 0, 0, 0.6)',
   borderRadius: 12,
   padding: '6px 10px',
   boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
@@ -85,8 +86,8 @@ const cardScrollStyle: CSSProperties = {
 };
 
 const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
-  minWidth: 90,
-  height: 72,
+  minWidth: 100,
+  height: 80,
   flexShrink: 0,
   borderRadius: 6,
   border: isSelected
@@ -98,7 +99,7 @@ const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
     ? 'rgba(0, 188, 212, 0.15)'
     : active
     ? 'rgba(59, 130, 246, 0.2)'
-    : 'rgba(255,255,255,0.04)',
+    : 'rgba(0,0,0,0.35)',
   cursor: 'pointer',
   display: 'flex',
   flexDirection: 'column',
@@ -110,17 +111,17 @@ const cardStyle = (active: boolean, isSelected: boolean): CSSProperties => ({
 });
 
 const cardNameStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
+  fontSize: 12,
+  fontWeight: 800,
   color: '#ffffff',
   textAlign: 'center',
-  lineHeight: 1.2,
+  lineHeight: 1.15,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   maxWidth: '100%',
   fontFamily: 'system-ui, sans-serif',
-  textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+  textShadow: '0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.4)',
 };
 
 const dividerStyle: CSSProperties = {
@@ -173,6 +174,12 @@ export default function BottomPanel() {
 
   const sidebarWidth = sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
   const forms = useMemo(() => getByCategory(category), [category]);
+  const ITEMS_PER_PAGE = 6;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(forms.length / ITEMS_PER_PAGE);
+  const visibleForms = forms.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
+  // Reset page when category changes
+  useEffect(() => setPage(0), [category]);
 
   // Auto-sync category when a SceneObject is selected
   useEffect(() => {
@@ -215,10 +222,26 @@ export default function BottomPanel() {
         ))}
       </div>
 
-      {/* Card bar */}
+      {/* Card bar with pagination */}
       <div style={cardBarStyle}>
-        <div style={cardScrollStyle}>
-          {forms.map((f) => {
+        {/* Prev page arrow */}
+        {totalPages > 1 && (
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            style={{
+              background: 'none', border: 'none', cursor: page === 0 ? 'default' : 'pointer',
+              color: page === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)',
+              padding: 2, flexShrink: 0, display: 'flex', alignItems: 'center',
+            }}
+            title="Previous"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        )}
+
+        <div style={{ ...cardScrollStyle, overflowX: 'hidden' }}>
+          {visibleForms.map((f) => {
             const isPlacing = activePlacementFormId === f.id;
             const isSelected = !isPlacing && selectedFormId === f.id;
             return (
@@ -236,8 +259,8 @@ export default function BottomPanel() {
                 }}
                 title={`${f.name} — $${f.costEstimate}`}
               >
-                <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : 'rgba(255,255,255,0.5)' }}>
-                  <FormThumbnail formId={f.id} size={28} />
+                <div style={{ color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : 'rgba(255,255,255,0.6)' }}>
+                  <FormThumbnail formId={f.id} size={32} />
                 </div>
                 <span style={{ ...cardNameStyle, color: isPlacing ? '#93c5fd' : isSelected ? HIGHLIGHT_COLOR_SELECT : undefined }}>
                   {f.name}
@@ -246,6 +269,22 @@ export default function BottomPanel() {
             );
           })}
         </div>
+
+        {/* Next page arrow */}
+        {totalPages > 1 && (
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            style={{
+              background: 'none', border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer',
+              color: page >= totalPages - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.7)',
+              padding: 2, flexShrink: 0, display: 'flex', alignItems: 'center',
+            }}
+            title="Next"
+          >
+            <ChevronRight size={18} />
+          </button>
+        )}
 
         {/* Badge area: placing or selected */}
         {(placingForm || (selectedForm && !activePlacementFormId)) && (
