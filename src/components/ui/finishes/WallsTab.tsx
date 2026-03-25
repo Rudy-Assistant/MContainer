@@ -12,6 +12,7 @@ import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import OptionCardGrid from './OptionCardGrid';
 import SwatchRow from './SwatchRow';
+import { PresetCard } from './PresetCard';
 import { useApplyFinish } from './useApplyFinish';
 
 interface Props {
@@ -55,25 +56,15 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
         }}>
           Wall Surface
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
           {wallTypes.map((entry) => (
-            <button
+            <PresetCard
               key={entry.surface + '-' + entry.category}
+              content={<span style={{ fontSize: 24 }}>{entry.icon}</span>}
+              label={entry.label}
+              active={surface === entry.surface}
               onClick={() => handleSurfaceChange(entry.surface)}
-              title={entry.label}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 6,
-                padding: '10px 4px', borderRadius: 8, cursor: 'pointer',
-                border: `2px solid ${surface === entry.surface ? 'var(--accent)' : 'var(--border)'}`,
-                background: surface === entry.surface ? 'var(--border-subtle)' : 'var(--btn-bg)',
-                boxShadow: surface === entry.surface ? '0 0 0 1px var(--accent)' : 'none',
-                color: 'var(--text-main)', transition: 'border-color 120ms, box-shadow 120ms',
-              }}
-            >
-              <span style={{ fontSize: 18 }}>{entry.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 500, textAlign: 'center', lineHeight: 1.3 }}>{entry.label}</span>
-            </button>
+            />
           ))}
         </div>
       </div>
