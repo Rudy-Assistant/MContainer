@@ -50,19 +50,57 @@ function getBox(w: number, h: number, d: number): THREE.BoxGeometry {
 // Bay groups — computed once at module level
 const BAY_GROUPS = computeBayGroups();
 
-/** Compute merged AABB for a bay group's voxel indices */
+/**
+ * Compute debug wireframe AABB for a bay group.
+ * Body bays use getVoxelLayout positions directly.
+ * Extension bays are clamped to the container edge — they render as thin
+ * strips flush against the body boundary (matching V2's hitbox display)
+ * rather than at their full fold-out positions.
+ */
 function bayGroupAABB(group: BayGroup, dims: { length: number; width: number; height: number }) {
+  const coreW = dims.length / 6;
+  const coreD = dims.width / 2;
+  const halfLen = dims.length / 2;
+  const halfWid = dims.width / 2;
+  // Extension strip thickness — thin enough to sit flush at the edge
+  const EXT_STRIP = coreW * 0.4;
+
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const idx of group.voxelIndices) {
     const row = Math.floor(idx / VOXEL_COLS);
     const col = idx % VOXEL_COLS;
-    const layout = getVoxelLayout(col, row, dims);
-    const halfW = layout.voxW / 2;
-    const halfD = layout.voxD / 2;
-    minX = Math.min(minX, layout.px - halfW);
-    maxX = Math.max(maxX, layout.px + halfW);
-    minZ = Math.min(minZ, layout.pz - halfD);
-    maxZ = Math.max(maxZ, layout.pz + halfD);
+    const isHaloCol = col === 0 || col === VOXEL_COLS - 1;
+    const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
+
+    // For extensions: position at container edge instead of fold-out position
+    let px: number, halfW: number;
+    if (col === 0) {
+      px = halfLen + EXT_STRIP / 2;
+      halfW = EXT_STRIP / 2;
+    } else if (col === VOXEL_COLS - 1) {
+      px = -(halfLen + EXT_STRIP / 2);
+      halfW = EXT_STRIP / 2;
+    } else {
+      px = -(col - 3.5) * coreW;
+      halfW = coreW / 2;
+    }
+
+    let pz: number, halfD: number;
+    if (row === 0) {
+      pz = -(halfWid + EXT_STRIP / 2);
+      halfD = EXT_STRIP / 2;
+    } else if (row === VOXEL_ROWS - 1) {
+      pz = halfWid + EXT_STRIP / 2;
+      halfD = EXT_STRIP / 2;
+    } else {
+      pz = (row - 1.5) * coreD;
+      halfD = coreD / 2;
+    }
+
+    minX = Math.min(minX, px - halfW);
+    maxX = Math.max(maxX, px + halfW);
+    minZ = Math.min(minZ, pz - halfD);
+    maxZ = Math.max(maxZ, pz + halfD);
   }
   return {
     cx: (minX + maxX) / 2,
@@ -93,7 +131,13 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
     }).filter(Boolean) as { cx: number; cz: number; w: number; d: number; h: number; isBody: boolean; id: string; label: string }[];
   }, [isSimpleMode, grid, dims, vHeight]);
 
-  // Detail mode: per-voxel wireframes
+  // Detail mode: per-voxel wireframes (extensions clamped to edge)
+  const coreW = dims.length / 6;
+  const coreD = dims.width / 2;
+  const halfLen = dims.length / 2;
+  const halfWid = dims.width / 2;
+  const EXT_STRIP = coreW * 0.4;
+
   const voxels = useMemo(() => {
     if (isSimpleMode) return null;
     const result: { px: number; py: number; pz: number; w: number; h: number; d: number; isExt: boolean; idx: number }[] = [];
@@ -102,14 +146,25 @@ function ContainerDebugWireframe({ container }: { container: Container }) {
       if (!v.active) continue;
       const row = Math.floor(i / VOXEL_COLS);
       const col = i % VOXEL_COLS;
-      const layout = getVoxelLayout(col, row, dims);
       const isHaloCol = col === 0 || col === VOXEL_COLS - 1;
       const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
       const isBody = !isHaloCol && !isHaloRow;
-      result.push({ px: layout.px, py: vHeight / 2, pz: layout.pz, w: layout.voxW, h: vHeight, d: layout.voxD, isExt: !isBody, idx: i });
+
+      // Extensions: clamp to container edge
+      let px: number, vW: number;
+      if (col === 0) { px = halfLen + EXT_STRIP / 2; vW = EXT_STRIP; }
+      else if (col === VOXEL_COLS - 1) { px = -(halfLen + EXT_STRIP / 2); vW = EXT_STRIP; }
+      else { px = -(col - 3.5) * coreW; vW = coreW; }
+
+      let pz: number, vD: number;
+      if (row === 0) { pz = -(halfWid + EXT_STRIP / 2); vD = EXT_STRIP; }
+      else if (row === VOXEL_ROWS - 1) { pz = halfWid + EXT_STRIP / 2; vD = EXT_STRIP; }
+      else { pz = (row - 1.5) * coreD; vD = coreD; }
+
+      result.push({ px, py: vHeight / 2, pz, w: vW, h: vHeight, d: vD, isExt: !isBody, idx: i });
     }
     return result;
-  }, [isSimpleMode, grid, dims, vHeight]);
+  }, [isSimpleMode, grid, dims, vHeight, coreW, coreD, halfLen, halfWid]);
 
   return (
     <group position={[container.position.x, container.position.y, container.position.z]}>
