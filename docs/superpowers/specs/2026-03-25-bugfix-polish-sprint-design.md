@@ -58,11 +58,11 @@ Replace horizontal PresetCard row with a 3-column CSS grid of larger icon button
 - ContainerPresetRow switches to a 3-column CSS grid
 - 5 presets: 3 on first row, 2 on second row (left-aligned)
 
-**PresetCard `size="large"` variant:**
-- New optional `size` prop: `"default" | "large"`
-- `"large"`: ~72-80px image area, `IsometricVoxelSVG` at 48-56px
-- Bold label: `font-weight: 600`, white text
-- Dark card background, subtle border (`rgba(255,255,255,0.08)`), `border-radius: 8px`
+**ContainerPresetCard wrapper:**
+- New `ContainerPresetCard` component that composes `PresetCard` with additional styling
+- Wrapper adds: dark card background, subtle border (`rgba(255,255,255,0.08)`), `border-radius: 8px`, larger image area (~72-80px)
+- Inner `PresetCard` renders `IsometricVoxelSVG` at 48-56px with bold label (`font-weight: 600`, white text)
+- PresetCard itself is unchanged — no new props needed
 - Highlight on image only (per PresetCard convention), text below outside highlight
 
 **Interaction:** Click applies preset (existing `handleApplyPreset`). Hover triggers ghost preview (existing `setGhostPreset`/`clearGhostPreset`).
@@ -84,21 +84,27 @@ Extend `faceToTab()` routing, add element-type routing, and batch the two Zustan
 ### Details
 
 **Face-to-tab routing (extend `faceToTab()`):**
+- `faceToTab()` remains a pure function taking only `face: string | null`
 - `n`, `s`, `e`, `w` → `'walls'` (already works)
-- `top` → `'ceiling'` when ceiling mode active, otherwise `'flooring'`
+- `top` → `'ceiling'` (always — this is the most intuitive default)
 - `bottom` → `'flooring'`
 - No face + bay/block element type → `'block'`
 - `null` face + no element → stays on current tab
 - Container tab is never auto-selected (manual only)
 
 **Batching fix in ContainerSkin:**
-- Combine `setSelectedElements()` + `setSelectedFace()` into a single Zustand action, or use `unstable_batchedUpdates` to ensure both land in the same React render cycle
-- FinishesPanel's `useEffect` watching `selectedFace` then fires reliably
+- Add a new combined Zustand action `selectWithFace(elements, face)` in `selectionSlice.ts`
+- This action calls `set()` once with both `selectedElements` and `selectedFace`, producing a single state update and single React re-render
+- Replace the two separate `setSelectedElements()` + `setSelectedFace()` calls in ContainerSkin (lines ~2364-2369, ~2965-2970, ~3023-3028) with the single `selectWithFace()` call
+- FinishesPanel's `useEffect` watching `selectedFace` then fires reliably on the already-updated value
 
-**Element-type routing (new):**
-- Second `useEffect` in FinishesPanel watching `selectedElements.type`
-- If type is `'bay'` or `'block'` and no face selected → auto-switch to `'block'` tab
-- Face selection takes priority over element-type routing
+**Unified tab-routing effect (new):**
+- Single `useEffect` in FinishesPanel watching both `selectedFace` and `selectedElements.type`
+- Priority logic within the effect: face routing wins over element-type routing
+- If face is set → `faceToTab(face)` determines the tab
+- Else if element type is `'bay'` or `'block'` → auto-switch to `'block'` tab
+- Else → stay on current tab
+- This avoids race conditions from two independent useEffects
 
 ### Verification
 Playwright clicks a wall face in 3D → confirms Walls tab active with "WALL SURFACE" options visible. Repeat for floor → Flooring tab, ceiling → Ceiling tab.
@@ -139,8 +145,10 @@ Redesign card styling to match aspirational art. Extend ghost preview system for
 **Ghost Preview (stamp mode):**
 - Trigger: hotbar material/bay config active (isPlacing = true), hovering a voxel face in 3D
 - Existing infrastructure: `ghostPreset` in uiSlice + `HoverPreviewGhost` — extend for hotbar stamp mode
-- New state: `stampPreview: { surfaceType: SurfaceType; hoveredVoxelIndex: number } | null` in uiSlice
-- Visual: transparent overlay (0.3 opacity) showing material on hovered face. Green tint (`#22c55e` at 0.2 opacity) = valid placement. Red tint = invalid (e.g., floor material on wall).
+- New state: `stampPreview: { surfaceType: SurfaceType; containerId: string; voxelIndex: number } | null` in uiSlice
+- New actions: `setStampPreview(preview)` and `clearStampPreview()` in uiSlice
+- The ghost renderer reads `hoveredVoxelEdge` (existing) for face position/normal, and `stampPreview` for the material to display
+- Visual: transparent overlay (0.3 opacity) showing material on hovered face. Green tint (`#22c55e` at 0.2 opacity) on all placements (validation logic deferred to follow-up sprint)
 - Flow: select material in hotbar → hover voxel face → ghost preview → click to apply → ghost follows cursor
 - Clear: deselect hotbar item, press Escape, or switch tabs
 
@@ -165,21 +173,21 @@ Port V2's approach: render voxels as wireframe meshes directly, suppress Contain
 
 **Replace DebugOverlay architecture:**
 - Remove EdgesGeometry + lineSegments approach
-- When `debugHitboxes` is true, render each voxel as `<mesh>` with `MeshBasicMaterial({ wireframe: true, depthTest: false, depthWrite: false, side: DoubleSide })`
+- When `debugMode` is true, render each voxel as `<mesh>` with `MeshBasicMaterial({ wireframe: true, depthTest: false, depthWrite: false, side: DoubleSide })`
 - Body voxels (rows 1-2, cols 1-6): red `0xff2222`, opacity 0.6
 - Extension voxels (rows 0/3, cols 0/7): orange `0xff8800`, opacity 0.4
-- Positions from `getVoxelLayout()` — exact alignment with ContainerSkin
+- Voxel positions computed using the same inline layout math as ContainerSkin (dims, foldDepth, coreWidth, coreDepth, col/row position formulas). Extract into a shared `computeVoxelPosition(col, row, dims)` utility if not already exported, or duplicate the ~15 lines of position math from ContainerSkin.
 - All 32 voxels rendered
 
 **ContainerSkin suppression:**
-- When `debugHitboxes` is true, skip normal face rendering (skin meshes, edge strips, baseplate wireframes, halo geometry)
+- When `debugMode` is true, skip normal face rendering (skin meshes, edge strips, baseplate wireframes, halo geometry)
 - Container becomes invisible except for DebugOverlay wireframes
 - Selection highlight and hover highlight still render on top (`renderOrder: 100+`)
 
 **Corner debug labels (from V2):**
 - Port `DebugLabels`: colored corner dots at voxels 0, 7, 24, 31
 - Red (NW), Blue (NE), Green (SW), Yellow (SE)
-- Only visible when `debugHitboxes` is true
+- Only visible when `debugMode` is true
 
 ### Verification
 Playwright toggles wireframe ON → confirms single set of wireframe outlines (no doubling). Confirms extensions visible in orange. Toggles OFF → normal rendering returns.
@@ -204,3 +212,11 @@ Issues 1-5 are largely independent. Ordering recommendation:
 5. Hotbar redesign + ghost preview (issue 4) — largest scope, touches BottomPanel + SmartHotbar + HoverPreviewGhost + uiSlice
 
 Issues 3 and 5 both modify ContainerSkin.tsx — implement 3 first (selection batching), then 5 (wireframe suppression) to avoid merge conflicts.
+
+Issue 4 should be split into two sub-tasks:
+- **4a: Hotbar styling** — BottomPanel card redesign + SmartHotbar frame treatment (CSS-only)
+- **4b: Ghost preview** — stampPreview state + HoverPreviewGhost extension (new 3D rendering + state)
+
+## Rollback Strategy
+
+Each issue must be committed independently so partial reverts are possible. Per CLAUDE.md: "If anything breaks, revert immediately." If an issue's implementation causes regressions in unrelated areas, `git revert` the single commit rather than attempting a forward fix under time pressure.
