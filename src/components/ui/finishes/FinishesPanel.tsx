@@ -11,7 +11,6 @@ import CeilingTab from './CeilingTab';
 import ElectricalTab from './ElectricalTab';
 import BlockTab from './BlockTab';
 import { ContainerTab } from './ContainerTab';
-import { SpatialVoxelGrid } from './SpatialVoxelGrid';
 
 export default function FinishesPanel() {
   const target = useSelectionTarget();
@@ -103,12 +102,7 @@ export default function FinishesPanel() {
         />
       </div>
 
-      {/* Spatial voxel grid — always visible above tabs */}
-      <div style={{ padding: '4px 8px 6px' }}>
-        <SpatialVoxelGrid containerId={containerId} />
-      </div>
-
-      {/* Tab bar */}
+      {/* Tab bar — spatial grid is rendered by MatrixEditor above this panel */}
       <FinishesTabBar
         activeTab={activeTab}
         onTabChange={(tab) => { setActiveTab(tab); clearGhostPreset(); }}
