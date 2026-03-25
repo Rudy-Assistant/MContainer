@@ -41,10 +41,8 @@ import * as THREE from "three";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import { useStore } from "@/store/useStore";
-import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
-import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
-import { getSelectedVoxel } from "@/hooks/useSelectedVoxel";
-import { getSelectedVoxels } from "@/hooks/useSelectedVoxels";
+import { useSelectedVoxel, getSelectedVoxel } from "@/hooks/useSelectedVoxel";
+import { useSelectedVoxels, getSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import {
   type Container,
   type SurfaceType,

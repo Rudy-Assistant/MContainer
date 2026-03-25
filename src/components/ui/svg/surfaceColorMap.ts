@@ -1,5 +1,12 @@
 import type { SurfaceType } from '@/types/container';
 
+/**
+ * SVG-specific surface colors for isometric previews.
+ * Intentionally diverges from SURFACE_COLORS in surfaceLabels.ts:
+ * - Open renders as light grey (visible wireframe), not transparent
+ * - Colors optimized for small SVG thumbnails, not 3D materials
+ * See surfaceLabels.ts SURFACE_COLORS for the 3D/UI palette.
+ */
 export const SURFACE_COLOR_MAP: Record<string, string> = {
   Open:               '#e2e8f0',
   Solid_Steel:        '#64748b',

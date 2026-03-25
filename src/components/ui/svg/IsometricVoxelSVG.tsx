@@ -1,6 +1,7 @@
 'use client';
 
-import type { VoxelFaces } from '@/types/container';
+import type { VoxelFaces, SurfaceType } from '@/types/container';
+import { isRailingSurface } from '@/types/container';
 import { surfaceColor } from './surfaceColorMap';
 
 interface IsometricVoxelSVGProps {
@@ -21,11 +22,10 @@ interface IsometricVoxelSVGProps {
  *   Half_Fold      → horizontal fold line
  *   Gull_Wing      → upward hinge line
  */
-const isOpen = (s: string) => s === 'Open';
-const isRailing = (s: string) => s.startsWith('Railing');
-const isGlass = (s: string) => s === 'Glass_Pane' || s.startsWith('Window');
-const isFold = (s: string) => s === 'Half_Fold';
-const isGull = (s: string) => s === 'Gull_Wing';
+const isOpen = (s: SurfaceType) => s === 'Open';
+const isGlass = (s: SurfaceType) => s === 'Glass_Pane' || s === 'Window_Standard' || s === 'Window_Sill' || s === 'Window_Clerestory' || s === 'Window_Half';
+const isFold = (s: SurfaceType) => s === 'Half_Fold';
+const isGull = (s: SurfaceType) => s === 'Gull_Wing';
 
 const WIRE = { stroke: '#94a3b8', strokeWidth: 0.8, strokeDasharray: '2 2' } as const;
 const SOLID = { stroke: '#475569', strokeWidth: 0.5, strokeDasharray: 'none' } as const;
@@ -79,7 +79,7 @@ export function IsometricVoxelSVG({ faces, size = 64 }: IsometricVoxelSVGProps) 
       />
 
       {/* Front face overlays */}
-      {isRailing(faces.s) && (
+      {isRailingSurface(faces.s) && (
         <g stroke="#334155" strokeWidth={0.6} opacity={0.7}>
           {/* Vertical posts */}
           <line x1={14} y1={20} x2={14} y2={34} />
@@ -110,7 +110,7 @@ export function IsometricVoxelSVG({ faces, size = 64 }: IsometricVoxelSVGProps) 
       />
 
       {/* Right face overlays */}
-      {isRailing(faces.e) && (
+      {isRailingSurface(faces.e) && (
         <g stroke="#334155" strokeWidth={0.6} opacity={0.7}>
           <line x1={34} y1={28} x2={34} y2={42} />
           <line x1={40} y1={24} x2={40} y2={38} />

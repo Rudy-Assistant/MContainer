@@ -3,7 +3,7 @@ import { useStore } from '@/store/useStore';
 
 function deriveVoxels(sel: { type: string; items: Array<{ containerId: string; id: string }> } | null): { containerId: string; indices: number[] } | null {
   if (!sel) return null;
-  if (sel.type !== 'bay' && sel.type !== 'voxel') return null;
+  if (sel.type !== 'bay') return null;
   const containerId = sel.items[0]?.containerId ?? '';
   const indices = sel.items.map(i => parseInt(i.id)).filter(n => !isNaN(n));
   if (indices.length === 0) return null;
