@@ -1898,7 +1898,7 @@ function FlushGhostPreview({
 // ── BaseplateCell — ground-level "Lego" tile for inactive voxels ─
 
 const BASEPLATE_FLOOR_Y = 0.05;    // Floor-level edge strips (matches active voxel paradigm)
-const BASEPLATE_STRIP = 0.2;       // Edge strip depth (matches active voxels)
+const BASEPLATE_STRIP = 0.33;      // Edge strip depth — wall selection quadrant width (wider = easier to click walls)
 
 function BaseplateCell({
   px, pz, colPitch, rowPitch, vHeight,

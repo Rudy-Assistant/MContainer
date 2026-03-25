@@ -20,8 +20,9 @@ import { nullRaycast } from "@/utils/nullRaycast";
 import { computeBayGroups } from "@/config/bayGroups";
 import { getVoxelLayout } from "@/components/objects/ContainerSkin";
 
-// Inset from tile edge to center zone (matches BASEPLATE_STRIP in ContainerSkin)
-const EDGE_INSET = 0.2;
+// Inset from tile edge to center zone — 40% larger than BASEPLATE_STRIP (0.2)
+// to give wall quadrants more visual weight and clickable area
+const EDGE_INSET = 0.33;
 
 // Tile outline materials
 const tileBodyMat = new THREE.LineBasicMaterial({
