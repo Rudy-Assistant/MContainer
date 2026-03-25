@@ -18,8 +18,13 @@ export default function FinishesPanel() {
   const clearSelection = useStore((s) => s.clearSelection);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 
-  // Auto-select tab on face change; manual clicks override freely
-  const [activeTab, setActiveTab] = useState<FinishTab>('container');
+  // Auto-select tab on face change; manual clicks override freely.
+  // IMPORTANT: Initialize from current selectedFace because the panel may
+  // mount AFTER setSelectedFace was already called (React batching). If we
+  // always default to 'container', the effect won't fire when prevFace
+  // already matches selectedFace on first render.
+  const initialTab = faceToTab(selectedFace) ?? 'container';
+  const [activeTab, setActiveTab] = useState<FinishTab>(initialTab);
   const prevFace = useRef(selectedFace);
   useEffect(() => {
     if (selectedFace !== prevFace.current) {
