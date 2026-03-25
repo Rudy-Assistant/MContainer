@@ -30,7 +30,7 @@ const isGull = (s: SurfaceType) => s === 'Gull_Wing';
 const WIRE = { stroke: '#94a3b8', strokeWidth: 0.8, strokeDasharray: '2 2' } as const;
 const SOLID = { stroke: '#475569', strokeWidth: 0.5, strokeDasharray: 'none' } as const;
 
-function faceProps(surface: string, color: string) {
+function faceProps(surface: SurfaceType, color: string) {
   const open = isOpen(surface);
   return {
     fill: open ? 'none' : color,

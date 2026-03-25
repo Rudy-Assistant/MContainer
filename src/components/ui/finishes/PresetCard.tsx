@@ -14,19 +14,16 @@ interface PresetCardProps {
 /**
  * Shared preset card: square image area with highlight on image only.
  * Text label sits below, outside the highlight border.
- * Matches the aspirational Interior Finishes art direction.
+ * Uses native <button> for accessibility (focus, Enter/Space, ARIA).
  */
 export function PresetCard({
   content, label, active, onClick, onMouseEnter, onMouseLeave,
 }: PresetCardProps) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -34,6 +31,9 @@ export function PresetCard({
         gap: 4,
         cursor: 'pointer',
         minWidth: 0,
+        border: 'none',
+        background: 'none',
+        padding: 0,
       }}
     >
       {/* Image area — highlight border here only */}
@@ -66,6 +66,6 @@ export function PresetCard({
       }}>
         {label}
       </span>
-    </div>
+    </button>
   );
 }

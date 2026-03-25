@@ -41,10 +41,9 @@ const ALL_CELLS = GRID_ROWS.flat();
 
 interface Props {
   containerId: string;
-  onCellClick: (indices: number[]) => void;
 }
 
-export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
+export function SpatialVoxelGrid({ containerId }: Props) {
   const [shiftHoverId, setShiftHoverId] = useState<string | null>(null);
 
   const { selectedElements, frameMode } = useStore(
@@ -109,11 +108,7 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
       setSelectedElements({ type: cellType, items: [{ containerId, id: cellId }] });
     }
 
-    // Also call onCellClick for backward compat (ContainerTab uses it for voxel selection)
-    // Only on plain click — Ctrl/Shift clicks are handled entirely via selectedElements
-    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
-      onCellClick(cellIndices);
-    }
+    // Selection is handled entirely via setSelectedElements above
   };
 
   const handleMouseEnter = (e: React.MouseEvent, cellId: string) => {

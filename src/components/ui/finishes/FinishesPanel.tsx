@@ -18,7 +18,6 @@ export default function FinishesPanel() {
   const selectedFace = useStore((s) => s.selectedFace) as FaceKey | null;
   const clearSelection = useStore((s) => s.clearSelection);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
-  const setSelectedElements = useStore((s) => s.setSelectedElements);
 
   // Auto-select tab on face change; manual clicks override freely
   const [activeTab, setActiveTab] = useState<FinishTab>('container');
@@ -106,12 +105,7 @@ export default function FinishesPanel() {
 
       {/* Spatial voxel grid — always visible above tabs */}
       <div style={{ padding: '4px 8px 6px' }}>
-        <SpatialVoxelGrid
-          containerId={containerId}
-          onCellClick={(cellIndices) => {
-            setSelectedElements({ type: 'bay', items: cellIndices.map(i => ({ containerId, id: String(i) })) });
-          }}
-        />
+        <SpatialVoxelGrid containerId={containerId} />
       </div>
 
       {/* Tab bar */}

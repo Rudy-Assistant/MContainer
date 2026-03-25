@@ -228,7 +228,8 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
 
   toggleElement: (containerId, id) => set((s: any) => {
     const curr = s.selectedElements;
-    if (!curr) return {};
+    // Bootstrap: if nothing selected, start a new voxel selection
+    if (!curr) return { selectedElements: { type: 'voxel', items: [{ containerId, id }] } };
     const idx = curr.items.findIndex((it: any) => it.containerId === containerId && it.id === id);
     if (idx >= 0) {
       const items = [...curr.items];
