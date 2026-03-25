@@ -38,16 +38,15 @@ describe('Selection', () => {
     expect(useStore.getState().selection).toHaveLength(0);
   });
 
-  it('SEL-3: setSelectedVoxel tracks containerId + index', () => {
+  it('SEL-3: setSelectedElements tracks containerId + id', () => {
     const id = useStore.getState().addContainer(ContainerSize.HighCube40);
-    const voxelRef = { containerId: id, index: 9 };
 
-    useStore.getState().setSelectedVoxel(voxelRef);
+    useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId: id, id: '9' }] });
 
-    const sv = useStore.getState().selectedVoxel;
-    expect(sv).toBeDefined();
-    expect(sv!.containerId).toBe(id);
-    expect((sv as any).index).toBe(9);
+    const sel = useStore.getState().selectedElements;
+    expect(sel).toBeDefined();
+    expect(sel!.items[0].containerId).toBe(id);
+    expect(sel!.items[0].id).toBe('9');
   });
 
   it('SEL-4: selection persists across setViewMode', () => {

@@ -95,26 +95,34 @@ describe('Bug: Simple mode selection uses bay groups', () => {
     expect(useStore.getState().designComplexity).toBe('simple');
   });
 
-  it('setSelectedVoxels clears selectedVoxel (mutual exclusion)', () => {
+  it('setSelectedElements(bay) sets bay selection', () => {
     const id = addTestContainer();
-    useStore.getState().setSelectedVoxel({ containerId: id, index: 9 });
-    expect(useStore.getState().selectedVoxel).not.toBeNull();
+    useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId: id, id: '9' }] });
+    expect(useStore.getState().selectedElements).not.toBeNull();
 
-    // Now set multi-select (bay group)
-    useStore.getState().setSelectedVoxels({ containerId: id, indices: [9, 10, 17, 18] });
-    expect(useStore.getState().selectedVoxel).toBeNull();
-    expect(useStore.getState().selectedVoxels).not.toBeNull();
-    expect(useStore.getState().selectedVoxels!.indices).toEqual([9, 10, 17, 18]);
+    // Now set multi-select (bay group) — replaces voxel selection
+    useStore.getState().setSelectedElements({ type: 'bay', items: [
+      { containerId: id, id: '9' }, { containerId: id, id: '10' },
+      { containerId: id, id: '17' }, { containerId: id, id: '18' },
+    ] });
+    const sel = useStore.getState().selectedElements;
+    expect(sel).not.toBeNull();
+    expect(sel!.type).toBe('bay');
+    expect(sel!.items.map(i => parseInt(i.id))).toEqual([9, 10, 17, 18]);
   });
 
-  it('setSelectedVoxel clears selectedVoxels (mutual exclusion)', () => {
+  it('setSelectedElements(voxel) replaces bay selection', () => {
     const id = addTestContainer();
-    useStore.getState().setSelectedVoxels({ containerId: id, indices: [9, 10, 17, 18] });
-    expect(useStore.getState().selectedVoxels).not.toBeNull();
+    useStore.getState().setSelectedElements({ type: 'bay', items: [
+      { containerId: id, id: '9' }, { containerId: id, id: '10' },
+      { containerId: id, id: '17' }, { containerId: id, id: '18' },
+    ] });
+    expect(useStore.getState().selectedElements).not.toBeNull();
 
-    useStore.getState().setSelectedVoxel({ containerId: id, index: 9 });
-    expect(useStore.getState().selectedVoxels).toBeNull();
-    expect(useStore.getState().selectedVoxel).not.toBeNull();
+    useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId: id, id: '9' }] });
+    const sel = useStore.getState().selectedElements;
+    expect(sel).not.toBeNull();
+    expect(sel!.type).toBe('voxel');
   });
 
   it('hoveredBayGroup can be set and cleared', () => {
@@ -138,15 +146,15 @@ describe('Bug: Simple mode selection uses bay groups', () => {
 });
 
 describe('Bug: Bay selection must include selectedFace for sidebar config', () => {
-  it('deriveSelectionTarget returns bay-face when selectedVoxels + selectedFace are set', () => {
-    // This verifies the sidebar routing: bay + face → FinishesPanel with config options
+  it('deriveSelectionTarget returns bay-face when selectedElements(bay) + selectedFace are set', () => {
     const id = addTestContainer();
 
-    // Simulate what handleClick SHOULD do: set both selectedVoxels and selectedFace
     const target = deriveSelectionTarget({
-      selectedVoxel: null,
+      selectedElements: { type: 'bay', items: [
+        { containerId: id, id: '9' }, { containerId: id, id: '10' },
+        { containerId: id, id: '17' }, { containerId: id, id: '18' },
+      ] },
       selectedFace: 's',
-      selectedVoxels: { containerId: id, indices: [9, 10, 17, 18] },
       selection: [],
     });
 
@@ -158,37 +166,37 @@ describe('Bug: Bay selection must include selectedFace for sidebar config', () =
   });
 
   it('deriveSelectionTarget returns bay (no config) when selectedFace is null', () => {
-    // This was the bug: handleClick set selectedVoxels but NOT selectedFace
     const id = addTestContainer();
 
     const target = deriveSelectionTarget({
-      selectedVoxel: null,
-      selectedFace: null, // ← bug: handleClick didn't set this
-      selectedVoxels: { containerId: id, indices: [9, 10, 17, 18] },
+      selectedElements: { type: 'bay', items: [
+        { containerId: id, id: '9' }, { containerId: id, id: '10' },
+        { containerId: id, id: '17' }, { containerId: id, id: '18' },
+      ] },
+      selectedFace: null,
       selection: [],
     });
 
-    // Without selectedFace, target is 'bay' (WallTypePicker) instead of 'bay-face' (FinishesPanel)
     expect(target.type).toBe('bay');
   });
 
-  it('setSelectedVoxels + setSelectedFace together produce bay-face target', () => {
+  it('setSelectedElements(bay) + setSelectedFace together produce bay-face target', () => {
     const id = addTestContainer();
     const store = useStore.getState();
 
-    // Simulate the fixed handleClick: set both bay group AND face
-    store.setSelectedVoxels({ containerId: id, indices: [9, 10, 17, 18] });
+    store.setSelectedElements({ type: 'bay', items: [
+      { containerId: id, id: '9' }, { containerId: id, id: '10' },
+      { containerId: id, id: '17' }, { containerId: id, id: '18' },
+    ] });
     store.setSelectedFace('s');
 
     const state = useStore.getState();
-    expect(state.selectedVoxels).not.toBeNull();
+    expect(state.selectedElements).not.toBeNull();
     expect(state.selectedFace).toBe('s');
 
-    // Verify target derivation
     const target = deriveSelectionTarget({
-      selectedVoxel: state.selectedVoxel,
+      selectedElements: state.selectedElements,
       selectedFace: state.selectedFace,
-      selectedVoxels: state.selectedVoxels,
       selection: state.selection,
     });
     expect(target.type).toBe('bay-face');

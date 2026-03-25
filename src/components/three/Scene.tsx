@@ -16,6 +16,7 @@ import {
 import type CameraControlsImpl from "camera-controls";
 import { useStore } from "@/store/useStore";
 import { ViewMode, CONTAINER_DIMENSIONS, DEFAULT_EXTENSION_CONFIG, type Container } from "@/types/container";
+import { getSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import {
   CAMERA_MIN_POLAR_ANGLE,
   CAMERA_MAX_POLAR_ANGLE,
@@ -590,9 +591,10 @@ function useKeyboardShortcuts() {
 
       // Delete / Backspace = Clear voxel if selected, else delete container
       if (e.code === "Delete" || e.code === "Backspace") {
-        if (store.selectedVoxel && !store.selectedVoxel.isExtension) {
+        const _delVoxel = getSelectedVoxel();
+      if (_delVoxel && !_delVoxel.isExtension) {
           e.preventDefault();
-          store.setVoxelActive(store.selectedVoxel.containerId, store.selectedVoxel.index, false);
+          store.setVoxelActive(_delVoxel.containerId, (_delVoxel as { containerId: string; index: number }).index, false);
           return;
         }
         if (store.selection.length > 0) {
@@ -790,7 +792,7 @@ function useKeyboardShortcuts() {
       if (e.key === 'Tab') {
         e.preventDefault();
         const store = useStore.getState();
-        const containerId = store.selection[0] ?? store.selectedVoxel?.containerId ?? null;
+        const containerId = store.selection[0] ?? store.selectedElements?.items[0]?.containerId ?? null;
         if (!containerId) return;
 
         const ids = Object.entries(store.sceneObjects)
@@ -1188,7 +1190,6 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
   const viewLevel = useStore((s) => s.viewLevel);
   const clearSelection = useStore((s) => s.clearSelection);
   const debugMode = useStore((s) => s.debugMode);
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
   const frameMode = useStore((s) => s.frameMode);
   const isPreviewMode = useStore((s) => s.isPreviewMode);
   const activePaletteId = useStore((s) => s.activePaletteId);
@@ -1383,7 +1384,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
           if (e.nativeEvent.button !== 0) return; // let right-click through to camera
           e.stopPropagation();
           clearSelection();
-          useStore.getState().setSelectedVoxel(null);
+          useStore.getState().setSelectedElements(null);
           if (frameMode) useStore.getState().setSelectedFrameElement(null);
         }}
       >

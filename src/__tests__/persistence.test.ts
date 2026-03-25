@@ -49,7 +49,7 @@ describe('Persistence', () => {
     // Pure selection changes should NOT create new temporal entries
     useStore.getState().select('some-id');
     useStore.getState().clearSelection();
-    useStore.getState().setSelectedVoxel({ containerId: 'x', index: 0 });
+    useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId: 'x', id: '0' }] });
 
     const pastAfter = useStore.temporal.getState().pastStates.length;
     expect(pastAfter).toBe(pastBefore);

@@ -2453,7 +2453,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       grid[voxelIndex] = { ...voxel, active: true, faces: { ...slot.faces! } };
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
-        selectedVoxel: { containerId, index: voxelIndex },
+        selectedElements: { type: 'voxel' as const, items: [{ containerId, id: String(voxelIndex) }] },
         };
     });
   },

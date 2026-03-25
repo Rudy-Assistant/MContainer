@@ -19,6 +19,7 @@ import {
   VOXEL_ROWS,
 } from "@/types/container";
 import { useStore } from "@/store/useStore";
+import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
 
 const Y = 0.5;
 
@@ -179,10 +180,10 @@ function VoxelBlueprintGrid({
   dims: ContainerDimensions;
   level: number;
 }) {
-  const setSelectedVoxel = useStore((s) => s.setSelectedVoxel);
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
   const select           = useStore((s) => s.select);
   const setHoveredVoxel  = useStore((s) => s.setHoveredVoxel);
-  const selectedVoxel    = useStore((s) => s.selectedVoxel);
+  const selectedVoxel    = useSelectedVoxel();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const grid: Voxel[] = container.voxelGrid ?? [];
@@ -257,7 +258,7 @@ function VoxelBlueprintGrid({
               onClick={(e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
                 select(container.id, e.nativeEvent.shiftKey);
-                setSelectedVoxel({ containerId: container.id, index: idx });
+                setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
               }}
               onPointerOver={(e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();

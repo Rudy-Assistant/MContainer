@@ -485,7 +485,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           [containerId]: { ...c, voxelGrid: grid, furniture },
         },
         furnitureIndex,
-        selectedVoxel: { containerId, index: voxelIndex },
+        selectedElements: { type: 'voxel' as const, items: [{ containerId, id: String(voxelIndex) }] },
       };
     });
   },
@@ -506,7 +506,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       grid[voxelIndex] = { ...voxel, active: true, faces: { ...slot.faces! } };
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
-        selectedVoxel: { containerId, index: voxelIndex },
+        selectedElements: { type: 'voxel' as const, items: [{ containerId, id: String(voxelIndex) }] },
         };
     });
   },

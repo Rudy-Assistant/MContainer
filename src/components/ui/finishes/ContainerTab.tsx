@@ -21,11 +21,11 @@ export function ContainerTab({ containerId }: Props) {
     }))
   );
 
-  const { containers, stampArea, setSelectedVoxels } = useStore(
+  const { containers, stampArea, setSelectedElements } = useStore(
     useShallow((s: any) => ({
       containers: s.containers,
       stampArea: s.stampArea,
-      setSelectedVoxels: s.setSelectedVoxels,
+      setSelectedElements: s.setSelectedElements,
     }))
   );
 
@@ -43,7 +43,7 @@ export function ContainerTab({ containerId }: Props) {
   }
 
   function handleCellClick(indices: number[]) {
-    setSelectedVoxels({ containerId, indices });
+    setSelectedElements({ type: 'bay', items: indices.map(i => ({ containerId, id: String(i) })) });
   }
 
   const iconBtnStyle = (active: boolean, disabled?: boolean): React.CSSProperties => ({

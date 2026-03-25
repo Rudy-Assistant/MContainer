@@ -165,14 +165,14 @@ describe('door system', () => {
 describe('3D-first selection', () => {
   it('setSelectedFace stores face context', () => {
     const id = addTestContainer();
-    useStore.getState().setSelectedVoxel({ containerId: id, index: 10 });
+    useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId: id, id: '10' }] });
     useStore.getState().setSelectedFace('n');
     expect(useStore.getState().selectedFace).toBe('n');
   });
 
   it('clearSelection clears selectedFace', () => {
     const id = addTestContainer();
-    useStore.getState().setSelectedVoxel({ containerId: id, index: 10 });
+    useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId: id, id: '10' }] });
     useStore.getState().setSelectedFace('s');
     useStore.getState().clearSelection();
     expect(useStore.getState().selectedFace).toBeNull();

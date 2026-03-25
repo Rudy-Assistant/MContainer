@@ -520,7 +520,7 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
                     material={mHit}
                     onClick={(e) => {
                       e.stopPropagation();
-                      useStore.getState().setSelectedVoxel({ containerId, index: voxelIdx });
+                      useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId, id: String(voxelIdx) }] });
                     }}
                     onPointerEnter={(e) => {
                       e.stopPropagation();

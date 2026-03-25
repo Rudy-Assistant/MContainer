@@ -3,11 +3,12 @@
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/react/shallow";
 import type { SurfaceType } from "@/types/container";
+import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
 
 export default function RecentItemsBar() {
   const recentItems = useStore(useShallow((s) => s.recentItems));
   const paintFace = useStore((s) => s.paintFace);
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
+  const selectedVoxel = useSelectedVoxel();
   const selectedFace = useStore((s) => s.selectedFace);
 
   const applyRecent = (index: number) => {

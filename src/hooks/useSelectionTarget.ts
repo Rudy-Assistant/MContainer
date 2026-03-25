@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import { useStore } from '../store/useStore';
-import type { VoxelPayload } from '../store/useStore';
 import type { VoxelFaces } from '../types/container';
 import { VOXEL_COLS } from '../types/container';
 import { getBayGroupForVoxel } from '../config/bayGroups';
+import type { ElementType } from '../store/slices/selectionSlice';
 
 export type FaceKey = keyof VoxelFaces;
 
@@ -16,40 +16,47 @@ export type SelectionTarget =
   | { type: 'bay-face'; containerId: string; indices: number[]; bayId: string; face: FaceKey };
 
 export interface SelectionState {
-  selectedVoxel: VoxelPayload | null;
+  selectedElements: {
+    type: ElementType;
+    items: Array<{ containerId: string; id: string }>;
+  } | null;
   selectedFace: FaceKey | null;
-  selectedVoxels: { containerId: string; indices: number[] } | null;
   selection: string[];
 }
 
 export function deriveSelectionTarget(state: SelectionState): SelectionTarget {
-  if (state.selectedVoxels) {
-    const cid = state.selectedVoxels.containerId;
-    const indices = state.selectedVoxels.indices;
-    const bayId = getBayGroupForVoxel(indices[0])?.id ?? 'custom';
-    if (state.selectedFace) {
-      return { type: 'bay-face', containerId: cid, indices, bayId, face: state.selectedFace };
+  const sel = state.selectedElements;
+
+  if (sel && (sel.type === 'bay' || (sel.type === 'voxel' && sel.items.length > 1))) {
+    // Bay / multi-voxel selection
+    const containerId = sel.items[0]?.containerId ?? '';
+    const indices = sel.items.map(it => parseInt(it.id)).filter(n => !isNaN(n));
+    if (indices.length > 0) {
+      const bayId = getBayGroupForVoxel(indices[0])?.id ?? 'custom';
+      if (state.selectedFace) {
+        return { type: 'bay-face', containerId, indices, bayId, face: state.selectedFace };
+      }
+      return { type: 'bay', containerId, indices, bayId };
     }
-    return { type: 'bay', containerId: cid, indices, bayId };
   }
 
-  if (state.selectedVoxel) {
-    const sv = state.selectedVoxel;
-    if (sv.isExtension) {
-      const idx = sv.row * VOXEL_COLS + sv.col;
-      const cid = sv.containerId;
-      if (state.selectedFace) {
-        return { type: 'face', containerId: cid, index: idx, face: state.selectedFace };
-      }
-      return { type: 'voxel', containerId: cid, index: idx };
+  if (sel && sel.type === 'voxel' && sel.items.length === 1) {
+    const item = sel.items[0];
+    const containerId = item.containerId;
+    let index: number;
+    if (item.id.startsWith('ext_')) {
+      const parts = item.id.split('_');
+      const col = parseInt(parts[1]);
+      const row = parseInt(parts[2]);
+      index = row * VOXEL_COLS + col;
     } else {
-      const cid = sv.containerId;
-      const idx = sv.index;
-      if (state.selectedFace) {
-        return { type: 'face', containerId: cid, index: idx, face: state.selectedFace };
-      }
-      return { type: 'voxel', containerId: cid, index: idx };
+      index = parseInt(item.id);
+      if (isNaN(index)) return { type: 'none' };
     }
+    if (state.selectedFace) {
+      return { type: 'face', containerId, index, face: state.selectedFace };
+    }
+    return { type: 'voxel', containerId, index };
   }
 
   if (state.selection.length > 0) {
@@ -79,9 +86,8 @@ export function useSelectionTarget(): SelectionTarget {
 
   const target = useStore((s) => {
     const next = deriveSelectionTarget({
-      selectedVoxel: s.selectedVoxel,
+      selectedElements: s.selectedElements,
       selectedFace: s.selectedFace,
-      selectedVoxels: s.selectedVoxels,
       selection: s.selection,
     });
     if (selectionTargetEqual(prevRef.current, next)) return prevRef.current;

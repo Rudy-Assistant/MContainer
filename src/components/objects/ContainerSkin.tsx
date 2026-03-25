@@ -41,6 +41,10 @@ import * as THREE from "three";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import { useStore } from "@/store/useStore";
+import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
+import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
+import { getSelectedVoxel } from "@/hooks/useSelectedVoxel";
+import { getSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import {
   type Container,
   type SurfaceType,
@@ -2046,7 +2050,7 @@ export default function ContainerSkin({
   /** When true, disables all hitboxes (used for drag-move ghost preview). */
   ghostMode?: boolean;
 }) {
-  const setSelectedVoxel  = useStore((s) => s.setSelectedVoxel);
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
   const setVoxelActive    = useStore((s) => s.setVoxelActive);
   const activeBrush       = useStore((s) => s.activeBrush);
   const setVoxelFace      = useStore((s) => s.setVoxelFace);
@@ -2054,7 +2058,7 @@ export default function ContainerSkin({
   const cycleVoxelTemplate = useStore((s) => s.cycleVoxelTemplate);
   const cycleBlockPreset   = useStore((s) => s.cycleBlockPreset);
   const select            = useStore((s) => s.select);
-  const selectedVoxel     = useStore((s) => s.selectedVoxel);
+  const selectedVoxel     = useSelectedVoxel();
   const globalCullSet     = useStore((s) => s.globalCullSet);
   const hoveredVoxelEdge  = useStore((s) => s.hoveredVoxelEdge);
   const setHoveredVoxel   = useStore((s) => s.setHoveredVoxel);
@@ -2077,7 +2081,7 @@ export default function ContainerSkin({
   const lockedVoxels         = useStore((s) => s.lockedVoxels);
   const setFaceContext       = useStore((s) => s.setFaceContext);
   const hoveredVoxel         = useStore((s) => s.hoveredVoxel);
-  const selectedVoxels       = useStore((s) => s.selectedVoxels);
+  const selectedVoxels       = useSelectedVoxels();
   const bucketMode           = useStore((s) => s.bucketMode);
   const bucketSurface        = useStore((s) => s.bucketSurface);
   const paintFace            = useStore((s) => s.paintFace);
@@ -2188,7 +2192,8 @@ export default function ContainerSkin({
       } else if (e.key === 'v') {
         e.preventDefault();
         const store = useStore.getState();
-        if (store.selectedVoxels && store.selectedVoxels.indices.length > 0) {
+        const _pasteVoxels = getSelectedVoxels();
+        if (_pasteVoxels && _pasteVoxels.indices.length > 0) {
           store.pasteToSelection();
         } else {
           store.pasteVoxel(hv.containerId, hvIndex);
@@ -2292,7 +2297,7 @@ export default function ContainerSkin({
 
         storeNow.applyStairsFromFace(container.id, voxelIndex, faceName as 'n' | 's' | 'e' | 'w');
         storeNow.setStaircasePlacementMode(false);
-        storeNow.setSelectedVoxel({ containerId: container.id, index: voxelIndex });
+        storeNow.setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(voxelIndex) }] });
         return;
       }
 
@@ -2348,7 +2353,7 @@ export default function ContainerSkin({
       const bayIndices = isSimple ? getBayIndicesForVoxel(voxelIndex, VOXEL_ROWS * VOXEL_COLS) : null;
 
       // Check if already selected (individual OR bay group)
-      const svs = useStore.getState().selectedVoxels;
+      const svs = getSelectedVoxels();
       const isBaySelected = bayIndices && svs && svs.containerId === container.id &&
         bayIndices.every((i: number) => svs.indices.includes(i));
       const alreadySelected = isBaySelected ||
@@ -2358,9 +2363,9 @@ export default function ContainerSkin({
 
       if (!alreadySelected) {
         if (bayIndices) {
-          useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+          useStore.getState().setSelectedElements({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) });
         } else {
-          setSelectedVoxel({ containerId: container.id, index: voxelIndex });
+          setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(voxelIndex) }] });
         }
         // Record which face was clicked so sidebar shows face configuration (FinishesPanel)
         useStore.getState().setSelectedFace(faceName);
@@ -2374,13 +2379,13 @@ export default function ContainerSkin({
         cycleVoxelFace(container.id, voxelIndex, faceName);
       }
     },
-    [container.id, activeBrush, bucketMode, bucketSurface, selectedVoxel, setSelectedVoxel, setVoxelFace, cycleVoxelFace, paintFace]
+    [container.id, activeBrush, bucketMode, bucketSurface, selectedVoxel, setSelectedElements, setVoxelFace, cycleVoxelFace, paintFace]
   );
 
   const handleContextMenu = useCallback(
     (voxelIndex: number, faceName: keyof VoxelFaces, nativeEvent: MouseEvent) => {
       nativeEvent.preventDefault();
-      setSelectedVoxel({ containerId: container.id, index: voxelIndex });
+      setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(voxelIndex) }] });
       // WU-9: Open FaceContextMenu with surface-aware actions
       const voxel = container.voxelGrid?.[voxelIndex];
       if (voxel) {
@@ -2394,7 +2399,7 @@ export default function ContainerSkin({
         });
       }
     },
-    [container.id, container.voxelGrid, setSelectedVoxel, setFaceContextMenuCtx]
+    [container.id, container.voxelGrid, setSelectedElements, setFaceContextMenuCtx]
   );
 
   // ── Ctrl+Drag Paint — paint faces by dragging across them with Ctrl held ──
@@ -2589,9 +2594,9 @@ export default function ContainerSkin({
                 }}
                 onContextMenu={(e: ThreeEvent<MouseEvent>) => {
                   if (bayIndicesForVoxel) {
-                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndicesForVoxel });
+                    useStore.getState().setSelectedElements({ type: 'bay', items: bayIndicesForVoxel.map((i: number) => ({ containerId: container.id, id: String(i) })) });
                   } else {
-                    setSelectedVoxel({ containerId: container.id, isExtension: true, col, row });
+                    setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: `ext_${col}_${row}` }] });
                   }
                 }}
                 onClick={() => {
@@ -2621,7 +2626,7 @@ export default function ContainerSkin({
                   } else {
                     // ★ Phase 2 WYSIWYC: Empty tiles are 1st-class citizens.
                     // Always select. On second click cycle block preset (continues infinite loop through Empty).
-                    const svs = useStore.getState().selectedVoxels;
+                    const svs = getSelectedVoxels();
                     const isBayAlreadySel = bayIndicesForVoxel && svs && svs.containerId === container.id &&
                       bayIndicesForVoxel.every((i: number) => svs.indices.includes(i));
                     const isAlreadySel = isBayAlreadySel || (selectedVoxel?.containerId === container.id
@@ -2636,16 +2641,16 @@ export default function ContainerSkin({
                       }
                       // Keep bay group selected (don't switch to single voxel in Simple mode)
                       if (!bayIndicesForVoxel) {
-                        setSelectedVoxel({ containerId: container.id, index: idx });
+                        setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
                       }
                       return;
                     }
                     // Simple mode: select entire bay group instead of individual extension voxel
                     if (bayIndicesForVoxel) {
-                      useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndicesForVoxel });
+                      useStore.getState().setSelectedElements({ type: 'bay', items: bayIndicesForVoxel.map((i: number) => ({ containerId: container.id, id: String(i) })) });
                     } else {
                       // ★ Synthetic extension payload — NO index (prevents grid lookups)
-                      setSelectedVoxel({ containerId: container.id, isExtension: true, col, row });
+                      setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: `ext_${col}_${row}` }] });
                     }
                   }
                 }}
@@ -2898,7 +2903,7 @@ export default function ContainerSkin({
               const onCtxShared = (face?: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
                 (e.nativeEvent as MouseEvent)?.preventDefault?.();
-                setSelectedVoxel({ containerId: container.id, index: idx });
+                setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
                 if (face) {
                   // Edge right-click → FaceContextMenu only (face-specific actions)
                   const voxel = useStore.getState().containers[container.id]?.voxelGrid?.[idx];
@@ -2924,7 +2929,7 @@ export default function ContainerSkin({
                   return;
                 }
                 const stampFaces = getStampFaces();
-                const multiSel = useStore.getState().selectedVoxels;
+                const multiSel = getSelectedVoxels();
                 if (multiSel && multiSel.containerId === container.id && multiSel.indices.length > 1 && stampFaces) {
                   // Multi-voxel: stamp exterior faces only
                   stampAreaSmart(container.id, multiSel.indices, stampFaces);
@@ -2944,23 +2949,24 @@ export default function ContainerSkin({
                 setFaceContext('floor');
                 // ★ Multi-select bypass: if >1 voxels selected + tool equipped, stamp all immediately
                 const facesNow = getStampFaces();
-                const multiSel = useStore.getState().selectedVoxels;
+                const multiSel = getSelectedVoxels();
                 if (facesNow && multiSel && multiSel.containerId === container.id && multiSel.indices.length > 1) {
                   doStamp();
                   return;
                 }
                 // Focus gate: first click always focuses — never stamp or cycle on first contact
                 // ★ STALE CLOSURE FIX: read selectedVoxel fresh at click time
-                const { selectedVoxel: sv, selectedVoxels: svs } = useStore.getState();
+                const sv = getSelectedVoxel();
+                const svs = getSelectedVoxels();
                 const isSelected =
-                  (sv?.containerId === container.id && !sv?.isExtension && sv?.index === idx) ||
+                  (sv?.containerId === container.id && !sv?.isExtension && (sv as any)?.index === idx) ||
                   (bayIndices && svs && svs.containerId === container.id &&
                    bayIndices.every((i: number) => svs.indices.includes(i)));
                 if (!isSelected) {
                   if (bayIndices) {
-                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+                    useStore.getState().setSelectedElements({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) });
                   } else {
-                    setSelectedVoxel({ containerId: container.id, index: idx });
+                    setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
                   }
                   // Set floor face so sidebar shows face configuration
                   useStore.getState().setSelectedFace('bottom');
@@ -2997,16 +3003,16 @@ export default function ContainerSkin({
                 if (activeBrush) {
                   select(container.id);
                   if (bayIndices) {
-                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+                    useStore.getState().setSelectedElements({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) });
                   } else {
-                    setSelectedVoxel({ containerId: container.id, index: idx });
+                    setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
                   }
                   setVoxelFace(container.id, idx, face, activeBrush);
                   return;
                 }
                 // ★ Multi-select bypass: if >1 voxels selected + tool equipped, stamp all immediately
                 const facesNow = getStampFaces();
-                const multiSel = useStore.getState().selectedVoxels;
+                const multiSel = getSelectedVoxels();
                 if (facesNow && multiSel && multiSel.containerId === container.id && multiSel.indices.length > 1) {
                   doStamp();
                   return;
@@ -3017,9 +3023,9 @@ export default function ContainerSkin({
                   bayIndices.every((i: number) => multiSel.indices.includes(i));
                 if (!isAlreadySelected && !isBayAlreadySelected) {
                   if (bayIndices) {
-                    useStore.getState().setSelectedVoxels({ containerId: container.id, indices: bayIndices });
+                    useStore.getState().setSelectedElements({ type: 'bay', items: bayIndices.map((i: number) => ({ containerId: container.id, id: String(i) })) });
                   } else {
-                    setSelectedVoxel({ containerId: container.id, index: idx });
+                    setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
                   }
                   useStore.getState().setSelectedFace(face);
                   return;

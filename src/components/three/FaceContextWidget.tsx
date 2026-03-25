@@ -3,6 +3,7 @@
 import { Html } from '@react-three/drei';
 import { useStore } from '@/store/useStore';
 import { type SurfaceType, type VoxelFaces, CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
+import { useSelectedVoxel } from '@/hooks/useSelectedVoxel';
 import { getVoxelLayout } from '@/components/objects/ContainerSkin';
 
 // ── Surface labels ────────────────────────────────────────────
@@ -201,7 +202,7 @@ function FaceWidget({ surfaceType, containerId, voxelIndex, face }: {
 // ── Main export ──────────────────────────────────────────────
 
 export function FaceContextWidget() {
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
+  const selectedVoxel = useSelectedVoxel();
   const selectedFace = useStore((s) => s.selectedFace);
   const containers = useStore((s) => s.containers);
   const activeBrush = useStore((s) => s.activeBrush);
@@ -209,7 +210,7 @@ export function FaceContextWidget() {
   if (!selectedVoxel || activeBrush || selectedVoxel.isExtension) return null;
   if (!selectedFace) return null;
 
-  const { containerId, index: voxelIndex } = selectedVoxel;
+  const { containerId, index: voxelIndex } = selectedVoxel as { containerId: string; index: number };
   const container = containers[containerId];
   if (!container) return null;
 

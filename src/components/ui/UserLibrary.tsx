@@ -12,6 +12,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useStore, type HotbarSlot } from "@/store/useStore";
 import type { VoxelFaces } from "@/types/container";
+import { getSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import { CssVoxelIcon } from "@/components/ui/SmartHotbar";
 import { LIBRARY_PRESETS, PRESET_SECTIONS } from "@/config/libraryPresets";
 import { MODEL_HOMES } from "@/config/modelHomes";
@@ -165,7 +166,6 @@ export default function UserLibrary() {
   const libraryHomeDesigns = useStore((s) => s.libraryHomeDesigns);
   const removeLibraryItem = useStore((s) => s.removeLibraryItem);
   const setLibraryDragPayload = useStore((s) => s.setLibraryDragPayload);
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
   const containers = useStore((s) => s.containers);
   const saveHomeDesign = useStore((s) => s.saveHomeDesign);
   const loadHomeDesign = useStore((s) => s.loadHomeDesign);
@@ -179,7 +179,7 @@ export default function UserLibrary() {
     const up = () => {
       // Stamp on hovered voxel if available
       const store = useStore.getState();
-      const target = store.hoveredVoxel ?? store.selectedVoxel;
+      const target = store.hoveredVoxel ?? getSelectedVoxel();
       // ★ Guard: extension tiles have no grid index — skip grid stamp
       if (target && !target.isExtension && store.libraryDragPayload?.type === 'block') {
         const f = store.libraryDragPayload.faces;

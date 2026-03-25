@@ -12,6 +12,8 @@
  */
 
 import { useStore } from '@/store/useStore';
+import { getSelectedVoxel } from '@/hooks/useSelectedVoxel';
+import { getSelectedVoxels } from '@/hooks/useSelectedVoxels';
 import { formRegistry } from '@/config/formRegistry';
 import { localToWorld, anchorToLocalPosition, anchorToLocalRotation, localRotToWorld } from '@/utils/anchorMath';
 import { useRef, useMemo, useEffect } from 'react';
@@ -160,7 +162,9 @@ function PresetGhost() {
     if (!group) return;
 
     const state = useStore.getState();
-    const { ghostPreset, selectedVoxel, selectedVoxels, containers } = state;
+    const { ghostPreset, containers } = state;
+    const selectedVoxel = getSelectedVoxel();
+    const selectedVoxels = getSelectedVoxels();
 
     if (!ghostPreset) {
       group.visible = false;
@@ -176,7 +180,7 @@ function PresetGhost() {
       if (ghostPreset.targetScope === 'bay' && selectedVoxels?.containerId === selectedVoxel.containerId) {
         indices = selectedVoxels.indices;
       } else {
-        indices = [selectedVoxel.index];
+        indices = [(selectedVoxel as { containerId: string; index: number }).index];
       }
     } else if (selectedVoxels) {
       containerId = selectedVoxels.containerId;

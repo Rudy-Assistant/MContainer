@@ -10,6 +10,9 @@
 
 import React, { useMemo, useCallback, useState, useRef, useEffect } from "react";
 import { useStore, autoStairDir } from "@/store/useStore";
+import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
+import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
+import { getSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import {
   type Container,
   type SurfaceType,
@@ -268,17 +271,16 @@ function VoxelGrid({
   containerId: string;
   level: number;
 }) {
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
-  const selectedVoxels = useStore((s) => s.selectedVoxels);
-  const setSelectedVoxels = useStore((s) => s.setSelectedVoxels);
-  const toggleVoxelInSelection = useStore((s) => s.toggleVoxelInSelection);
+  const selectedVoxel = useSelectedVoxel();
+  const selectedVoxels = useSelectedVoxels();
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
+  const toggleElement = useStore((s) => s.toggleElement);
   const lockedVoxels = useStore((s) => s.lockedVoxels);
   const hoveredVoxel = useStore((s) => s.hoveredVoxel);
   const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
   const setHoveredVoxel = useStore((s) => s.setHoveredVoxel);
   const setHoveredVoxelEdge = useStore((s) => s.setHoveredVoxelEdge);
   const cycleVoxelFace = useStore((s) => s.cycleVoxelFace);
-  const setSelectedVoxelGrid = useStore((s) => s.setSelectedVoxel);
   const hoveredPreviewFace = useStore((s) => s.hoveredPreviewFace);
   const selectedFace = useStore((s) => s.selectedFace);
   const setVoxelActive = useStore((s) => s.setVoxelActive);
@@ -332,9 +334,9 @@ function VoxelGrid({
   }, [setHoveredVoxelEdge]);
 
   const handleEdgeClick = useCallback((idx: number, face: string) => {
-    setSelectedVoxelGrid({ containerId, index: idx });
+    setSelectedElements({ type: 'voxel', items: [{ containerId, id: String(idx) }] });
     cycleVoxelFace(containerId, idx, face as keyof import("@/types/container").VoxelFaces);
-  }, [containerId, setSelectedVoxelGrid, cycleVoxelFace]);
+  }, [containerId, setSelectedElements, cycleVoxelFace]);
 
   // Context menu: open on right-click, close on outside click
   useEffect(() => {
@@ -356,22 +358,21 @@ function VoxelGrid({
     }
     if (e.ctrlKey || e.metaKey) {
       // Ctrl/Cmd+Click: toggle individual voxel in/out of multi-select
-      toggleVoxelInSelection(containerId, idx);
+      toggleElement(containerId, String(idx));
       lastClickedRef.current = idx;
     } else if (e.shiftKey && lastClickedRef.current >= 0) {
       // Shift+Click: fill linear range [anchor → idx] row-by-row
       const a = Math.min(lastClickedRef.current, idx);
       const b = Math.max(lastClickedRef.current, idx);
-      setSelectedVoxels({ containerId, indices: Array.from({ length: b - a + 1 }, (_, i) => a + i) });
+      setSelectedElements({ type: 'bay', items: Array.from({ length: b - a + 1 }, (_, i) => ({ containerId, id: String(a + i) })) });
       // anchor is NOT updated — allows extending range with successive Shift+Clicks
     } else {
       // Normal click: single select, clear multi-select
-      setSelectedVoxelGrid({ containerId, index: idx });
-      setSelectedVoxels(null);
+      setSelectedElements({ type: 'voxel', items: [{ containerId, id: String(idx) }] });
       setMarqueeCells([]);
       lastClickedRef.current = idx;
     }
-  }, [containerId, setSelectedVoxelGrid, setSelectedVoxels, toggleVoxelInSelection]);
+  }, [containerId, setSelectedElements, toggleElement]);
 
   // Marquee drag: mouseDown starts drag, mouseEnter expands rect, mouseUp commits
   const handleCellMouseDown = useCallback((idx: number, e: React.MouseEvent) => {
@@ -409,7 +410,7 @@ function VoxelGrid({
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       if (marqueeCells.length > 1) {
-        setSelectedVoxels({ containerId, indices: marqueeCells });
+        setSelectedElements({ type: 'bay', items: marqueeCells.map(i => ({ containerId, id: String(i) })) });
         justDraggedRef.current = true;
       }
       dragStartRef.current = -1;
@@ -417,7 +418,7 @@ function VoxelGrid({
     };
     window.addEventListener('mouseup', handleMouseUp);
     return () => window.removeEventListener('mouseup', handleMouseUp);
-  }, [containerId, marqueeCells, setSelectedVoxels]);
+  }, [containerId, marqueeCells, setSelectedElements]);
 
   // Map data col (0-7) to CSS grid column (1-indexed, with spacer tracks at 2 and 9)
   // Grid: ext(1) | spacer(2) | body×6(3-8) | spacer(9) | ext(10)
@@ -551,7 +552,7 @@ function VoxelGrid({
                 onCellMouseEnterDrag={() => handleCellMouseEnterDrag(cell.voxelIndex)}
                 onActivate={() => {
                   setVoxelActive(containerId, cell.voxelIndex, true);
-                  setSelectedVoxelGrid({ containerId, index: cell.voxelIndex });
+                  setSelectedElements({ type: 'voxel', items: [{ containerId, id: String(cell.voxelIndex) }] });
                 }}
                 onContextMenu={handleContextMenu}
               />
@@ -644,15 +645,14 @@ function SimpleBayGrid({
   containerId: string;
   level: number;
 }) {
-  const setSelectedVoxel = useStore((s) => s.setSelectedVoxel);
-  const setSelectedVoxels = useStore((s) => s.setSelectedVoxels);
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
   const activeBrush = useStore((s) => s.activeBrush);
   const activeSlot = useStore((s) => s.activeHotbarSlot);
   const setVoxelFace = useStore((s) => s.setVoxelFace);
   const setHoveredBayGroup = useStore((s) => s.setHoveredBayGroup);
   const setSelectedFace = useStore((s) => s.setSelectedFace);
-  const selectedVoxels = useStore((s) => s.selectedVoxels);
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
+  const selectedVoxels = useSelectedVoxels();
+  const selectedVoxel = useSelectedVoxel();
   const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
   const voxelGrid = container.voxelGrid ?? createDefaultVoxelGrid();
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
@@ -682,16 +682,16 @@ function SimpleBayGrid({
 
     // Ctrl/Cmd+Click: toggle bay voxels in/out of multi-select
     if (e.ctrlKey || e.metaKey) {
-      const cur = useStore.getState().selectedVoxels;
+      const cur = getSelectedVoxels();
       if (!cur || cur.containerId !== containerId) {
-        setSelectedVoxels({ containerId, indices });
+        setSelectedElements({ type: 'bay', items: indices.map(i => ({ containerId, id: String(i) })) });
       } else {
         // Toggle: if all bay indices are already selected, remove them; else add them
         const allSelected = indices.every(i => cur.indices.includes(i));
         const next = allSelected
           ? cur.indices.filter(i => !indices.includes(i))
           : [...new Set([...cur.indices, ...indices])];
-        setSelectedVoxels(next.length ? { containerId, indices: next } : null);
+        setSelectedElements(next.length ? { type: 'bay', items: next.map(i => ({ containerId, id: String(i) })) } : null);
       }
       setSelectedFace('s');
       return;
@@ -699,12 +699,12 @@ function SimpleBayGrid({
 
     // Plain click: select this bay group
     if (indices.length === 1) {
-      setSelectedVoxel({ containerId, index: indices[0] });
+      setSelectedElements({ type: 'voxel', items: [{ containerId, id: String(indices[0]) }] });
     } else {
-      setSelectedVoxels({ containerId, indices });
+      setSelectedElements({ type: 'bay', items: indices.map(i => ({ containerId, id: String(i) })) });
     }
     setSelectedFace('s');
-  }, [level, containerId, activeBrush, setVoxelFace, setSelectedVoxel, setSelectedVoxels, setSelectedFace]);
+  }, [level, containerId, activeBrush, setVoxelFace, setSelectedElements, setSelectedFace]);
 
   const handleBayHover = useCallback((group: BayGroup) => {
     setHoveredGroupId(group.id);
@@ -990,8 +990,8 @@ export default function MatrixEditor({
   container: Container;
   containerId: string;
 }) {
-  const selectedVoxel    = useStore((s) => s.selectedVoxel);
-  const selectedVoxels   = useStore((s) => s.selectedVoxels);
+  const selectedVoxel    = useSelectedVoxel();
+  const selectedVoxels   = useSelectedVoxels();
   const setAllExtensions = useStore((s) => s.setAllExtensions);
 
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);

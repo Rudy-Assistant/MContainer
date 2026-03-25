@@ -93,14 +93,14 @@ describe('F1: Staircase Placement Mode', () => {
     const voxelIndex = 10; // row 1, col 2 — body voxel
     s().applyStairsFromFace(bottomId, voxelIndex, 'e');
     s().setStaircasePlacementMode(false);
-    s().setSelectedVoxel({ containerId: bottomId, index: voxelIndex });
+    s().setSelectedElements({ type: 'voxel', items: [{ containerId: bottomId, id: String(voxelIndex) }] });
 
     // Verify
     expect(s().staircasePlacementMode).toBe(false);
     expect(s().containers[bottomId].voxelGrid![voxelIndex].voxelType).toBe('stairs');
-    const sv = s().selectedVoxel;
-    expect(sv?.containerId).toBe(bottomId);
-    expect(sv && !sv.isExtension ? sv.index : undefined).toBe(voxelIndex);
+    const sel = s().selectedElements;
+    expect(sel?.items[0]?.containerId).toBe(bottomId);
+    expect(sel?.items[0]?.id).toBe(String(voxelIndex));
   });
 
   it('extension voxels are not valid staircase targets', () => {

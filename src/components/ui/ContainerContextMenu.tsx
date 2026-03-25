@@ -68,7 +68,7 @@ export default function ContainerContextMenu() {
       return;
     }
     store.setAllExtensions(newId, DEFAULT_EXTENSION_CONFIG, false);
-    store.setSelectedVoxel({ containerId: newId, index: 0 });
+    store.setSelectedElements({ type: 'voxel', items: [{ containerId: newId, id: '0' }] });
     closeMenu();
   }, [ctx, container, closeMenu]);
 

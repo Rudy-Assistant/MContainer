@@ -219,7 +219,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   clearGrabMode: () => set({ grabMode: { active: false, containerId: null, origin: null } }),
 
   designComplexity: 'simple',
-  setDesignComplexity: (c) => set({ designComplexity: c, selectedVoxel: null, selectedVoxels: null, hoveredBayGroup: null }),
+  setDesignComplexity: (c) => set({ designComplexity: c, selectedElements: null, hoveredBayGroup: null }),
 
   hoveredBayGroup: null,
   setHoveredBayGroup: (g) => set({ hoveredBayGroup: g }),
@@ -322,9 +322,8 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   selectedObjectId: null,
   selectObject: (id) => set({
     selectedObjectId: id,
-    selectedVoxel: null,
+    selectedElements: null,
     selectedFace: null,
-    selectedVoxels: null,
   }),
 
   // SceneObject hover (Feature 1: emissive tint)

@@ -2,10 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { deriveSelectionTarget } from '../hooks/useSelectionTarget';
 
 const base = {
-  selectedVoxel: null,
+  selectedElements: null,
   selectedFace: null,
-  selectedVoxels: null,
-  selection: [],
+  selection: [] as string[],
 };
 
 describe('deriveSelectionTarget', () => {
@@ -18,32 +17,37 @@ describe('deriveSelectionTarget', () => {
       .toEqual({ type: 'container', containerId: 'c1' });
   });
 
-  it('returns voxel for VoxelRef without face', () => {
+  it('returns voxel for single voxel without face', () => {
     expect(deriveSelectionTarget({
       ...base,
-      selectedVoxel: { containerId: 'c1', index: 5 },
+      selectedElements: { type: 'voxel', items: [{ containerId: 'c1', id: '5' }] },
     })).toEqual({ type: 'voxel', containerId: 'c1', index: 5 });
   });
 
-  it('returns face for VoxelRef with face', () => {
+  it('returns face for single voxel with face', () => {
     expect(deriveSelectionTarget({
       ...base,
-      selectedVoxel: { containerId: 'c1', index: 5 },
+      selectedElements: { type: 'voxel', items: [{ containerId: 'c1', id: '5' }] },
       selectedFace: 'n',
     })).toEqual({ type: 'face', containerId: 'c1', index: 5, face: 'n' });
   });
 
-  it('returns voxel for VoxelExtRef (converts col/row to index)', () => {
+  it('returns voxel for extension voxel (converts col/row to index)', () => {
     expect(deriveSelectionTarget({
       ...base,
-      selectedVoxel: { containerId: 'c1', isExtension: true as const, col: 3, row: 0 },
+      selectedElements: { type: 'voxel', items: [{ containerId: 'c1', id: 'ext_3_0' }] },
     })).toEqual({ type: 'voxel', containerId: 'c1', index: 3 });
   });
 
-  it('returns bay for selectedVoxels without face', () => {
+  it('returns bay for bay selection without face', () => {
     const result = deriveSelectionTarget({
       ...base,
-      selectedVoxels: { containerId: 'c1', indices: [9, 10, 17, 18] },
+      selectedElements: { type: 'bay', items: [
+        { containerId: 'c1', id: '9' },
+        { containerId: 'c1', id: '10' },
+        { containerId: 'c1', id: '17' },
+        { containerId: 'c1', id: '18' },
+      ] },
     });
     expect(result.type).toBe('bay');
     if (result.type === 'bay') {
@@ -53,10 +57,15 @@ describe('deriveSelectionTarget', () => {
     }
   });
 
-  it('returns bay-face for selectedVoxels with face', () => {
+  it('returns bay-face for bay selection with face', () => {
     const result = deriveSelectionTarget({
       ...base,
-      selectedVoxels: { containerId: 'c1', indices: [9, 10, 17, 18] },
+      selectedElements: { type: 'bay', items: [
+        { containerId: 'c1', id: '9' },
+        { containerId: 'c1', id: '10' },
+        { containerId: 'c1', id: '17' },
+        { containerId: 'c1', id: '18' },
+      ] },
       selectedFace: 'e',
     });
     expect(result.type).toBe('bay-face');
@@ -65,19 +74,10 @@ describe('deriveSelectionTarget', () => {
     }
   });
 
-  it('selectedVoxels takes priority over selectedVoxel', () => {
+  it('voxel selection takes priority over container selection', () => {
     const result = deriveSelectionTarget({
       ...base,
-      selectedVoxel: { containerId: 'c1', index: 0 },
-      selectedVoxels: { containerId: 'c1', indices: [9, 10] },
-    });
-    expect(result.type).toBe('bay');
-  });
-
-  it('selectedVoxel takes priority over selection', () => {
-    const result = deriveSelectionTarget({
-      ...base,
-      selectedVoxel: { containerId: 'c1', index: 5 },
+      selectedElements: { type: 'voxel', items: [{ containerId: 'c1', id: '5' }] },
       selection: ['c1'],
     });
     expect(result.type).toBe('voxel');

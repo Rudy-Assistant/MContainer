@@ -1308,8 +1308,7 @@ export default function SmartHotbar() {
         setActiveSlot(null);
         setActiveModulePreset(null);
         useStore.getState().setActiveBrush(null);
-        useStore.getState().setSelectedVoxel(null);
-        useStore.getState().setSelectedVoxels(null);
+        useStore.getState().setSelectedElements(null);
         return;
       }
 

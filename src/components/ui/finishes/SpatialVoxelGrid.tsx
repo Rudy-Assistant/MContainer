@@ -48,9 +48,8 @@ interface Props {
 export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
   const [shiftHoverId, setShiftHoverId] = useState<string | null>(null);
 
-  const { selectedVoxels, selectedElements, frameMode } = useStore(
+  const { selectedElements, frameMode } = useStore(
     useShallow((s: any) => ({
-      selectedVoxels: s.selectedVoxels,
       selectedElements: s.selectedElements,
       frameMode: s.frameMode as boolean,
     }))
@@ -58,18 +57,13 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
 
   // Build selected cell label set from selectedElements (bay/frame type)
   const selectedIds = new Set<string>();
-  if (selectedElements && (selectedElements.type === 'bay' || selectedElements.type === 'frame')) {
+  if (selectedElements && (selectedElements.type === 'bay' || selectedElements.type === 'frame' || selectedElements.type === 'voxel')) {
     for (const item of selectedElements.items) {
       if (item.containerId === containerId) {
         selectedIds.add(item.id);
       }
     }
   }
-
-  // Fallback: legacy selectedVoxels for backward compat
-  const legacySelectedSet = new Set<number>(
-    selectedVoxels?.containerId === containerId ? selectedVoxels.indices : []
-  );
 
   // Compute shift-hover range preview
   const shiftRangeIds = new Set<string>();
@@ -146,8 +140,8 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
       {allCells.map((cell) => {
         const cellId = cell.label;
         const isSelectedByElements = selectedIds.has(cellId);
-        const isSelectedByLegacy = cell.indices.some(i => legacySelectedSet.has(i));
-        const isSelected = isSelectedByElements || isSelectedByLegacy;
+        const isSelectedByIndex = cell.indices.some(i => selectedIds.has(String(i)));
+        const isSelected = isSelectedByElements || isSelectedByIndex;
         const isMultiSelected = isSelected && (selectedElements?.items?.length ?? 0) > 1;
         const isShiftPreview = shiftRangeIds.has(cellId) && !isSelected;
 

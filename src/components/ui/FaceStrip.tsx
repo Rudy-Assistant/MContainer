@@ -50,8 +50,7 @@ export default function FaceStrip({ containerId, indices }: {
 }) {
   const grid = useStore((s) => s.containers[containerId]?.voxelGrid);
   const saveBlockToLibrary = useStore((s) => s.saveBlockToLibrary);
-  const setSelectedVoxel = useStore((s) => s.setSelectedVoxel);
-  const setSelectedVoxels = useStore((s) => s.setSelectedVoxels);
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
   const [expandedFace, setExpandedFace] = useState<keyof VoxelFaces | null>(null);
 
   if (!grid || indices.length === 0) return null;
@@ -67,8 +66,7 @@ export default function FaceStrip({ containerId, indices }: {
   }, [grid, indices]);
 
   const handleDeselect = () => {
-    setSelectedVoxel(null);
-    setSelectedVoxels(null);
+    setSelectedElements(null);
   };
 
   const handleSaveToLibrary = () => {

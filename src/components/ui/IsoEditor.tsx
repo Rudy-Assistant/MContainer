@@ -25,6 +25,8 @@ import {
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { useStore } from "@/store/useStore";
+import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
+import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import { Text } from "@react-three/drei";
 import ContainerSkin, { getVoxelLayout } from "@/components/objects/ContainerSkin";
 
@@ -200,8 +202,8 @@ function getIsoEdges(w: number, h: number, d: number): THREE.EdgesGeometry {
 }
 
 function IsoSelectionHighlight({ containerId, dims }: { containerId: string; dims: { length: number; width: number; height: number } }) {
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
-  const selectedVoxels = useStore((s) => s.selectedVoxels);
+  const selectedVoxel = useSelectedVoxel();
+  const selectedVoxels = useSelectedVoxels();
   const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
   const vHeight = dims.height;
 

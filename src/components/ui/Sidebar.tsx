@@ -714,14 +714,15 @@ export default function Sidebar() {
   const containers    = useStore((s) => s.containers);
   const clearSelection = useStore((s) => s.clearSelection);
   const selectContainer = useStore((s) => s.select);
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
   const viewMode      = useStore((s) => s.viewMode);
   const collapsed     = useStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
 
+  const selectedElements = useStore((s) => s.selectedElements);
+
   // Primary selected container — from explicit selection OR from voxel selection (auto-switch)
   const selectionId = selection.length > 0 ? selection[selection.length - 1] : null;
-  const voxelContainerId = selectedVoxel?.containerId ?? null;
+  const voxelContainerId = selectedElements?.items[0]?.containerId ?? null;
   const selectedId  = selectionId ?? voxelContainerId;
   const container   = selectedId ? containers[selectedId] : null;
 

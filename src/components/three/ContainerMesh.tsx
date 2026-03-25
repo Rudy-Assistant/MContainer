@@ -27,6 +27,8 @@ import {
   VOXEL_COLS,
 } from "@/types/container";
 import { useStore } from "@/store/useStore";
+import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
+import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER } from "@/config/highlightColors";
 
 import { nullRaycast } from '@/utils/nullRaycast';
@@ -1972,8 +1974,8 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
   const hoveredVoxel = useStore((s) => s.hoveredVoxel);
   const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
   const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
-  const selectedVoxel = useStore((s) => s.selectedVoxel);
-  const selectedVoxels = useStore((s) => s.selectedVoxels);
+  const selectedVoxel = useSelectedVoxel();
+  const selectedVoxels = useSelectedVoxels();
   const selectedFace = useStore((s) => s.selectedFace);
   const hoveredObjectId = useStore((s) => s.hoveredObjectId);
   // Suppress voxel hover when a SceneObject is hovered (avoid competing highlights)

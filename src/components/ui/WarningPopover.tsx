@@ -23,7 +23,7 @@ function WarningIcon({ severity }: { severity: WarningSeverity }) {
 export default function WarningPopover({ onClose }: { onClose: () => void }) {
   const warnings = useStore(useShallow((s) => s.warnings));
   const setHoveredWarning = useStore((s) => s.setHoveredWarning);
-  const setSelectedVoxel = useStore((s) => s.setSelectedVoxel);
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
   const setSelectedFace = useStore((s) => s.setSelectedFace);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const ref = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export default function WarningPopover({ onClose }: { onClose: () => void }) {
 
   function handleWarningClick(w: DesignWarning) {
     const idx = w.voxelIndices[0] ?? 0;
-    setSelectedVoxel({ containerId: w.containerId, index: idx });
+    setSelectedElements({ type: 'voxel', items: [{ containerId: w.containerId, id: String(idx) }] });
 
     // Guide hotbar to solution based on warning type
     if (w.message.includes('all walls are solid') || w.message.includes('No exit')) {

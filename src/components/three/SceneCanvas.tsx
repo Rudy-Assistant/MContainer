@@ -105,8 +105,7 @@ export default function SceneCanvas() {
           s.setHoveredBayGroup(null);
           s.setFaceContext(null);
           s.setSelectedFace(null);
-          s.setSelectedVoxel(null);
-          s.setSelectedVoxels(null);
+          s.setSelectedElements(null);
           s.setFacePreview(null);
           s.selectObject(null);
           s.clearGhostPreset();

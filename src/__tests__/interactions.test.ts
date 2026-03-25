@@ -97,17 +97,17 @@ describe('VoxelPreview sync', () => {
     useStore.setState(initial, true);
   });
 
-  it('setSelectedVoxel updates selectedVoxel in store', () => {
+  it('setSelectedElements updates selectedElements in store', () => {
     const s = useStore.getState;
     const id = s().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
 
-    expect(s().selectedVoxel).toBeNull();
+    expect(s().selectedElements).toBeNull();
 
-    s().setSelectedVoxel({ containerId: id, index: 10 });
-    expect(s().selectedVoxel).toEqual({ containerId: id, index: 10 });
+    s().setSelectedElements({ type: 'voxel', items: [{ containerId: id, id: '10' }] });
+    expect(s().selectedElements).toEqual({ type: 'voxel', items: [{ containerId: id, id: '10' }] });
 
-    s().setSelectedVoxel(null);
-    expect(s().selectedVoxel).toBeNull();
+    s().setSelectedElements(null);
+    expect(s().selectedElements).toBeNull();
   });
 });
 
@@ -235,7 +235,7 @@ describe('Ctrl+V multi-paste', () => {
     const clip = s().clipboardVoxel!;
     expect(clip).toBeDefined();
     // Select multiple voxels
-    s().setSelectedVoxels({ containerId: id, indices: [10, 11, 12] });
+    s().setSelectedElements({ type: 'bay', items: [{ containerId: id, id: '10' }, { containerId: id, id: '11' }, { containerId: id, id: '12' }] });
     // Paste to selection
     s().pasteToSelection();
     // Verify all targets have clipboard faces
@@ -249,7 +249,7 @@ describe('Ctrl+V multi-paste', () => {
     const s = useStore.getState;
     const id = s().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
     const originalFaces = { ...s().containers[id].voxelGrid![10].faces };
-    s().setSelectedVoxels({ containerId: id, indices: [10] });
+    s().setSelectedElements({ type: 'bay', items: [{ containerId: id, id: '10' }] });
     s().pasteToSelection(); // no clipboard set
     expect(s().containers[id].voxelGrid![10].faces).toEqual(originalFaces);
   });
@@ -260,7 +260,7 @@ describe('Ctrl+V multi-paste', () => {
     s().copyVoxel(id, 8);
     // No selection set
     s().pasteToSelection(); // should not throw
-    expect(s().selectedVoxels).toBeNull();
+    expect(s().selectedElements).toBeNull();
   });
 });
 
