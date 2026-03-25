@@ -1130,7 +1130,7 @@ function HotbarSlotButton({
       onMouseLeave={() => onHoverChange(null)}
       title={slot.label || `Slot ${slot.key}`}
       style={{
-        width: 64,
+        width: 72,
         borderRadius: 8,
         border: isActive ? `2px solid ${accent}` : `1px solid var(--btn-border, #e5e7eb)`,
         background: isActive ? `${accent}08` : "var(--btn-bg, #ffffff)",
@@ -1185,18 +1185,17 @@ function HotbarSlotButton({
         </div>
       )}
 
-      {/* Label — white text for visibility on dark hotbar background */}
+      {/* Label — readable on slot button background */}
       {slot.label && (
         <span style={{
           fontSize: 9, fontWeight: 600,
-          color: "rgba(255,255,255,0.95)",
-          lineHeight: 1.1, letterSpacing: "0.02em",
-          textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+          color: "var(--text-main, #1e293b)",
+          lineHeight: 1.1, letterSpacing: "0.01em",
           marginTop: 1, marginBottom: 2,
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
-          maxWidth: 80,
+          maxWidth: 66,
         }}>
           {slot.label}
         </span>
@@ -1489,7 +1488,7 @@ export default function SmartHotbar() {
             gap: 4,
             padding: "7px 10px 12px",
             borderRadius: 12,
-            maxWidth: 720,
+            maxWidth: "calc(100vw - 40px)",
             position: "relative",
             overflow: "hidden",
             background: "var(--hotbar-bg)",
@@ -1590,7 +1589,7 @@ export default function SmartHotbar() {
             gap: 4,
             padding: "7px 10px 12px",
             borderRadius: 12,
-            maxWidth: 720,
+            maxWidth: "calc(100vw - 40px)",
             position: "relative",
             overflow: "hidden",
             background: "var(--hotbar-bg, rgba(255,255,255,0.78))",
