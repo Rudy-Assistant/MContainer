@@ -21,30 +21,30 @@ interface IsometricVoxelSVGProps {
  *   Half_Fold      → horizontal fold line
  *   Gull_Wing      → upward hinge line
  */
+const isOpen = (s: string) => s === 'Open';
+const isRailing = (s: string) => s.startsWith('Railing');
+const isGlass = (s: string) => s === 'Glass_Pane' || s.startsWith('Window');
+const isFold = (s: string) => s === 'Half_Fold';
+const isGull = (s: string) => s === 'Gull_Wing';
+
+const WIRE = { stroke: '#94a3b8', strokeWidth: 0.8, strokeDasharray: '2 2' } as const;
+const SOLID = { stroke: '#475569', strokeWidth: 0.5, strokeDasharray: 'none' } as const;
+
+function faceProps(surface: string, color: string) {
+  const open = isOpen(surface);
+  return {
+    fill: open ? 'none' : color,
+    stroke: open ? WIRE.stroke : SOLID.stroke,
+    strokeWidth: open ? WIRE.strokeWidth : SOLID.strokeWidth,
+    strokeDasharray: open ? WIRE.strokeDasharray : SOLID.strokeDasharray,
+  };
+}
+
 export function IsometricVoxelSVG({ faces, size = 64 }: IsometricVoxelSVGProps) {
   const topColor = surfaceColor(faces.top);
   const bottomColor = surfaceColor(faces.bottom);
   const frontColor = surfaceColor(faces.s);
   const rightColor = surfaceColor(faces.e);
-
-  const isOpen = (s: string) => s === 'Open';
-  const isRailing = (s: string) => s.startsWith('Railing');
-  const isGlass = (s: string) => s === 'Glass_Pane' || s.startsWith('Window');
-  const isFold = (s: string) => s === 'Half_Fold';
-  const isGull = (s: string) => s === 'Gull_Wing';
-
-  const wire = { stroke: '#94a3b8', strokeWidth: 0.8, strokeDasharray: '2 2' };
-  const solid = { stroke: '#475569', strokeWidth: 0.5, strokeDasharray: 'none' };
-
-  function faceProps(surface: string, color: string) {
-    const open = isOpen(surface);
-    return {
-      fill: open ? 'none' : color,
-      stroke: open ? wire.stroke : solid.stroke,
-      strokeWidth: open ? wire.strokeWidth : solid.strokeWidth,
-      strokeDasharray: open ? wire.strokeDasharray : solid.strokeDasharray,
-    };
-  }
 
   return (
     <svg

@@ -35,10 +35,9 @@ const GRID_ROWS: CellDef[][] = [
   ],
 ];
 
-// Flattened ordered list of all cell labels (row-major) for range selection
-function getAllCellIds(): string[] {
-  return GRID_ROWS.flatMap(row => row.map(cell => cell.label));
-}
+// Flattened ordered list of all cell labels (row-major) for range selection — computed once
+const ALL_CELL_IDS = GRID_ROWS.flatMap(row => row.map(cell => cell.label));
+const ALL_CELLS = GRID_ROWS.flat();
 
 interface Props {
   containerId: string;
@@ -68,7 +67,7 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
   // Compute shift-hover range preview
   const shiftRangeIds = new Set<string>();
   if (shiftHoverId && selectedElements && selectedElements.items.length > 0) {
-    const allCellIds = getAllCellIds();
+    const allCellIds = ALL_CELL_IDS;
     const lastId = selectedElements.items[selectedElements.items.length - 1].id;
     const startIdx = allCellIds.indexOf(lastId);
     const endIdx = allCellIds.indexOf(shiftHoverId);
@@ -94,7 +93,7 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
       }
     } else if (e.shiftKey && selectedElements && selectedElements.items.length > 0) {
       // Shift+Click: range select
-      const allCellIds = getAllCellIds();
+      const allCellIds = ALL_CELL_IDS;
       const lastId = selectedElements.items[selectedElements.items.length - 1].id;
       const startIdx = allCellIds.indexOf(lastId);
       const endIdx = allCellIds.indexOf(cellId);
@@ -127,8 +126,7 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
     setShiftHoverId(null);
   };
 
-  // Flat list of all cells for CSS Grid placement (15 cells in a 5×3 grid)
-  const allCells = GRID_ROWS.flat();
+  // Use pre-computed flat list for CSS Grid placement (15 cells in a 5×3 grid)
 
   return (
     <div style={{
@@ -137,7 +135,7 @@ export function SpatialVoxelGrid({ containerId, onCellClick }: Props) {
       gridTemplateRows: '0.6fr 1.4fr 0.6fr',
       gap: 3,
     }}>
-      {allCells.map((cell) => {
+      {ALL_CELLS.map((cell) => {
         const cellId = cell.label;
         const isSelectedByElements = selectedIds.has(cellId);
         const isSelectedByIndex = cell.indices.some(i => selectedIds.has(String(i)));
