@@ -175,9 +175,28 @@ The MatrixEditor grid has two modes controlling voxel granularity:
 
 Sprint handoff docs live in `MContainer/docs/handoff/`, NOT `docs/handoff/` from MHome root.
 
+## UI Ownership Invariants (DO NOT VIOLATE)
+
+These components have clear ownership. Do NOT duplicate or relocate them:
+
+| Component | Owner | Location | Notes |
+|-----------|-------|----------|-------|
+| Spatial/Block Grid | MatrixEditor | `src/components/ui/MatrixEditor.tsx` | SimpleBayGrid, VoxelGrid, FrameGridOverlay. NEVER duplicate in FinishesPanel. |
+| VoxelPreview3D | FinishesPanel | Below MatrixEditor | Shows selected voxel/bay 3D preview with face selector |
+| Interior Finishes tabs | FinishesPanel | `src/components/ui/finishes/FinishesPanel.tsx` | Tab content only (materials, presets). No grid rendering. |
+| Selection highlighting | REQUIRED in all views | Grid + Preview + 3D viewport | Wall/face selection MUST show in MatrixEditor grid, VoxelPreview3D, and ContainerSkin. If any stops working, it's a regression. |
+| Hotbar | SmartHotbar | `src/components/ui/SmartHotbar.tsx` | Uses CSS calc() for sidebar offset. DO NOT add JS resize listeners. |
+
+**Context-aware tabs**: When a face is selected (selectedFace is non-null), FinishesPanel auto-switches to the relevant tab (flooring/walls/ceiling). If this stops working, selectedFace is not being set or is being cleared prematurely by setSelectedElements.
+
+**selectedFace vs selectedElements**: These are ORTHOGONAL:
+- `selectedElements` = which voxel/bay/container is selected
+- `selectedFace` = which face direction (n/s/e/w/top/bottom) is being edited
+- `setSelectedElements` must NOT clear `selectedFace` unless clearing the selection entirely (sel === null)
+
 ## UI Card Convention (PresetCard)
 
-All preset/swatch cards use shared PresetCard: square (~80px), isometric SVG or texture thumbnail content, label at bottom with same background (NO divider line above label). Used across Block tab, Container tab, Flooring, Walls, Ceiling, Electrical.
+All preset/swatch cards use shared PresetCard: square image area with highlight border on IMAGE ONLY (not text), text label sits below outside the highlight. Used across Block tab, Container tab, Flooring, Walls, Ceiling, Electrical. Matches the aspirational Interior Finishes art direction (dark background, square thumbnails, white text).
 
 ## Camera Architecture
 
