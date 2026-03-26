@@ -198,14 +198,10 @@ function PresetGhost() {
     const group = groupRef.current;
     if (!group) return;
 
-    // Pulse opacity
+    // Pulse opacity (flat ghost mats — always active)
     const t = (Math.sin(clock.getElapsedTime() * Math.PI * 2 / 0.8) + 1) / 2;
     _ghostMats.solid.opacity = 0.22 + t * 0.12;
     _ghostMats.glass.opacity = 0.14 + t * 0.10;
-    // Also pulse material-accurate ghosts
-    for (const mat of _activeGhostMats) {
-      mat.opacity = 0.22 + t * 0.12;
-    }
 
     const pool = getGhostPool();
     _activeGhostMats.length = 0;
@@ -324,6 +320,11 @@ function PresetGhost() {
     // Hide unused pool meshes
     for (let i = poolIdx; i < GHOST_POOL_SIZE; i++) {
       pool[i].visible = false;
+    }
+
+    // Pulse material-accurate ghosts (after pool is populated with fresh mats)
+    for (const mat of _activeGhostMats) {
+      mat.opacity = 0.22 + t * 0.12;
     }
 
     // Pop animation

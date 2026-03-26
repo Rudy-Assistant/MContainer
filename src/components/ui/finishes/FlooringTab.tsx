@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { FLOOR_MATERIALS, PAINT_COLORS } from '@/config/finishPresets';
 import { FLOOR_CATEGORIES, getCategoryForSurface } from '@/config/surfaceCategories';
-import type { SurfaceType, MaterialDef, VoxelFaces } from '@/types/container';
+import { EMPTY_FACES, type SurfaceType, type MaterialDef, type VoxelFaces } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import SwatchRow from './SwatchRow';
@@ -33,7 +33,7 @@ export default function FlooringTab({ containerId, voxelIndex, indices, face }: 
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
   const currentFaces = useStore((s) => {
     const v = s.containers[containerId]?.voxelGrid?.[indices[0]];
-    return v?.faces ?? { top: 'Open' as const, bottom: 'Open' as const, n: 'Open' as const, s: 'Open' as const, e: 'Open' as const, w: 'Open' as const };
+    return v?.faces ?? EMPTY_FACES;
   });
   const applyFinish = useApplyFinish(containerId, indices, face);
 

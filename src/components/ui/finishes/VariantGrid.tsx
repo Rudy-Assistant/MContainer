@@ -2,7 +2,7 @@
 import { PresetCard } from './PresetCard';
 import { useStore } from '@/store/useStore';
 import type { SurfaceCategory, CategoryVariant } from '@/config/surfaceCategories';
-import type { SurfaceType, VoxelFaces, MaterialDef } from '@/types/container';
+import { EMPTY_FACES, type SurfaceType, type VoxelFaces, type MaterialDef } from '@/types/container';
 import { sectionHeaderStyle } from './sectionHeaderStyle';
 
 interface VariantGridProps {
@@ -29,7 +29,7 @@ export default function VariantGrid({
   const triggerGhostPop = useStore((s) => s.triggerGhostPop);
   const currentFaces = useStore((s) => {
     const v = s.containers[containerId]?.voxelGrid?.[indices[0]];
-    return v?.faces ?? { top: 'Open' as const, bottom: 'Open' as const, n: 'Open' as const, s: 'Open' as const, e: 'Open' as const, w: 'Open' as const };
+    return v?.faces ?? EMPTY_FACES;
   });
 
   if (category.placeholder) {

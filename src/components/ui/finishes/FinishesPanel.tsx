@@ -11,6 +11,7 @@ import CeilingTab from './CeilingTab';
 import ElectricalTab from './ElectricalTab';
 import BlockTab from './BlockTab';
 import { ContainerTab } from './ContainerTab';
+import BlockThumbnailRenderer from './BlockThumbnailRenderer';
 
 export default function FinishesPanel() {
   const target = useSelectionTarget();
@@ -87,69 +88,71 @@ export default function FinishesPanel() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Panel header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 12px 6px',
-      }}>
-        <span style={{
-          fontSize: 13, fontWeight: 700, color: 'var(--text-main)',
-          letterSpacing: '-0.01em',
+    <BlockThumbnailRenderer>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Panel header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 12px 6px',
         }}>
-          Interior Finishes
-        </span>
-        <button
-          onClick={() => { clearSelection(); clearGhostPreset(); clearStampPreview(); }}
-          title="Close"
-          style={{
-            width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
-            border: '1px solid var(--border)', background: 'var(--btn-bg)',
-            color: 'var(--text-muted)', fontSize: 13, lineHeight: 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          ×
-        </button>
-      </div>
+          <span style={{
+            fontSize: 13, fontWeight: 700, color: 'var(--text-main)',
+            letterSpacing: '-0.01em',
+          }}>
+            Interior Finishes
+          </span>
+          <button
+            onClick={() => { clearSelection(); clearGhostPreset(); clearStampPreview(); }}
+            title="Close"
+            style={{
+              width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
+              border: '1px solid var(--border)', background: 'var(--btn-bg)',
+              color: 'var(--text-muted)', fontSize: 13, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ×
+          </button>
+        </div>
 
-      {/* VoxelPreview3D — face selector */}
-      <div style={{ padding: '0 8px 4px' }}>
-        <VoxelPreview3D
-          containerId={containerId}
-          voxelIndex={voxelIndex}
-          bayGroupIndices={bayGroupIndices}
+        {/* VoxelPreview3D — face selector */}
+        <div style={{ padding: '0 8px 4px' }}>
+          <VoxelPreview3D
+            containerId={containerId}
+            voxelIndex={voxelIndex}
+            bayGroupIndices={bayGroupIndices}
+          />
+        </div>
+
+        {/* Tab bar — spatial grid is rendered by MatrixEditor above this panel */}
+        <FinishesTabBar
+          activeTab={activeTab}
+          onTabChange={(tab) => { setActiveTab(tab); clearGhostPreset(); clearStampPreview(); }}
         />
-      </div>
 
-      {/* Tab bar — spatial grid is rendered by MatrixEditor above this panel */}
-      <FinishesTabBar
-        activeTab={activeTab}
-        onTabChange={(tab) => { setActiveTab(tab); clearGhostPreset(); clearStampPreview(); }}
-      />
-
-      {/* Tab content — scrollable */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {activeTab === 'container' ? (
-          <ContainerTab containerId={containerId} />
-        ) : activeTab === 'block' ? (
-          <BlockTab containerId={containerId} voxelIndex={voxelIndex} indices={indices} />
-        ) : !hasFace ? (
-          <div style={{ padding: '24px 12px', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-              Click a face in the preview to edit finishes
+        {/* Tab content — scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {activeTab === 'container' ? (
+            <ContainerTab containerId={containerId} />
+          ) : activeTab === 'block' ? (
+            <BlockTab containerId={containerId} voxelIndex={voxelIndex} indices={indices} />
+          ) : !hasFace ? (
+            <div style={{ padding: '24px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                Click a face in the preview to edit finishes
+              </div>
             </div>
-          </div>
-        ) : activeTab === 'flooring' ? (
-          <FlooringTab {...tabProps} />
-        ) : activeTab === 'walls' ? (
-          <WallsTab {...tabProps} />
-        ) : activeTab === 'ceiling' ? (
-          <CeilingTab {...tabProps} />
-        ) : activeTab === 'electrical' ? (
-          <ElectricalTab {...tabProps} />
-        ) : null}
+          ) : activeTab === 'flooring' ? (
+            <FlooringTab {...tabProps} />
+          ) : activeTab === 'walls' ? (
+            <WallsTab {...tabProps} />
+          ) : activeTab === 'ceiling' ? (
+            <CeilingTab {...tabProps} />
+          ) : activeTab === 'electrical' ? (
+            <ElectricalTab {...tabProps} />
+          ) : null}
+        </div>
       </div>
-    </div>
+    </BlockThumbnailRenderer>
   );
 }

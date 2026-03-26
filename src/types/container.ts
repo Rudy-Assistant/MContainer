@@ -288,6 +288,11 @@ export interface VoxelFaces {
   w:      SurfaceType; // west face  (toward Left wall,  –X)
 }
 
+/** Stable empty faces constant — use as selector fallback to avoid inline object anti-pattern. */
+export const EMPTY_FACES: VoxelFaces = {
+  top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open',
+};
+
 /** Material definition for ghost preview — maps surface type to concrete material properties. */
 export interface MaterialDef {
   surfaceType: SurfaceType;

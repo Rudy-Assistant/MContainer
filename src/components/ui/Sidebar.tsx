@@ -423,7 +423,7 @@ function Inspector({
             </button>
             <button
               onClick={() => setPreviewCollapsed(!previewCollapsed)}
-              title={previewCollapsed ? "Show preview" : "Hide preview"}
+              title={previewCollapsed ? "Show container preview" : "Hide container preview"}
               style={{
                 background: previewCollapsed ? "none" : "rgba(59,130,246,0.1)",
                 border: "1px solid #e2e8f0", borderRadius: "4px",
@@ -443,7 +443,7 @@ function Inspector({
                 color: gridCollapsed ? "#64748b" : "#3b82f6", display: "flex", alignItems: "center",
               }}
             >
-              <Palette size={12} />
+              <Grid3x3 size={12} />
             </button>
             {container.level === 0 && !hasContainerAbove && (
               <button

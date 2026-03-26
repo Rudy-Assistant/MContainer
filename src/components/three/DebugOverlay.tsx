@@ -7,6 +7,7 @@
  * - Outer rectangle: tile boundary
  * - Inner rectangle: center zone (floor/block click area)
  * - Corner-to-corner lines connecting outer to inner rect (quadrant boundaries)
+ * - Hover highlight: semi-transparent fill when a tile's voxel is hovered
  * Simple mode: bay-grouped tiles (merged for multi-voxel bays)
  * Detail mode: per-voxel tiles
  * Ceiling mode: tiles at ceiling level when inspectorView === 'ceiling'
@@ -15,8 +16,9 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { useStore } from "@/store/useStore";
-import { CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS, type Container } from "@/types/container";
+import { CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS, type Container, type VoxelFaces } from "@/types/container";
 import { nullRaycast } from "@/utils/nullRaycast";
+import { getCachedPlane } from "@/utils/geometryCache";
 import { computeBayGroups } from "@/config/bayGroups";
 import { getVoxelLayout, BASEPLATE_STRIP } from "@/components/objects/ContainerSkin";
 
@@ -38,6 +40,22 @@ const centerMat = new THREE.LineBasicMaterial({
 const quadMat = new THREE.LineBasicMaterial({
   color: 0xcccc00, transparent: true, opacity: 0.4, depthTest: false,
 });
+
+// Hover highlight materials (face-coded)
+function makeHoverMat(color: number) {
+  return new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide,
+  });
+}
+const hoverFloorMat = makeHoverMat(0x44ff88);
+const hoverWallMat  = makeHoverMat(0xffbb33);
+const hoverCeilMat  = makeHoverMat(0x44aaff);
+
+function getHoverMat(face: keyof VoxelFaces) {
+  if (face === 'bottom') return hoverFloorMat;
+  if (face === 'top') return hoverCeilMat;
+  return hoverWallMat; // n/s/e/w
+}
 
 // Geometry caches
 const _geoCache = new Map<string, THREE.BufferGeometry>();
@@ -85,6 +103,8 @@ interface TileDef {
   cx: number; cz: number;
   w: number; d: number;
   isBody: boolean;
+  /** Voxel indices this tile represents (for hover matching) */
+  voxelIndices: number[];
 }
 
 function ContainerDebugFloorTiles({ container }: { container: Container }) {
@@ -92,10 +112,25 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
   const grid = container.voxelGrid;
   const isSimpleMode = useStore((s) => s.designComplexity === 'simple');
   const inspectorView = useStore((s) => s.inspectorView);
+  // Scoped selector: only re-renders when THIS container's hover state changes.
+  // Non-matching containers get stable `null` → no re-render on other containers' hover.
+  const cid = container.id;
+  const hoveredVoxelEdge = useStore((s) =>
+    s.hoveredVoxelEdge?.containerId === cid ? s.hoveredVoxelEdge : null
+  );
   if (!grid) return null;
 
   const vHeight = dims.height;
   const tileY = inspectorView === 'ceiling' ? vHeight + 0.02 : 0.02;
+
+  // Determine which tile index is hovered
+  const hoveredTileInfo = useMemo(() => {
+    if (!hoveredVoxelEdge) return null;
+    const vi = hoveredVoxelEdge.voxelIndex;
+    // Strip level from voxelIndex for floor-level tile matching (level 0 only for debug tiles)
+    const flatIdx = vi % (VOXEL_COLS * VOXEL_ROWS);
+    return { flatIdx, face: hoveredVoxelEdge.face };
+  }, [hoveredVoxelEdge]);
 
   // Simple mode: bay-grouped tiles (merged AABBs)
   const bayTiles = useMemo((): TileDef[] | null => {
@@ -115,6 +150,7 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
         cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2,
         w: maxX - minX, d: maxZ - minZ,
         isBody: group.role === 'body',
+        voxelIndices: group.voxelIndices,
       };
     });
   }, [isSimpleMode, grid, dims]);
@@ -134,6 +170,7 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
         cx: layout.px, cz: layout.pz,
         w: layout.voxW, d: layout.voxD,
         isBody: !isHaloCol && !isHaloRow,
+        voxelIndices: [i],
       });
     }
     return result;
@@ -141,13 +178,33 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
 
   const tiles = bayTiles || voxelTiles || [];
 
+  // Precompute hovered tile index (O(1) lookup instead of O(k) per tile)
+  const hoveredTileIdx = useMemo(() => {
+    if (!hoveredTileInfo) return -1;
+    return tiles.findIndex(t => t.voxelIndices.includes(hoveredTileInfo.flatIdx));
+  }, [hoveredTileInfo, tiles]);
+
   return (
     <group position={[container.position.x, container.position.y, container.position.z]}>
       {tiles.map((t, i) => {
         const centerW = Math.max(t.w - EDGE_INSET * 2, 0.1);
         const centerD = Math.max(t.d - EDGE_INSET * 2, 0.1);
+
+        const isHovered = i === hoveredTileIdx;
+
         return (
           <group key={i}>
+            {/* Hover highlight fill — semi-transparent plane behind the wireframe */}
+            {isHovered && (
+              <mesh
+                position={[t.cx, tileY + 0.001, t.cz]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                geometry={getCachedPlane(t.w, t.d)}
+                material={getHoverMat(hoveredTileInfo!.face)}
+                renderOrder={100}
+                raycast={nullRaycast}
+              />
+            )}
             {/* Outer tile outline */}
             <lineSegments
               position={[t.cx, tileY, t.cz]}
@@ -182,10 +239,10 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
 export default function DebugOverlay() {
   const containers = useStore((s) => s.containers);
   return (
-    <group>
+    <>
       {Object.values(containers).map(c => (
         <ContainerDebugFloorTiles key={c.id} container={c} />
       ))}
-    </group>
+    </>
   );
 }

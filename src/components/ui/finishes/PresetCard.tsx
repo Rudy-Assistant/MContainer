@@ -22,7 +22,7 @@ export function getCardImageStyle(active: boolean, hovered: boolean): CSSPropert
     return {
       transform: 'scale(1.04)',
       boxShadow:
-        '0 6px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)',
+        '0 4px 12px rgba(0,0,0,0.12), 0 0 0 1.5px rgba(99,102,241,0.35)',
     };
   }
   return {};
@@ -45,7 +45,13 @@ let _injected = false;
 /* ── Component ────────────────────────────────────────────────────── */
 
 interface PresetCardProps {
-  content: ReactNode;
+  /** Full custom content (image, SVG, etc.) — fills the card area. */
+  content?: ReactNode;
+  /** Shorthand for emoji/text icon — renders centered with raised background.
+   *  Takes precedence display-wise but `content` is used if both provided. */
+  icon?: ReactNode;
+  /** Icon font size when using `icon` prop (default 28). */
+  iconSize?: number;
   label: string;
   active: boolean;
   onClick: () => void;
@@ -57,9 +63,12 @@ interface PresetCardProps {
  * Shared preset card: square image area with highlight on image only.
  * Text label sits below, outside the highlight border.
  * Uses native <button> for accessibility (focus, Enter/Space, ARIA).
+ *
+ * Pass `content` for custom fills (images, SVGs) or `icon` for centered
+ * emoji/text icons with a standard raised background.
  */
 export function PresetCard({
-  content, label, active, onClick, onMouseEnter, onMouseLeave,
+  content, icon, iconSize = 28, label, active, onClick, onMouseEnter, onMouseLeave,
 }: PresetCardProps) {
   const [hovered, setHovered] = useState(false);
   const prevActiveRef = useRef(active);
@@ -118,11 +127,11 @@ export function PresetCard({
   return (
     <button
       onClick={onClick}
-      onMouseEnter={(e) => {
+      onMouseEnter={() => {
         setHovered(true);
         onMouseEnter?.();
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={() => {
         setHovered(false);
         onMouseLeave?.();
       }}
@@ -140,7 +149,15 @@ export function PresetCard({
     >
       {/* Image area — visual effects here only */}
       <div style={imageStyle}>
-        {content}
+        {content ?? (icon != null && (
+          <div style={{
+            width: '100%', height: '100%', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: iconSize,
+            background: 'var(--surface-raised, #f0f2f5)', borderRadius: 4,
+          }}>
+            {icon}
+          </div>
+        ))}
         {/* Check badge for selected state */}
         {active && (
           <div

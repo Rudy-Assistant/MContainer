@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { CEILING_MATERIALS, LIGHT_FIXTURES, LIGHT_COLORS, PAINT_COLORS } from '@/config/finishPresets';
 import { CEILING_CATEGORIES, getCategoryForSurface } from '@/config/surfaceCategories';
-import type { SurfaceType, MaterialDef, VoxelFaces } from '@/types/container';
+import { EMPTY_FACES, type SurfaceType, type MaterialDef, type VoxelFaces } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import OptionCardGrid from './OptionCardGrid';
@@ -34,7 +34,7 @@ export default function CeilingTab({ containerId, voxelIndex, indices, face }: P
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
   const currentFaces = useStore((s) => {
     const v = s.containers[containerId]?.voxelGrid?.[indices[0]];
-    return v?.faces ?? { top: 'Open' as const, bottom: 'Open' as const, n: 'Open' as const, s: 'Open' as const, e: 'Open' as const, w: 'Open' as const };
+    return v?.faces ?? EMPTY_FACES;
   });
   const applyFinish = useApplyFinish(containerId, indices, face);
 

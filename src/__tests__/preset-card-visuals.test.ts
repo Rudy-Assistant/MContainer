@@ -19,7 +19,7 @@ describe('PresetCard visual states', () => {
 
     const hoverStyle = getCardImageStyle(false, true);
     expect(hoverStyle.transform).toBe('scale(1.04)');
-    expect(hoverStyle.boxShadow).toContain('24px');
+    expect(hoverStyle.boxShadow).toContain('12px');
 
     const selectedStyle = getCardImageStyle(true, false);
     expect(selectedStyle.boxShadow).toContain('99,102,241');

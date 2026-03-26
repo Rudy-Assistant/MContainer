@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { ColorPreset } from '@/config/finishPresets';
 import ColorPicker from '@/components/ui/ColorPicker';
+import { sectionHeaderStyle } from './sectionHeaderStyle';
 
 interface Props {
   colors: ColorPreset[];
@@ -16,10 +17,7 @@ export default function SwatchRow({ colors, activeHex, onSelect, label }: Props)
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{
-        fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-        color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 6,
-      }}>
+      <div style={sectionHeaderStyle(6)}>
         {label}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>

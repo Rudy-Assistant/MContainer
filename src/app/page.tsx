@@ -154,8 +154,8 @@ export default function Home() {
               SmartHotbar.tsx kept for CssVoxelIcon export used by CustomHotbar and UserLibrary */}
           {showHotbar && !isPreviewMode && <RecentItemsBar />}
 
-          {/* Form picker strip — thin floating bar above status dock */}
-          {!isPreviewMode && <BottomPanel />}
+          {/* Form picker strip — thin floating bar above status dock (hidden with hotbar) */}
+          {showHotbar && !isPreviewMode && <BottomPanel />}
 
           {/* Bottom dock removed — TOD, cost, compass moved to TopToolbar */}
 
