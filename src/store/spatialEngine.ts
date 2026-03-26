@@ -425,7 +425,23 @@ export function findStackTarget(
 
 // ── Adjacency Detection ─────────────────────────────────────
 
-const ADJACENCY_TOLERANCE = 0.15; // metres — how close walls must be to auto-merge
+/**
+ * Check if a voxel's physical extent overlaps a container's extent by >50%.
+ * Used by both mergeBoundaryVoxels and computeGlobalCulling to ensure identical behavior.
+ */
+export function voxelExtentsOverlap(
+  voxelCenter: number,
+  voxelWidth: number,
+  extentMin: number,
+  extentMax: number,
+): boolean {
+  const vMin = voxelCenter - voxelWidth / 2;
+  const vMax = voxelCenter + voxelWidth / 2;
+  const overlap = Math.min(vMax, extentMax) - Math.max(vMin, extentMin);
+  return overlap > voxelWidth * 0.5;
+}
+
+const ADJACENCY_TOLERANCE = 0.03; // metres — how close walls must be to auto-merge
 
 /**
  * Detect all pairs of adjacent containers that share a wall face.
@@ -621,10 +637,12 @@ export function computeGlobalCulling(
         for (let row = 0; row < VOXEL_ROWS; row++) {
           const aWorldZ = a.position.z + (row - 1.5) * aRowPitch;
           const bWorldZ = b.position.z + (row - 1.5) * bRowPitch;
-          const aOvl = aWorldZ >= b.position.z - bHalfZ - aRowPitch / 2
-                    && aWorldZ <= b.position.z + bHalfZ + aRowPitch / 2;
-          const bOvl = bWorldZ >= a.position.z - aHalfZ - bRowPitch / 2
-                    && bWorldZ <= a.position.z + aHalfZ + bRowPitch / 2;
+          const bExtMinZ = b.position.z - bHalfZ;
+          const bExtMaxZ = b.position.z + bHalfZ;
+          const aExtMinZ = a.position.z - aHalfZ;
+          const aExtMaxZ = a.position.z + aHalfZ;
+          const aOvl = voxelExtentsOverlap(aWorldZ, aRowPitch, bExtMinZ, bExtMaxZ);
+          const bOvl = voxelExtentsOverlap(bWorldZ, bRowPitch, aExtMinZ, aExtMaxZ);
 
           if (!aOvl && !bOvl) continue;
 
@@ -642,10 +660,12 @@ export function computeGlobalCulling(
         for (let col = 0; col < VOXEL_COLS; col++) {
           const aWorldX = a.position.x + -(col - 3.5) * aColPitch;
           const bWorldX = b.position.x + -(col - 3.5) * bColPitch;
-          const aOvl = aWorldX >= b.position.x - bHalfX - aColPitch / 2
-                    && aWorldX <= b.position.x + bHalfX + aColPitch / 2;
-          const bOvl = bWorldX >= a.position.x - aHalfX - bColPitch / 2
-                    && bWorldX <= a.position.x + aHalfX + bColPitch / 2;
+          const bExtMinX = b.position.x - bHalfX;
+          const bExtMaxX = b.position.x + bHalfX;
+          const aExtMinX = a.position.x - aHalfX;
+          const aExtMaxX = a.position.x + aHalfX;
+          const aOvl = voxelExtentsOverlap(aWorldX, aColPitch, bExtMinX, bExtMaxX);
+          const bOvl = voxelExtentsOverlap(bWorldX, bColPitch, aExtMinX, aExtMaxX);
 
           if (!aOvl && !bOvl) continue;
 

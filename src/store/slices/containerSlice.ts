@@ -48,7 +48,7 @@ import {
   createDefaultVoxelGrid,
   createPoolVoxelGrid,
 } from "@/types/factories";
-import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverlap, getFootprintAt, getFullFootprint, findEdgeSnap } from "@/store/spatialEngine";
+import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverlap, getFootprintAt, getFullFootprint, findEdgeSnap, voxelExtentsOverlap } from "@/store/spatialEngine";
 import defaultPricing from "@/config/pricing_config.json";
 import { getContainerRole, CONTAINER_ROLES } from "@/config/containerRoles";
 import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from "@/types/container";
@@ -1538,22 +1538,22 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
               // Col boundary (Front/Back) — check Z overlap of this row
               const aWorldZ = a.position.z + (iter - 1.5) * aRowPitch;
               const bWorldZ = b.position.z + (iter - 1.5) * bRowPitch;
-              const bHalfZ = (VOXEL_ROWS / 2) * bRowPitch;
-              const aHalfZ = (VOXEL_ROWS / 2) * aRowPitch;
-              const aTol = aRowPitch / 2;
-              const bTol = bRowPitch / 2;
-              aOverlaps = aWorldZ >= b.position.z - bHalfZ - aTol && aWorldZ <= b.position.z + bHalfZ + aTol;
-              bOverlaps = bWorldZ >= a.position.z - aHalfZ - bTol && bWorldZ <= a.position.z + aHalfZ + bTol;
+              const bExtMinZ = b.position.z - (VOXEL_ROWS / 2) * bRowPitch;
+              const bExtMaxZ = b.position.z + (VOXEL_ROWS / 2) * bRowPitch;
+              const aExtMinZ = a.position.z - (VOXEL_ROWS / 2) * aRowPitch;
+              const aExtMaxZ = a.position.z + (VOXEL_ROWS / 2) * aRowPitch;
+              aOverlaps = voxelExtentsOverlap(aWorldZ, aRowPitch, bExtMinZ, bExtMaxZ);
+              bOverlaps = voxelExtentsOverlap(bWorldZ, bRowPitch, aExtMinZ, aExtMaxZ);
             } else {
               // Row boundary (Left/Right) — check X overlap of this col
               const aWorldX = a.position.x + -(iter - 3.5) * aColPitch;
               const bWorldX = b.position.x + -(iter - 3.5) * bColPitch;
-              const bHalfX = (VOXEL_COLS / 2) * bColPitch;
-              const aHalfX = (VOXEL_COLS / 2) * aColPitch;
-              const aTol = aColPitch / 2;
-              const bTol = bColPitch / 2;
-              aOverlaps = aWorldX >= b.position.x - bHalfX - aTol && aWorldX <= b.position.x + bHalfX + aTol;
-              bOverlaps = bWorldX >= a.position.x - aHalfX - bTol && bWorldX <= a.position.x + aHalfX + bTol;
+              const bExtMinX = b.position.x - (VOXEL_COLS / 2) * bColPitch;
+              const bExtMaxX = b.position.x + (VOXEL_COLS / 2) * bColPitch;
+              const aExtMinX = a.position.x - (VOXEL_COLS / 2) * aColPitch;
+              const aExtMaxX = a.position.x + (VOXEL_COLS / 2) * aColPitch;
+              aOverlaps = voxelExtentsOverlap(aWorldX, aColPitch, bExtMinX, bExtMaxX);
+              bOverlaps = voxelExtentsOverlap(bWorldX, bColPitch, aExtMinX, aExtMaxX);
             }
 
             if (!aOverlaps && !bOverlaps) continue;
