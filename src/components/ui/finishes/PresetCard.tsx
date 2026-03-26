@@ -1,6 +1,48 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
+
+/* ── Pure style helpers (exported for testing) ────────────────────── */
+
+export const PRESET_CARD_KEYFRAMES = `
+@keyframes selectPop {
+  0%   { transform: scale(1.04); }
+  40%  { transform: scale(1.08); }
+  100% { transform: scale(1.0);  }
+}`;
+
+export function getCardImageStyle(active: boolean, hovered: boolean): CSSProperties {
+  if (active) {
+    return {
+      boxShadow:
+        '0 0 0 2.5px rgba(99,102,241,0.7), 0 0 16px rgba(99,102,241,0.2)',
+    };
+  }
+  if (hovered) {
+    return {
+      transform: 'scale(1.04)',
+      boxShadow:
+        '0 6px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)',
+    };
+  }
+  return {};
+}
+
+export function getCardLabelStyle(active: boolean, hovered: boolean): CSSProperties {
+  if (active) {
+    return { color: 'var(--text-main)', fontWeight: 700 };
+  }
+  if (hovered) {
+    return { color: 'var(--text-main)', fontWeight: 600 };
+  }
+  return { color: 'var(--text-muted)', fontWeight: 400 };
+}
+
+/* ── Keyframe injection guard ─────────────────────────────────────── */
+
+let _injected = false;
+
+/* ── Component ────────────────────────────────────────────────────── */
 
 interface PresetCardProps {
   content: ReactNode;
@@ -19,11 +61,70 @@ interface PresetCardProps {
 export function PresetCard({
   content, label, active, onClick, onMouseEnter, onMouseLeave,
 }: PresetCardProps) {
+  const [hovered, setHovered] = useState(false);
+  const prevActiveRef = useRef(active);
+  const [animating, setAnimating] = useState(false);
+
+  // Inject keyframes once
+  useEffect(() => {
+    if (_injected) return;
+    const style = document.createElement('style');
+    style.textContent = PRESET_CARD_KEYFRAMES;
+    document.head.appendChild(style);
+    _injected = true;
+  }, []);
+
+  // Detect false→true transition on active prop
+  useEffect(() => {
+    if (active && !prevActiveRef.current) {
+      setAnimating(true);
+      const timer = setTimeout(() => setAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+    prevActiveRef.current = active;
+  }, [active]);
+
+  const imageStyle: CSSProperties = {
+    ...getCardImageStyle(active, hovered),
+    position: 'relative',
+    aspectRatio: '1',
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: 'none',
+    borderRadius: 6,
+    background: 'var(--surface)',
+    overflow: 'hidden',
+    transition: 'transform 150ms ease-out, box-shadow 150ms ease-out',
+    ...(animating
+      ? { animation: 'selectPop 200ms ease-out' }
+      : {}),
+  };
+
+  const labelStyle: CSSProperties = {
+    ...getCardLabelStyle(active, hovered),
+    fontSize: 10,
+    lineHeight: 1.2,
+    textAlign: 'center',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+    whiteSpace: 'nowrap',
+    transition: 'color 150ms, font-weight 150ms',
+  };
+
   return (
     <button
       onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      onMouseEnter={(e) => {
+        setHovered(true);
+        onMouseEnter?.();
+      }}
+      onMouseLeave={(e) => {
+        setHovered(false);
+        onMouseLeave?.();
+      }}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -36,34 +137,37 @@ export function PresetCard({
         padding: 0,
       }}
     >
-      {/* Image area — highlight border here only */}
-      <div style={{
-        aspectRatio: '1',
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
-        borderRadius: 6,
-        background: 'var(--surface)',
-        overflow: 'hidden',
-        transition: 'border-color 100ms',
-      }}>
+      {/* Image area — visual effects here only */}
+      <div style={imageStyle}>
         {content}
+        {/* Check badge for selected state */}
+        {active && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              background: 'rgb(99,102,241)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+              color: '#fff',
+              fontWeight: 700,
+              lineHeight: 1,
+              pointerEvents: 'none',
+            }}
+          >
+            ✓
+          </div>
+        )}
       </div>
 
       {/* Label — outside highlight, no border */}
-      <span style={{
-        fontSize: 10,
-        color: active ? 'var(--text-main)' : 'var(--text-muted)',
-        fontWeight: active ? 600 : 400,
-        lineHeight: 1.2,
-        textAlign: 'center',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        maxWidth: '100%',
-        whiteSpace: 'nowrap',
-      }}>
+      <span style={labelStyle}>
         {label}
       </span>
     </button>
