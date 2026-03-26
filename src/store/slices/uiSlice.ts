@@ -46,6 +46,15 @@ export interface UiSlice {
   setActiveHotbarTab: (tab: number) => void;
   cycleHotbarTab: (dir: 1 | -1) => void;
 
+  showHotbar: boolean;
+  toggleHotbar: () => void;
+  selectedWallCategory: string | null;
+  selectedFloorCategory: string | null;
+  selectedCeilingCategory: string | null;
+  setSelectedWallCategory: (cat: string | null) => void;
+  setSelectedFloorCategory: (cat: string | null) => void;
+  setSelectedCeilingCategory: (cat: string | null) => void;
+
   // Active furniture preset for placing furniture via canvas click
   activeFurniturePreset: string | null;
   setActiveFurniturePreset: (type: string | null) => void;
@@ -213,6 +222,15 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   activeHotbarTab: 1, // Default: Surfaces (was Rooms)
   setActiveHotbarTab: (tab) => set({ activeHotbarTab: tab }),
   cycleHotbarTab: (dir) => set((s: any) => ({ activeHotbarTab: ((s.activeHotbarTab + dir) % 4 + 4) % 4 })),
+
+  showHotbar: false,
+  toggleHotbar: () => set((s) => ({ showHotbar: !s.showHotbar })),
+  selectedWallCategory: null,
+  selectedFloorCategory: null,
+  selectedCeilingCategory: null,
+  setSelectedWallCategory: (cat) => set({ selectedWallCategory: cat }),
+  setSelectedFloorCategory: (cat) => set({ selectedFloorCategory: cat }),
+  setSelectedCeilingCategory: (cat) => set({ selectedCeilingCategory: cat }),
 
   activeFurniturePreset: null,
   setActiveFurniturePreset: (type) => set({ activeFurniturePreset: type, activeLightType: null, activeHotbarSlot: null, activeBrush: null } as any),
