@@ -67,7 +67,7 @@ The rendering loop reads frame overrides but never maps material names to Three.
    ```
    Note: `onPointerOut` (step 4) uses `resolvedMaterial` directly from its closure scope — it captures the correct per-pole value from the render loop iteration, so no ref lookup is needed there.
 
-6. **Rails — display only, no interactivity this sprint.** Rail meshes currently have `raycast={nullRaycast}` unconditionally and no pointer handlers. This sprint only wires the visual material: resolve the rail material name via `resolveFrameProperty(override, defaults, 'rail', 'material')` and apply the correct Three.js material to rail meshes. The rail override comes from `container.railOverrides?.[railKey]` (same pattern as poles — this field already exists on the Container type and is managed by `setFrameElementOverride`/`clearFrameElementOverride` in containerSlice). Rail hover/click interactivity (adding pointer handlers, conditional raycast, hoveredRailRef) is deferred to the Phase 2 frame completion sprint.
+6. **Rails — deferred entirely to Phase 2.** Investigation found that frame rail meshes (horizontal members between poles) are **not yet rendered** in ContainerSkin. Only surface railings (`RailingCable`/`RailingGlass`) exist as face-type renderers — these are surface types, not frame elements. The store infrastructure exists (`container.railOverrides`, `container.frameDefaults.railMaterial`, `resolveFrameProperty` for rails) but there are no frame rail mesh elements to apply materials to. Both rail visual material wiring and rail interactivity are deferred to the Phase 2 frame completion sprint when frame rail meshes are added.
 
 ### Files
 
