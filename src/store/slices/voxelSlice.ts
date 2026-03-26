@@ -275,6 +275,9 @@ export function recomputeSmartRailings(
 
       for (const face of WALL_FACES) {
         if (v.userPaintedFaces?.[face]) continue;   // user override
+        // Structural fold surfaces (Gull_Wing, Half_Fold) act as enclosures — skip auto-railing
+        const currentSurface = v.faces[face as keyof VoxelFaces];
+        if (currentSurface === 'Gull_Wing' || currentSurface === 'Half_Fold') continue;
         const delta = FACE_NEIGHBOR_DELTA[face];
         const nr = row + delta.dr;
         const nc = col + delta.dc;
