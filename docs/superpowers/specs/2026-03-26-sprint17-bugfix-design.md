@@ -41,7 +41,7 @@ Shift detection happens via `window.addEventListener('keydown')` which fires asy
 
 1. **Add pointer-level Shift check** — Add a `pointerdown` listener on the GL canvas (`gl.domElement`) that checks `e.shiftKey` and immediately sets `cameraControlsRef.current.enabled = false`. This catches Shift+click as one atomic gesture regardless of keydown timing.
 
-2. **Abort in-progress camera drag** — When disabling camera controls (in the sync function), call `cameraControlsRef.current.cancel?.()` to stop any active drag momentum. If `cancel` is not available on the drei CameraControls API, use `cameraControlsRef.current.reset(false)` as fallback, or set `smoothTime = 0` temporarily.
+2. **Stop accepting input immediately** — Setting `cameraControlsRef.current.enabled = false` is sufficient to stop processing new pointer input. Do NOT call `reset(false)` — it teleports the camera to its last saved position, causing a jarring jump. The camera-controls library does not have significant momentum when `smoothTime` is small (Scene.tsx uses 0.15), so disabling is enough.
 
 3. **Re-sync on pointerup** — Add a `pointerup` listener that calls `sync()` to re-evaluate camera enabled state. This ensures camera re-enables after Shift+drag completes.
 
@@ -53,9 +53,9 @@ Shift detection happens via `window.addEventListener('keydown')` which fires asy
 
 ### Tests
 
-- Unit test: mock pointerdown with `shiftKey: true` → verify camera.enabled set to false
 - Browser: Shift+click container → no camera rotation, drag initiates cleanly
 - Browser: rotate camera, press Shift mid-rotation → camera stops immediately
+- Browser: click without Shift → camera orbit works normally (no regression)
 
 ---
 
@@ -77,11 +77,11 @@ The `snapDistance` parameter defaults to 1.5m (line 293 of spatialEngine.ts). Al
 
 1. **Reduce default `snapDistance`** from 1.5m → 0.3m in the `findEdgeSnap` function signature. This makes the snap feel tight and magnetic — containers only snap when nearly touching.
 
-2. **Add center-alignment snap** — When edge-snapping along X (right-to-left or left-to-right), also check if Z centers are within 0.3m and snap Z to match. This gives row alignment in a single snap gesture. Same for X-center when edge-snapping along Z.
+2. **Tighten existing center-alignment snap** — `findEdgeSnap` already has center-alignment logic at lines 362-382 with a 2.0m threshold. This existing block must be **replaced** (not supplemented) with the tighter 0.3m threshold. The existing code snaps Z-center when X-edge-snapping and X-center when Z-edge-snapping — this pattern is correct, only the threshold needs tightening from 2.0m → 0.3m.
 
-   Implementation: After finding the best edge snap, compute the center-to-center offset on the perpendicular axis. If `|offset| < 0.3m`, snap the perpendicular axis to align centers.
+   **Important:** Do NOT add a second alignment block alongside the existing one. Replace the `2.0` constant in the existing center-alignment logic with `0.3`. Adding a parallel block creates two competing behaviors.
 
-3. **No V2 port** — V1's `findEdgeSnap` already handles the 4 cardinal snap scenarios correctly. Adjusting threshold + adding center alignment is simpler than introducing `stickySnap.ts`.
+3. **No V2 port** — V1's `findEdgeSnap` already handles the 4 cardinal snap scenarios + center alignment correctly. Only the thresholds need tightening.
 
 ### Files
 
@@ -136,9 +136,13 @@ Same issue exists in `computeGlobalCulling` (spatialEngine.ts ~lines 546-663) wh
    ```
    This ensures only voxels whose physical footprints genuinely intersect get merged.
 
-3. **Apply same fix to `computeGlobalCulling`** — The render-time culling in `tryCullPair` uses the same loose overlap. Apply identical geometric intersection logic so visual culling matches merge behavior.
+3. **Extract shared overlap predicate** — Both `mergeBoundaryVoxels` and `computeGlobalCulling` must use the exact same overlap test. Extract the geometric intersection logic into a shared helper function (e.g., `voxelExtentsOverlap(aCenter, aWidth, bMin, bMax): boolean`) in `spatialEngine.ts`. Both callers import and use this single function. This prevents the two implementations from drifting and causing visual artifacts where faces are merged but not culled, or vice versa.
 
-4. **Preserve `_preMergeWalls` restore** — The existing save/restore mechanism for undo is correct and should not change.
+4. **Apply shared predicate to `computeGlobalCulling`** — Replace the loose overlap check in `tryCullPair` (spatialEngine.ts ~lines 624-627) with the same `voxelExtentsOverlap` helper.
+
+5. **Preserve `_preMergeWalls` restore** — The existing save/restore mechanism for undo is correct and should not change.
+
+**Note on floating-point precision:** After tightening `ADJACENCY_TOLERANCE` to 0.03m, perfectly edge-snapped containers (gap = 0) will still be detected since 0 < 0.03. If floating-point drift produces a gap of 0.031m, adjacency would be missed. This is low risk since snap positions are quantized, but implementers should be aware.
 
 ### Files
 
@@ -168,9 +172,9 @@ No visual feedback distinguishing "hovering over stackable target" from "just dr
 
 ### Design
 
-1. **Green highlight when stack eligible** — When `ghostPos.stackTargetId` is set during drag, change `StackTargetIndicator` material color from the current neutral to green (`0x22c55e`). Add emissive glow (`emissive: 0x22c55e, emissiveIntensity: 0.3`).
+1. **Green highlight when stack eligible** — `StackTargetIndicator` (Scene.tsx ~line 1732) already renders a wireframe with `HIGHLIGHT_COLOR_SELECT` (cyan) and an `<Html>` label reading "Stack Here" at line 1769. Change the wireframe color from `HIGHLIGHT_COLOR_SELECT` to green (`0x22c55e`) and add emissive glow (`emissive: 0x22c55e, emissiveIntensity: 0.3`).
 
-2. **"Release to stack" label** — Add an `<Html>` label (from @react-three/drei) positioned above the `StackTargetIndicator` wireframe. Text: "Release to stack". Style: white text, dark semi-transparent background pill, small font. Only visible when `stackTargetId` is set.
+2. **Update existing label text** — Change the existing `<Html>` label text from "Stack Here" to "Release to stack" for clearer affordance. Do NOT add a second `<Html>` label — one already exists at line 1769.
 
 3. **Lower overlap threshold** — In `findStackTarget` (spatialEngine.ts ~line 406), lower the footprint overlap requirement from 60% → 40%. This makes it easier to discover drag-to-stack without requiring near-perfect alignment.
 
