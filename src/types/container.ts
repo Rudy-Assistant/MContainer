@@ -288,6 +288,17 @@ export interface VoxelFaces {
   w:      SurfaceType; // west face  (toward Left wall,  –X)
 }
 
+/** Material definition for ghost preview — maps surface type to concrete material properties. */
+export interface MaterialDef {
+  surfaceType: SurfaceType;
+  /** Key into _themeMats texture cache (e.g., 'steelCorrugated', 'oakPlanks') */
+  textureId?: string;
+  /** Hex color override (e.g., '#78716c' for custom paint) */
+  color?: string;
+  /** Finish metadata — doorStyle, glassTint, etc. */
+  finishMeta?: Record<string, string>;
+}
+
 export interface Voxel {
   /** Whether this voxel is included in the scene (deck rows start inactive) */
   active: boolean;

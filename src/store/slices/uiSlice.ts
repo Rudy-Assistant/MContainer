@@ -5,7 +5,7 @@
  * not undo-tracked. Consumer selectors unchanged.
  */
 
-import type { SurfaceType, VoxelFaces } from '@/types/container';
+import type { MaterialDef, SurfaceType, VoxelFaces } from '@/types/container';
 import type { DesignWarning } from '@/types/validation';
 import type { VoxelPayload } from '../useStore';
 
@@ -183,12 +183,19 @@ export interface UiSlice {
 
   // Preset card hover → ghost preview of faces in 3D scene
   ghostPreset: {
-    source: 'block' | 'container';
+    source: 'block' | 'container' | 'walls' | 'flooring' | 'ceiling';
     faces: VoxelFaces;
     targetScope: 'voxel' | 'bay' | 'container';
+    materialMap?: Partial<Record<keyof VoxelFaces, MaterialDef>>;
   } | null;
-  setGhostPreset: (g: { source: 'block' | 'container'; faces: VoxelFaces; targetScope: 'voxel' | 'bay' | 'container' } | null) => void;
+  setGhostPreset: (g: { source: 'block' | 'container' | 'walls' | 'flooring' | 'ceiling'; faces: VoxelFaces; targetScope: 'voxel' | 'bay' | 'container'; materialMap?: Partial<Record<keyof VoxelFaces, MaterialDef>> } | null) => void;
   clearGhostPreset: () => void;
+
+  // Ghost pop animation lifecycle
+  ghostPopActive: boolean;
+  ghostPopStartTime: number;
+  triggerGhostPop: () => void;
+  clearGhostPop: () => void;
 
   // Stamp mode ghost preview — green tint overlay on hovered face
   stampPreview: {
@@ -365,6 +372,15 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   ghostPreset: null,
   setGhostPreset: (g) => set({ ghostPreset: g }),
   clearGhostPreset: () => set({ ghostPreset: null }),
+
+  // Ghost pop animation lifecycle
+  ghostPopActive: false,
+  ghostPopStartTime: 0,
+  triggerGhostPop: () => set({
+    ghostPopActive: true,
+    ghostPopStartTime: performance.now(),
+  }),
+  clearGhostPop: () => set({ ghostPopActive: false }),
 
   // Stamp mode ghost preview
   stampPreview: null,
