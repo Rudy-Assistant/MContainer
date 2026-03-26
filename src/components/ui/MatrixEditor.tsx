@@ -85,39 +85,41 @@ function GridCell({
   const effectiveEdge = edgeFace || syncFace;
 
   // Always use longhand border properties to avoid React shorthand/longhand conflict warnings
-  const borderStyle: React.CSSProperties = isSelected && syncFace
-    ? {
-        borderTop:    syncFace === "n" ? "3px solid #06b6d4" : "2px solid #2563eb",
-        borderBottom: syncFace === "s" ? "3px solid #06b6d4" : "2px solid #2563eb",
-        borderRight:  syncFace === "e" ? "3px solid #06b6d4" : "2px solid #2563eb",
-        borderLeft:   syncFace === "w" ? "3px solid #06b6d4" : "2px solid #2563eb",
-      }
-    : isSelected
-      ? { borderTop: "2px solid #2563eb", borderBottom: "2px solid #2563eb", borderLeft: "2px solid #2563eb", borderRight: "2px solid #2563eb" }
-    : isMultiSelected
-      ? { borderTop: "2px solid #1565c0", borderBottom: "2px solid #1565c0", borderLeft: "2px solid #1565c0", borderRight: "2px solid #1565c0" }
-    : isHovered && effectiveEdge
-      ? (effectiveEdge === "top" || effectiveEdge === "bottom")
-        ? { borderTop: "2px solid #fde047", borderBottom: "2px solid #fde047", borderLeft: "2px solid #fde047", borderRight: "2px solid #fde047", background: `rgba(253,224,71,0.25)` }
-        : {
-            borderTop:    effectiveEdge === "n" ? "3px solid #fde047" : "1px solid #fef08a",
-            borderBottom: effectiveEdge === "s" ? "3px solid #fde047" : "1px solid #fef08a",
-            borderRight:  effectiveEdge === "e" ? "3px solid #fde047" : "1px solid #fef08a",
-            borderLeft:   effectiveEdge === "w" ? "3px solid #fde047" : "1px solid #fef08a",
-          }
-      : isHovered
-        ? { borderTop: "2px solid #fef08a", borderBottom: "2px solid #fef08a", borderLeft: "2px solid #fef08a", borderRight: "2px solid #fef08a" }
-        : isCore
-          ? { borderTop: "2px solid var(--border, #cbd5e1)", borderBottom: "2px solid var(--border, #cbd5e1)", borderLeft: "2px solid var(--border, #cbd5e1)", borderRight: "2px solid var(--border, #cbd5e1)", borderRadius: 8 }
-          : { borderTop: "2px solid #e5e7eb", borderBottom: "2px solid #e5e7eb", borderLeft: "2px solid #e5e7eb", borderRight: "2px solid #e5e7eb", borderRadius: 8 };
+  // Cell border: selected face gets thick cyan, hovered edge gets thick amber
+  const b = (face: string, fallback: string) =>
+    isSelected && syncFace === face ? "4px solid #06b6d4"
+    : isHovered && effectiveEdge === face ? "4px solid #fbbf24"
+    : fallback;
+  const fallbackBorder = isSelected ? "2px solid #2563eb"
+    : isMultiSelected ? "2px solid #1565c0"
+    : isHovered ? "2px solid #fef08a"
+    : `2px solid ${isCore ? "var(--border, #cbd5e1)" : "#e5e7eb"}`;
 
-  // ★ Fix 5: Edge hotspot base style
+  const borderStyle: React.CSSProperties = {
+    borderTop: b("n", fallbackBorder),
+    borderBottom: b("s", fallbackBorder),
+    borderRight: b("e", fallbackBorder),
+    borderLeft: b("w", fallbackBorder),
+    borderRadius: 8,
+  };
+
+  // Edge hotspot base style — always slightly visible, prominent on hover/select
   const edgeHotBase: React.CSSProperties = {
     position: "absolute",
     zIndex: 2,
     cursor: "crosshair",
-    background: "transparent",
+    transition: "all 100ms ease",
   };
+
+  // Edge visual state helpers
+  const edgeIsHovered = (face: string) => edgeFace === face;
+  const edgeIsSelected = (face: string) => isSelected && syncFace === face;
+  const edgeBg = (face: string) =>
+    edgeIsSelected(face) ? "rgba(6,182,212,0.85)"     // cyan for selected
+    : edgeIsHovered(face) ? "rgba(253,224,71,0.75)"    // amber for hovered
+    : "rgba(148,163,184,0.18)";                        // subtle slate — always visible
+  const edgeSize = (face: string) =>
+    edgeIsSelected(face) ? 10 : edgeIsHovered(face) ? 10 : 4;
 
   return (
     <button
@@ -180,9 +182,8 @@ function GridCell({
         <>
           {/* North edge */}
           <div
-            style={{ ...edgeHotBase, top: 0, left: 4, right: 4, height: (edgeFace === "n" || syncFace === "n") ? 8 : 5,
-              background: (edgeFace === "n" || syncFace === "n") ? "rgba(253,224,71,0.8)" : "transparent",
-              borderRadius: (edgeFace === "n" || syncFace === "n") ? "4px 4px 0 0" : 0,
+            style={{ ...edgeHotBase, top: 0, left: 0, right: 0, height: edgeSize("n"),
+              background: edgeBg("n"), borderRadius: "4px 4px 0 0",
             }}
             onMouseEnter={(e) => { e.stopPropagation(); onEdgeHover("n"); }}
             onMouseLeave={(e) => { e.stopPropagation(); onEdgeLeave(); }}
@@ -190,9 +191,8 @@ function GridCell({
           />
           {/* South edge */}
           <div
-            style={{ ...edgeHotBase, bottom: 0, left: 4, right: 4, height: (edgeFace === "s" || syncFace === "s") ? 8 : 5,
-              background: (edgeFace === "s" || syncFace === "s") ? "rgba(253,224,71,0.8)" : "transparent",
-              borderRadius: (edgeFace === "s" || syncFace === "s") ? "0 0 4px 4px" : 0,
+            style={{ ...edgeHotBase, bottom: 0, left: 0, right: 0, height: edgeSize("s"),
+              background: edgeBg("s"), borderRadius: "0 0 4px 4px",
             }}
             onMouseEnter={(e) => { e.stopPropagation(); onEdgeHover("s"); }}
             onMouseLeave={(e) => { e.stopPropagation(); onEdgeLeave(); }}
@@ -200,9 +200,8 @@ function GridCell({
           />
           {/* East edge */}
           <div
-            style={{ ...edgeHotBase, right: 0, top: 4, bottom: 4, width: (edgeFace === "e" || syncFace === "e") ? 8 : 5,
-              background: (edgeFace === "e" || syncFace === "e") ? "rgba(253,224,71,0.8)" : "transparent",
-              borderRadius: (edgeFace === "e" || syncFace === "e") ? "0 4px 4px 0" : 0,
+            style={{ ...edgeHotBase, right: 0, top: 0, bottom: 0, width: edgeSize("e"),
+              background: edgeBg("e"), borderRadius: "0 4px 4px 0",
             }}
             onMouseEnter={(e) => { e.stopPropagation(); onEdgeHover("e"); }}
             onMouseLeave={(e) => { e.stopPropagation(); onEdgeLeave(); }}
@@ -210,9 +209,8 @@ function GridCell({
           />
           {/* West edge */}
           <div
-            style={{ ...edgeHotBase, left: 0, top: 4, bottom: 4, width: (edgeFace === "w" || syncFace === "w") ? 8 : 5,
-              background: (edgeFace === "w" || syncFace === "w") ? "rgba(253,224,71,0.8)" : "transparent",
-              borderRadius: (edgeFace === "w" || syncFace === "w") ? "4px 0 0 4px" : 0,
+            style={{ ...edgeHotBase, left: 0, top: 0, bottom: 0, width: edgeSize("w"),
+              background: edgeBg("w"), borderRadius: "4px 0 0 4px",
             }}
             onMouseEnter={(e) => { e.stopPropagation(); onEdgeHover("w"); }}
             onMouseLeave={(e) => { e.stopPropagation(); onEdgeLeave(); }}
@@ -630,11 +628,13 @@ function SimpleBayGrid({
   const setSelectedElements = useStore((s) => s.setSelectedElements);
   const selectWithFace = useStore((s) => s.selectWithFace);
   const setHoveredVoxelEdge = useStore((s) => s.setHoveredVoxelEdge);
+  const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
   const activeBrush = useStore((s) => s.activeBrush);
   const activeSlot = useStore((s) => s.activeHotbarSlot);
   const setVoxelFace = useStore((s) => s.setVoxelFace);
   const setHoveredBayGroup = useStore((s) => s.setHoveredBayGroup);
   const setSelectedFace = useStore((s) => s.setSelectedFace);
+  const selectedFace = useStore((s) => s.selectedFace);
   const selectedVoxels = useSelectedVoxels();
   const selectedVoxel = useSelectedVoxel();
   const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
@@ -801,22 +801,29 @@ function SimpleBayGrid({
             title={`${group.label}${hasTool ? " — click to apply" : ""}`}
           >
             {group.label}
-            {/* Edge hotspots for face selection */}
+            {/* Edge hotspots for face selection — always visible, prominent on hover */}
             {['n', 's', 'e', 'w'].map((face) => {
-              const isEdge = face === 'n' || face === 's';
+              const isFaceHovered = hoveredVoxelEdge?.containerId === containerId &&
+                group.voxelIndices.includes((hoveredVoxelEdge?.voxelIndex ?? -1) - levelOffset) &&
+                hoveredVoxelEdge?.face === face;
+              const isFaceSelected = isSelected && selectedFace === face;
+              const eSz = isFaceSelected ? 10 : isFaceHovered ? 10 : 4;
+              const eBg = isFaceSelected ? "rgba(6,182,212,0.85)"
+                : isFaceHovered ? "rgba(253,224,71,0.75)"
+                : "rgba(148,163,184,0.18)";
               const pos: React.CSSProperties = face === 'n'
-                ? { top: 0, left: 4, right: 4, height: 6 }
+                ? { top: 0, left: 0, right: 0, height: eSz, borderRadius: "4px 4px 0 0" }
                 : face === 's'
-                  ? { bottom: 0, left: 4, right: 4, height: 6 }
+                  ? { bottom: 0, left: 0, right: 0, height: eSz, borderRadius: "0 0 4px 4px" }
                   : face === 'e'
-                    ? { right: 0, top: 4, bottom: 4, width: 6 }
-                    : { left: 0, top: 4, bottom: 4, width: 6 };
+                    ? { right: 0, top: 0, bottom: 0, width: eSz, borderRadius: "0 4px 4px 0" }
+                    : { left: 0, top: 0, bottom: 0, width: eSz, borderRadius: "4px 0 0 4px" };
               return (
                 <div
                   key={face}
                   style={{
                     position: 'absolute', zIndex: 2, cursor: 'crosshair',
-                    background: 'transparent', ...pos,
+                    background: eBg, transition: 'all 100ms ease', ...pos,
                   }}
                   onMouseEnter={(e) => {
                     e.stopPropagation();
