@@ -290,7 +290,7 @@ export function findEdgeSnap(
   z: number,
   size: ContainerSize,
   rotation: number = 0,
-  snapDistance: number = 1.5
+  snapDistance: number = 0.3
 ): SnapResult {
   const dims = CONTAINER_DIMENSIONS[size];
   const cosA = Math.abs(Math.cos(rotation));
@@ -362,11 +362,11 @@ export function findEdgeSnap(
     // Also snap Z alignment when X-snapped (align containers along their shared axis)
     if (adjacentTo === c.id) {
       const zAlign = c.position.z;
-      if (Math.abs(bestZ - zAlign) < 2.0) {
+      if (Math.abs(bestZ - zAlign) < 0.3) {
         bestZ = zAlign;
       }
       const xAlign = c.position.x;
-      if (Math.abs(bestX - xAlign) < 2.0) {
+      if (Math.abs(bestX - xAlign) < 0.3) {
         bestX = xAlign;
       }
     }
