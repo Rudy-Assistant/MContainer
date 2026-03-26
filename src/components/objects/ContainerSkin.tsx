@@ -627,7 +627,7 @@ function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig, doorMat }: {
       <group position={isSlide ? [0, 0, 0] : [-pivotOffset, 0, -pivotOffsetZ]}>
         <group ref={groupRef}>
           <mesh
-            geometry={isNS ? getBox(doorW, h * 0.95, d * 0.6) : getBox(d * 0.6, h * 0.95, doorW)}
+            geometry={isNS ? getBox(doorW, h * 0.95, d * 0.95) : getBox(d * 0.95, h * 0.95, doorW)}
             position={isSlide ? [0, 0, 0] : [pivotOffset, 0, pivotOffsetZ]}
             material={doorMat ?? mSteel}
             castShadow raycast={nullRaycast}
