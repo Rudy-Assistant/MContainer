@@ -16,6 +16,10 @@ import { getSelectedVoxel } from '@/hooks/useSelectedVoxel';
 import { getSelectedVoxels } from '@/hooks/useSelectedVoxels';
 import { formRegistry } from '@/config/formRegistry';
 import { localToWorld, anchorToLocalPosition, anchorToLocalRotation, localRotToWorld } from '@/utils/anchorMath';
+import { nullRaycast } from '@/utils/nullRaycast';
+import { getCachedPlane } from '@/utils/geometryCache';
+import { createGhostMaterial } from '@/utils/ghostMaterial';
+import { getMaterialForFace } from '@/config/materialCache';
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -27,7 +31,10 @@ import {
   VOXEL_ROWS,
   VOXEL_LEVELS,
   ContainerSize,
+  type SurfaceType,
+  type FaceFinish,
 } from '@/types/container';
+import { getVoxelLayout } from '@/components/objects/ContainerSkin';
 
 const PREVIEW_COLOR = new THREE.Color('#3b82f6');
 const PREVIEW_OPACITY = 0.25;
@@ -129,40 +136,79 @@ function HoverPreviewGhostInner({ formId }: { formId: string }) {
   );
 }
 
-// ── PresetGhost — overlay on selected voxel(s) when preset card is hovered ──
+// ── PresetGhost — face-coded overlay on selected voxel(s) when preset card is hovered ──
 
-const GHOST_COLOR = new THREE.Color('#60a5fa'); // blue-400
+// Face-coded ghost materials: solid faces blue, glass faces lighter blue, open faces invisible
+const _ghostMats = {
+  solid: new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.30, depthWrite: false, side: THREE.DoubleSide }),
+  glass: new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.20, depthWrite: false, side: THREE.DoubleSide }),
+};
+
+// Determine material based on surface type — glass-like surfaces get lighter tint
+const GLASS_SURFACES: ReadonlySet<SurfaceType> = new Set([
+  'Glass_Pane', 'Railing_Glass', 'Glass_Shoji', 'Wall_Washi',
+  'Window_Standard', 'Window_Sill', 'Window_Clerestory',
+]);
+const _activeGhostMats: THREE.Material[] = [];
+
+function ghostMatForSurface(surfaceType: SurfaceType): THREE.MeshBasicMaterial | null {
+  if (surfaceType === 'Open') return null;
+  if (GLASS_SURFACES.has(surfaceType)) return _ghostMats.glass;
+  return _ghostMats.solid;
+}
+
+// Reusable pool: avoid creating/destroying meshes every frame
+const GHOST_POOL_SIZE = 48; // max 8 voxels × 6 faces
+let _ghostPool: THREE.Mesh[] | null = null;
+function getGhostPool(): THREE.Mesh[] {
+  if (!_ghostPool) {
+    _ghostPool = [];
+    const placeholder = new THREE.PlaneGeometry(1, 1);
+    for (let i = 0; i < GHOST_POOL_SIZE; i++) {
+      const m = new THREE.Mesh(placeholder, _ghostMats.solid);
+      m.visible = false;
+      m.raycast = nullRaycast;
+      _ghostPool.push(m);
+    }
+  }
+  return _ghostPool;
+}
+
+// Face layout templates — static rotations, reused to avoid per-frame allocation
+const FACE_KEYS: ReadonlyArray<keyof import('@/types/container').VoxelFaces> = ['top', 'bottom', 'n', 's', 'e', 'w'];
+const FACE_RX = [-Math.PI / 2, -Math.PI / 2, 0, 0, 0, 0];
+const FACE_RY = [0, 0, 0, Math.PI, Math.PI / 2, -Math.PI / 2];
 
 function PresetGhost() {
   const groupRef = useRef<THREE.Group>(null);
-  const materialRef = useRef<THREE.MeshBasicMaterial | null>(null);
 
-  if (!materialRef.current) {
-    materialRef.current = new THREE.MeshBasicMaterial({
-      color: GHOST_COLOR,
-      transparent: true,
-      opacity: 0.35,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-  }
-
+  // Attach pool meshes to the group once
   useEffect(() => {
-    const mat = materialRef.current;
-    return () => { mat?.dispose(); };
-  }, []);
-
-  // Pulse animation: opacity oscillates 0.25↔0.40 over 800ms
-  useFrame(({ clock }) => {
-    if (!materialRef.current) return;
-    const t = (Math.sin(clock.getElapsedTime() * Math.PI * 2 / 0.8) + 1) / 2;
-    materialRef.current.opacity = 0.25 + t * 0.15;
-  });
-
-  // Compute mesh positions from store state
-  useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
+    const pool = getGhostPool();
+    for (const m of pool) group.add(m);
+    return () => {
+      for (const m of pool) { m.visible = false; group.remove(m); }
+    };
+  }, []);
+
+  // Single useFrame: pulse opacity + position face panels
+  useFrame(({ clock }) => {
+    const group = groupRef.current;
+    if (!group) return;
+
+    // Pulse opacity
+    const t = (Math.sin(clock.getElapsedTime() * Math.PI * 2 / 0.8) + 1) / 2;
+    _ghostMats.solid.opacity = 0.22 + t * 0.12;
+    _ghostMats.glass.opacity = 0.14 + t * 0.10;
+    // Also pulse material-accurate ghosts
+    for (const mat of _activeGhostMats) {
+      mat.opacity = 0.22 + t * 0.12;
+    }
+
+    const pool = getGhostPool();
+    _activeGhostMats.length = 0;
 
     const state = useStore.getState();
     const { ghostPreset, containers } = state;
@@ -171,10 +217,11 @@ function PresetGhost() {
 
     if (!ghostPreset) {
       group.visible = false;
+      for (const m of pool) m.visible = false;
       return;
     }
 
-    // Determine which container + indices to highlight
+    // Determine target container + indices
     let containerId: string | null = null;
     let indices: number[] = [];
 
@@ -192,61 +239,117 @@ function PresetGhost() {
 
     if (!containerId || indices.length === 0) {
       group.visible = false;
+      for (const m of pool) m.visible = false;
       return;
     }
 
     const container = containers[containerId];
     if (!container) {
       group.visible = false;
+      for (const m of pool) m.visible = false;
       return;
     }
 
     const dims = CONTAINER_DIMENSIONS[container.size as ContainerSize];
-    const colPitch = dims.length / 6;
-    const rowPitch = dims.width / 2;
     const vHeight = dims.height / VOXEL_LEVELS;
+    const halfH = vHeight / 2;
+    const { faces } = ghostPreset;
 
-    // Clear old children
-    while (group.children.length > 0) {
-      group.remove(group.children[0]);
-    }
+    // Pre-compute container transform (avoid recomputing cos/sin per face)
+    const cp = container.position;
+    const cosR = Math.cos(container.rotation);
+    const sinR = Math.sin(container.rotation);
+    const rot = container.rotation;
 
-    const mat = materialRef.current!;
-    const boxGeo = new THREE.BoxGeometry(colPitch, vHeight, rowPitch);
+    let poolIdx = 0;
 
     for (const idx of indices) {
       const col = idx % VOXEL_COLS;
       const row = Math.floor(idx / VOXEL_COLS) % VOXEL_ROWS;
       const level = Math.floor(idx / (VOXEL_COLS * VOXEL_ROWS));
 
-      const localX = -(col - 3.5) * colPitch;
-      const localY = level * vHeight + vHeight / 2;
-      const localZ = (row - 1.5) * rowPitch;
+      const { voxW, voxD, px, pz } = getVoxelLayout(col, row, dims);
+      const cy = level * vHeight + halfH;
+      const halfW = voxW / 2;
+      const halfD = voxD / 2;
 
-      const worldPos = localToWorld([localX, localY, localZ], container);
+      // Per-face: local position offsets, plane dimensions
+      // [lx, ly, lz, pw, ph] for each of the 6 faces
+      const faceData: [number, number, number, number, number][] = [
+        [px,         cy + halfH, pz,         voxW,    voxD],     // top
+        [px,         cy - halfH, pz,         voxW,    voxD],     // bottom
+        [px,         cy,         pz - halfD, voxW,    vHeight],  // n
+        [px,         cy,         pz + halfD, voxW,    vHeight],  // s
+        [px + halfW, cy,         pz,         voxD,    vHeight],  // e
+        [px - halfW, cy,         pz,         voxD,    vHeight],  // w
+      ];
 
-      const mesh = new THREE.Mesh(boxGeo, mat);
-      mesh.position.set(worldPos[0], worldPos[1], worldPos[2]);
-      mesh.rotation.y = container.rotation;
-      mesh.raycast = () => {};
-      group.add(mesh);
+      for (let fi = 0; fi < 6; fi++) {
+        const faceKey = FACE_KEYS[fi];
+        const surfType = faces[faceKey];
+        if (surfType === 'Open' || poolIdx >= GHOST_POOL_SIZE) continue;
+
+        const [lx, ly, lz, pw, ph] = faceData[fi];
+        const mesh = pool[poolIdx++];
+        mesh.geometry = getCachedPlane(pw, ph);
+
+        // Check for material-accurate path via materialMap
+        const matDef = ghostPreset.materialMap?.[faceKey as keyof typeof ghostPreset.materialMap];
+        let faceMat: THREE.Material;
+
+        if (matDef) {
+          // Material-accurate path: resolve MaterialDef → actual material → ghost clone
+          const finish = matDef.finishMeta as FaceFinish | undefined;
+          const baseMat = getMaterialForFace(matDef.surfaceType, finish, state.currentTheme ?? 'industrial');
+          faceMat = createGhostMaterial(baseMat);
+          _activeGhostMats.push(faceMat);
+        } else {
+          // Fallback: use surface type from faces field
+          faceMat = GLASS_SURFACES.has(surfType) ? _ghostMats.glass : _ghostMats.solid;
+        }
+
+        mesh.material = faceMat;
+
+        // Inline localToWorld — container transform computed once outside loop
+        mesh.position.set(
+          cp.x + lx * cosR - lz * sinR,
+          cp.y + ly,
+          cp.z + lx * sinR + lz * cosR,
+        );
+        mesh.rotation.set(FACE_RX[fi], FACE_RY[fi] + rot, 0);
+        mesh.visible = true;
+      }
+    }
+
+    // Hide unused pool meshes
+    for (let i = poolIdx; i < GHOST_POOL_SIZE; i++) {
+      pool[i].visible = false;
+    }
+
+    // Pop animation
+    const { ghostPopActive, ghostPopStartTime } = state;
+    if (ghostPopActive) {
+      const elapsed = performance.now() - ghostPopStartTime;
+      const progress = Math.min(elapsed / 200, 1); // 200ms duration
+      let scale: number;
+      if (progress < 0.4) {
+        scale = 1.0 + 0.06 * (progress / 0.4);
+      } else {
+        scale = 1.06 - 0.06 * ((progress - 0.4) / 0.6);
+      }
+      for (let i = 0; i < poolIdx; i++) {
+        pool[i].scale.setScalar(scale);
+      }
+      if (progress >= 1.0) {
+        state.clearGhostPop();
+        for (let i = 0; i < poolIdx; i++) pool[i].scale.setScalar(1.0);
+      }
+    } else {
+      for (let i = 0; i < poolIdx; i++) pool[i].scale.setScalar(1.0);
     }
 
     group.visible = true;
   });
-
-  useEffect(() => {
-    return () => {
-      const group = groupRef.current;
-      if (group) {
-        while (group.children.length > 0) {
-          const mesh = group.children[0] as THREE.Mesh;
-          mesh.geometry?.dispose();
-          group.remove(mesh);
-        }
-      }
-    };
-  }, []);
 
   return <group ref={groupRef} />;
 }
@@ -292,30 +395,31 @@ function StampGhost() {
     if (!container) { mesh.visible = false; return; }
 
     const dims = CONTAINER_DIMENSIONS[container.size as ContainerSize];
-    const colPitch = dims.length / 6;
-    const rowPitch = dims.width / 2;
     const vHeight = dims.height / VOXEL_LEVELS;
 
     const col = voxelIndex % VOXEL_COLS;
     const row = Math.floor(voxelIndex / VOXEL_COLS) % VOXEL_ROWS;
     const level = Math.floor(voxelIndex / (VOXEL_COLS * VOXEL_ROWS));
 
+    // Dynamic voxel dimensions — correct for both body and halo/extension voxels
+    const { voxW, voxD, px, pz } = getVoxelLayout(col, row, dims);
+
     // Voxel center in local space
-    const cx = -(col - 3.5) * colPitch;
+    const cx = px;
     const cy = level * vHeight + vHeight / 2;
-    const cz = (row - 1.5) * rowPitch;
+    const cz = pz;
 
     // Offset to face center + geometry sizing
     let lx = cx, ly = cy, lz = cz;
-    let gw = colPitch, gh = vHeight, gd = rowPitch; // face-sized defaults
+    let gw = voxW, gh = vHeight, gd = voxD; // face-sized defaults
 
     switch (face) {
-      case 'n':  lz -= rowPitch / 2; gw = colPitch; gh = vHeight; gd = STAMP_THICKNESS; break;
-      case 's':  lz += rowPitch / 2; gw = colPitch; gh = vHeight; gd = STAMP_THICKNESS; break;
-      case 'e':  lx += colPitch / 2; gw = STAMP_THICKNESS; gh = vHeight; gd = rowPitch; break;
-      case 'w':  lx -= colPitch / 2; gw = STAMP_THICKNESS; gh = vHeight; gd = rowPitch; break;
-      case 'top':    ly += vHeight / 2; gw = colPitch; gh = STAMP_THICKNESS; gd = rowPitch; break;
-      case 'bottom': ly -= vHeight / 2; gw = colPitch; gh = STAMP_THICKNESS; gd = rowPitch; break;
+      case 'n':  lz -= voxD / 2; gw = voxW; gh = vHeight; gd = STAMP_THICKNESS; break;
+      case 's':  lz += voxD / 2; gw = voxW; gh = vHeight; gd = STAMP_THICKNESS; break;
+      case 'e':  lx += voxW / 2; gw = STAMP_THICKNESS; gh = vHeight; gd = voxD; break;
+      case 'w':  lx -= voxW / 2; gw = STAMP_THICKNESS; gh = vHeight; gd = voxD; break;
+      case 'top':    ly += vHeight / 2; gw = voxW; gh = STAMP_THICKNESS; gd = voxD; break;
+      case 'bottom': ly -= vHeight / 2; gw = voxW; gh = STAMP_THICKNESS; gd = voxD; break;
       default: mesh.visible = false; return;
     }
 
