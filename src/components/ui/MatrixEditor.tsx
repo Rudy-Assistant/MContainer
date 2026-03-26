@@ -27,15 +27,7 @@ import { createDefaultVoxelGrid } from "@/types/factories";
 import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
 import { HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
 import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
-import { SURFACE_COLORS } from "@/config/surfaceLabels";
-
-/** Derive a single representative color from a voxel's faces */
-function cellColor(faces: { n: SurfaceType; s: SurfaceType; e: SurfaceType; w: SurfaceType; top: SurfaceType; bottom: SurfaceType }): string {
-  for (const f of [faces.n, faces.s, faces.e, faces.w, faces.top, faces.bottom]) {
-    if (f !== "Open") return SURFACE_COLORS[f] ?? "#78909c";
-  }
-  return "transparent";
-}
+// Color legend removed — grid cells are transparent, highlight on hover/select only
 
 // ── Grid Cell ────────────────────────────────────────────────
 
@@ -43,8 +35,6 @@ function GridCell({
   voxelIndex,
   containerId,
   active,
-  color,
-  floorColor,
   isSelected,
   isMultiSelected,
   isHovered,
@@ -68,8 +58,6 @@ function GridCell({
   voxelIndex: number;
   containerId: string;
   active: boolean;
-  color: string;
-  floorColor: string;
   isSelected: boolean;
   isMultiSelected: boolean;
   isHovered: boolean;
@@ -91,8 +79,7 @@ function GridCell({
   onContextMenu: (e: React.MouseEvent, voxelIndex: number) => void;
 }) {
 
-  // Active cells show floor material color as a subtle bottom stripe
-  const hasFloor = active && floorColor !== "transparent";
+  // Floor stripe removed — cells are transparent with hover/select highlights only
 
   // Determine effective edge highlight: direct 3D hover > Cell View sync > context menu
   const effectiveEdge = edgeFace || syncFace;
@@ -160,19 +147,15 @@ function GridCell({
         ...(gridColumn ? { gridColumn } : {}),
         ...(gridRow ? { gridRow } : {}),
         ...borderStyle,
-        background: active ? (color === "transparent" ? "var(--surface-alt, #f8fafc)" : color) : (isCore ? "var(--input-bg, #f1f5f9)" : "var(--surface-alt, #fafbfc)"),
+        background: active
+          ? (isSelected ? "rgba(6,182,212,0.12)" : isHovered ? "rgba(253,224,71,0.12)" : "var(--surface-alt, #f8fafc)")
+          : (isCore ? "var(--input-bg, #f1f5f9)" : "var(--surface-alt, #fafbfc)"),
         boxShadow: active ? "inset 0 0 0 1px rgba(0,0,0,0.1)" : isHovered ? "0 0 0 1px #fef08a, 0 1px 4px rgba(254,240,138,0.3)" : "none",
         transition: "all 80ms ease",
       }}
       title={`Block [C${voxelIndex % VOXEL_COLS}, R${Math.floor((voxelIndex % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS)}]${active ? "" : " (click to deploy)"}${isLocked ? " locked" : ""}`}
     >
-      {/* Floor material stripe at bottom of cell */}
-      {hasFloor && (
-        <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0,
-          height: "3px", background: floorColor, opacity: 0.7,
-        }} />
-      )}
+      {/* Floor stripe removed — transparent cells */}
       {isLocked && (
         <div style={{
           position: "absolute", inset: 0, display: "flex",
@@ -274,6 +257,7 @@ function VoxelGrid({
   const selectedVoxel = useSelectedVoxel();
   const selectedVoxels = useSelectedVoxels();
   const setSelectedElements = useStore((s) => s.setSelectedElements);
+  const selectWithFace = useStore((s) => s.selectWithFace);
   const toggleElement = useStore((s) => s.toggleElement);
   const lockedVoxels = useStore((s) => s.lockedVoxels);
   const hoveredVoxel = useStore((s) => s.hoveredVoxel);
@@ -334,9 +318,11 @@ function VoxelGrid({
   }, [setHoveredVoxelEdge]);
 
   const handleEdgeClick = useCallback((idx: number, face: string) => {
-    setSelectedElements({ type: 'voxel', items: [{ containerId, id: String(idx) }] });
-    cycleVoxelFace(containerId, idx, face as keyof import("@/types/container").VoxelFaces);
-  }, [containerId, setSelectedElements, cycleVoxelFace]);
+    selectWithFace(
+      { type: 'voxel', items: [{ containerId, id: String(idx) }] },
+      face as keyof import("@/types/container").VoxelFaces,
+    );
+  }, [containerId, selectWithFace]);
 
   // Context menu: open on right-click, close on outside click
   useEffect(() => {
@@ -438,7 +424,7 @@ function VoxelGrid({
 
   // Build rows (0=north → 3=south), columns REVERSED so col 0 (+X, FRONT) is on RIGHT
   const rows = useMemo(() => {
-    const r: { voxelIndex: number; col: number; row: number; active: boolean; color: string; floorColor: string; isCore: boolean; isLocked: boolean }[][] = [];
+    const r: { voxelIndex: number; col: number; row: number; active: boolean; isCore: boolean; isLocked: boolean }[][] = [];
     for (let row = 0; row < VOXEL_ROWS; row++) {
       const cells: typeof r[0] = [];
       for (let col = VOXEL_COLS - 1; col >= 0; col--) {
@@ -450,8 +436,6 @@ function VoxelGrid({
           col,
           row,
           active: v?.active ?? false,
-          color: v ? cellColor(v.faces) : "transparent",
-          floorColor: v ? (SURFACE_COLORS[v.faces.bottom] ?? "transparent") : "transparent",
           isCore,
           isLocked: !!lockedVoxels[`${containerId}_${idx}`],
         });
@@ -531,8 +515,6 @@ function VoxelGrid({
                 voxelIndex={cell.voxelIndex}
                 containerId={containerId}
                 active={cell.active}
-                color={cell.color}
-                floorColor={cell.floorColor}
                 isSelected={isThisSelected}
                 isMultiSelected={isThisMultiSelected}
                 isHovered={isThisHovered}
@@ -646,6 +628,8 @@ function SimpleBayGrid({
   level: number;
 }) {
   const setSelectedElements = useStore((s) => s.setSelectedElements);
+  const selectWithFace = useStore((s) => s.selectWithFace);
+  const setHoveredVoxelEdge = useStore((s) => s.setHoveredVoxelEdge);
   const activeBrush = useStore((s) => s.activeBrush);
   const activeSlot = useStore((s) => s.activeHotbarSlot);
   const setVoxelFace = useStore((s) => s.setVoxelFace);
@@ -741,13 +725,7 @@ function SimpleBayGrid({
       }}>
       {BAY_GROUPS.map((group) => {
         // Compute dominant color from voxels in this group
-        const colors = group.voxelIndices.map((i) => {
-          const idx = level * VOXEL_ROWS * VOXEL_COLS + i;
-          const v = voxelGrid[idx];
-          if (!v) return "transparent";
-          return cellColor(v.faces);
-        });
-        const dominantColor = colors.find((c) => c !== "transparent") ?? "var(--input-bg, #f1f5f9)";
+        // Cells are transparent — highlight on hover/select only
 
         // Check if this bay group is currently selected or hovered
         const levelOffset = level * VOXEL_ROWS * VOXEL_COLS;
@@ -768,11 +746,14 @@ function SimpleBayGrid({
           return false;
         })();
 
-        // Ghost preview: when hovering with a tool, show what the result would look like
-        const showBrushPreview = isHovered && hasTool && brushPreviewColor;
-        const bgColor = showBrushPreview
-          ? brushPreviewColor
-          : dominantColor === "transparent" ? "var(--surface-alt, #f8fafc)" : dominantColor;
+        const showBrushPreview = isHovered && hasTool && !!brushPreviewColor;
+
+        // Background: transparent by default, highlight on hover/select
+        const bgColor = isSelected
+          ? "rgba(6,182,212,0.12)"
+          : isHovered
+            ? (hasTool && brushPreviewColor ? brushPreviewColor : "rgba(253,224,71,0.12)")
+            : "var(--surface-alt, #f8fafc)";
 
         // Adjust grid positions for spacer tracks (col 2 and col 9 are 2px spacers)
         const adjCol = group.gridCol <= 1 ? group.gridCol : group.gridCol <= 7 ? group.gridCol + 1 : group.gridCol + 2;
@@ -804,8 +785,8 @@ function SimpleBayGrid({
               fontWeight: 600,
               minWidth: 0,       // allow grid fr to control sizing
               overflow: "hidden", // prevent text from forcing wider
-              color: (showBrushPreview || (dominantColor !== "transparent" && dominantColor !== "var(--input-bg, #f1f5f9)")) ? "#fff" : "#94a3b8",
-              textShadow: (showBrushPreview || (dominantColor !== "transparent" && dominantColor !== "var(--input-bg, #f1f5f9)")) ? "0 1px 2px rgba(0,0,0,0.3)" : "none",
+              color: showBrushPreview ? "#fff" : "#94a3b8",
+              textShadow: showBrushPreview ? "0 1px 2px rgba(0,0,0,0.3)" : "none",
               transition: "all 100ms ease",
               opacity: group.role === 'corner' ? 0.6 : 1,
               boxShadow: isSelected
@@ -820,6 +801,45 @@ function SimpleBayGrid({
             title={`${group.label}${hasTool ? " — click to apply" : ""}`}
           >
             {group.label}
+            {/* Edge hotspots for face selection */}
+            {['n', 's', 'e', 'w'].map((face) => {
+              const isEdge = face === 'n' || face === 's';
+              const pos: React.CSSProperties = face === 'n'
+                ? { top: 0, left: 4, right: 4, height: 6 }
+                : face === 's'
+                  ? { bottom: 0, left: 4, right: 4, height: 6 }
+                  : face === 'e'
+                    ? { right: 0, top: 4, bottom: 4, width: 6 }
+                    : { left: 0, top: 4, bottom: 4, width: 6 };
+              return (
+                <div
+                  key={face}
+                  style={{
+                    position: 'absolute', zIndex: 2, cursor: 'crosshair',
+                    background: 'transparent', ...pos,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.stopPropagation();
+                    setHoveredVoxelEdge({
+                      containerId,
+                      voxelIndex: levelOffset + group.voxelIndices[0],
+                      face: face as keyof VoxelFaces,
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    e.stopPropagation();
+                    setHoveredVoxelEdge(null);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectWithFace(
+                      { type: 'bay-face', items: groupIndicesAtLevel.map(i => ({ containerId, id: String(i) })) },
+                      face as keyof VoxelFaces,
+                    );
+                  }}
+                />
+              );
+            })}
             {/* Ghost preview overlay when hovering with tool */}
             {showBrushPreview && (
               <div style={{
