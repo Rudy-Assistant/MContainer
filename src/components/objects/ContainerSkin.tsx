@@ -57,7 +57,7 @@ import {
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
 import { type ThemeId, THEMES } from "@/config/themes";
-import { _themeMats, type ThemeMaterialSet, getMaterialForFace } from "@/config/materialCache";
+import { _themeMats, type ThemeMaterialSet, getMaterialForFace, getFrameThreeMaterial } from "@/config/materialCache";
 import type { FaceFinish } from "@/types/container";
 import { isRailingSurface } from "@/types/container";
 import {
@@ -69,7 +69,7 @@ import {
 import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
 import { computePolePositions } from "@/utils/smartPoles";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
-import { makePoleKey } from "@/config/frameMaterials";
+import { makePoleKey, resolveFrameProperty } from "@/config/frameMaterials";
 import LightFixture from './LightFixture';
 import ElectricalPlate from './ElectricalPlate';
 import { formRegistry } from "@/config/formRegistry";
@@ -2143,7 +2143,7 @@ export default function ContainerSkin({
   // hoveredEdge removed — was set in 9 places but never read (dead state causing needless re-renders)
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Frame mode: track hovered pole via ref (avoids full re-render on hover)
-  const hoveredPoleRef = useRef<THREE.Mesh | null>(null);
+  const hoveredPoleRef = useRef<{ mesh: THREE.Mesh; material: THREE.Material } | null>(null);
 
   // Ctrl+drag painting — tracks active drag state and painted faces to prevent double-painting
   const paintDragging = useRef(false);
@@ -3448,7 +3448,9 @@ export default function ContainerSkin({
         const poleOverride = container.poleOverrides?.[poleKey];
         if (poleOverride?.visible === false) return null;
         const isSelectedPole = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === poleKey;
-        const poleMat = isSelectedPole ? frameSelectMat : mFrame;
+        const resolvedMatName = resolveFrameProperty(poleOverride, container.frameDefaults, 'pole', 'material');
+        const resolvedMaterial = getFrameThreeMaterial(resolvedMatName, currentTheme);
+        const poleMat = isSelectedPole ? frameSelectMat : resolvedMaterial;
         const pillarMesh = (
           <mesh
             geometry={getCyl(PILLAR_R, poleH)}
@@ -3458,16 +3460,16 @@ export default function ContainerSkin({
             onPointerOver={frameMode ? (e) => {
               e.stopPropagation();
               const mesh = e.object as THREE.Mesh;
-              if (hoveredPoleRef.current && hoveredPoleRef.current !== mesh) {
-                hoveredPoleRef.current.material = mFrame;
+              if (hoveredPoleRef.current && hoveredPoleRef.current.mesh !== mesh) {
+                hoveredPoleRef.current.mesh.material = hoveredPoleRef.current.material;
               }
-              hoveredPoleRef.current = mesh;
+              hoveredPoleRef.current = { mesh, material: resolvedMaterial };
               if (!isSelectedPole) mesh.material = frameHoverMat;
             } : undefined}
             onPointerOut={frameMode ? (e) => {
               const mesh = e.object as THREE.Mesh;
-              if (hoveredPoleRef.current === mesh) hoveredPoleRef.current = null;
-              if (!isSelectedPole) mesh.material = mFrame;
+              if (hoveredPoleRef.current?.mesh === mesh) hoveredPoleRef.current = null;
+              if (!isSelectedPole) mesh.material = resolvedMaterial;
             } : undefined}
             onClick={frameMode ? (e) => { e.stopPropagation(); setSelectedFrameElement({ containerId: container.id, key: poleKey, type: 'pole' }); } : undefined}
           />
