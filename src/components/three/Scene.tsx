@@ -1207,6 +1207,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
   const currentTheme = useStore((s) => s.currentTheme);
   const cameraControlsRef = useRef<CameraControlsImpl>(null);
   const isShiftHeldRef = useRef(false);
+  const gl = useThree((s) => s.gl);
 
   // Disable camera controls when Shift is held — prevents conflict with container Shift+drag.
   // Uses ref + imperative mutation (sole owner of .enabled) to avoid useState in R3F reconciler.
@@ -1221,12 +1222,30 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
     const up = (e: KeyboardEvent) => { if (e.key === 'Shift') { isShiftHeldRef.current = false; sync(); } };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    const pdown = (e: PointerEvent) => {
+      if (e.shiftKey) {
+        isShiftHeldRef.current = true;
+        sync();
+      }
+    };
+    const pup = () => {
+      // Re-sync on pointer up — camera re-enables if Shift is released
+      sync();
+    };
+    gl.domElement.addEventListener('pointerdown', pdown);
+    gl.domElement.addEventListener('pointerup', pup);
     // Also sync when dragMovingId or isPaintDragging change
     const unsub = useStore.subscribe((s, prev) => {
       if (s.dragMovingId !== prev.dragMovingId || s.isPaintDragging !== prev.isPaintDragging) sync();
     });
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); unsub(); };
-  }, []);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      gl.domElement.removeEventListener('pointerdown', pdown);
+      gl.domElement.removeEventListener('pointerup', pup);
+      unsub();
+    };
+  }, [gl.domElement]);
 
   // Expose camera controls ref for Playwright gates — update via useFrame to ensure ref is populated
   useFrame(() => {
