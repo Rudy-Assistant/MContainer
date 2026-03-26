@@ -58,9 +58,16 @@ The rendering loop reads frame overrides but never maps material names to Three.
 
 4. Fix the `onPointerOut` handler (~line 3470) to restore `resolvedMaterial` instead of `mFrame`
 
-5. Fix the `onPointerOver` cross-pole transition (~line 3462): when the pointer moves directly from one pole to another, the handler resets the previously-hovered pole to `mFrame`. This must also restore `resolvedMaterial` for that pole. Store the resolved material alongside the mesh ref in `hoveredPoleRef` (e.g., `hoveredPoleRef.current = { mesh, material: resolvedMaterial }`) or recompute it from the pole key at reset time.
+5. Fix the `onPointerOver` cross-pole transition (~line 3462): when the pointer moves directly from one pole to another, the handler resets the previously-hovered pole to `mFrame`. This must also restore `resolvedMaterial` for that pole. Change `hoveredPoleRef` from `useRef<THREE.Mesh | null>(null)` to `useRef<{ mesh: THREE.Mesh; material: THREE.Material } | null>(null)`. Then the cross-pole reset becomes:
+   ```ts
+   if (hoveredPoleRef.current && hoveredPoleRef.current.mesh !== mesh) {
+     hoveredPoleRef.current.mesh.material = hoveredPoleRef.current.material;
+   }
+   hoveredPoleRef.current = { mesh, material: resolvedMaterial };
+   ```
+   Note: `onPointerOut` (step 4) uses `resolvedMaterial` directly from its closure scope — it captures the correct per-pole value from the render loop iteration, so no ref lookup is needed there.
 
-6. **Rails — display only, no interactivity this sprint.** Rail meshes currently have `raycast={nullRaycast}` unconditionally and no pointer handlers. This sprint only wires the visual material: resolve the rail material name via `resolveFrameProperty(override, defaults, 'rail', 'material')` and apply the correct Three.js material to rail meshes. Rail hover/click interactivity (adding pointer handlers, conditional raycast, hoveredRailRef) is deferred to the Phase 2 frame completion sprint.
+6. **Rails — display only, no interactivity this sprint.** Rail meshes currently have `raycast={nullRaycast}` unconditionally and no pointer handlers. This sprint only wires the visual material: resolve the rail material name via `resolveFrameProperty(override, defaults, 'rail', 'material')` and apply the correct Three.js material to rail meshes. The rail override comes from `container.railOverrides?.[railKey]` (same pattern as poles — this field already exists on the Container type and is managed by `setFrameElementOverride`/`clearFrameElementOverride` in containerSlice). Rail hover/click interactivity (adding pointer handlers, conditional raycast, hoveredRailRef) is deferred to the Phase 2 frame completion sprint.
 
 ### Files
 
