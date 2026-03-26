@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { THEMES, type ThemeId, type ThemeMaterialConfig } from './themes';
 import { getTexturePaths, applyTextures, type TextureQuality } from './textureLoader';
 import type { FaceFinish, SurfaceType } from '../types/container';
+import type { PoleMaterial, RailMaterial } from './frameMaterials';
 
 // ── Theme Material Set ──────────────────────────────────────
 
@@ -229,6 +230,22 @@ const MATERIAL_ID_MAP: Record<string, keyof ThemeMaterialSet> = {
   concrete: 'concrete',
   bamboo: 'wood',
 };
+
+/** Map a frame material name (from frameMaterials.ts) to a Three.js material from the theme cache. */
+const FRAME_MATERIAL_MAP: Record<string, keyof ThemeMaterialSet> = {
+  Steel: 'steel',
+  Wood: 'wood',
+  Concrete: 'concrete',
+  Aluminum: 'frame',
+};
+
+export function getFrameThreeMaterial(
+  name: PoleMaterial | RailMaterial | string,
+  theme: ThemeId,
+): THREE.MeshStandardMaterial {
+  const key = FRAME_MATERIAL_MAP[name] ?? 'steel';
+  return _themeMats[theme][key] as THREE.MeshStandardMaterial;
+}
 
 function surfaceToMatKey(surface: SurfaceType): keyof ThemeMaterialSet {
   switch (surface) {
