@@ -36,7 +36,7 @@
  * in that direction is also active — prevents interior cross-walls.
  */
 
-import { type ReactNode, useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { Component, type ReactNode, useState, useMemo, useCallback, useRef, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
@@ -307,15 +307,22 @@ const frameSelectMat = new THREE.MeshStandardMaterial({
 
 const _box = new Map<string, THREE.BufferGeometry>();
 function getBox(w: number, h: number, d: number): THREE.BufferGeometry {
-  const k = `${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}`;
-  if (!_box.has(k)) _box.set(k, new THREE.BoxGeometry(w, h, d));
+  // Guard: clamp to minimum positive values to avoid degenerate geometry
+  const safeW = Math.max(w, 0.001);
+  const safeH = Math.max(h, 0.001);
+  const safeD = Math.max(d, 0.001);
+  const k = `${safeW.toFixed(3)}_${safeH.toFixed(3)}_${safeD.toFixed(3)}`;
+  if (!_box.has(k)) _box.set(k, new THREE.BoxGeometry(safeW, safeH, safeD));
   return _box.get(k)!;
 }
 
 const _cyl = new Map<string, THREE.BufferGeometry>();
 function getCyl(r: number, h: number): THREE.BufferGeometry {
-  const k = `${r.toFixed(3)}_${h.toFixed(3)}`;
-  if (!_cyl.has(k)) _cyl.set(k, new THREE.CylinderGeometry(r, r, h, 8));
+  // Guard: clamp to minimum positive values to avoid degenerate geometry
+  const safeR = Math.max(r, 0.001);
+  const safeH = Math.max(h, 0.001);
+  const k = `${safeR.toFixed(3)}_${safeH.toFixed(3)}`;
+  if (!_cyl.has(k)) _cyl.set(k, new THREE.CylinderGeometry(safeR, safeR, safeH, 8));
   return _cyl.get(k)!;
 }
 
@@ -340,6 +347,18 @@ function getEdges(w: number, h: number, d: number): THREE.BufferGeometry {
     b.dispose();
   }
   return _edges.get(k)!;
+}
+
+// ── Face Render Error Boundary ─────────────────────────────────
+// Catches silent Three.js render crashes in face components (e.g. degenerate
+// geometry, null materials) and renders nothing instead of killing the scene.
+class FaceErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError(): { hasError: boolean } { return { hasError: true }; }
+  componentDidCatch(error: Error) {
+    console.warn('[FaceErrorBoundary] Face render crashed:', error.message);
+  }
+  render() { return this.state.hasError ? null : this.props.children; }
 }
 
 // ── 3D Face Assets ─────────────────────────────────────────────
@@ -517,7 +536,13 @@ function HalfFoldFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS
 /** Gull-Wing face — split horizontally: top 50% folds up (awning), bottom 50% folds down (deck).
  *  Rendered as upper awning panel + lower deck panel with visible hinge at center. */
 function GullWingFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS: boolean }) {
+  // Guard: degenerate dimensions → fall back to simple steel panel
+  if (!w || !h || !d || !isFinite(w) || !isFinite(h) || !isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
+    return <SteelFace w={Math.max(w || 0.1, 0.1)} h={Math.max(h || 0.1, 0.1)} d={Math.max(d || 0.1, 0.1)} />;
+  }
   const halfH = h / 2;
+  // Ensure cylinder height is positive (avoids degenerate geometry)
+  const cylH = Math.max(halfH * 0.3, 0.01);
   return (
     <>
       {/* Upper half — awning (steel exterior facing up) */}
@@ -536,7 +561,7 @@ function GullWingFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS
       {[w / 2 - 0.08, -(w / 2 - 0.08)].map((x, i) => (
         <mesh key={i}
           position={isNS ? [x, halfH / 2, 0] : [0, halfH / 2, x]}
-          geometry={getCyl(0.02, halfH * 0.3)}
+          geometry={getCyl(0.02, cylH)}
           material={mFrame} castShadow raycast={nullRaycast} />
       ))}
     </>
@@ -1340,7 +1365,7 @@ function SingleFace({
     <group position={pos}>
       <group ref={groupRef} position={[0, 0, pivotZ]}>
         <group ref={innerRef} position={[0, 0, offsetZ]}>
-          {renderVisual()}
+          <FaceErrorBoundary>{renderVisual()}</FaceErrorBoundary>
         </group>
       </group>
     </group>
@@ -1881,15 +1906,17 @@ function FlushGhostPreview({
         if (surface === 'Open') return null;
         return (
           <group key={dir} position={pos}>
-            <FaceVisual
-              surface={surface}
-              colPitch={colPitch}
-              rowPitch={rowPitch}
-              vHeight={vHeight}
-              isNS={isNS}
-              isEW={isEW}
-              isHoriz={isHoriz}
-            />
+            <FaceErrorBoundary>
+              <FaceVisual
+                surface={surface}
+                colPitch={colPitch}
+                rowPitch={rowPitch}
+                vHeight={vHeight}
+                isNS={isNS}
+                isEW={isEW}
+                isHoriz={isHoriz}
+              />
+            </FaceErrorBoundary>
           </group>
         );
       })}
@@ -2825,15 +2852,8 @@ export default function ContainerSkin({
                       stairPart={voxel.stairPart}
                     />
                 }
-                {/* Invisible click target for stair voxels (Open faces → no visible panels to click) */}
-                <mesh
-                  geometry={getBox(voxW, vHeight, voxD)}
-                  onClick={(e) => { e.stopPropagation(); handleClick(idx, 'top'); }}
-                  onPointerOver={(e) => { e.stopPropagation(); setHoveredVoxel({ containerId: container.id, index: idx }); }}
-                  onPointerOut={() => setHoveredVoxel(null)}
-                >
-                  <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-                </mesh>
+                {/* Stair voxel click/hover handled by floor-edge paradigm hitboxes (lines 3083+).
+                    Full-cube hitbox removed — it blocked floor tiles from receiving pointer events. */}
               </>
             )}
 
