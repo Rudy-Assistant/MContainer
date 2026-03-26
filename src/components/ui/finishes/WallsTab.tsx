@@ -1,18 +1,19 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import {
   EXTERIOR_MATERIALS, GLASS_TINTS, FRAME_COLORS, DOOR_STYLES, PAINT_COLORS,
   getFinishOptionsForFace,
 } from '@/config/finishPresets';
-import { getWallTypesForContext } from '@/config/wallTypes';
+import { WALL_CATEGORIES, getCategoryForSurface } from '@/config/surfaceCategories';
 import type { SurfaceType } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import OptionCardGrid from './OptionCardGrid';
 import SwatchRow from './SwatchRow';
-import { PresetCard } from './PresetCard';
+import CategoryRow from './CategoryRow';
+import VariantGrid from './VariantGrid';
 import { useApplyFinish } from './useApplyFinish';
 
 interface Props {
@@ -29,45 +30,47 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
   const currentFinish = useStore((s) =>
     s.containers[containerId]?.voxelGrid?.[voxelIndex]?.faceFinishes?.[face]
   );
-  const inspectorView = useStore((s) => s.inspectorView);
-  const paintFace = useStore((s) => s.paintFace);
+  const selectedWallCategory = useStore((s) => s.selectedWallCategory);
+  const setSelectedWallCategory = useStore((s) => s.setSelectedWallCategory);
   const addRecentItem = useStore((s) => s.addRecentItem);
   const applyFinish = useApplyFinish(containerId, indices, face);
 
-  const wallTypes = useMemo(
-    () => getWallTypesForContext(inspectorView, face),
-    [inspectorView, face],
-  );
+  // Auto-detect category when surface changes and no category is selected
+  useEffect(() => {
+    if (surface && selectedWallCategory === null) {
+      const detected = getCategoryForSurface(surface, 'wall');
+      if (detected) setSelectedWallCategory(detected);
+    }
+  }, [surface, selectedWallCategory, setSelectedWallCategory]);
 
-  const handleSurfaceChange = (newSurface: SurfaceType) => {
-    for (const idx of indices) paintFace(containerId, idx, face, newSurface);
-    addRecentItem({ type: 'wallType', value: newSurface, label: newSurface.replace(/_/g, ' ') });
-  };
+  const selectedCategory = WALL_CATEGORIES.find((c) => c.id === selectedWallCategory) ?? null;
 
   const opts = surface ? getFinishOptionsForFace(surface, face) : null;
 
   return (
     <div style={{ padding: '8px 12px' }}>
-      {/* Surface type picker — always visible */}
+      {/* Category picker — always visible */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{
-          fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-          color: 'var(--text-dim)', letterSpacing: '0.05em', marginBottom: 8,
-        }}>
-          Wall Surface
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-          {wallTypes.map((entry) => (
-            <PresetCard
-              key={entry.surface + '-' + entry.category}
-              content={<span style={{ fontSize: 24 }}>{entry.icon}</span>}
-              label={entry.label}
-              active={surface === entry.surface}
-              onClick={() => handleSurfaceChange(entry.surface)}
-            />
-          ))}
-        </div>
+        <CategoryRow
+          categories={WALL_CATEGORIES}
+          selected={selectedWallCategory}
+          onSelect={setSelectedWallCategory}
+        />
       </div>
+
+      {/* Variant grid — visible when a category is selected */}
+      {selectedCategory && (
+        <div style={{ marginBottom: 14 }}>
+          <VariantGrid
+            category={selectedCategory}
+            currentSurface={(surface as SurfaceType) ?? null}
+            currentFinish={(currentFinish as Record<string, string> | null) ?? null}
+            containerId={containerId}
+            indices={indices}
+            face={face}
+          />
+        </div>
+      )}
 
       {/* Surface-dependent finishes — only when surface is not Open */}
       {opts?.exteriorMaterial && (
