@@ -79,9 +79,10 @@ export function PresetCard({
     if (active && !prevActiveRef.current) {
       setAnimating(true);
       const timer = setTimeout(() => setAnimating(false), 200);
+      prevActiveRef.current = true;   // mark transition handled immediately
       return () => clearTimeout(timer);
     }
-    prevActiveRef.current = active;
+    prevActiveRef.current = active;   // handles true→false reset
   }, [active]);
 
   const imageStyle: CSSProperties = {
