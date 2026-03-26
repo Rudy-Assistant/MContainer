@@ -114,6 +114,7 @@ export default function Home() {
   const isPreviewMode = useStore((s) => s.isPreviewMode);
   const hasHydrated = useStore((s) => s._hasHydrated);
   const activeHotbarSlot = useStore((s) => s.activeHotbarSlot);
+  const showHotbar = useStore((s) => s.showHotbar);
   useHydrationSeed();
 
   if (!hasHydrated) {
@@ -147,11 +148,11 @@ export default function Home() {
           {/* Level Selector — hidden in FPV where level navigation is irrelevant */}
           {!isWalkthrough && <LevelSlicer />}
 
-          {/* Hotbars — visible when container selected (not walkthrough, not preview) */}
-          {!isWalkthrough && !isPreviewMode && <CustomHotbar />}
+          {/* Hotbars — visible when showHotbar enabled (not walkthrough, not preview) */}
+          {showHotbar && !isWalkthrough && !isPreviewMode && <CustomHotbar />}
           {/* SmartHotbar replaced by RecentItemsBar (Task 6 — Sims-Style UI Overhaul Plan A)
               SmartHotbar.tsx kept for CssVoxelIcon export used by CustomHotbar and UserLibrary */}
-          {!isPreviewMode && <RecentItemsBar />}
+          {showHotbar && !isPreviewMode && <RecentItemsBar />}
 
           {/* Form picker strip — thin floating bar above status dock */}
           {!isPreviewMode && <BottomPanel />}

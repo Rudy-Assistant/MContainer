@@ -104,6 +104,8 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const openWizard = useStore((s) => s.openWizard);
+  const showHotbar = useStore((s) => s.showHotbar);
+  const toggleHotbar = useStore((s) => s.toggleHotbar);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   useEffect(() => {
@@ -714,6 +716,20 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
                 <Bug size={13} />
                 Wireframe
                 <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{debugMode ? "ON" : "OFF"}</span>
+              </button>
+
+              {/* Hotbar toggle */}
+              <button onClick={toggleHotbar} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, marginBottom: 4,
+                color: showHotbar ? "#f59e0b" : "var(--text-main)",
+                background: showHotbar ? "rgba(245,158,11,0.12)" : "transparent",
+                transition: "all 100ms",
+              }}>
+                <SlidersHorizontal size={13} />
+                Hotbar
+                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{showHotbar ? "ON" : "OFF"}</span>
               </button>
 
               {/* Grid complexity: Simple/Detail toggle */}
