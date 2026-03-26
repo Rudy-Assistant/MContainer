@@ -2727,6 +2727,9 @@ export default function ContainerSkin({
         const faceNodes = FACE_DIRS.map((dir) => {
           const surface = voxel.faces[dir];
 
+          // Frame mode: show only floor — hide walls and ceiling so frame structure is visible
+          if (frameMode && dir !== 'bottom') return null;
+
           // ★ Phase 15: Intelligent face melting — replaces dual adjIsActive + railing bypass.
           // Culls internal walls when surfaces are semantically compatible (same type, railings, or solids).
           if (adjIsMelting(grid, col, row, dir, surface)) return null;
