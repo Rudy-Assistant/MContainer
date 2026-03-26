@@ -26,6 +26,7 @@ export default function VariantGrid({
   const addRecentItem = useStore((s) => s.addRecentItem);
   const setGhostPreset = useStore((s) => s.setGhostPreset);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
+  const triggerGhostPop = useStore((s) => s.triggerGhostPop);
   const currentFaces = useStore((s) => {
     const v = s.containers[containerId]?.voxelGrid?.[indices[0]];
     return v?.faces ?? { top: 'Open' as const, bottom: 'Open' as const, n: 'Open' as const, s: 'Open' as const, e: 'Open' as const, w: 'Open' as const };
@@ -54,6 +55,7 @@ export default function VariantGrid({
   };
 
   const handleSelect = (variant: CategoryVariant) => {
+    triggerGhostPop();
     if (category.volumetric) {
       for (const idx of indices) {
         applyStairsFromFace(containerId, idx, face as 'n' | 's' | 'e' | 'w' | 'top');

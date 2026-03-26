@@ -6,6 +6,30 @@ import type { MaterialDef, VoxelFaces, SurfaceType } from '@/types/container';
 import { Lock, Unlock, Copy, RotateCcw } from 'lucide-react';
 import { PresetCard } from './PresetCard';
 import { IsometricVoxelSVG } from '../svg/IsometricVoxelSVG';
+import { useBlockThumbnail } from './BlockThumbnailContext';
+
+function PresetCardWithThumbnail({ preset, active, onClick, onMouseEnter, onMouseLeave }: {
+  preset: typeof BLOCK_PRESETS[number];
+  active: boolean;
+  onClick: () => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  const thumbnail = useBlockThumbnail(preset.id);
+  return (
+    <PresetCard
+      content={thumbnail ? (
+        <img src={thumbnail} alt={preset.label}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 4 }} />
+      ) : <IsometricVoxelSVG faces={preset.faces} />}
+      label={preset.label}
+      active={active}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    />
+  );
+}
 
 interface Props {
   containerId: string;
@@ -20,6 +44,7 @@ export default function BlockTab({ containerId, voxelIndex, indices }: Props) {
   const copyStyle = useStore((s) => s.copyVoxelStyle);
   const setGhostPreset = useStore((s) => s.setGhostPreset);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
+  const triggerGhostPop = useStore((s) => s.triggerGhostPop);
 
   // Detect active preset by comparing current faces
   const voxel = useStore((s) => s.containers[containerId]?.voxelGrid?.[voxelIndex]);
@@ -45,12 +70,14 @@ export default function BlockTab({ containerId, voxelIndex, indices }: Props) {
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
       }}>
         {BLOCK_PRESETS.map((preset) => (
-          <PresetCard
+          <PresetCardWithThumbnail
             key={preset.id}
-            content={<IsometricVoxelSVG faces={preset.faces} />}
-            label={preset.label}
+            preset={preset}
             active={activePresetId === preset.id}
-            onClick={() => applyBlockConfig(containerId, indices, preset.id)}
+            onClick={() => {
+              triggerGhostPop();
+              applyBlockConfig(containerId, indices, preset.id);
+            }}
             onMouseEnter={() => {
               const materialMap: Partial<Record<keyof VoxelFaces, MaterialDef>> = {};
               for (const [fk, st] of Object.entries(preset.faces) as [keyof VoxelFaces, SurfaceType][]) {
