@@ -405,7 +405,7 @@ export function findStackTarget(
     const existingFoot = getFootprint(c);
     const overlap = overlapFraction(newFoot, existingFoot);
 
-    if (overlap < 0.6) continue;
+    if (overlap < 0.4) continue;
 
     const dims = CONTAINER_DIMENSIONS[c.size];
     const topY = c.position.y + dims.height;

@@ -1783,7 +1783,7 @@ function StackTargetIndicator({
     <group ref={groupRef} visible={false}>
       <mesh raycast={() => {}}>
         <boxGeometry args={[1, 0.05, 1]} />
-        <meshBasicMaterial wireframe color={HIGHLIGHT_COLOR_SELECT} transparent opacity={0.8} />
+        <meshStandardMaterial wireframe color={0x22c55e} emissive={0x22c55e} emissiveIntensity={0.3} transparent opacity={0.8} />
       </mesh>
       <Html center position={[0, 0.5, 0]} style={{ pointerEvents: "none" }}>
         <span
@@ -1797,7 +1797,7 @@ function StackTargetIndicator({
             whiteSpace: "nowrap",
           }}
         >
-          Stack Here
+          Release to stack
         </span>
       </Html>
     </group>
