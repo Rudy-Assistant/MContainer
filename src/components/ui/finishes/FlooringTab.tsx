@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { FLOOR_MATERIALS, PAINT_COLORS } from '@/config/finishPresets';
 import { FLOOR_CATEGORIES, getCategoryForSurface } from '@/config/surfaceCategories';
-import type { SurfaceType } from '@/types/container';
+import type { SurfaceType, MaterialDef, VoxelFaces } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import SwatchRow from './SwatchRow';
@@ -29,7 +29,26 @@ export default function FlooringTab({ containerId, voxelIndex, indices, face }: 
   const selectedFloorCategory = useStore((s) => s.selectedFloorCategory);
   const setSelectedFloorCategory = useStore((s) => s.setSelectedFloorCategory);
   const addRecentItem = useStore((s) => s.addRecentItem);
+  const setGhostPreset = useStore((s) => s.setGhostPreset);
+  const clearGhostPreset = useStore((s) => s.clearGhostPreset);
+  const currentFaces = useStore((s) => {
+    const v = s.containers[containerId]?.voxelGrid?.[indices[0]];
+    return v?.faces ?? { top: 'Open' as const, bottom: 'Open' as const, n: 'Open' as const, s: 'Open' as const, e: 'Open' as const, w: 'Open' as const };
+  });
   const applyFinish = useApplyFinish(containerId, indices, face);
+
+  const handleFlooringHover = (surfaceType?: SurfaceType) => {
+    if (indices.length === 0) return;
+    const materialMap: Partial<Record<keyof VoxelFaces, MaterialDef>> = {
+      bottom: { surfaceType: surfaceType ?? (currentFaces.bottom as SurfaceType) },
+    };
+    setGhostPreset({
+      source: 'flooring',
+      faces: currentFaces,
+      targetScope: indices.length > 1 ? 'bay' : 'voxel',
+      materialMap,
+    });
+  };
 
   // Auto-detect category when surface changes and no category is selected
   useEffect(() => {
@@ -62,6 +81,7 @@ export default function FlooringTab({ containerId, voxelIndex, indices, face }: 
             containerId={containerId}
             indices={indices}
             face={face}
+            ghostSource="flooring"
           />
         </div>
       )}
@@ -75,6 +95,8 @@ export default function FlooringTab({ containerId, voxelIndex, indices, face }: 
           applyFinish({ material: id });
           addRecentItem({ type: 'finish', value: `floor:${id}`, label });
         }}
+        onHoverItem={() => handleFlooringHover()}
+        onLeaveItem={() => clearGhostPreset()}
       />
 
       {/* Color */}

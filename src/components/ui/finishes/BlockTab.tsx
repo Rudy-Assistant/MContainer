@@ -2,6 +2,7 @@
 
 import { useStore } from '@/store/useStore';
 import { BLOCK_PRESETS, type BlockPresetId } from '@/config/blockPresets';
+import type { MaterialDef, VoxelFaces, SurfaceType } from '@/types/container';
 import { Lock, Unlock, Copy, RotateCcw } from 'lucide-react';
 import { PresetCard } from './PresetCard';
 import { IsometricVoxelSVG } from '../svg/IsometricVoxelSVG';
@@ -50,11 +51,20 @@ export default function BlockTab({ containerId, voxelIndex, indices }: Props) {
             label={preset.label}
             active={activePresetId === preset.id}
             onClick={() => applyBlockConfig(containerId, indices, preset.id)}
-            onMouseEnter={() => setGhostPreset({
-              source: 'block',
-              faces: preset.faces,
-              targetScope: indices.length > 1 ? 'bay' : 'voxel',
-            })}
+            onMouseEnter={() => {
+              const materialMap: Partial<Record<keyof VoxelFaces, MaterialDef>> = {};
+              for (const [fk, st] of Object.entries(preset.faces) as [keyof VoxelFaces, SurfaceType][]) {
+                if (st !== 'Open') {
+                  materialMap[fk] = { surfaceType: st };
+                }
+              }
+              setGhostPreset({
+                source: 'block',
+                faces: preset.faces,
+                targetScope: indices.length > 1 ? 'bay' : 'voxel',
+                materialMap,
+              });
+            }}
             onMouseLeave={() => clearGhostPreset()}
           />
         ))}

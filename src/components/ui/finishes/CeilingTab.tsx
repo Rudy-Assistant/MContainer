@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { CEILING_MATERIALS, LIGHT_FIXTURES, LIGHT_COLORS, PAINT_COLORS } from '@/config/finishPresets';
 import { CEILING_CATEGORIES, getCategoryForSurface } from '@/config/surfaceCategories';
-import type { SurfaceType } from '@/types/container';
+import type { SurfaceType, MaterialDef, VoxelFaces } from '@/types/container';
 import type { FaceKey } from '@/hooks/useSelectionTarget';
 import TextureSwatchGrid from './TextureSwatchGrid';
 import OptionCardGrid from './OptionCardGrid';
@@ -30,7 +30,26 @@ export default function CeilingTab({ containerId, voxelIndex, indices, face }: P
   const selectedCeilingCategory = useStore((s) => s.selectedCeilingCategory);
   const setSelectedCeilingCategory = useStore((s) => s.setSelectedCeilingCategory);
   const addRecentItem = useStore((s) => s.addRecentItem);
+  const setGhostPreset = useStore((s) => s.setGhostPreset);
+  const clearGhostPreset = useStore((s) => s.clearGhostPreset);
+  const currentFaces = useStore((s) => {
+    const v = s.containers[containerId]?.voxelGrid?.[indices[0]];
+    return v?.faces ?? { top: 'Open' as const, bottom: 'Open' as const, n: 'Open' as const, s: 'Open' as const, e: 'Open' as const, w: 'Open' as const };
+  });
   const applyFinish = useApplyFinish(containerId, indices, face);
+
+  const handleCeilingHover = (surfaceType?: SurfaceType) => {
+    if (indices.length === 0) return;
+    const materialMap: Partial<Record<keyof VoxelFaces, MaterialDef>> = {
+      top: { surfaceType: surfaceType ?? (currentFaces.top as SurfaceType) },
+    };
+    setGhostPreset({
+      source: 'ceiling',
+      faces: currentFaces,
+      targetScope: indices.length > 1 ? 'bay' : 'voxel',
+      materialMap,
+    });
+  };
 
   // Auto-detect category when surface changes and no category is selected
   useEffect(() => {
@@ -63,6 +82,7 @@ export default function CeilingTab({ containerId, voxelIndex, indices, face }: P
             containerId={containerId}
             indices={indices}
             face={face}
+            ghostSource="ceiling"
           />
         </div>
       )}
@@ -76,6 +96,8 @@ export default function CeilingTab({ containerId, voxelIndex, indices, face }: P
           applyFinish({ material: id });
           addRecentItem({ type: 'finish', value: `ceil:${id}`, label });
         }}
+        onHoverItem={() => handleCeilingHover()}
+        onLeaveItem={() => clearGhostPreset()}
       />
 
       {/* Light fixture controls */}
@@ -87,6 +109,8 @@ export default function CeilingTab({ containerId, voxelIndex, indices, face }: P
           applyFinish({ light: id });
           addRecentItem({ type: 'finish', value: `light:${id}`, label });
         }}
+        onHoverItem={() => handleCeilingHover()}
+        onLeaveItem={() => clearGhostPreset()}
       />
       {currentFinish?.light && currentFinish.light !== 'none' && (
         <OptionCardGrid

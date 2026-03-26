@@ -68,6 +68,7 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
             containerId={containerId}
             indices={indices}
             face={face}
+            ghostSource="walls"
           />
         </div>
       )}
