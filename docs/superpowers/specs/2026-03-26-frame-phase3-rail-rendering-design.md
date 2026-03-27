@@ -66,9 +66,9 @@ interface RailPosition {
 Insert a rail rendering block in ContainerSkin.tsx immediately after the pole block (`pillarPositions.map(...)`, ~line 3492), before the pool water plane.
 
 Each rail renders as:
-- **Geometry:** `getCyl(RAIL_R, length)` where `length = Math.hypot(px2 - px1, pz2 - pz1)` and `RAIL_R = 0.02`
-- **Position:** Midpoint between endpoints, at roof height: `[(px1+px2)/2, vOffset + vHeight/2, (pz1+pz2)/2]`
-- **Rotation:** Horizontal rails (h) rotate around Y to align with the X-axis direction between endpoints. Vertical rails (v) rotate to align with the Z-axis direction. Use `Math.atan2(dz, dx)` for the Y rotation.
+- **Geometry:** `getCyl(FRAME_RAIL_R, length)` where `length = Math.hypot(px2 - px1, pz2 - pz1)` and `FRAME_RAIL_R = 0.02`
+- **Position:** Midpoint between endpoints, at roof height: `[(px1+px2)/2, vOffset + vHeight/2, (pz1+pz2)/2]` (simplifies to Y = `vHeight` in local container space)
+- **Rotation:** `getCyl` returns a Y-axis `CylinderGeometry` (Three.js default). To lay it horizontal, apply a 90° pre-rotation, then aim toward the endpoint. Use the same `railRot` pattern as existing surface railings (line 426): horizontal rails (h, running along X) use `[0, 0, Math.PI / 2]`, vertical rails (v, running along Z) use `[Math.PI / 2, 0, 0]`. No `atan2` needed since the container grid is axis-aligned.
 - **Material:** `resolveFrameProperty(railOverride, container.frameDefaults, 'rail', 'material')` → `getFrameThreeMaterial(name, currentTheme)`
 
 ### 3. Rail Interaction (Frame Mode Only)
@@ -98,7 +98,7 @@ Rails appear/disappear instantly with their endpoint poles. No `PillarFoldDown` 
 ## Files
 
 - **Modify:** `src/components/objects/ContainerSkin.tsx`
-  - Add `RAIL_R` constant (~0.02)
+  - Add `FRAME_RAIL_R` constant (0.02) — NOT `RAIL_R` which is already taken (0.015 for railing cables at line 171)
   - Add `computeRailPositions` pure function (exportable for testing)
   - Add `railPositions` useMemo
   - Add `hoveredRailRef`
