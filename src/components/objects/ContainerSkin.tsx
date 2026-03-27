@@ -67,9 +67,9 @@ import {
   PILLAR_FOLD_SPEED,
 } from "@/config/unpackAnimations";
 import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
-import { computePolePositions } from "@/utils/smartPoles";
+import { computePolePositions, type PolePosition } from "@/utils/smartPoles";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
-import { makePoleKey, resolveFrameProperty } from "@/config/frameMaterials";
+import { makePoleKey, makeRailKey, resolveFrameProperty } from "@/config/frameMaterials";
 import LightFixture from './LightFixture';
 import ElectricalPlate from './ElectricalPlate';
 import { formRegistry } from "@/config/formRegistry";
@@ -169,6 +169,7 @@ const PILLAR_R    = 0.035;  // auto-pillar radius for halo awning support
 const FRAME_W     = 0.05;   // glass frame bar width
 const POST_R      = 0.025;  // railing post radius
 const RAIL_R      = 0.015;  // railing cable radius
+export const FRAME_RAIL_R = 0.02;   // frame rail radius
 const RAILING_H   = 1.0;    // railing height (matches ContainerMesh)
 const DECK_THICK  = 0.05;   // deck plank slab thickness
 
@@ -2061,6 +2062,76 @@ export function getVoxelLayout(
   else if (row === VOXEL_ROWS - 1) pz = dims.width / 2 + foldDepth / 2;
   else                             pz = (row - 1.5) * coreDepth;
   return { voxW, voxD, px, pz };
+}
+
+// ── Rail Position Computation ─────────────────────────────────
+
+export interface RailPosition {
+  key: string;
+  px1: number;
+  pz1: number;
+  px2: number;
+  pz2: number;
+  orientation: 'h' | 'v';
+}
+
+/**
+ * Pure function: given an array of pole positions, compute which horizontal
+ * and vertical rail segments to render. A rail renders only if BOTH endpoint
+ * poles (vertices) exist.
+ */
+export function computeRailPositions(poles: PolePosition[]): RailPosition[] {
+  // Build vertex map: corner → vertex mapping
+  const vertexMap = new Map<string, { px: number; pz: number }>();
+  for (const p of poles) {
+    let vr: number, vc: number;
+    switch (p.corner) {
+      case 'ne': vr = p.row;     vc = p.col + 1; break;
+      case 'nw': vr = p.row;     vc = p.col;     break;
+      case 'se': vr = p.row + 1; vc = p.col + 1; break;
+      case 'sw': vr = p.row + 1; vc = p.col;     break;
+    }
+    const key = `${vr}_${vc}`;
+    if (!vertexMap.has(key)) vertexMap.set(key, { px: p.px, pz: p.pz });
+  }
+
+  const rails: RailPosition[] = [];
+
+  // Horizontal rails: connect vertex (vr, vc) to (vr, vc+1)
+  for (const [key, pos] of vertexMap) {
+    const [vrStr, vcStr] = key.split('_');
+    const vr = Number(vrStr);
+    const vc = Number(vcStr);
+    const rightKey = `${vr}_${vc + 1}`;
+    const rightPos = vertexMap.get(rightKey);
+    if (rightPos) {
+      rails.push({
+        key: makeRailKey(vr, vc, 'h'),
+        px1: pos.px, pz1: pos.pz,
+        px2: rightPos.px, pz2: rightPos.pz,
+        orientation: 'h',
+      });
+    }
+  }
+
+  // Vertical rails: connect vertex (vr, vc) to (vr+1, vc)
+  for (const [key, pos] of vertexMap) {
+    const [vrStr, vcStr] = key.split('_');
+    const vr = Number(vrStr);
+    const vc = Number(vcStr);
+    const belowKey = `${vr + 1}_${vc}`;
+    const belowPos = vertexMap.get(belowKey);
+    if (belowPos) {
+      rails.push({
+        key: makeRailKey(vr, vc, 'v'),
+        px1: pos.px, pz1: pos.pz,
+        px2: belowPos.px, pz2: belowPos.pz,
+        orientation: 'v',
+      });
+    }
+  }
+
+  return rails;
 }
 
 // ── ContainerSkin ──────────────────────────────────────────────
