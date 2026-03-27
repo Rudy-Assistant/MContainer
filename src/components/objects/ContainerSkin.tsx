@@ -2215,6 +2215,7 @@ export default function ContainerSkin({
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Frame mode: track hovered pole via ref (avoids full re-render on hover)
   const hoveredPoleRef = useRef<{ mesh: THREE.Mesh; material: THREE.Material } | null>(null);
+  const hoveredRailRef = useRef<{ mesh: THREE.Mesh; material: THREE.Material } | null>(null);
 
   // Ctrl+drag painting — tracks active drag state and painted faces to prevent double-painting
   const paintDragging = useRef(false);
@@ -2383,6 +2384,8 @@ export default function ContainerSkin({
     };
     return computePolePositions(grid, 0, 0, 0, 0, resolver);
   }, [grid, getVoxelLayout]);
+
+  const railPositions = useMemo(() => computeRailPositions(pillarPositions), [pillarPositions]);
 
   const handleClick = useCallback(
     (voxelIndex: number, faceName: keyof VoxelFaces) => {
@@ -3559,6 +3562,48 @@ export default function ContainerSkin({
               : pillarMesh
             }
           </group>
+        );
+      })}
+
+      {/* Frame rails — horizontal members connecting adjacent poles */}
+      {!(container.supporting?.length === 0 && containerY > 0) && railPositions.map((rail) => {
+        const railOverride = container.railOverrides?.[rail.key];
+        if (railOverride?.visible === false) return null;
+        const isSelectedRail = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === rail.key;
+        const resolvedRailMatName = resolveFrameProperty(railOverride, container.frameDefaults, 'rail', 'material');
+        const resolvedRailMaterial = getFrameThreeMaterial(resolvedRailMatName, currentTheme);
+        const railMat = isSelectedRail ? frameSelectMat : resolvedRailMaterial;
+        const length = Math.hypot(rail.px2 - rail.px1, rail.pz2 - rail.pz1);
+        const midX = (rail.px1 + rail.px2) / 2;
+        const midZ = (rail.pz1 + rail.pz2) / 2;
+        const railRot: [number, number, number] = rail.orientation === 'h'
+          ? [0, 0, Math.PI / 2]
+          : [Math.PI / 2, 0, 0];
+        return (
+          <mesh
+            key={`rail_${rail.key}`}
+            position={[midX, vHeight, midZ]}
+            rotation={railRot}
+            geometry={getCyl(FRAME_RAIL_R, length)}
+            material={railMat}
+            castShadow
+            raycast={frameMode ? undefined : nullRaycast}
+            onPointerOver={frameMode ? (e) => {
+              e.stopPropagation();
+              const mesh = e.object as THREE.Mesh;
+              if (hoveredRailRef.current && hoveredRailRef.current.mesh !== mesh) {
+                hoveredRailRef.current.mesh.material = hoveredRailRef.current.material;
+              }
+              hoveredRailRef.current = { mesh, material: resolvedRailMaterial };
+              if (!isSelectedRail) mesh.material = frameHoverMat;
+            } : undefined}
+            onPointerOut={frameMode ? (e) => {
+              const mesh = e.object as THREE.Mesh;
+              if (hoveredRailRef.current?.mesh === mesh) hoveredRailRef.current = null;
+              if (!isSelectedRail) mesh.material = resolvedRailMaterial;
+            } : undefined}
+            onClick={frameMode ? (e) => { e.stopPropagation(); setSelectedFrameElement({ containerId: container.id, key: rail.key, type: 'rail' }); } : undefined}
+          />
         );
       })}
 
