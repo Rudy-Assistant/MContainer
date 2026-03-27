@@ -62,4 +62,23 @@ describe('computeRailPositions', () => {
     expect(rails[0].px2).toBe(3);
     expect(rails[0].pz2).toBe(-1);
   });
+
+  it('RAIL-7: poles far apart (like real container corners) still connect', () => {
+    // Real scenario: 40ft HC has corner poles at vertices (1,1), (1,7), (3,1), (3,7)
+    const poles = [
+      pole(0, 0, 'se', -5, -1),   // vertex (1,1)
+      pole(0, 6, 'se', 5, -1),    // vertex (1,7)
+      pole(2, 0, 'se', -5, 1),    // vertex (3,1)
+      pole(2, 6, 'se', 5, 1),     // vertex (3,7)
+    ];
+    const rails = computeRailPositions(poles);
+    const hRails = rails.filter(r => r.orientation === 'h');
+    const vRails = rails.filter(r => r.orientation === 'v');
+    // Should connect: (1,1)→(1,7) top-front, (3,1)→(3,7) top-back = 2 horizontal
+    expect(hRails.length).toBe(2);
+    // Should connect: (1,1)→(3,1) left, (1,7)→(3,7) right = 2 vertical
+    expect(vRails.length).toBe(2);
+    // Total = 4 rails forming a rectangle
+    expect(rails.length).toBe(4);
+  });
 });

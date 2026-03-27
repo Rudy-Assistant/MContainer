@@ -2081,8 +2081,8 @@ export interface RailPosition {
  * poles (vertices) exist.
  */
 export function computeRailPositions(poles: PolePosition[]): RailPosition[] {
-  // Build vertex map: corner → vertex mapping
-  const vertexMap = new Map<string, { px: number; pz: number }>();
+  // Build vertex map: corner → vertex coordinates + world position
+  const vertexMap = new Map<string, { vr: number; vc: number; px: number; pz: number }>();
   for (const p of poles) {
     let vr: number, vc: number;
     switch (p.corner) {
@@ -2092,40 +2092,42 @@ export function computeRailPositions(poles: PolePosition[]): RailPosition[] {
       case 'sw': vr = p.row + 1; vc = p.col;     break;
     }
     const key = `${vr}_${vc}`;
-    if (!vertexMap.has(key)) vertexMap.set(key, { px: p.px, pz: p.pz });
+    if (!vertexMap.has(key)) vertexMap.set(key, { vr, vc, px: p.px, pz: p.pz });
+  }
+
+  // Group vertices by row and column for nearest-neighbor pairing
+  const byRow = new Map<number, { vc: number; px: number; pz: number }[]>();
+  const byCol = new Map<number, { vr: number; px: number; pz: number }[]>();
+  for (const v of vertexMap.values()) {
+    if (!byRow.has(v.vr)) byRow.set(v.vr, []);
+    byRow.get(v.vr)!.push({ vc: v.vc, px: v.px, pz: v.pz });
+    if (!byCol.has(v.vc)) byCol.set(v.vc, []);
+    byCol.get(v.vc)!.push({ vr: v.vr, px: v.px, pz: v.pz });
   }
 
   const rails: RailPosition[] = [];
 
-  // Horizontal rails: connect vertex (vr, vc) to (vr, vc+1)
-  for (const [key, pos] of vertexMap) {
-    const [vrStr, vcStr] = key.split('_');
-    const vr = Number(vrStr);
-    const vc = Number(vcStr);
-    const rightKey = `${vr}_${vc + 1}`;
-    const rightPos = vertexMap.get(rightKey);
-    if (rightPos) {
+  // Horizontal rails: connect nearest neighbors sharing the same vertex row
+  for (const [vr, verts] of byRow) {
+    const sorted = verts.sort((a, b) => a.vc - b.vc);
+    for (let i = 0; i < sorted.length - 1; i++) {
       rails.push({
-        key: makeRailKey(vr, vc, 'h'),
-        px1: pos.px, pz1: pos.pz,
-        px2: rightPos.px, pz2: rightPos.pz,
+        key: makeRailKey(vr, sorted[i].vc, 'h'),
+        px1: sorted[i].px, pz1: sorted[i].pz,
+        px2: sorted[i + 1].px, pz2: sorted[i + 1].pz,
         orientation: 'h',
       });
     }
   }
 
-  // Vertical rails: connect vertex (vr, vc) to (vr+1, vc)
-  for (const [key, pos] of vertexMap) {
-    const [vrStr, vcStr] = key.split('_');
-    const vr = Number(vrStr);
-    const vc = Number(vcStr);
-    const belowKey = `${vr + 1}_${vc}`;
-    const belowPos = vertexMap.get(belowKey);
-    if (belowPos) {
+  // Vertical rails: connect nearest neighbors sharing the same vertex column
+  for (const [vc, verts] of byCol) {
+    const sorted = verts.sort((a, b) => a.vr - b.vr);
+    for (let i = 0; i < sorted.length - 1; i++) {
       rails.push({
-        key: makeRailKey(vr, vc, 'v'),
-        px1: pos.px, pz1: pos.pz,
-        px2: belowPos.px, pz2: belowPos.pz,
+        key: makeRailKey(sorted[i].vr, vc, 'v'),
+        px1: sorted[i].px, pz1: sorted[i].pz,
+        px2: sorted[i + 1].px, pz2: sorted[i + 1].pz,
         orientation: 'v',
       });
     }
