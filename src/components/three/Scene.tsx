@@ -1234,6 +1234,9 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
     };
     gl.domElement.addEventListener('pointerdown', pdown);
     gl.domElement.addEventListener('pointerup', pup);
+    // Reset Shift ref when window loses focus (prevents stuck camera-disable after Alt-Tab)
+    const blur = () => { isShiftHeldRef.current = false; sync(); };
+    window.addEventListener('blur', blur);
     // Also sync when dragMovingId or isPaintDragging change
     const unsub = useStore.subscribe((s, prev) => {
       if (s.dragMovingId !== prev.dragMovingId || s.isPaintDragging !== prev.isPaintDragging) sync();
@@ -1241,6 +1244,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
       gl.domElement.removeEventListener('pointerdown', pdown);
       gl.domElement.removeEventListener('pointerup', pup);
       unsub();

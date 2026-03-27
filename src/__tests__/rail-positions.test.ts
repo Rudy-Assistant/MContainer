@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeRailPositions, type RailPosition } from '@/components/objects/ContainerSkin';
-import type { PolePosition } from '@/utils/smartPoles';
+import { computeRailPositions, type RailPosition, type PolePosition } from '@/utils/smartPoles';
 
 function pole(row: number, col: number, corner: 'ne' | 'nw' | 'se' | 'sw', px: number, pz: number): PolePosition {
   return { row, col, corner, px, pz };

@@ -11,6 +11,7 @@
  */
 
 import { type Voxel, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
+import { makeRailKey } from '@/config/frameMaterials';
 
 export interface PolePosition {
   /** Grid row of the "anchor" voxel (the roofed voxel at a convex corner, or the unroofed gap at a concave corner) */
@@ -130,4 +131,76 @@ export function computePolePositions(
   }
 
   return positions;
+}
+
+// ── Rail Position Computation ─────────────────────────────────
+
+export interface RailPosition {
+  key: string;
+  px1: number;
+  pz1: number;
+  px2: number;
+  pz2: number;
+  orientation: 'h' | 'v';
+}
+
+/**
+ * Pure function: given an array of pole positions, compute which horizontal
+ * and vertical rail segments to render. A rail renders only if BOTH endpoint
+ * poles (vertices) exist.
+ */
+export function computeRailPositions(poles: PolePosition[]): RailPosition[] {
+  // Build vertex map: corner → vertex coordinates + world position
+  const vertexMap = new Map<string, { vr: number; vc: number; px: number; pz: number }>();
+  for (const p of poles) {
+    let vr: number, vc: number;
+    switch (p.corner) {
+      case 'ne': vr = p.row;     vc = p.col + 1; break;
+      case 'nw': vr = p.row;     vc = p.col;     break;
+      case 'se': vr = p.row + 1; vc = p.col + 1; break;
+      case 'sw': vr = p.row + 1; vc = p.col;     break;
+    }
+    const key = `${vr}_${vc}`;
+    if (!vertexMap.has(key)) vertexMap.set(key, { vr, vc, px: p.px, pz: p.pz });
+  }
+
+  // Group vertices by row and column for nearest-neighbor pairing
+  const byRow = new Map<number, { vc: number; px: number; pz: number }[]>();
+  const byCol = new Map<number, { vr: number; px: number; pz: number }[]>();
+  for (const v of vertexMap.values()) {
+    if (!byRow.has(v.vr)) byRow.set(v.vr, []);
+    byRow.get(v.vr)!.push({ vc: v.vc, px: v.px, pz: v.pz });
+    if (!byCol.has(v.vc)) byCol.set(v.vc, []);
+    byCol.get(v.vc)!.push({ vr: v.vr, px: v.px, pz: v.pz });
+  }
+
+  const rails: RailPosition[] = [];
+
+  // Horizontal rails: connect nearest neighbors sharing the same vertex row
+  for (const [vr, verts] of byRow) {
+    const sorted = [...verts].sort((a, b) => a.vc - b.vc);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      rails.push({
+        key: makeRailKey(vr, sorted[i].vc, 'h'),
+        px1: sorted[i].px, pz1: sorted[i].pz,
+        px2: sorted[i + 1].px, pz2: sorted[i + 1].pz,
+        orientation: 'h',
+      });
+    }
+  }
+
+  // Vertical rails: connect nearest neighbors sharing the same vertex column
+  for (const [vc, verts] of byCol) {
+    const sorted = [...verts].sort((a, b) => a.vr - b.vr);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      rails.push({
+        key: makeRailKey(sorted[i].vr, vc, 'v'),
+        px1: sorted[i].px, pz1: sorted[i].pz,
+        px2: sorted[i + 1].px, pz2: sorted[i + 1].pz,
+        orientation: 'v',
+      });
+    }
+  }
+
+  return rails;
 }

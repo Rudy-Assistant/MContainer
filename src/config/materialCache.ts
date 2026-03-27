@@ -231,8 +231,9 @@ const MATERIAL_ID_MAP: Record<string, keyof ThemeMaterialSet> = {
   bamboo: 'wood',
 };
 
-/** Map a frame material name (from frameMaterials.ts) to a Three.js material from the theme cache. */
-const FRAME_MATERIAL_MAP: Record<string, keyof ThemeMaterialSet> = {
+/** Map a frame material name (from frameMaterials.ts) to a Three.js material from the theme cache.
+ *  Keys match PoleMaterial/RailMaterial union values (title-case). */
+const FRAME_MATERIAL_MAP: Partial<Record<PoleMaterial | RailMaterial, keyof ThemeMaterialSet>> = {
   Steel: 'steel',
   Wood: 'wood',
   Concrete: 'concrete',
@@ -243,7 +244,7 @@ export function getFrameThreeMaterial(
   name: PoleMaterial | RailMaterial | string,
   theme: ThemeId,
 ): THREE.MeshStandardMaterial {
-  const key = FRAME_MATERIAL_MAP[name] ?? 'steel';
+  const key = FRAME_MATERIAL_MAP[name as PoleMaterial | RailMaterial] ?? 'steel';
   return _themeMats[theme][key] as THREE.MeshStandardMaterial;
 }
 
