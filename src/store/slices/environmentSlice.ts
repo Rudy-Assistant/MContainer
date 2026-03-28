@@ -50,6 +50,22 @@ export interface EnvironmentSlice {
   // Quality preset (persisted)
   qualityPreset: QualityPresetId;
   setQualityPreset: (preset: QualityPresetId) => void;
+
+  // UI mode (simple vs advanced)
+  uiMode: 'simple' | 'advanced';
+  setUiMode: (mode: 'simple' | 'advanced') => void;
+
+  // Milestone tracking
+  milestones: {
+    containerPlaced: boolean;
+    materialApplied: boolean;
+    containerStacked: boolean;
+    multipleContainers: boolean;
+    furniturePlaced: boolean;
+    exploredWalkthrough: boolean;
+    exportedDesign: boolean;
+  };
+  setMilestone: (key: string, value: boolean) => void;
 }
 
 export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => ({
@@ -63,6 +79,16 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
   savedCamera3D: null,
   cameraRestoring: false,
   qualityPreset: 'medium' as QualityPresetId,
+  uiMode: 'simple',
+  milestones: {
+    containerPlaced: false,
+    materialApplied: false,
+    containerStacked: false,
+    multipleContainers: false,
+    furniturePlaced: false,
+    exploredWalkthrough: false,
+    exportedDesign: false,
+  },
 
   // ── Actions ────────────────────────────────────────────
   setTimeOfDay: (time) =>
@@ -118,4 +144,9 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
   saveCamera3D: (position, target) => set({ savedCamera3D: { position, target } }),
   setCameraRestoring: (v) => set({ cameraRestoring: v }),
   setQualityPreset: (preset) => set({ qualityPreset: preset }),
+  setUiMode: (mode) => set({ uiMode: mode }),
+  setMilestone: (key, value) =>
+    set((s: any) => ({
+      milestones: { ...s.milestones, [key]: value },
+    })),
 });

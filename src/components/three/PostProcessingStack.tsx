@@ -10,8 +10,10 @@ import {
   Outline,
   HueSaturation,
   BrightnessContrast,
+  SMAA,
+  Vignette,
 } from '@react-three/postprocessing';
-import { ToneMappingMode } from 'postprocessing';
+import { ToneMappingMode, SMAAPreset } from 'postprocessing';
 import { useStore } from '@/store/useStore';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
 import { getStyle } from '@/config/styleRegistry';
@@ -96,6 +98,13 @@ function PostProcessingEffects() {
     <N8AO key="ao" {...aoProps} />,
   ];
 
+  // SMAA anti-aliasing — eliminates jagged edges (biggest single visual win)
+  if (qualityPreset !== 'low') {
+    children.push(
+      <SMAA key="smaa" preset={qualityPreset === 'high' ? SMAAPreset.ULTRA : SMAAPreset.MEDIUM} />,
+    );
+  }
+
   if (config.bloomEnabled) {
     children.push(
       <Bloom
@@ -139,6 +148,13 @@ function PostProcessingEffects() {
         pulseSpeed={0.4}
         selectionLayer={12}
       />,
+    );
+  }
+
+  // Vignette — subtle lens darkening at edges (High quality only)
+  if (qualityPreset === 'high') {
+    children.push(
+      <Vignette key="vignette" offset={0.3} darkness={0.4} />,
     );
   }
 

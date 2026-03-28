@@ -23,6 +23,12 @@ import MaterialPaletteModal from "@/components/ui/MaterialPaletteModal";
 import BottomPanel from "@/components/ui/BottomPanel";
 // Legacy GameHUD, Hotbar, StyleSelector removed in Phase 7
 
+// Simplified UI — lazy loaded to avoid increasing main bundle
+const SimpleLayout = dynamic(
+  () => import("@/components/simple/SimpleLayout"),
+  { ssr: false }
+);
+
 const SceneCanvas = dynamic(
   () => import("@/components/three/SceneCanvas"),
   { ssr: false }
@@ -115,6 +121,7 @@ export default function Home() {
   const hasHydrated = useStore((s) => s._hasHydrated);
   const activeHotbarSlot = useStore((s) => s.activeHotbarSlot);
   const showHotbar = useStore((s) => s.showHotbar);
+  const uiMode = useStore((s) => s.uiMode);
   useHydrationSeed();
 
   if (!hasHydrated) {
@@ -123,6 +130,11 @@ export default function Home() {
         Loading project...
       </div>
     );
+  }
+
+  // Simple UI mode — completely different layout
+  if (uiMode === 'simple') {
+    return <SimpleLayout />;
   }
 
   return (

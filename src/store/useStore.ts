@@ -218,7 +218,8 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
   partialize: (state) => {
     const { containers, zones, environment, viewMode, pricing, furnitureIndex,
             libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-            palettes, activePaletteId, currentTheme, activeStyle, sceneObjects } = state;
+            palettes, activePaletteId, currentTheme, activeStyle, sceneObjects,
+            uiMode, milestones } = state;
     // Strip ephemeral _preMergeWalls, _preExtensionDoors, _smartRailingChanges, and voxel unpackPhase from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
@@ -235,7 +236,8 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     }
     return { containers: cleanContainers, zones, environment, viewMode, pricing, furnitureIndex,
              libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-             palettes, activePaletteId, currentTheme, activeStyle, sceneObjects } as StoreState;
+             palettes, activePaletteId, currentTheme, activeStyle, sceneObjects,
+             uiMode, milestones } as StoreState;
   },
   merge: (persistedState, currentState) => {
     if (!persistedState) return currentState as StoreState;
@@ -279,6 +281,17 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
         }
       }
     }
+    // Rehydrate milestones based on existing state
+    if (state) {
+      const containers = state.containers ?? {};
+      const count = Object.keys(containers).length;
+      if (count >= 1 && state.milestones && !state.milestones.containerPlaced) {
+        useStore.setState((s: any) => ({ milestones: { ...s.milestones, containerPlaced: true } }));
+      }
+      if (count >= 2 && state.milestones && !state.milestones.multipleContainers) {
+        useStore.setState((s: any) => ({ milestones: { ...s.milestones, multipleContainers: true } }));
+      }
+    }
     useStore.setState({ _hasHydrated: true });
   },
 }));
@@ -288,6 +301,10 @@ setTemporalApiAccessor(() => useStore.temporal.getState());
 setLibraryTemporalAccessor(() => useStore.temporal.getState());
 setVoxelStoreRef(useStore);
 setContainerTemporalAccessor(() => useStore.temporal.getState());
+
+// Initialize milestone tracking (progressive disclosure)
+import { initMilestoneTracking } from './milestoneMiddleware';
+initMilestoneTracking(useStore);
 
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).__store = useStore;
