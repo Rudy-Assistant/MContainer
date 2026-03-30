@@ -22,7 +22,7 @@ npm run dev
 
 ```bash
 npx tsc --noEmit     # type check — must be 0 errors
-npx vitest run       # behavioral tests — must be 243 pass
+npx vitest run       # behavioral tests — must be 307 pass
 ```
 
 ## Project structure
@@ -41,7 +41,7 @@ src/
     slices/             7 slice files — ALL business logic lives here
   types/                container.ts — the primary type definitions
   utils/                applyPalette, exportGLB, adjacencyDetection
-  __tests__/            23 test files, 243 behavioral tests
+  Testing/              79 test files, 307 behavioral tests
 ```
 
 ## Key concepts
@@ -82,13 +82,13 @@ The Zustand store is composed of 7 slices, each owning a distinct domain:
 |-------|--------|
 | containerSlice | Container CRUD, zones, furniture, stacking, adjacency |
 | voxelSlice | Face mutations, staircases, doors, modules, bucket tool |
-| environmentSlice | Time of day, theme, view mode, camera, ground |
-| uiSlice | Hover state, grab mode, face preview, hotbar tab |
-| selectionSlice | Selection, brush, hotbar slots, clipboard |
-| dragSlice | Container/furniture drag, context menus |
-| librarySlice | Library, palettes, custom hotbar, export/import |
+| uiSlice | View mode, modals, toolbar state, hotbar visibility |
+| selectionSlice | Selected container, voxel, face, bay |
+| dragSlice | Drag state, ghost transforms, snap points |
+| librarySlice | User presets, favorites, collections |
+| sceneObjectSlice | Furniture and fixture placement |
 
-The middleware chain wraps all slices: `persist(temporal(slices))`. Undo tracks only containers/zones/furnitureIndex. Persistence includes those plus environment, pricing, library, and palettes.
+The middleware chain wraps all slices: `immer(zundo(persist(slices)))` (Immer innermost, Persist outermost). Undo tracks containers and voxel state. Persistence uses idb-keyval (IndexedDB).
 
 ### Rendering Pipeline
 
@@ -100,7 +100,7 @@ The middleware chain wraps all slices: `persist(temporal(slices))`. Undo tracks 
 ## Before your first PR
 
 1. `npx tsc --noEmit` → 0 errors
-2. `npx vitest run` → 243 pass
+2. `npx vitest run` → 307 pass
 3. Open `localhost:3000` and manually verify your change looks correct in 3D view
 4. Check `CLAUDE.md` for the full list of invariants and anti-patterns
 
