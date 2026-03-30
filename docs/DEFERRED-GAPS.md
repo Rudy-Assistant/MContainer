@@ -1,7 +1,6 @@
-# Deferred Gaps — Unified Placeable Object System
+# Deferred Gaps — Remaining Work Items
 
-> These items were explicitly deferred during the Form+Skin sprint (March 2026).
-> Future sprints should pick these up.
+> Updated 2026-03-30. Previously listed items have been resolved inline.
 
 ## 1. GLB Models for 27 Forms (Art Pipeline)
 
@@ -14,23 +13,28 @@
 
 **Files to modify:** `src/components/objects/SceneObjectRenderer.tsx`, `src/config/forms/*.ts`
 
-## 2. Four Postprocessing Style Effects
+## 2. ~~Four Postprocessing Style Effects~~ RESOLVED
 
-**Current state:** These 4 effects are no-ops in `src/utils/styleEffects.ts` (switch cases with `break` only).
+All 4 effects are implemented:
+- `salt_frost` — HueSaturation desaturation + BrightnessContrast + Outline (layer 11)
+- `soft_bloom` — Bloom with lowered luminance threshold (0.5)
+- `dappled_light` — DappleGobo procedural gobo plane with leaf-pattern shadows
+- `edge_glow` — Outline with style color (layer 12)
 
-| Effect | Requires |
-|--------|----------|
-| `salt_frost` | Edge-detect shader pass — white blend on exterior frame edges |
-| `soft_bloom` | Per-fixture bloom threshold override in `@react-three/postprocessing` |
-| `dappled_light` | Gobo/cookie texture applied to `SunLight` shadow camera |
-| `edge_glow` | Emissive channel mapped to edge geometry UVs on frame meshes |
+## 3. Bottom-Panel Layout Option (Design Decision)
 
-**Files to modify:** `src/utils/styleEffects.ts`, `src/components/three/PostProcessingStack.tsx`, `src/components/three/SunLight.tsx`
+**Current state:** FormCatalog is a fixed bottom bar. SkinEditor is a fixed left panel. The user flagged a potential future redesign to a Sims-style bottom panel that combines both.
 
-## 3. Bottom-Panel Layout Option
+**Status:** Design/UX decision, not a code gap. BottomPanel.tsx exists as a unified drawer.
 
-**Current state:** FormCatalog is a fixed bottom bar (`position: fixed, bottom: 80px`). SkinEditor is a fixed left panel. The user flagged a potential future redesign to a Sims-style bottom panel that combines both.
+## 4. Phase 4: Hinged Wall Animations
 
-**Decision point:** Whether to keep the current dual-panel (left + bottom) or merge into a single bottom drawer. This is a design/UX decision, not a code gap.
+**Current state:** TODO in ContainerMesh.tsx line 2538. Legacy WallAssembly components disabled due to Z-fighting with ContainerSkin voxel faces.
 
-**Files affected:** `src/components/ui/FormCatalog.tsx`, `src/components/ui/SkinEditor.tsx`, `src/app/page.tsx`
+**What's needed:** Rebuild hinged door/wall fold animations within the voxel-based rendering system (ContainerSkin is now sole authority for wall rendering).
+
+## 5. Shelf Surface Category
+
+**Current state:** Placeholder category in surfaceCategories.ts with empty variants array.
+
+**What's needed:** Shelves are scene objects (wall-mounted furniture), not surface types. Requires scene object pipeline support for wall-mounted items with anchor type='face'.
