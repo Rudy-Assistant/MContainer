@@ -14,7 +14,7 @@ This is **V1** (codebase: `C:\MHome\MContainer\`). V2 exists at `C:\MHome\` for 
 
 ```bash
 npm run dev          # Next.js dev server
-npm run test         # vitest run (307 tests)
+npm run test         # vitest run (782 tests)
 npx tsc --noEmit     # Type check
 npm run gates        # Acceptance gates
 npm run quality      # Generate quality assessment
@@ -127,7 +127,7 @@ during cleanup sprints. When in doubt, move to a secondary location rather than 
 Every sprint must complete ALL of these before being declared done:
 
 1. `npx tsc --noEmit` → 0 errors
-2. `npx vitest run` → all tests pass (307 currently)
+2. `npx vitest run` → all tests pass (782 currently)
 3. `node acceptance-gates.mjs` → all gates pass, 0 FAIL
 4. `node generate-quality-assessment.mjs` → CURRENT-QUALITY-ASSESSMENT.md updated
 5. Read ALL gate screenshots with view tool — describe what each shows
@@ -150,16 +150,16 @@ Regressions that have occurred in past sprints. Check these specifically during 
 | Extension platforms/moats rendering | Extension top/bottom returned true from isExteriorFace | Extension top/bottom now return false | 10 |
 | Stale baselines cause visual gate failures | Scene changes without baseline recapture | Run `npm run baselines` after any visual change, commit PNGs | 8 |
 
-## Outstanding Issues (Sprint 17 Handoff)
+## Resolved Issues (Sprint 17 Handoff — all fixed)
 
-These bugs are unresolved. See `sprint17-handoff.md` in project memory for root cause analysis.
+All 4 Sprint 17 bugs are resolved (verified 2026-03-30):
 
-| # | Issue | Root Cause | Suggested Fix |
-|---|-------|-----------|---------------|
-| 1 | Containers don't stack via UI | `stackContainer` works programmatically but no UI gesture triggers it | Add "Stack" button or drag-to-stack gesture |
-| 2 | Adjacent container removes entire wall | `mergeBoundaryVoxels` merges ALL boundary voxels, not just overlapping portions | Check actual geometric overlap before merging |
-| 3 | Sticky alignment not triggering | `STICKY_THRESHOLD=0.3` may not apply during `addContainer` smart placement | Verify snap logic runs on drag-and-drop placement |
-| 4 | Shift+click camera conflict | Both container drag and camera orbit respond to Shift+mouse | Disable CameraControls when Shift held |
+| # | Issue | Resolution |
+|---|-------|-----------|
+| 1 | Containers don't stack via UI | Right-click "Stack Container Above" + drag-to-stack (>40% overlap) |
+| 2 | Adjacent container removes entire wall | `voxelExtentsOverlap` partial merge — only overlapping voxels merged |
+| 3 | Sticky alignment not triggering | `findEdgeSnap` runs every frame during drag + on `addContainer` |
+| 4 | Shift+click camera conflict | CameraControls disabled when Shift held (keyboard + pointer + blur) |
 
 ## Simple vs Detail Mode (Voxel Grouping)
 
