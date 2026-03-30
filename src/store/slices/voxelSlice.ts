@@ -663,7 +663,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           ...upperVoxel,
           active: true,
           voxelType: 'stairs',
-            stairPart: 'upper',
+          stairPart: 'upper',
           stairAscending: ascending,
           faces: buildStairFaces(isNS, 'upper'),
         };
