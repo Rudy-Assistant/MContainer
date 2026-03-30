@@ -25,7 +25,9 @@ export function QualityAutoDetect() {
     const gpuInfo = extractGPUInfo(glContext);
     const preset = detectQualityPreset(gpuInfo);
 
-    console.log(`[QualityAutoDetect] GPU: ${gpuInfo.rendererName ?? 'unknown'}, maxTex: ${gpuInfo.maxTextureSize} → ${preset}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[QualityAutoDetect] GPU: ${gpuInfo.rendererName ?? 'unknown'}, maxTex: ${gpuInfo.maxTextureSize} → ${preset}`);
+    }
 
     useStore.getState().setQualityPreset(preset);
     localStorage.setItem('moduhome-gpu-detected', 'true');

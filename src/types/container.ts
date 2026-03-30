@@ -312,9 +312,7 @@ export interface Voxel {
   faces: VoxelFaces;
   /** Volumetric discriminator — 'stairs' renders 3D tread geometry inside the voxel */
   voxelType?: 'standard' | 'stairs';
-  /** Tread ascending axis for stair voxels (legacy — use stairAscending when present) */
-  stairDir?: 'ns' | 'ew';
-  /** Direction treads ascend toward (toward active neighbor) — takes precedence over stairDir */
+  /** Direction treads ascend toward (toward active neighbor) */
   stairAscending?: 'n' | 's' | 'e' | 'w';
   /** Faces that are currently open (door swung, shoji slid) — for animated fenestration */
   openFaces?: Partial<Record<keyof VoxelFaces, boolean>>;

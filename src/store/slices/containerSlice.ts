@@ -52,7 +52,7 @@ import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverl
 import defaultPricing from "@/config/pricing_config.json";
 import { getContainerRole, CONTAINER_ROLES } from "@/config/containerRoles";
 import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from "@/types/container";
-import { type HotbarSlot, BLOCK_PRESETS, autoStairDir, autoStairAscending } from "../useStore";
+import { type HotbarSlot, BLOCK_PRESETS, autoStairAscending } from "../useStore";
 import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
@@ -1304,9 +1304,9 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         },
       },
     }));
-    console.log(
-      `Stacked: "${top.name}" (L${newLevel}) on "${bottom.name}" (L${bottom.level}) at Y=${newY.toFixed(2)}m`
-    );
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Stacked: "${top.name}" (L${newLevel}) on "${bottom.name}" (L${bottom.level}) at Y=${newY.toFixed(2)}m`);
+    }
     // Auto-generate rooftop deck on the newly stacked top container FIRST
     get().generateRooftopDeck(topId);
 
@@ -1583,7 +1583,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         if (sameSet) return s;
       }
 
-      if (pairs.length > 0) {
+      if (process.env.NODE_ENV === 'development' && pairs.length > 0) {
         console.log(`Adjacency: ${pairs.length} shared wall(s) detected, ${newCullSet.size} faces culled`, pairs);
       }
       return { containers: changed ? updated : s.containers, globalCullSet: newCullSet };
@@ -1788,31 +1788,12 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     // Stack upper on ground
     const success = get().stackContainer(upperId, groundId);
 
-    // Log the result
-    const state = get();
-    const ground = state.containers[groundId];
-    const upper = state.containers[upperId];
-
-    console.log("═══ 2-STORY STACK VERIFICATION ═══");
-    console.log("Stack result:", success ? "SUCCESS" : "FAILED");
-    console.log("Ground Floor:", {
-      id: ground.id,
-      name: ground.name,
-      level: ground.level,
-      position: ground.position,
-      stackedOn: ground.stackedOn,
-      supporting: ground.supporting,
-    });
-    console.log("Second Floor:", {
-      id: upper.id,
-      name: upper.name,
-      level: upper.level,
-      position: upper.position,
-      stackedOn: upper.stackedOn,
-      supporting: upper.supporting,
-    });
-    console.log("Y offset:", upper.position.y, "m (expected:", CONTAINER_DIMENSIONS[ContainerSize.HighCube40].height, "m)");
-    console.log("═══════════════════════════════════");
+    if (process.env.NODE_ENV === 'development') {
+      const state = get();
+      const ground = state.containers[groundId];
+      const upper = state.containers[upperId];
+      console.log(`2-story stack ${success ? 'OK' : 'FAILED'}: ground=${ground.name} L${ground.level}, upper=${upper.name} L${upper.level} Y=${upper.position.y.toFixed(2)}m`);
+    }
   },
 
   // ── Outer Wall Type ─────────────────────────────────────────
@@ -2281,9 +2262,6 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         active: next.active,
         faces: { ...next.faces },
         voxelType: next.voxelType ?? 'standard',
-        stairDir: next.voxelType === 'stairs'
-          ? autoStairDir(grid, voxelIndex)
-          : (next.stairDir ?? 'ns'),
         stairAscending: next.voxelType === 'stairs'
           ? autoStairAscending(grid, voxelIndex)
           : undefined,

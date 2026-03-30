@@ -100,8 +100,6 @@ export function setVoxelStoreRef(ref: any) { _useStoreRef = ref; }
 // - All entry points (setVoxelFace('Stairs'), applyModule('stairs'), stampStaircase)
 //   delegate to applyStairsFromFace.
 // - stairAscending ('n'|'s'|'e'|'w') is the canonical direction field.
-// - stairDir ('ns'|'ew') is DEPRECATED — derived from stairAscending for backward
-//   compat with persisted data. Will be removed in a future migration sprint.
 // - stairPart ('lower'|'upper'|'single') identifies entry vs ascent voxel in 2-voxel pairs.
 //   BOM counts only 'lower'/'single' to avoid double-counting.
 export const STAIR_FLIP: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
@@ -647,7 +645,6 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         ...voxel,
         active: true,
         voxelType: 'stairs',
-        stairDir: isNS ? 'ns' : 'ew',
         stairPart: lowerPart,
         stairAscending: ascending,
         faces: buildStairFaces(isNS, lowerPart),
@@ -666,8 +663,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           ...upperVoxel,
           active: true,
           voxelType: 'stairs',
-          stairDir: isNS ? 'ns' : 'ew',
-          stairPart: 'upper',
+            stairPart: 'upper',
           stairAscending: ascending,
           faces: buildStairFaces(isNS, 'upper'),
         };
@@ -838,7 +834,6 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         ...lowerVoxel,
         active: true,
         voxelType: 'stairs',
-        stairDir: isNS ? 'ns' : 'ew',
         stairPart: 'lower',
         stairAscending: facing,
         faces: { ...buildStairFaces(isNS, 'lower'), top: 'Open' },
@@ -849,7 +844,6 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         ...upperVoxel,
         active: true,
         voxelType: 'stairs',
-        stairDir: isNS ? 'ns' : 'ew',
         stairPart: 'upper',
         stairAscending: facing,
         faces: { ...buildStairFaces(isNS, 'upper'), bottom: 'Open' },
@@ -1030,7 +1024,6 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       };
       delete grid[voxelIndex]._smartStairChanges;
       delete grid[voxelIndex].voxelType;
-      delete grid[voxelIndex].stairDir;
       delete grid[voxelIndex].stairAscending;
       delete grid[voxelIndex].stairPart;
       delete grid[voxelIndex]._stairExiting;
@@ -1044,7 +1037,6 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
             active: grid[uIdx].active,
           };
           delete grid[uIdx].voxelType;
-          delete grid[uIdx].stairDir;
           delete grid[uIdx].stairAscending;
           delete grid[uIdx].stairPart;
           delete grid[uIdx]._stairExiting;

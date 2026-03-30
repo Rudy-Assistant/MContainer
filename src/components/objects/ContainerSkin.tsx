@@ -2845,7 +2845,7 @@ export default function ContainerSkin({
                         voxW={voxW}
                         voxD={voxD}
                         voxH={vHeight}
-                        ascending={voxel.stairAscending ?? (voxel.stairDir === 'ew' ? 'e' : 'n')}
+                        ascending={voxel.stairAscending ?? 'n'}
                         faces={voxel.faces}
                         stairPart={voxel.stairPart}
                       />
@@ -2854,7 +2854,7 @@ export default function ContainerSkin({
                       voxW={voxW}
                       voxD={voxD}
                       voxH={vHeight}
-                      ascending={voxel.stairAscending ?? (voxel.stairDir === 'ew' ? 'e' : 'n')}
+                      ascending={voxel.stairAscending ?? 'n'}
                       faces={voxel.faces}
                       stairPart={voxel.stairPart}
                     />

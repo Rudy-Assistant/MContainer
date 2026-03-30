@@ -9,7 +9,7 @@
  */
 
 import React, { useMemo, useCallback, useState, useRef, useEffect } from "react";
-import { useStore, autoStairDir } from "@/store/useStore";
+import { useStore } from "@/store/useStore";
 import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import { getSelectedVoxels } from "@/hooks/useSelectedVoxels";

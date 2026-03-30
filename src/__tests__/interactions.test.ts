@@ -48,7 +48,6 @@ describe('two-level home workflow', () => {
 
     const voxel = s().containers[id].voxelGrid![17];
     expect(voxel.voxelType).toBe('stairs');
-    expect(voxel.stairDir).toBeDefined();
     expect(voxel.stairAscending).toBeDefined();
   });
 

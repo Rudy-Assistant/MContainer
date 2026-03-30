@@ -7,7 +7,6 @@
  * - applyModule('stairs') redirects to applyStairsFromFace
  * - BOM includes stair cost (once per staircase, not per voxel)
  * - stairAscending is always set
- * - Legacy stairDir is derived from stairAscending
  * - Cross-container void works through unified path
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -94,19 +93,15 @@ describe('Unified Staircase System', () => {
     }
   });
 
-  it('USTAIR-5: stairDir is derived and consistent with stairAscending', () => {
+  it('USTAIR-5: stairAscending is set correctly from face direction', () => {
     const s = useStore.getState;
     const id = s().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
 
     s().applyStairsFromFace(id, 10, 'n');
     const v = s().containers[id].voxelGrid![10];
 
-    // stairAscending 's' (face='n' flips to ascending='s') → stairDir should be 'ns'
-    if (v.stairAscending === 'n' || v.stairAscending === 's') {
-      expect(v.stairDir).toBe('ns');
-    } else {
-      expect(v.stairDir).toBe('ew');
-    }
+    // face='n' flips to ascending='s'
+    expect(v.stairAscending).toBe('s');
   });
 
   // ── BOM Integration ────────────────────────────────────────

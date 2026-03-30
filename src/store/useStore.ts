@@ -119,7 +119,6 @@ export interface BlockPreset {
   faces: VoxelFaces;
   active: boolean;
   voxelType?: 'standard' | 'stairs';
-  stairDir?: 'ns' | 'ew';
   stairAscending?: 'n' | 's' | 'e' | 'w';
 }
 
@@ -138,34 +137,8 @@ export const BLOCK_PRESETS: BlockPreset[] = [
 // ── Auto Stair Direction ─────────────────────────────────────
 /**
  * Infers optimal stair direction from active neighbors.
- * N/S neighbor → 'ns'; E/W neighbor → 'ew'; defaults to 'ns'.
- * Note: E/W deltas are inverted because col→X mapping is negated (per MEMORY.md).
- */
-export function autoStairDir(grid: Voxel[], voxelIndex: number): 'ns' | 'ew' {
-  const col      = voxelIndex % VOXEL_COLS;
-  const rowLocal = Math.floor((voxelIndex % (VOXEL_COLS * VOXEL_ROWS)) / VOXEL_COLS);
-  const level    = Math.floor(voxelIndex / (VOXEL_COLS * VOXEL_ROWS));
-  const base     = level * VOXEL_COLS * VOXEL_ROWS;
-
-  const nIdx = base + (rowLocal - 1) * VOXEL_COLS + col;
-  const sIdx = base + (rowLocal + 1) * VOXEL_COLS + col;
-  // E(+X)→col-1, W(-X)→col+1 (negated-X axis)
-  const eIdx = base + rowLocal * VOXEL_COLS + (col - 1);
-  const wIdx = base + rowLocal * VOXEL_COLS + (col + 1);
-
-  const nActive = rowLocal > 0           && grid[nIdx]?.active;
-  const sActive = rowLocal < VOXEL_ROWS - 1 && grid[sIdx]?.active;
-  const eActive = col > 0               && grid[eIdx]?.active;
-  const wActive = col < VOXEL_COLS - 1  && grid[wIdx]?.active;
-
-  if (nActive || sActive) return 'ns';
-  if (eActive || wActive) return 'ew';
-  return 'ns';
-}
-
-/**
  * Returns the direction treads should ascend toward (toward the active neighbor).
- * More precise than autoStairDir — returns exact cardinal direction, not just axis.
+ * Note: E/W deltas are inverted because col→X mapping is negated.
  */
 export function autoStairAscending(
   grid: Voxel[], voxelIndex: number
@@ -264,6 +237,18 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
       const result = persistedStateSchema.safeParse(state);
       if (!result.success) {
         console.warn('ModuHome: Invalid persisted state, using defaults:', result.error);
+      }
+      // Migrate legacy stairDir → stairAscending for persisted voxels
+      if (state.containers) {
+        for (const container of Object.values(state.containers) as any[]) {
+          if (!container?.voxelGrid) continue;
+          for (const voxel of container.voxelGrid) {
+            if (voxel?.stairDir && !voxel.stairAscending) {
+              voxel.stairAscending = voxel.stairDir === 'ns' ? 'n' : 'e';
+            }
+            delete voxel?.stairDir;
+          }
+        }
       }
       // Rebuild smart railing tracking from persisted voxel state
       // (_smartRailingChanges is stripped from persist but Railing_Cable faces are persisted)

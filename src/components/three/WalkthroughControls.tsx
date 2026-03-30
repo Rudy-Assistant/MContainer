@@ -246,7 +246,7 @@ function generateInteriorTourWaypoints(): { waypoints: THREE.Vector3[]; center: 
         wp.push(new THREE.Vector3(wx, floorY, wz));
 
         // Ascending direction → world offset per step
-        const ascending = voxel.stairAscending ?? (voxel.stairDir === 'ns' ? 'n' : 'e');
+        const ascending = voxel.stairAscending ?? 'n';
         // Delta in local space per full stair height
         const dLocal = ascending === 'n' ? { x: 0, z: -rowPitch }
                      : ascending === 's' ? { x: 0, z: rowPitch }
@@ -554,9 +554,7 @@ export default function WalkthroughControls() {
           const pz = (rowLocal - 1.5) * rowPitch;
           const py = c.position.y + level * vHeight; // base of this voxel level
 
-          // Use stairAscending (modern) with stairDir fallback (legacy persisted data).
-          // Direction within axis doesn't affect tread positions — treads tile the full voxel.
-          const ascending = voxel.stairAscending ?? (voxel.stairDir === 'ns' ? 'n' : 'e');
+          const ascending = voxel.stairAscending ?? 'n';
           const isNS = ascending === 'n' || ascending === 's';
           const stepH = vHeight / STEPS;
           const treadLen = (isNS ? voxDLocal : voxWLocal) / STEPS;
