@@ -69,7 +69,7 @@ import {
 import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
 import { computePolePositions, computeRailPositions, type PolePosition, type RailPosition } from "@/utils/smartPoles";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
-import { makePoleKey, resolveFrameProperty } from "@/config/frameMaterials";
+import { makePoleKey, resolveFrameProperty, type PoleShape, type RailShape } from "@/config/frameMaterials";
 import LightFixture from './LightFixture';
 import ElectricalPlate from './ElectricalPlate';
 import { formRegistry } from "@/config/formRegistry";
@@ -327,6 +327,23 @@ function getCyl(r: number, h: number): THREE.BufferGeometry {
   return _cyl.get(k)!;
 }
 
+function getPoleGeometry(r: number, h: number, shape: PoleShape): THREE.BufferGeometry {
+  switch (shape) {
+    case 'Square':   return getBox(r * 2, h, r * 2);
+    case 'I-Beam':   return getBox(r * 2.5, h, r * 1.2);
+    case 'H-Beam':   return getBox(r * 1.2, h, r * 2.5);
+    default:         return getCyl(r, h);
+  }
+}
+
+function getRailGeometry(r: number, length: number, shape: RailShape): THREE.BufferGeometry {
+  switch (shape) {
+    case 'Square':   return getBox(r * 2, length, r * 2);
+    case 'Channel':  return getBox(r * 2.5, length, r * 1.5);
+    default:         return getCyl(r, length);
+  }
+}
+
 const _edges = new Map<string, THREE.BufferGeometry>();
 function getEdges(w: number, h: number, d: number): THREE.BufferGeometry {
   const k = `${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}`;
@@ -576,8 +593,9 @@ function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig, doorMat }: {
   doorConfig?: import('@/types/container').DoorConfig;
   doorMat?: THREE.MeshStandardMaterial;
 }) {
-  const doorW = w * 0.7;
-  const halfSpan = doorW / 2;
+  const doorW = w * 0.92;
+  const halfW = w / 2;
+  const halfDoor = doorW / 2;
 
   // Resolve config: doorConfig takes precedence, fallback to legacy doorState
   const cfg = doorConfig ?? {
@@ -590,11 +608,13 @@ function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig, doorMat }: {
   const isSlide = cfg.type === 'slide' || cfg.state === 'open_slide';
   const shouldOpen = cfg.state === 'open_swing' || cfg.state === 'open_slide' || !!isOpen;
 
-  // Pivot: hingeEdge determines which edge the door pivots from
+  // Pivot at wall edge so the hinge is flush with the frame
   const hingeLeft = cfg.hingeEdge === 'left';
   const pivotSign = hingeLeft ? 1 : -1;
-  const pivotOffset = isNS ? halfSpan * pivotSign : 0;
-  const pivotOffsetZ = isNS ? 0 : halfSpan * pivotSign;
+  const pivotOffset = isNS ? halfW * pivotSign : 0;
+  const pivotOffsetZ = isNS ? 0 : halfW * pivotSign;
+  const panelX = isNS ? halfDoor * pivotSign : 0;
+  const panelZ = isNS ? 0 : halfDoor * pivotSign;
 
   // Swing angle: direction determines which way door opens
   const swingSign = hingeLeft ? 1 : -1;
@@ -624,21 +644,20 @@ function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig, doorMat }: {
     <>
       {/* Frame — steel surround (fixed) */}
       <mesh geometry={isNS ? getBox(w, h, d) : getBox(d, h, w)} material={mFrame} castShadow raycast={nullRaycast} />
-      {/* Animated door panel — pivots from hinge edge (swing) or translates (slide) */}
+      {/* Animated door panel — pivots from wall edge (swing) or translates (slide) */}
       <group position={isSlide ? [0, 0, 0] : [-pivotOffset, 0, -pivotOffsetZ]}>
         <group ref={groupRef}>
           <mesh
             geometry={isNS ? getBox(doorW, h * 0.95, d * 0.95) : getBox(d * 0.95, h * 0.95, doorW)}
-            position={isSlide ? [0, 0, 0] : [pivotOffset, 0, pivotOffsetZ]}
+            position={isSlide ? [0, 0, 0] : [panelX, 0, panelZ]}
             material={doorMat ?? mSteel}
             castShadow raycast={nullRaycast}
           />
-          {/* Handle dot */}
           <mesh
             geometry={getCyl(0.015, 0.05)}
             position={isNS
-              ? [(isSlide ? 0 : pivotOffset) + doorW * 0.35 * -pivotSign, -h * 0.1, 0]
-              : [0, -h * 0.1, (isSlide ? 0 : pivotOffsetZ) + doorW * 0.35 * -pivotSign]}
+              ? [(isSlide ? 0 : panelX) + doorW * 0.35 * -pivotSign, -h * 0.1, 0]
+              : [0, -h * 0.1, (isSlide ? 0 : panelZ) + doorW * 0.35 * -pivotSign]}
             material={mFrame}
             castShadow raycast={nullRaycast}
           />
@@ -3456,11 +3475,12 @@ export default function ContainerSkin({
         if (poleOverride?.visible === false) return null;
         const isSelectedPole = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === poleKey;
         const resolvedMatName = resolveFrameProperty(poleOverride, container.frameDefaults, 'pole', 'material');
+        const resolvedShapeName = resolveFrameProperty(poleOverride, container.frameDefaults, 'pole', 'shape') as PoleShape;
         const resolvedMaterial = getFrameThreeMaterial(resolvedMatName, currentTheme);
         const poleMat = isSelectedPole ? frameSelectMat : resolvedMaterial;
         const pillarMesh = (
           <mesh
-            geometry={getCyl(PILLAR_R, poleH)}
+            geometry={getPoleGeometry(PILLAR_R, poleH, resolvedShapeName)}
             material={poleMat}
             castShadow
             raycast={frameMode ? undefined : nullRaycast}
@@ -3501,11 +3521,13 @@ export default function ContainerSkin({
         if (railOverride?.visible === false) return null;
         const isSelectedRail = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === rail.key;
         const resolvedRailMatName = resolveFrameProperty(railOverride, container.frameDefaults, 'rail', 'material');
+        const resolvedRailShapeName = resolveFrameProperty(railOverride, container.frameDefaults, 'rail', 'shape') as RailShape;
         const resolvedRailMaterial = getFrameThreeMaterial(resolvedRailMatName, currentTheme);
         const railMat = isSelectedRail ? frameSelectMat : resolvedRailMaterial;
         const length = Math.hypot(rail.px2 - rail.px1, rail.pz2 - rail.pz1);
         const midX = (rail.px1 + rail.px2) / 2;
         const midZ = (rail.pz1 + rail.pz2) / 2;
+        // Rail geometry is built along Y axis; rotation maps it to the correct direction
         const railRot: [number, number, number] = rail.orientation === 'h'
           ? [0, 0, Math.PI / 2]
           : [Math.PI / 2, 0, 0];
@@ -3514,7 +3536,7 @@ export default function ContainerSkin({
             key={`rail_${rail.key}`}
             position={[midX, vHeight, midZ]}
             rotation={railRot}
-            geometry={getCyl(FRAME_RAIL_R, length)}
+            geometry={getRailGeometry(FRAME_RAIL_R, length, resolvedRailShapeName)}
             material={railMat}
             castShadow
             raycast={frameMode ? undefined : nullRaycast}
