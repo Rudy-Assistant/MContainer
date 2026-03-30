@@ -1,14 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
+import LZString from 'lz-string';
 import { encodeDesign, decodeDesign, buildShareUrl } from '@/utils/shareUrl';
 import { createContainer } from '@/types/factories';
 import { ContainerSize } from '@/types/container';
 
 function makeContainerRecord(...containers: ReturnType<typeof createContainer>[]) {
-  const record: Record<string, ReturnType<typeof createContainer>> = {};
-  for (const c of containers) {
-    record[c.id] = c;
-  }
-  return record;
+  return Object.fromEntries(containers.map((c) => [c.id, c]));
 }
 
 describe('shareUrl', () => {
@@ -115,14 +112,11 @@ describe('shareUrl', () => {
     });
 
     it('returns null for valid LZ but invalid JSON structure', () => {
-      // Encode a non-design object
-      const LZString = require('lz-string');
       const encoded = LZString.compressToEncodedURIComponent(JSON.stringify({ foo: 'bar' }));
       expect(decodeDesign(encoded)).toBeNull();
     });
 
     it('returns null for valid LZ with non-JSON content', () => {
-      const LZString = require('lz-string');
       const encoded = LZString.compressToEncodedURIComponent('not json at all');
       expect(decodeDesign(encoded)).toBeNull();
     });

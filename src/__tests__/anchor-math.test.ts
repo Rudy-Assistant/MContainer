@@ -1,6 +1,3 @@
-/**
- * anchorMath.ts — Pure math tests for anchor-to-position conversion.
- */
 import { describe, it, expect } from 'vitest';
 import {
   anchorToLocalPosition,
@@ -8,12 +5,7 @@ import {
   localToWorld,
   localRotToWorld,
 } from '@/utils/anchorMath';
-import {
-  ContainerSize,
-  CONTAINER_DIMENSIONS,
-  VOXEL_COLS,
-  VOXEL_ROWS,
-} from '@/types/container';
+import { ContainerSize, CONTAINER_DIMENSIONS } from '@/types/container';
 import { createContainer } from '@/types/factories';
 import type { SceneObject } from '@/types/sceneObject';
 
