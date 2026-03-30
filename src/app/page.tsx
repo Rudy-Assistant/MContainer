@@ -6,7 +6,6 @@ import { useStore } from "@/store/useStore";
 import { ContainerSize, ViewMode } from "@/types/container";
 import { useFrameStore } from "@/store/frameStore";
 import Sidebar from "@/components/ui/Sidebar";
-import BottomDock from "@/components/ui/BottomDock";
 import BudgetModal from "@/components/ui/BudgetModal";
 import WizardModal from "@/components/ui/WizardModal";
 import StructureEditorModal from "@/components/ui/StructureEditorModal";

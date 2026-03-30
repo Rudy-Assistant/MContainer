@@ -170,11 +170,9 @@ export interface ContainerSlice {
   setBayModule: (containerId: string, wall: WallSide, bayIndex: number, module: WallModule) => void;
   toggleBayOpen: (containerId: string, wall: WallSide, bayIndex: number) => void;
   cycleBayModule: (containerId: string, wall: WallSide, bayIndex: number) => void;
-  toggleBayLock: (containerId: string, wall: WallSide, bayIndex: number) => void;
   setAllOuterWalls: (preset: 'solid' | 'glass' | 'fold_down' | 'fold_up' | 'gull' | 'open') => void;
   setOuterWallType: (containerId: string, wall: WallSide, bayIndex: number, outerWall: 'railing' | 'glass' | 'solid' | 'closet' | 'none') => void;
   setSideWallType: (containerId: string, wall: WallSide, bayIndex: number, sideWall: 'railing' | 'glass' | 'solid' | 'closet' | 'none' | undefined) => void;
-  setBayColor: (containerId: string, wall: WallSide, bayIndex: number, color: string | undefined) => void;
 
   // ── Adjacency ─────────────────────────────────────────────
   refreshAdjacency: () => void;
@@ -1055,26 +1053,6 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     });
   },
 
-  toggleBayLock: (containerId, wall, bayIndex) => {
-    set((s) => {
-      const container = s.containers[containerId];
-      if (!container) return s;
-      const wallConfig = { ...container.walls[wall] };
-      const bays = [...wallConfig.bays];
-      const bay = bays[bayIndex];
-      bays[bayIndex] = { ...bay, locked: !bay.locked };
-      return {
-        containers: {
-          ...s.containers,
-          [containerId]: {
-            ...container,
-            walls: { ...container.walls, [wall]: { ...wallConfig, bays } },
-          },
-        },
-      };
-    });
-  },
-
   setAllOuterWalls: (preset) => {
 
     set((s) => {
@@ -1871,28 +1849,6 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       const bay = bays[bayIndex];
       if (bay.module.type !== ModuleType.HingedWall) return s;
       bays[bayIndex] = { ...bay, module: { ...bay.module, sideWall } };
-      return {
-        containers: {
-          ...s.containers,
-          [containerId]: {
-            ...container,
-            walls: { ...container.walls, [wall]: { ...wallConfig, bays } },
-          },
-        },
-        };
-    });
-  },
-
-  setBayColor: (containerId, wall, bayIndex, color) => {
-
-    set((s) => {
-      const container = s.containers[containerId];
-      if (!container) return s;
-      const wallConfig = { ...container.walls[wall] };
-      const bays = [...wallConfig.bays];
-      const bay = bays[bayIndex];
-      const m = { ...bay.module, color } as typeof bay.module;
-      bays[bayIndex] = { ...bay, module: m };
       return {
         containers: {
           ...s.containers,
