@@ -26,6 +26,7 @@ import {
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
 import { HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
+import { SURFACE_COLORS } from "@/config/surfaceLabels";
 import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
 // Color legend removed — grid cells are transparent, highlight on hover/select only
 
@@ -840,7 +841,7 @@ function SimpleBayGrid({
                   onClick={(e) => {
                     e.stopPropagation();
                     selectWithFace(
-                      { type: 'bay-face', items: groupIndicesAtLevel.map(i => ({ containerId, id: String(i) })) },
+                      { type: 'bay', items: groupIndicesAtLevel.map(i => ({ containerId, id: String(i) })) },
                       face as keyof VoxelFaces,
                     );
                   }}
