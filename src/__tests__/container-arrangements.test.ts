@@ -25,6 +25,7 @@ describe('container arrangements', () => {
     const grid = useStore.getState().containers[id].voxelGrid!;
 
     expect(grid.filter((voxel) => voxel.active)).toHaveLength(64);
+    expect(grid[idx(1, 1)].faces.top).toBe('Solid_Steel');
     expect(grid[idx(1, 1)].faces.w).toBe('Open');
     expect(grid[idx(1, 1)].faces.e).toBe('Open');
     expect(grid[idx(0, 1)].faces.n).toBe('Solid_Steel');
@@ -38,6 +39,7 @@ describe('container arrangements', () => {
     const grid = useStore.getState().containers[id].voxelGrid!;
 
     expect(grid[idx(0, 1)].faces.n).toBe('Glass_Pane');
+    expect(grid[idx(0, 1)].faces.top).toBe('Solid_Steel');
     expect(grid[idx(3, 6)].faces.s).toBe('Glass_Pane');
     expect(grid[idx(1, 1)].faces.n).toBe('Open');
   });

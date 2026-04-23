@@ -18,13 +18,13 @@ export const CONTAINER_LEVEL_PRESETS: ContainerLevelPreset[] = [
     id: 'max_closed',
     label: 'Max Box',
     title: 'Maximum closed interior',
-    faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
+    faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
   },
   {
     id: 'largest_glass',
     label: 'Glass Box',
     title: 'Largest glass interior',
-    faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Glass_Pane', s: 'Glass_Pane', e: 'Glass_Pane', w: 'Glass_Pane' },
+    faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Glass_Pane', s: 'Glass_Pane', e: 'Glass_Pane', w: 'Glass_Pane' },
   },
   {
     id: 'wraparound_deck',

@@ -10,6 +10,7 @@ import {
   Sky,
   Environment,
   CubeCamera,
+  ContactShadows,
   Stars,
   Html,
 } from "@react-three/drei";
@@ -166,23 +167,23 @@ function SunLight() {
         castShadow
         color={color}
         position={timeOfDay >= 5 && timeOfDay <= 21 ? [Math.max(sunPos.x, -80), Math.max(sunPos.y, 2.0), sunPos.z] : [20, 40, 20]}
-        intensity={Math.min(Math.max(intensity * 0.65, 0.18), 1.25)}
+        intensity={Math.min(Math.max(intensity * 0.72, 0.2), 1.3)}
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
-        shadow-bias={-0.0005}
-        shadow-normalBias={0.0005}
-        shadow-camera-left={-50}
-        shadow-camera-right={50}
-        shadow-camera-top={50}
-        shadow-camera-bottom={-50}
+        shadow-bias={-0.00015}
+        shadow-normalBias={0.0002}
+        shadow-camera-left={-60}
+        shadow-camera-right={60}
+        shadow-camera-top={60}
+        shadow-camera-bottom={-60}
         shadow-camera-near={0.5}
-        shadow-camera-far={120}
+        shadow-camera-far={140}
       />
       <ambientLight
-        intensity={Math.max(intensity * 0.3, 0.18)}
+        intensity={Math.max(intensity * 0.16, 0.08)}
         color={timeOfDay > 5 && timeOfDay < 21 ? 0xd0e0f8 : 0x080818}
       />
       <hemisphereLight
-        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.26, 0.14)]}
+        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.14, 0.06)]}
       />
     </>
   );
@@ -476,7 +477,7 @@ import { isNight as isNightTime, isGoldenHour as isGoldenHourTime, isDeepTwiligh
 
 const FOG_NIGHT = { color: '#060614', near: 60, far: 200 } as const;
 const FOG_GOLDEN = { color: '#d4c4a8', near: 60, far: 180 } as const;
-const FOG_DAY = { color: '#a8c0d0', near: 60, far: 180 } as const;
+const FOG_DAY = { color: '#8fb3c8', near: 90, far: 260 } as const;
 
 function getFogParams(t: number) {
   if (isNightTime(t)) return FOG_NIGHT;
@@ -500,10 +501,10 @@ export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
   return {
-    rayleigh: deepTwilight ? 3.5 : goldenHour ? 2.7 : 2.8,
-    turbidity: deepTwilight ? 7 : goldenHour ? 3.8 : 1.2,
-    mieCoefficient: goldenHour ? 0.006 : 0.001,
-    mieDirectionalG: goldenHour ? 0.86 : 0.7,
+    rayleigh: deepTwilight ? 3.0 : goldenHour ? 2.35 : 2.2,
+    turbidity: deepTwilight ? 5.0 : goldenHour ? 2.4 : 0.8,
+    mieCoefficient: goldenHour ? 0.0025 : 0.0005,
+    mieDirectionalG: goldenHour ? 0.72 : 0.65,
   };
 }
 
@@ -585,6 +586,25 @@ function SceneFog() {
   }, [fog]);
 
   return <fog ref={fogRef} attach="fog" args={[fog.color, fog.near, fog.far]} />;
+}
+
+function GroundContactShadows() {
+  const qualityPreset = useStore((s) => s.qualityPreset);
+  const viewMode = useStore((s) => s.viewMode);
+
+  if (qualityPreset === 'low' || viewMode === ViewMode.Blueprint) return null;
+
+  return (
+    <ContactShadows
+      position={[0, 0.015, 0]}
+      opacity={0.16}
+      scale={140}
+      blur={2.2}
+      far={70}
+      resolution={1024}
+      color="#000000"
+    />
+  );
 }
 
 // ── Keyboard Shortcuts ──────────────────────────────────────
@@ -1389,12 +1409,12 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
       <ValidationSubscriber />
 
       {/* Phase 8: HDRI environment for PBR reflections (visible corrugation reflections) */}
-      <TimeOfDayEnvironment intensity={0.45} />
+      <TimeOfDayEnvironment intensity={0.28} />
 
       {/* Distance fog — softens horizon edge */}
       <SceneFog />
 
-      {/* ContactShadows removed — caused ground afterburn artifact (Sprint 8 fix re-applied) */}
+      <GroundContactShadows />
 
       {/* Clouds REMOVED — see SkyDome comment above */}
 
@@ -2058,7 +2078,7 @@ function WalkthroughScene() {
       <GroundManager />
 
       {/* Phase 8: HDRI environment for PBR reflections */}
-      <TimeOfDayEnvironment intensity={0.45} />
+      <TimeOfDayEnvironment intensity={0.28} />
 
       {visibleContainers.map((container) => (
         <ContainerMesh key={container.id} container={container} />

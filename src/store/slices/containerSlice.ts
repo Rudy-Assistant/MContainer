@@ -828,7 +828,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             if (arrangementId === 'max_closed' || arrangementId === 'largest_glass') {
               const wall = arrangementId === 'largest_glass' ? 'Glass_Pane' : 'Solid_Steel';
               const faces: VoxelFaces = level === 0
-                ? exteriorPerimeterFaces(row, col, wall, 'Open', 'Deck_Wood')
+                ? exteriorPerimeterFaces(row, col, wall, 'Solid_Steel', 'Deck_Wood')
                 : { ...openFaces(), top: 'Solid_Steel', bottom: 'Solid_Steel' };
               setCell(idx, true, faces, animateExtension);
               continue;
