@@ -19,7 +19,6 @@ import {
   VOXEL_COLS,
   VOXEL_ROWS,
   VOXEL_LEVELS,
-  VOXEL_CORE_ROWS,
 } from "./container";
 
 // ── Module Factories ────────────────────────────────────────

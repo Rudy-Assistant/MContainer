@@ -33,7 +33,7 @@ export default function LevelSlicer() {
   }, [expanded]);
 
   // Derive level extents from the shallow-compared level array
-  const { maxLevel, minLevel, occupiedLevels } = useMemo(() => {
+  const { maxLevel, occupiedLevels } = useMemo(() => {
     let max = 0, min = 0;
     const occupied = new Set<number>();
     for (const lvl of containerLevels) {
@@ -41,7 +41,7 @@ export default function LevelSlicer() {
       if (lvl < min) min = lvl;
       occupied.add(lvl);
     }
-    return { maxLevel: max, minLevel: min, occupiedLevels: occupied };
+    return { maxLevel: max, occupiedLevels: occupied };
   }, [containerLevels]);
 
   const topLevel = Math.max(maxLevel, 1);

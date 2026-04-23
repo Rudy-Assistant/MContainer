@@ -3,10 +3,8 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback, useReducer } from "react";
 import * as THREE from "three";
 import { useFrame, useThree, ThreeEvent } from "@react-three/fiber";
-import { Html, Text, useGLTF } from "@react-three/drei";
-import { createSelectionGlowMaterial } from "./materials/SelectionGlow";
+import { Html, useGLTF } from "@react-three/drei";
 import ContainerSkin, { getVoxelLayout } from "@/components/objects/ContainerSkin";
-import { detectOverlappingEdges } from "@/utils/edgeDetection";
 import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
 import {
   type Container,
@@ -162,12 +160,6 @@ const frameSemiMat = new THREE.MeshStandardMaterial({
   opacity: 0.3,
   depthWrite: false,
 });
-// Permanent hitbox for hidden frame elements — invisible but raycastable
-const frameHitMat = new THREE.MeshBasicMaterial({
-  transparent: true, opacity: 0.001, colorWrite: false, depthWrite: false,
-  side: THREE.DoubleSide,
-});
-
 // Phase 8: Hinge exterior — matches upgraded steel PBR
 const hingeExterior = new THREE.MeshStandardMaterial({
   color: 0x8a9199,
@@ -201,6 +193,15 @@ const roofMat = new THREE.MeshStandardMaterial({
   normalMap: corrugationNormal,
   normalScale: new THREE.Vector2(0.8, 0.8),
 });
+
+type OpacityMaterial = THREE.Material & {
+  opacity: number;
+  transparent: boolean;
+};
+
+function hasOpacity(material: THREE.Material): material is OpacityMaterial {
+  return "opacity" in material && typeof material.opacity === "number";
+}
 
 // Wood panel materials for wall cladding
 const woodPanelLight = new THREE.MeshStandardMaterial({
@@ -283,7 +284,6 @@ function getFloorMaterial(fm: FloorMaterialType | undefined): THREE.MeshStandard
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════
 
-const BAY_WIDTH = 1.5;
 const HINGE_RADIUS = 0.035;
 const PANEL_THICKNESS = 0.06;
 const ANIM_SPEED = 1.2;
@@ -397,8 +397,11 @@ function InteractiveRailingEdge({
     } else if (glowRef.current > 0) {
       glowRef.current = Math.max(0, glowRef.current - delta * 2.5);
     }
-    glowMat.opacity = glowRef.current * 0.3;
     if (glowMeshRef.current) {
+      const material = glowMeshRef.current.material;
+      if (material instanceof THREE.MeshBasicMaterial) {
+        material.opacity = glowRef.current * 0.3;
+      }
       glowMeshRef.current.visible = glowRef.current > 0.01;
     }
   });
@@ -470,8 +473,11 @@ function InteractiveExtensionOverlay({
     } else if (glowRef.current > target) {
       glowRef.current = Math.max(target, glowRef.current - delta * 2.5);
     }
-    glowMat.opacity = glowRef.current * 0.4;
     if (glowMeshRef.current) {
+      const material = glowMeshRef.current.material;
+      if (material instanceof THREE.MeshBasicMaterial) {
+        material.opacity = glowRef.current * 0.4;
+      }
       glowMeshRef.current.visible = true; // always visible (idle glow)
     }
   });
@@ -749,11 +755,9 @@ function HingedBayFoldDown({
 function HingedBayFoldUp({
   mod, wallHeight, bayWidth, foldFlip = false,
   containerId, wallSide, bayIndex, bayCount = 1,
-  adjacentDeckAtFirst = false, adjacentDeckAtLast = false,
 }: {
   mod: HingedWallType; wallHeight: number; bayWidth: number; foldFlip?: boolean;
   containerId?: string; wallSide?: WallSide; bayIndex?: number; bayCount?: number;
-  adjacentDeckAtFirst?: boolean; adjacentDeckAtLast?: boolean;
 }) {
   const targetAngle = mod.openAmount * (Math.PI / 2) * (foldFlip ? -1 : 1);
   const outwardSign = foldFlip ? 1 : -1;
@@ -999,9 +1003,10 @@ function GlassBay({ wallHeight, bayWidth }: { wallHeight: number; bayWidth: numb
 }
 
 // ═══════════════════════════════════════════════════════════════
-// BAY MODULE — Dispatcher
+// BAY MODULE — Legacy wall dispatcher retained for reference
 // ═══════════════════════════════════════════════════════════════
 
+/* eslint-disable react-hooks/refs -- Legacy wall animation mutates refs during render; inactive while ContainerSkin owns wall rendering. */
 function BayModule({
   bay, wallHeight, bayWidth, position, rotation,
   containerId, wallSide, bayIndex, bayCount,
@@ -1078,8 +1083,11 @@ function BayModule({
     } else if (glowRef.current > 0) {
       glowRef.current = Math.max(0, glowRef.current - delta * 2.5);
     }
-    glowMat.opacity = glowRef.current * 0.35;
     if (glowMeshRef.current) {
+      const material = glowMeshRef.current.material;
+      if (material instanceof THREE.MeshBasicMaterial) {
+        material.opacity = glowRef.current * 0.35;
+      }
       glowMeshRef.current.visible = glowRef.current > 0.01;
     }
   });
@@ -1142,11 +1150,14 @@ function BayModule({
     </group>
   );
 }
+/* eslint-enable react-hooks/refs */
 
 // ═══════════════════════════════════════════════════════════════
 // WALL ASSEMBLY
 // ═══════════════════════════════════════════════════════════════
 
+// Legacy renderer retained for reference while ContainerSkin owns wall rendering.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function WallAssembly({
   wall,
   containerDims,
@@ -1465,21 +1476,22 @@ function isMetalLike(mat: THREE.MeshStandardMaterial): boolean {
 function applyThemeToFurniture(obj: THREE.Object3D, theme: string) {
   const cfg = FURNITURE_THEME_CONFIGS[theme];
   if (!cfg) return;
-  obj.traverse((child: any) => {
-    if (!child.isMesh || !child.material) return;
-    const origMat = child.material as THREE.MeshStandardMaterial;
+  obj.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.material) return;
+    const origMat = mesh.material as THREE.MeshStandardMaterial;
     if (!origMat.color) return;
     // Only clone + modify if classification matches (avoid unnecessary clones)
     if (isMetalLike(origMat)) {
       const mat = origMat.clone();
       mat.color.set(cfg.metal);
       mat.roughness = cfg.metalRoughness;
-      child.material = mat;
+      mesh.material = mat;
     } else if (isWoodLike(origMat)) {
       const mat = origMat.clone();
       mat.color.set(cfg.wood);
       mat.roughness = cfg.woodRoughness;
-      child.material = mat;
+      mesh.material = mat;
     }
   });
 }
@@ -1501,11 +1513,12 @@ function GLBModel({ glb, dims }: { glb: string; dims: { length: number; width: n
       const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scaleFactor);
       c.position.sub(center);
     }
-    c.traverse((child: any) => {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        child.raycast = nullRaycast;
+    c.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (mesh.isMesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.raycast = nullRaycast;
       }
     });
     applyThemeToFurniture(c, theme);
@@ -1515,6 +1528,8 @@ function GLBModel({ glb, dims }: { glb: string; dims: { length: number; width: n
 }
 
 function FurniturePiece({ item }: { item: FurnitureItem }) {
+  const showLabels = useStore((s) => s.showFurnitureLabels);
+
   // Stairs get special staircase geometry
   if (item.type === FurnitureType.Stairs) {
     return <StaircasePiece item={item} />;
@@ -1523,8 +1538,7 @@ function FurniturePiece({ item }: { item: FurnitureItem }) {
   const catalog = FURNITURE_CATALOG.find((c) => c.type === item.type);
   if (!catalog) return null;
 
-  const showLabels = useStore((s) => s.showFurnitureLabels);
-  const { length, width, height } = catalog.dims;
+  const { height } = catalog.dims;
   const useGlb = catalog.glb && !_failedGlbs.has(catalog.glb);
 
   return (
@@ -1564,18 +1578,6 @@ function FurniturePiece({ item }: { item: FurnitureItem }) {
 // ═══════════════════════════════════════════════════════════════
 // CORNER DECK PIECES — fills gap where two adjacent deployed decks meet
 // ═══════════════════════════════════════════════════════════════
-
-const OUTER_WALL_CYCLE_3D: Array<'railing' | 'glass' | 'solid' | 'closet' | 'none'> =
-  ['railing', 'glass', 'solid', 'closet', 'none'];
-
-// Hover glow material for interactive corner pieces
-const cornerHoverGlow = new THREE.MeshBasicMaterial({
-  color: 0x66bb6a,
-  transparent: true,
-  opacity: 0.25,
-  depthWrite: false,
-});
-
 
 // ═══════════════════════════════════════════════════════════════
 // FLOOR PLATE WITH STAIRCASE HOLES
@@ -1758,7 +1760,6 @@ function FloorPlate({ container, dims }: { container: Container; dims: { length:
 interface FrameProps {
   container: Container;
   dims: { length: number; width: number; height: number };
-  hoveredElement: string | null;
   setHoveredElement: (key: string | null) => void;
 }
 
@@ -1766,7 +1767,7 @@ interface FrameProps {
 const PROXY_SIZE = 0.4;
 
 /** 4 corner posts — individually hoverable + right-click to toggle visibility */
-function FramePosts({ container, dims, hoveredElement, setHoveredElement }: FrameProps) {
+function FramePosts({ container, dims, setHoveredElement }: FrameProps) {
   const toggleStructuralElement = useStore((s) => s.toggleStructuralElement);
   const wallCutMode = useStore((s) => s.wallCutMode);
   const wallCutHeight = useStore((s) => s.wallCutHeight);
@@ -1821,7 +1822,7 @@ function FramePosts({ container, dims, hoveredElement, setHoveredElement }: Fram
 }
 
 /** 8 edge beams (4 top + 4 bottom) — individually hoverable + right-click to toggle visibility */
-function FrameBeams({ container, dims, hoveredElement, setHoveredElement }: FrameProps) {
+function FrameBeams({ container, dims }: Omit<FrameProps, "setHoveredElement">) {
   const toggleStructuralElement = useStore((s) => s.toggleStructuralElement);
   const wallCutMode = useStore((s) => s.wallCutMode);
   const wallCutHeight = useStore((s) => s.wallCutHeight);
@@ -1994,8 +1995,6 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
   const selectedVoxels = useSelectedVoxels();
   const selectedFace = useStore((s) => s.selectedFace);
   const hoveredObjectId = useStore((s) => s.hoveredObjectId);
-  // Suppress voxel hover when a SceneObject is hovered (avoid competing highlights)
-  if (hoveredObjectId) return null;
   const dims = CONTAINER_DIMENSIONS[container.size];
   const vHeight = dims.height;
   const vOffset = vHeight / 2;
@@ -2007,7 +2006,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
   }, [vHeight]);
 
   // Collect highlights: individual entries + merged AABB boxes for bay groups
-  const { individualHighlights, mergedHoverBox, mergedSelectBox } = useMemo(() => {
+  const { individualHighlights, mergedHoverBox, mergedSelectBox } = (() => {
     const result: { idx: number; isHover: boolean; isSelect: boolean }[] = [];
     // Track which voxels are part of bay groups (skip their individual wireframes)
     const bayGroupIndices = new Set<number>();
@@ -2026,7 +2025,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
       if (!hoveredVoxel.isExtension && hoveredVoxel.index !== undefined) {
         hoverIdx = hoveredVoxel.index;
       } else if (hoveredVoxel.isExtension) {
-        hoverIdx = (hoveredVoxel as any).row * VOXEL_COLS + (hoveredVoxel as any).col;
+        hoverIdx = hoveredVoxel.row * VOXEL_COLS + hoveredVoxel.col;
       }
     }
     if (hoverIdx < 0 && hoveredVoxelEdge && hoveredVoxelEdge.containerId === container.id) {
@@ -2042,7 +2041,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
       if (!selectedVoxel.isExtension && selectedVoxel.index !== undefined) {
         selIdx = selectedVoxel.index;
       } else if (selectedVoxel.isExtension) {
-        selIdx = (selectedVoxel as any).row * VOXEL_COLS + (selectedVoxel as any).col;
+        selIdx = selectedVoxel.row * VOXEL_COLS + selectedVoxel.col;
       }
     }
     if (selIdx >= 0 && !bayGroupIndices.has(selIdx)) {
@@ -2062,7 +2061,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
     }
 
     return { individualHighlights: result, mergedHoverBox: mHover, mergedSelectBox: mSelect };
-  }, [hoveredVoxel, hoveredVoxelEdge, hoveredBayGroup, selectedVoxel, selectedVoxels, container.id, dims]);
+  })();
 
   // Determine which wall face is hovered (for amber wall overlay)
   const hoveredFace = (hoveredVoxelEdge && hoveredVoxelEdge.containerId === container.id)
@@ -2075,9 +2074,12 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
     if (!selectedVoxel.isExtension && selectedVoxel.index !== undefined) {
       selectedVoxelIdx = selectedVoxel.index;
     } else if (selectedVoxel.isExtension) {
-      selectedVoxelIdx = (selectedVoxel as any).row * VOXEL_COLS + (selectedVoxel as any).col;
+      selectedVoxelIdx = selectedVoxel.row * VOXEL_COLS + selectedVoxel.col;
     }
   }
+
+  // Suppress voxel hover when a SceneObject is hovered (avoid competing highlights)
+  if (hoveredObjectId) return null;
 
   if (individualHighlights.length === 0 && !mergedHoverBox && !mergedSelectBox) return null;
 
@@ -2395,12 +2397,10 @@ export default function ContainerMesh({ container }: { container: Container }) {
   const startContainerDrag = useStore((s) => s.startContainerDrag);
   const dragMovingId = useStore((s) => s.dragMovingId);
   const viewMode = useStore((s) => s.viewMode);
-  const openContainerContextMenu = useStore((s) => s.openContainerContextMenu);
-  const toggleStructuralElement = useStore((s) => s.toggleStructuralElement);
   const isSelected = selection.includes(container.id);
   const isBeingDragged = dragMovingId === container.id;
   const [hovered, setHovered] = useState(false);
-  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+  const [, setHoveredElement] = useState<string | null>(null);
   const dragPendingRef = useRef<{ id: string; clientX: number; clientY: number } | null>(null);
   const { gl } = useThree();
 
@@ -2462,7 +2462,7 @@ export default function ContainerMesh({ container }: { container: Container }) {
   }, [startContainerDrag, gl]);
 
   // During drag: dim the original container to 30% opacity so user sees where they're dragging FROM.
-  const _savedOpacities = useRef<Map<THREE.Material, { opacity: number; transparent: boolean }>>(new Map());
+  const _savedOpacities = useRef<Map<OpacityMaterial, { opacity: number; transparent: boolean }>>(new Map());
   useEffect(() => {
     if (!groupRef.current) return;
     const saved = _savedOpacities.current;
@@ -2473,17 +2473,18 @@ export default function ContainerMesh({ container }: { container: Container }) {
         if (!mesh.isMesh) return;
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         for (const m of mats) {
+          if (!hasOpacity(m)) continue;
           if (!saved.has(m)) {
-            saved.set(m, { opacity: (m as any).opacity ?? 1, transparent: m.transparent });
+            saved.set(m, { opacity: m.opacity, transparent: m.transparent });
           }
           m.transparent = true;
-          (m as any).opacity = 0.3;
+          m.opacity = 0.3;
         }
       });
     } else if (saved.size > 0) {
       // Restore all materials
       for (const [m, orig] of saved) {
-        (m as any).opacity = orig.opacity;
+        m.opacity = orig.opacity;
         m.transparent = orig.transparent;
       }
       saved.clear();
@@ -2528,8 +2529,8 @@ export default function ContainerMesh({ container }: { container: Container }) {
       <ContainerRoof container={container} dims={dims} />
 
       {/* Structural frame — individually interactive posts and beams */}
-      <FramePosts container={container} dims={dims} hoveredElement={hoveredElement} setHoveredElement={setHoveredElement} />
-      <FrameBeams container={container} dims={dims} hoveredElement={hoveredElement} setHoveredElement={setHoveredElement} />
+      <FramePosts container={container} dims={dims} setHoveredElement={setHoveredElement} />
+      <FrameBeams container={container} dims={dims} />
 
       {/* ★ PHASE 1: Legacy WallAssembly DISABLED — ContainerSkin is the sole authority.
           Legacy panels (SolidBay, GlassBay, HingedWall) rendered at identical positions

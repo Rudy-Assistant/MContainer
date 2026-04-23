@@ -60,16 +60,15 @@ export function HoverPreviewGhost() {
 function HoverPreviewGhostInner({ formId }: { formId: string }) {
   const form = formRegistry.get(formId);
   const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
-
-  if (!materialRef.current) {
-    materialRef.current = new THREE.MeshStandardMaterial({
+  const previewMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({
       color: PREVIEW_COLOR,
       transparent: true,
       opacity: PREVIEW_OPACITY,
       depthWrite: false,
-    });
-  }
+    }),
+    []
+  );
 
   const geometry = useMemo(() => {
     if (!form) return new THREE.BoxGeometry(0.5, 1, 0.1);
@@ -77,10 +76,7 @@ function HoverPreviewGhostInner({ formId }: { formId: string }) {
   }, [form]);
 
   useEffect(() => () => { geometry.dispose(); }, [geometry]);
-  useEffect(() => {
-    const mat = materialRef.current;
-    return () => { mat?.dispose(); };
-  }, []);
+  useEffect(() => () => { previewMaterial.dispose(); }, [previewMaterial]);
 
   useFrame(() => {
     const mesh = meshRef.current;
@@ -129,7 +125,7 @@ function HoverPreviewGhostInner({ formId }: { formId: string }) {
     <mesh
       ref={meshRef}
       geometry={geometry}
-      material={materialRef.current!}
+      material={previewMaterial}
       visible={false}
       raycast={() => {}}
     />
@@ -150,12 +146,6 @@ const GLASS_SURFACES: ReadonlySet<SurfaceType> = new Set([
   'Window_Standard', 'Window_Sill', 'Window_Clerestory',
 ]);
 const _activeGhostMats: THREE.Material[] = [];
-
-function ghostMatForSurface(surfaceType: SurfaceType): THREE.MeshBasicMaterial | null {
-  if (surfaceType === 'Open') return null;
-  if (GLASS_SURFACES.has(surfaceType)) return _ghostMats.glass;
-  return _ghostMats.solid;
-}
 
 // Reusable pool: avoid creating/destroying meshes every frame
 const GHOST_POOL_SIZE = 48; // max 8 voxels × 6 faces
@@ -362,22 +352,18 @@ const STAMP_THICKNESS = 0.02;
 
 function StampGhost() {
   const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.MeshBasicMaterial | null>(null);
-
-  if (!materialRef.current) {
-    materialRef.current = new THREE.MeshBasicMaterial({
+  const stampMaterial = useMemo(
+    () => new THREE.MeshBasicMaterial({
       color: STAMP_COLOR,
       transparent: true,
       opacity: 0.2,
       depthWrite: false,
       side: THREE.DoubleSide,
-    });
-  }
+    }),
+    []
+  );
 
-  useEffect(() => {
-    const mat = materialRef.current;
-    return () => { mat?.dispose(); };
-  }, []);
+  useEffect(() => () => { stampMaterial.dispose(); }, [stampMaterial]);
 
   useFrame(() => {
     const mesh = meshRef.current;
@@ -437,7 +423,7 @@ function StampGhost() {
     <mesh
       ref={meshRef}
       geometry={unitBox}
-      material={materialRef.current!}
+      material={stampMaterial}
       visible={false}
       raycast={() => {}}
     />

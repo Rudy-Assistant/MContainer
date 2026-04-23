@@ -9,11 +9,15 @@ import { ViewMode } from '@/types/container';
 import { type ThemeId, THEMES, STYLE_TO_THEME_MAP, THEME_TO_STYLE_MAP } from '@/config/themes';
 import { type QualityPresetId } from '@/config/qualityPresets';
 import type { StyleId } from '@/types/sceneObject';
+import type { SliceSet } from './types';
 
-// Use a lazy StoreState reference to avoid circular imports.
-// The slice function receives set/get typed to the full store.
-type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
-type Get = () => any;
+type EnvironmentRuntimeState = EnvironmentSlice & {
+  selection: string[];
+  hoveredEdge: unknown;
+  overlappingEdges: unknown;
+};
+
+type Set = SliceSet<EnvironmentRuntimeState>;
 
 export interface EnvironmentSlice {
   // Environment (persisted in `environment` object)
@@ -52,7 +56,7 @@ export interface EnvironmentSlice {
   setQualityPreset: (preset: QualityPresetId) => void;
 }
 
-export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => ({
+export const createEnvironmentSlice = (set: Set): EnvironmentSlice => ({
   // ── Initial State ──────────────────────────────────────
   environment: { timeOfDay: 15, northOffset: 0, groundPreset: 'grass' },
   viewMode: ViewMode.Realistic3D,
@@ -66,17 +70,17 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
 
   // ── Actions ────────────────────────────────────────────
   setTimeOfDay: (time) =>
-    set((s: any) => ({
+    set((s) => ({
       environment: { ...s.environment, timeOfDay: Math.max(0, Math.min(24, time)) },
     })),
 
   setNorthOffset: (degrees) =>
-    set((s: any) => ({
+    set((s) => ({
       environment: { ...s.environment, northOffset: ((degrees % 360) + 360) % 360 },
     })),
 
   setGroundPreset: (preset) =>
-    set((s: any) => ({
+    set((s) => ({
       environment: { ...s.environment, groundPreset: preset },
     })),
 
@@ -95,14 +99,14 @@ export const createEnvironmentSlice = (set: Set, get: Get): EnvironmentSlice => 
 
   setTheme: (theme) => {
     const themeConfig = THEMES[theme];
-    set((s: any) => ({
+    set((s) => ({
       currentTheme: theme,
       activeStyle: THEME_TO_STYLE_MAP[theme] ?? 'industrial',
       environment: { ...s.environment, groundPreset: themeConfig.groundPreset },
     }));
   },
 
-  setActiveStyle: (style) => set((s: any) => {
+  setActiveStyle: (style) => set((s) => {
     // Sync legacy currentTheme if a mapping exists
     const legacyTheme = STYLE_TO_THEME_MAP[style];
     // Update ground preset to match theme

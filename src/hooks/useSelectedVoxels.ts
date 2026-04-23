@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { useMemo } from 'react';
 import { useStore } from '@/store/useStore';
 import { useShallow } from 'zustand/react/shallow';
+import type { StoreState } from '@/store/useStore';
+import type { SelectedElements } from '@/store/slices/selectionSlice';
 
-function deriveVoxels(sel: { type: string; items: Array<{ containerId: string; id: string }> } | null): { containerId: string; indices: number[] } | null {
+function deriveVoxels(sel: SelectedElements): { containerId: string; indices: number[] } | null {
   if (!sel) return null;
   if (sel.type !== 'bay') return null;
   const containerId = sel.items[0]?.containerId ?? '';
@@ -11,28 +13,13 @@ function deriveVoxels(sel: { type: string; items: Array<{ containerId: string; i
   return { containerId, indices };
 }
 
-function voxelsEqual(
-  a: { containerId: string; indices: number[] } | null,
-  b: { containerId: string; indices: number[] } | null,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.containerId !== b.containerId) return false;
-  if (a.indices.length !== b.indices.length) return false;
-  return a.indices.every((v, i) => v === b.indices[i]);
-}
-
 /**
  * Derives legacy selectedVoxels shape from selectedElements (bay type only).
  * Uses useShallow for stable subscription, derives in component body.
  */
 export function useSelectedVoxels(): { containerId: string; indices: number[] } | null {
-  const selectedElements = useStore(useShallow((s: any) => s.selectedElements));
-  const prevRef = useRef<{ containerId: string; indices: number[] } | null>(null);
-  const next = deriveVoxels(selectedElements);
-  if (voxelsEqual(next, prevRef.current)) return prevRef.current!;
-  prevRef.current = next;
-  return next;
+  const selectedElements = useStore(useShallow((s: StoreState) => s.selectedElements));
+  return useMemo(() => deriveVoxels(selectedElements), [selectedElements]);
 }
 
 /**

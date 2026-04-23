@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useStore } from "@/store/useStore";
 import { ContainerSize, ModuleType, type PricingConfig } from "@/types/container";
 import defaultPricing from "@/config/pricing_config.json";

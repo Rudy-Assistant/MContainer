@@ -24,7 +24,7 @@ import { createLibrarySlice, type LibrarySlice, setLibraryTemporalAccessor } fro
 import { createVoxelSlice, type VoxelSlice, setVoxelStoreRef, recomputeSmartRailings } from "./slices/voxelSlice";
 import { createContainerSlice, type ContainerSlice, setContainerTemporalAccessor } from "./slices/containerSlice";
 import { createSceneObjectSlice, type SceneObjectSlice } from "./slices/sceneObjectSlice";
-import { THEMES } from "@/config/themes";
+import { THEMES, type ThemeId } from "@/config/themes";
 
 // ── Voxel Target Union ─────────────────────────────────────
 /** Standard voxel reference (maps to a real grid index). */
@@ -159,17 +159,41 @@ export function autoStairAscending(
 // ── Store ───────────────────────────────────────────────────
 
 export type StoreState = AppState & EnvironmentSlice & UiSlice & SelectionSlice & DragSlice & LibrarySlice & VoxelSlice & ContainerSlice & SceneObjectSlice & { _hasHydrated: boolean };
+type LegacyVoxel = Voxel & { stairDir?: string };
+type DevWindow = Window & typeof globalThis & { __store?: typeof useStore };
 
 export const useStore = create<StoreState>()(persist(temporal(immer((set, get) => ({
   // ── Slices ─────────────────────────────────────────────
-  ...createEnvironmentSlice(set as any, get as any),
-  ...createUiSlice(set as any, get as any),
-  ...createSelectionSlice(set as any, get as any),
-  ...createDragSlice(set as any, get as any),
-  ...createLibrarySlice(set as any, get as any, DEFAULT_HOTBAR),
-  ...createVoxelSlice(set as any, get as any),
-  ...createContainerSlice(set as any, get as any),
-  ...createSceneObjectSlice(set as any, get as any),
+  ...createEnvironmentSlice(set as unknown as Parameters<typeof createEnvironmentSlice>[0]),
+  ...createUiSlice(
+    set as unknown as Parameters<typeof createUiSlice>[0],
+    get as unknown as Parameters<typeof createUiSlice>[1],
+  ),
+  ...createSelectionSlice(
+    set as unknown as Parameters<typeof createSelectionSlice>[0],
+    get as unknown as Parameters<typeof createSelectionSlice>[1],
+  ),
+  ...createDragSlice(
+    set as unknown as Parameters<typeof createDragSlice>[0],
+    get as unknown as Parameters<typeof createDragSlice>[1],
+  ),
+  ...createLibrarySlice(
+    set as unknown as Parameters<typeof createLibrarySlice>[0],
+    get as unknown as Parameters<typeof createLibrarySlice>[1],
+    DEFAULT_HOTBAR,
+  ),
+  ...createVoxelSlice(
+    set as unknown as Parameters<typeof createVoxelSlice>[0],
+    get as unknown as Parameters<typeof createVoxelSlice>[1],
+  ),
+  ...createContainerSlice(
+    set as unknown as Parameters<typeof createContainerSlice>[0],
+    get as unknown as Parameters<typeof createContainerSlice>[1],
+  ),
+  ...createSceneObjectSlice(
+    set as unknown as Parameters<typeof createSceneObjectSlice>[0],
+    get as unknown as Parameters<typeof createSceneObjectSlice>[1],
+  ),
 
   // ── Initial State ───────────────────────────────────────
   _hasHydrated: false,
@@ -181,10 +205,10 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     return { containers, zones, furnitureIndex, sceneObjects } as StoreState;
   },
   equality: (pastState, currentState) =>
-    (pastState as any).containers === (currentState as any).containers &&
-    (pastState as any).zones === (currentState as any).zones &&
-    (pastState as any).furnitureIndex === (currentState as any).furnitureIndex &&
-    (pastState as any).sceneObjects === (currentState as any).sceneObjects,
+    (pastState as StoreState).containers === (currentState as StoreState).containers &&
+    (pastState as StoreState).zones === (currentState as StoreState).zones &&
+    (pastState as StoreState).furnitureIndex === (currentState as StoreState).furnitureIndex &&
+    (pastState as StoreState).sceneObjects === (currentState as StoreState).sceneObjects,
 }), {
   name: 'moduhome-project',
   storage: createJSONStorage(() => idbStorage),
@@ -195,12 +219,18 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     // Strip ephemeral _preMergeWalls, _preExtensionDoors, _smartRailingChanges, and voxel unpackPhase from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
-      const { _preMergeWalls, _preExtensionDoors, _smartRailingChanges, ...rest } = c;
+      const rest: Container = { ...c };
+      delete rest._preMergeWalls;
+      delete rest._preExtensionDoors;
+      delete rest._smartRailingChanges;
       // Strip ephemeral unpackPhase, _reverseOriginalPhase, _stairExiting from voxels (animation-only, never persisted)
       if (rest.voxelGrid) {
         rest.voxelGrid = rest.voxelGrid.map(v => {
           if (v.unpackPhase === undefined && v._reverseOriginalPhase === undefined && v._stairExiting === undefined) return v;
-          const { unpackPhase: _u, _reverseOriginalPhase: _r, _stairExiting: _se, ...cleanVoxel } = v;
+          const cleanVoxel: Voxel = { ...v };
+          delete cleanVoxel.unpackPhase;
+          delete cleanVoxel._reverseOriginalPhase;
+          delete cleanVoxel._stairExiting;
           return cleanVoxel;
         });
       }
@@ -216,10 +246,10 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     const merged = { ...currentState, ...persisted };
     // Sync groundPreset with theme (theme determines ground preset)
     if (persisted.environment) {
-      const themeId = (persisted as any).currentTheme ?? (currentState as any).currentTheme ?? 'industrial';
-      const expectedGround = THEMES[themeId as import('@/config/themes').ThemeId]?.groundPreset ?? 'grass';
+      const themeId = persisted.currentTheme ?? currentState.currentTheme ?? 'industrial';
+      const expectedGround = THEMES[themeId as ThemeId]?.groundPreset ?? 'grass';
       // Theme determines ground preset — override persisted ground if mismatched
-      (merged as any).environment = { ...persisted.environment, groundPreset: expectedGround };
+      merged.environment = { ...persisted.environment, groundPreset: expectedGround };
     }
     return merged as StoreState;
   },
@@ -240,26 +270,26 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
       }
       // Migrate legacy stairDir → stairAscending for persisted voxels
       if (state.containers) {
-        for (const container of Object.values(state.containers) as any[]) {
+        for (const container of Object.values(state.containers)) {
           if (!container?.voxelGrid) continue;
           for (const voxel of container.voxelGrid) {
-            if (voxel?.stairDir && !voxel.stairAscending) {
-              voxel.stairAscending = voxel.stairDir === 'ns' ? 'n' : 'e';
+            const legacyVoxel = voxel as LegacyVoxel;
+            if (legacyVoxel.stairDir && !legacyVoxel.stairAscending) {
+              legacyVoxel.stairAscending = legacyVoxel.stairDir === 'ns' ? 'n' : 'e';
             }
-            delete voxel?.stairDir;
+            delete legacyVoxel.stairDir;
           }
         }
       }
       // Rebuild smart railing tracking from persisted voxel state
       // (_smartRailingChanges is stripped from persist but Railing_Cable faces are persisted)
       if (state.containers) {
-        for (const [id, container] of Object.entries(state.containers)) {
-          const c = container as any;
-          if (c.voxelGrid) {
-            const grid = [...c.voxelGrid];
-            const rc: any = { _smartRailingChanges: undefined };
+        for (const container of Object.values(state.containers)) {
+          if (container.voxelGrid) {
+            const grid = [...container.voxelGrid];
+            const rc: Pick<Container, '_smartRailingChanges'> = { _smartRailingChanges: undefined };
             recomputeSmartRailings(grid, rc);
-            c._smartRailingChanges = rc._smartRailingChanges;
+            container._smartRailingChanges = rc._smartRailingChanges;
           }
         }
       }
@@ -275,5 +305,5 @@ setVoxelStoreRef(useStore);
 setContainerTemporalAccessor(() => useStore.temporal.getState());
 
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  (window as any).__store = useStore;
+  (window as DevWindow).__store = useStore;
 }

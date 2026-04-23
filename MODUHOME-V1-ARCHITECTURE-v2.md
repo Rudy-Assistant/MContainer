@@ -13,7 +13,7 @@ ModuHome V1 is a browser-based 3D shipping container home architectural design t
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Framework | Next.js App Router | 16.1.6 |
+| Framework | Next.js App Router | 16.2.4 |
 | UI | React | 19.2.3 |
 | 3D Engine | Three.js | ^0.182.0 |
 | React 3D | @react-three/fiber + drei + postprocessing | v9 / v10 / v3 |
@@ -37,7 +37,7 @@ src/
   config/                themes, materialCache, groundPresets, pbrTextures
   types/                 container.ts — primary type definitions
   utils/                 applyPalette, exportGLB, adjacencyDetection
-  __tests__/             23 test files, 243 behavioral tests
+  __tests__/             behavioral tests and regression coverage
 ```
 
 ### V2 Reference
@@ -318,7 +318,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 These must never be violated:
 
 1. `npx tsc --noEmit` → 0 errors before any PR
-2. `npx vitest run` → all 297 tests pass before any PR
+2. `npx vitest run` → full suite pass before any PR
 3. Browser/visual verification is a **hard gate** separate from the test suite
 4. Never split `useStore.ts` structure (only slice file content changes)
 5. Never use `useStore(s => s)` — subscribe to atomic selectors only

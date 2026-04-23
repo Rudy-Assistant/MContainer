@@ -1,9 +1,10 @@
-import { useRef } from 'react';
+import { useMemo } from 'react';
 import { useStore } from '@/store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { VoxelPayload } from '@/store/useStore';
+import type { StoreState, VoxelPayload } from '@/store/useStore';
+import type { SelectedElements } from '@/store/slices/selectionSlice';
 
-function deriveVoxel(sel: { type: string; items: Array<{ containerId: string; id: string }> } | null): VoxelPayload | null {
+function deriveVoxel(sel: SelectedElements): VoxelPayload | null {
   if (!sel || sel.type !== 'voxel' || sel.items.length !== 1) return null;
   const item = sel.items[0];
   if (item.id.startsWith('ext_')) {
@@ -18,27 +19,14 @@ function deriveVoxel(sel: { type: string; items: Array<{ containerId: string; id
   return { containerId: item.containerId, index };
 }
 
-function voxelEqual(a: VoxelPayload | null, b: VoxelPayload | null): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.containerId !== b.containerId) return false;
-  if ('index' in a && 'index' in b) return a.index === b.index;
-  if ('isExtension' in a && 'isExtension' in b) return (a as any).col === (b as any).col && (a as any).row === (b as any).row;
-  return false;
-}
-
 /**
  * Derives legacy selectedVoxel shape from selectedElements.
  * Uses useShallow to read selectedElements (stable subscription),
  * then derives in component body with ref-based dedup.
  */
 export function useSelectedVoxel(): VoxelPayload | null {
-  const selectedElements = useStore(useShallow((s: any) => s.selectedElements));
-  const prevRef = useRef<VoxelPayload | null>(null);
-  const next = deriveVoxel(selectedElements);
-  if (voxelEqual(next, prevRef.current)) return prevRef.current!;
-  prevRef.current = next;
-  return next;
+  const selectedElements = useStore(useShallow((s: StoreState) => s.selectedElements));
+  return useMemo(() => deriveVoxel(selectedElements), [selectedElements]);
 }
 
 /**

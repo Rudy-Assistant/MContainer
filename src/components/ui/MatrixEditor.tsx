@@ -15,12 +15,10 @@ import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import { getSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import {
   type Container,
-  type SurfaceType,
   type VoxelFaces,
-  type ExtensionConfig,
+  type DoorConfig,
   VOXEL_COLS,
   VOXEL_ROWS,
-  VOXEL_LEVELS,
   CONTAINER_DIMENSIONS,
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
@@ -34,7 +32,6 @@ import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
 
 function GridCell({
   voxelIndex,
-  containerId,
   active,
   isSelected,
   isMultiSelected,
@@ -57,7 +54,6 @@ function GridCell({
   onContextMenu,
 }: {
   voxelIndex: number;
-  containerId: string;
   active: boolean;
   isSelected: boolean;
   isMultiSelected: boolean;
@@ -263,7 +259,6 @@ function VoxelGrid({
   const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
   const setHoveredVoxel = useStore((s) => s.setHoveredVoxel);
   const setHoveredVoxelEdge = useStore((s) => s.setHoveredVoxelEdge);
-  const cycleVoxelFace = useStore((s) => s.cycleVoxelFace);
   const hoveredPreviewFace = useStore((s) => s.hoveredPreviewFace);
   const selectedFace = useStore((s) => s.selectedFace);
   const setVoxelActive = useStore((s) => s.setVoxelActive);
@@ -343,7 +338,17 @@ function VoxelGrid({
     }
     if (e.ctrlKey || e.metaKey) {
       // Ctrl/Cmd+Click: toggle individual voxel in/out of multi-select
-      toggleElement(containerId, String(idx));
+      const curr = useStore.getState().selectedElements;
+      const id = String(idx);
+      const item = { containerId, id };
+      if (curr?.type === 'bay' && curr.items.every((it) => it.containerId === containerId)) {
+        toggleElement(containerId, id, 'bay');
+      } else if (curr?.type === 'voxel' && curr.items.length === 1 && curr.items[0].containerId === containerId) {
+        const first = curr.items[0];
+        setSelectedElements(first.id === id ? null : { type: 'bay', items: [first, item] });
+      } else {
+        setSelectedElements({ type: 'bay', items: [item] });
+      }
       lastClickedRef.current = idx;
     } else if (e.shiftKey && lastClickedRef.current >= 0) {
       // Shift+Click: fill linear range [anchor → idx] row-by-row
@@ -512,7 +517,6 @@ function VoxelGrid({
               <GridCell
                 key={cell.voxelIndex}
                 voxelIndex={cell.voxelIndex}
-                containerId={containerId}
                 active={cell.active}
                 isSelected={isThisSelected}
                 isMultiSelected={isThisMultiSelected}
@@ -577,42 +581,6 @@ function VoxelGrid({
   );
 }
 
-// ── Level Toggle ─────────────────────────────────────────────
-
-function LevelToggle({
-  activeLevel,
-  onChange,
-}: {
-  activeLevel: number;
-  onChange: (l: number) => void;
-}) {
-  const labels = ["Floor", "Roof"];
-  return (
-    <div style={{ display: "flex", gap: 3 }}>
-      {[0, 1].map((l) => (
-        <button
-          key={l}
-          onClick={() => onChange(l)}
-          style={{
-            flex: 1,
-            padding: "3px 0",
-            borderRadius: 4,
-            fontSize: 9,
-            fontWeight: activeLevel === l ? 700 : 500,
-            border: activeLevel === l ? "1px solid var(--accent, #2563eb)" : "1px solid var(--border, #e2e8f0)",
-            background: activeLevel === l ? "var(--accent, #2563eb)" : "var(--btn-bg, #fff)",
-            color: activeLevel === l ? "#fff" : "var(--text-dim, #94a3b8)",
-            cursor: "pointer",
-            transition: "all 100ms ease",
-          }}
-        >
-          {labels[l]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ── Simple Bay Grid ──────────────────────────────────────────
 
 const BAY_GROUPS = computeBayGroups();
@@ -639,7 +607,6 @@ function SimpleBayGrid({
   const selectedVoxels = useSelectedVoxels();
   const selectedVoxel = useSelectedVoxel();
   const hoveredBayGroup = useStore((s) => s.hoveredBayGroup);
-  const voxelGrid = container.voxelGrid ?? createDefaultVoxelGrid();
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
   const dims = CONTAINER_DIMENSIONS[container.size];
 
@@ -1033,7 +1000,6 @@ export default function MatrixEditor({
 }) {
   const selectedVoxel    = useSelectedVoxel();
   const selectedVoxels   = useSelectedVoxels();
-  const setAllExtensions = useStore((s) => s.setAllExtensions);
 
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);
 
@@ -1138,8 +1104,8 @@ export default function MatrixEditor({
                 </span>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {([
-                    { label: 'Hinge', options: ['left', 'right'] as const, value: cfg.hingeEdge, key: 'hingeEdge', disabled: (_: string) => false, tooltip: (_: string) => '' },
-                    { label: 'Swing', options: ['in', 'out'] as const, value: cfg.swingDirection, key: 'swingDirection', disabled: (_: string) => cfg.type !== 'swing', tooltip: (_: string) => cfg.type !== 'swing' ? 'Only for swing doors' : '' },
+                    { label: 'Hinge', options: ['left', 'right'] as const, value: cfg.hingeEdge, key: 'hingeEdge', disabled: () => false, tooltip: () => '' },
+                    { label: 'Swing', options: ['in', 'out'] as const, value: cfg.swingDirection, key: 'swingDirection', disabled: () => cfg.type !== 'swing', tooltip: () => cfg.type !== 'swing' ? 'Only for swing doors' : '' },
                     { label: 'Type', options: ['swing', 'slide'] as const, value: cfg.type, key: 'type',
                       disabled: (opt: string) => (opt === 'swing' && !constraints.canSwing) || (opt === 'slide' && !constraints.canSlide),
                       tooltip: (opt: string) => opt === 'swing' && !constraints.canSwing ? (constraints.swingBlockReason ?? '') : opt === 'slide' && !constraints.canSlide ? (constraints.slideBlockReason ?? '') : '',
@@ -1154,7 +1120,16 @@ export default function MatrixEditor({
                           return (
                             <button
                               key={opt}
-                              onClick={() => !isDisabled && useStore.getState().setDoorConfig(containerId, selIdx, doorFace, { [key]: opt } as any)}
+                              onClick={() => {
+                                if (!isDisabled) {
+                                  useStore.getState().setDoorConfig(
+                                    containerId,
+                                    selIdx,
+                                    doorFace,
+                                    { [key]: opt } as Pick<DoorConfig, typeof key>
+                                  );
+                                }
+                              }}
                               title={tip || undefined}
                               style={{
                                 padding: '2px 6px', fontSize: 10, borderRadius: 4,

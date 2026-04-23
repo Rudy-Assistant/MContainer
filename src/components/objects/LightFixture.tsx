@@ -32,7 +32,7 @@ interface LightFixtureProps {
   vHeight: number;
 }
 
-export default function LightFixture({ type, lightColor, colPitch: _colPitch, rowPitch: _rowPitch, vHeight }: LightFixtureProps) {
+export default function LightFixture({ type, lightColor, vHeight }: LightFixtureProps) {
   const color = LIGHT_COLOR_MAP[lightColor || 'warm'] || '#FFE4B5';
   const intensity = 2.0;
   const ceilingY = 0;

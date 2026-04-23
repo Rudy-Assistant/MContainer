@@ -86,6 +86,7 @@ export function PresetCard({
   // Detect false→true transition on active prop
   useEffect(() => {
     if (active && !prevActiveRef.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Local animation state intentionally responds to active prop transitions.
       setAnimating(true);
       const timer = setTimeout(() => setAnimating(false), 200);
       prevActiveRef.current = true;   // mark transition handled immediately

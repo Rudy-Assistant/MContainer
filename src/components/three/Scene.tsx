@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { setExportScene } from "@/utils/exportGLB";
@@ -61,6 +61,44 @@ import { QUALITY_PRESETS } from "@/config/qualityPresets";
 import { QualityAutoDetect } from './QualityAutoDetect';
 import { getStyle } from '@/config/styleRegistry';
 
+type CameraControlsLike = {
+  getPosition: (target: THREE.Vector3) => THREE.Vector3;
+  getTarget: (target: THREE.Vector3) => THREE.Vector3;
+  setPosition: (x: number, y: number, z: number, enableTransition?: boolean) => void;
+  setTarget: (x: number, y: number, z: number, enableTransition?: boolean) => void;
+  rotate?: (azimuthAngle: number, polarAngle: number, enableTransition?: boolean) => void;
+  polarAngle?: number;
+  azimuthAngle?: number;
+};
+
+declare global {
+  interface Window {
+    __camDiag?: {
+      posY: string;
+      targetY: string;
+      polarAngle?: string;
+      azimuthAngle?: string;
+    };
+    __cameraControls?: CameraControlsImpl;
+    __scene?: THREE.Scene;
+    __camera?: THREE.Camera;
+  }
+}
+
+function isCameraControlsLike(value: unknown): value is CameraControlsLike {
+  return !!value &&
+    typeof (value as Partial<CameraControlsLike>).getPosition === 'function' &&
+    typeof (value as Partial<CameraControlsLike>).getTarget === 'function';
+}
+
+function materialOpacity(material: THREE.Material): number {
+  return "opacity" in material && typeof material.opacity === "number" ? material.opacity : 1;
+}
+
+function hasOrbitTarget(value: unknown): value is { target: THREE.Vector3 } {
+  return !!value && "target" in (value as object) && (value as { target?: unknown }).target instanceof THREE.Vector3;
+}
+
 
 // ── Sun Position Calculator ─────────────────────────────────
 
@@ -91,7 +129,7 @@ function SunLight() {
   const intensity = useMemo(() => {
     if (timeOfDay < 5 || timeOfDay > 21) return 0;
     const t = ((timeOfDay - 5) / 16) * Math.PI;
-    return Math.max(Math.sin(t) * 2.0, 0);
+    return Math.max(Math.sin(t) * 1.55, 0);
   }, [timeOfDay]);
 
   const color = useMemo(() => {
@@ -128,7 +166,7 @@ function SunLight() {
         castShadow
         color={color}
         position={timeOfDay >= 5 && timeOfDay <= 21 ? [Math.max(sunPos.x, -80), Math.max(sunPos.y, 2.0), sunPos.z] : [20, 40, 20]}
-        intensity={Math.min(Math.max(intensity * 0.8, 0.25), 2.0)}
+        intensity={Math.min(Math.max(intensity * 0.65, 0.18), 1.25)}
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0005}
         shadow-normalBias={0.002}
@@ -140,11 +178,11 @@ function SunLight() {
         shadow-camera-far={120}
       />
       <ambientLight
-        intensity={Math.max(intensity * 0.45, 0.25)}
+        intensity={Math.max(intensity * 0.3, 0.18)}
         color={timeOfDay > 5 && timeOfDay < 21 ? 0xd0e0f8 : 0x080818}
       />
       <hemisphereLight
-        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.40, 0.20)]}
+        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.26, 0.14)]}
       />
     </>
   );
@@ -220,6 +258,8 @@ function DappleGobo() {
 const _v3A = new THREE.Vector3();
 const _v3B = new THREE.Vector3();
 const _upY = new THREE.Vector3(0, 1, 0);
+const _panForward = new THREE.Vector3();
+const _panRight = new THREE.Vector3();
 
 // ── Blueprint Grid (1m spacing, dark blue-gray) ─────────────
 
@@ -451,8 +491,7 @@ function getFogParams(t: number) {
  *
  * @remarks
  * Pure function, no side effects. Used by SkyDome component.
- * Values tuned to avoid white-out at midday (rayleigh 2.0) and
- * ensure visible blue sky at 10AM (mieCoefficient 0.005).
+ * Values tuned to preserve sky color under bloom and ACES tonemapping.
  *
  * @param timeOfDay - Hours (0-24), fractional allowed (e.g. 17.5 = 5:30 PM)
  * @returns Sky shader parameters: rayleigh, turbidity, mieCoefficient, mieDirectionalG
@@ -461,10 +500,10 @@ export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
   return {
-    rayleigh: deepTwilight ? 4 : goldenHour ? 3.0 : 4.0,    // 4.0 midday = vivid saturated blue
-    turbidity: deepTwilight ? 15 : goldenHour ? 8 : 0.8,    // 0.8 = ultra-clear; 8 = dramatic golden hour haze
-    mieCoefficient: goldenHour ? 0.012 : 0.001,             // 0.001 = minimal haze → cleaner sky
-    mieDirectionalG: goldenHour ? 0.97 : 0.75,              // 0.75 = tight sun disc, less bloom
+    rayleigh: deepTwilight ? 3.5 : goldenHour ? 2.7 : 2.8,
+    turbidity: deepTwilight ? 7 : goldenHour ? 3.8 : 1.2,
+    mieCoefficient: goldenHour ? 0.006 : 0.001,
+    mieDirectionalG: goldenHour ? 0.86 : 0.7,
   };
 }
 
@@ -480,8 +519,6 @@ export function getSkyParams(timeOfDay: number) {
 // (cameraConstants.ts + CameraFloorGuard) are the defense against
 // excessive sky visibility — not rendering hacks.
 
-const _skyBgColor = new THREE.Color();
-
 function SkyDome() {
   const sunPos = useSunPosition();
   const timeOfDay = useStore((s) => s.environment.timeOfDay);
@@ -496,9 +533,12 @@ function SkyDome() {
         ? 0xc48040
         : 0x4a8ac0;  // Richer blue background for clearer sky
 
-  // Set scene.background synchronously during render — idempotent, no attach/detach.
-  _skyBgColor.set(bgHex);
-  scene.background = _skyBgColor;
+  const bgColor = useMemo(() => new THREE.Color(bgHex), [bgHex]);
+
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- R3F scene background is an imperative Three.js field.
+    scene.background = bgColor;
+  }, [scene, bgColor]);
 
   const isNight = isNightTime(timeOfDay);
   const isTwilight = isTwilightTime(timeOfDay);
@@ -550,9 +590,6 @@ function SceneFog() {
 // ── Keyboard Shortcuts ──────────────────────────────────────
 
 function useKeyboardShortcuts() {
-  const containers = useStore((s) => s.containers);
-  const selection = useStore((s) => s.selection);
-
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Ignore if typing in an input
@@ -807,7 +844,7 @@ function useKeyboardShortcuts() {
         if (!containerId) return;
 
         const ids = Object.entries(store.sceneObjects)
-          .filter(([, obj]) => (obj as any).anchor.containerId === containerId)
+          .filter(([, obj]) => obj.anchor.containerId === containerId)
           .map(([id]) => id)
           .sort();
         if (ids.length === 0) return;
@@ -835,7 +872,7 @@ function useKeyboardShortcuts() {
       if (!e.ctrlKey) return;
       e.preventDefault();
       const store = useStore.getState();
-      const maxLvl = Math.max(2, ...Object.values(store.containers).map((c: any) => c.level));
+      const maxLvl = Math.max(2, ...Object.values(store.containers).map((c) => c.level));
       const cur = store.viewLevel;
       if (e.deltaY < 0) {
         // Scroll up = go up a level
@@ -857,6 +894,7 @@ function useKeyboardShortcuts() {
 // ── Keyboard Pan / Fly-Through Controls ──────────────────────
 
 const panKeys: Record<string, boolean> = {};
+const DISABLED_MOUSE_ACTION = -1 as THREE.MOUSE;
 
 function KeyboardPanControls() {
   const viewMode = useStore((s) => s.viewMode);
@@ -878,10 +916,6 @@ function KeyboardPanControls() {
     };
   }, []);
 
-  const forwardVec = useMemo(() => new THREE.Vector3(), []);
-  const rightVec = useMemo(() => new THREE.Vector3(), []);
-  const spherical = useMemo(() => new THREE.Spherical(), []);
-
   useFrame((state, delta) => {
     if (viewMode === ViewMode.Walkthrough) return;
     const dt = Math.min(delta, 0.1);
@@ -898,8 +932,8 @@ function KeyboardPanControls() {
       if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
         _v3A.set(dx, 0, dz);
         camera.position.add(_v3A);
-        if (state.controls && "target" in state.controls) {
-          (state.controls as any).target.add(_v3A);
+        if (hasOrbitTarget(state.controls)) {
+          state.controls.target.add(_v3A);
         }
       }
       return;
@@ -909,24 +943,23 @@ function KeyboardPanControls() {
     // Use CameraControls API (setPosition/setTarget) instead of direct camera.position
     // mutation — camera-controls recalculates position from internal state each frame,
     // so direct writes are overwritten.
-    const controls = state.controls as any;
-    const hasCC = controls && typeof controls.getPosition === 'function';
+    const controls = state.controls;
+    const hasCC = isCameraControlsLike(controls);
 
     // WASD = Horizontal pan relative to camera facing direction.
     // Vertical fly (R/F) removed: conflicts with Rotate and Walkthrough toggle.
     // Use right-click TRUCK drag for vertical panning instead.
     let dx = 0, dz = 0;
     const panSpeed = 15;
-    camera.getWorldDirection(forwardVec);
-    forwardVec.y = 0;
-    forwardVec.normalize();
-    rightVec.crossVectors(forwardVec, _upY).normalize();
+    camera.getWorldDirection(_panForward);
+    _panForward.set(_panForward.x, 0, _panForward.z).normalize();
+    _panRight.crossVectors(_panForward, _upY).normalize();
 
     let mx = 0, mz = 0;
-    if (panKeys["KeyW"]) { mx += forwardVec.x; mz += forwardVec.z; }
-    if (panKeys["KeyS"]) { mx -= forwardVec.x; mz -= forwardVec.z; }
-    if (panKeys["KeyA"]) { mx -= rightVec.x; mz -= rightVec.z; }
-    if (panKeys["KeyD"]) { mx += rightVec.x; mz += rightVec.z; }
+    if (panKeys["KeyW"]) { mx += _panForward.x; mz += _panForward.z; }
+    if (panKeys["KeyS"]) { mx -= _panForward.x; mz -= _panForward.z; }
+    if (panKeys["KeyA"]) { mx -= _panRight.x; mz -= _panRight.z; }
+    if (panKeys["KeyD"]) { mx += _panRight.x; mz += _panRight.z; }
     const len = Math.sqrt(mx * mx + mz * mz);
     if (len > 0.001) { dx = (mx / len) * panSpeed * dt; dz = (mz / len) * panSpeed * dt; }
 
@@ -954,7 +987,7 @@ function KeyboardPanControls() {
       if (panKeys["ArrowUp"]) dPhi -= orbitSpeed * dt;
       if (panKeys["ArrowDown"]) dPhi += orbitSpeed * dt;
 
-      if (Math.abs(dTheta) > 0.0001 || Math.abs(dPhi) > 0.0001) {
+      if ((Math.abs(dTheta) > 0.0001 || Math.abs(dPhi) > 0.0001) && controls.rotate) {
         controls.rotate(dTheta, dPhi, false);
       }
     }
@@ -985,6 +1018,7 @@ const _prevDesired = new THREE.Vector3(Infinity, Infinity, Infinity);
  */
 const LERP_SETTLE_THRESHOLD = 0.01; // Stop lerping when within 1cm of target
 
+/* eslint-disable react-hooks/refs -- Camera target settling deliberately uses mutable Three.js refs outside React render state. */
 function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
   const { controls } = useThree();
   const dragMovingId = useStore((s) => s.dragMovingId);
@@ -996,8 +1030,8 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
     _prevDesired.copy(_desiredTarget);
     isSettled.current = false;
     // Seed _lerpTarget from current camera target so lerp starts from where user is
-    const ctrl = controls as any;
-    if (ctrl && typeof ctrl.getTarget === 'function') {
+    const ctrl = isCameraControlsLike(controls) ? controls : null;
+    if (ctrl) {
       ctrl.getTarget(_lerpTarget);
     }
   }
@@ -1007,11 +1041,11 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
     if (isSettled.current) return; // already settled — don't fight user TRUCK/WASD
     // WU-6: Skip lerp while 3D camera is being restored (prevents "spring" fight with CameraBroadcast)
     if (useStore.getState().cameraRestoring) return;
-    const ctrl = controls as any;
+    const ctrl = isCameraControlsLike(controls) ? controls : null;
     // CRITICAL: Use setTarget() API, NOT direct ctrl.target.copy().
     // Direct target mutation bypasses camera-controls' polar angle and boundary
     // constraints, causing the viewing angle to escape maxPolarAngle → sky fills viewport.
-    if (typeof ctrl.setTarget !== 'function') return;
+    if (!ctrl) return;
     // Exponential decay lerp — ~7× per second half-life feels like smooth glide
     _lerpTarget.lerp(_desiredTarget, 1 - Math.pow(0.001, delta));
     // Clamp target Y to prevent looking through ground (defense in depth)
@@ -1027,6 +1061,7 @@ function CameraTargetLerp({ desired }: { desired: [number, number, number] }) {
   });
   return null;
 }
+/* eslint-enable react-hooks/refs */
 
 /**
  * CameraFloorGuard — NaN recovery + diagnostics.
@@ -1043,8 +1078,8 @@ function CameraFloorGuard() {
   const _diagFrameCount = useRef(0);
 
   useFrame(() => {
-    const cc = controls as any;
-    if (!cc || typeof cc.getPosition !== 'function') return;
+    const cc = isCameraControlsLike(controls) ? controls : null;
+    if (!cc) return;
 
     cc.getPosition(_floorGuardVec);
     cc.getTarget(_targetGuardVec);
@@ -1064,7 +1099,7 @@ function CameraFloorGuard() {
 
     // Diagnostic: expose camera state for Playwright gates
     if (_diagFrameCount.current++ % 10 === 0) {
-      (window as any).__camDiag = {
+      window.__camDiag = {
         posY: _floorGuardVec.y.toFixed(3),
         targetY: _targetGuardVec.y.toFixed(3),
         polarAngle: cc.polarAngle?.toFixed(3),
@@ -1110,8 +1145,8 @@ function CameraBroadcast() {
   useEffect(() => {
     if (!savedCamera3D) return;
     const timer = setTimeout(() => {
-      const cc = controlsRef.current as any;
-      if (!cc || typeof cc.setPosition !== 'function') return;
+      const cc = isCameraControlsLike(controlsRef.current) ? controlsRef.current : null;
+      if (!cc) return;
       useStore.getState().setCameraRestoring(true);
       const [px, py, pz] = savedCamera3D.position;
       const [tx, ty, tz] = savedCamera3D.target;
@@ -1127,9 +1162,9 @@ function CameraBroadcast() {
   // controlsRef.current gives the latest camera-controls instance.
   useEffect(() => {
     return () => {
-      const cc = controlsRef.current as any;
+      const cc = isCameraControlsLike(controlsRef.current) ? controlsRef.current : null;
       const pos = camera.position.toArray() as [number, number, number];
-      if (cc && typeof cc.getTarget === 'function') {
+      if (cc) {
         cc.getTarget(_broadcastTarget);
         saveCamera3D(pos, [_broadcastTarget.x, _broadcastTarget.y, _broadcastTarget.z]);
       } else {
@@ -1141,8 +1176,8 @@ function CameraBroadcast() {
 
   useFrame(() => {
     if (++frameCount.current % 6 !== 0) return;
-    const cc = controlsRef.current as any;
-    if (cc && typeof cc.getTarget === 'function') {
+    const cc = isCameraControlsLike(controlsRef.current) ? controlsRef.current : null;
+    if (cc) {
       cc.getTarget(_broadcastTarget);
     } else {
       _broadcastTarget.set(0, 0, 0);
@@ -1202,7 +1237,6 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
   const clearSelection = useStore((s) => s.clearSelection);
   const debugMode = useStore((s) => s.debugMode);
   const frameMode = useStore((s) => s.frameMode);
-  const isPreviewMode = useStore((s) => s.isPreviewMode);
   const activePaletteId = useStore((s) => s.activePaletteId);
   const currentTheme = useStore((s) => s.currentTheme);
   const cameraControlsRef = useRef<CameraControlsImpl>(null);
@@ -1253,8 +1287,8 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
 
   // Expose camera controls ref for Playwright gates — update via useFrame to ensure ref is populated
   useFrame(() => {
-    if (cameraControlsRef.current && !(window as any).__cameraControls) {
-      (window as any).__cameraControls = cameraControlsRef.current;
+    if (cameraControlsRef.current && !window.__cameraControls) {
+      window.__cameraControls = cameraControlsRef.current;
     }
   });
 
@@ -1355,7 +1389,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
       <ValidationSubscriber />
 
       {/* Phase 8: HDRI environment for PBR reflections (visible corrugation reflections) */}
-      <TimeOfDayEnvironment intensity={0.8} />
+      <TimeOfDayEnvironment intensity={0.45} />
 
       {/* Distance fog — softens horizon edge */}
       <SceneFog />
@@ -1488,7 +1522,7 @@ function BlueprintScene() {
         dampingFactor={0.1}
         screenSpacePanning
         mouseButtons={{
-          LEFT: -1 as any,
+          LEFT: DISABLED_MOUSE_ACTION,
           MIDDLE: THREE.MOUSE.PAN,
           RIGHT: THREE.MOUSE.PAN,
         }}
@@ -1500,18 +1534,16 @@ function BlueprintScene() {
 // ── Palette Drag Ghost (new container from palette) ─────────
 
 // Grid snapping — imported from gridSystem for consistency
-import { gridSnap, GRID_STEP } from "@/utils/gridSystem";
+import { gridSnap } from "@/utils/gridSystem";
 
-const ghostSolid = new THREE.MeshBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, transparent: true, opacity: 0.35 }); // Cyan ghost
 const ghostEdge = new THREE.MeshBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, transparent: true, opacity: 0.7, wireframe: true });
 const ghostInvalidEdge = new THREE.MeshBasicMaterial({ color: "#c62828", transparent: true, opacity: 0.7, wireframe: true });
-const ghostStackSolid = new THREE.MeshBasicMaterial({ color: "#2e7d32", transparent: true, opacity: 0.25 });
 const ghostStackEdge = new THREE.MeshBasicMaterial({ color: "#2e7d32", transparent: true, opacity: 0.7, wireframe: true });
-const ghostSnapSolid = new THREE.MeshBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, transparent: true, opacity: 0.4 });
 const ghostSnapEdge = new THREE.MeshBasicMaterial({ color: "#42a5f5", transparent: true, opacity: 0.8, wireframe: true });
 // Shared material-clone cache for all ghost renderers (DragGhost + MoveGhostVisual)
 const _ghostOverlayMats = new Map<THREE.Material, THREE.Material>();
 
+/* eslint-disable react-hooks/refs -- Drag ghost material selection reflects per-frame raycast refs from useFrame. */
 function DragGhost() {
   const dragContainer = useStore((s) => s.dragContainer);
   const setDragWorldPos = useStore((s) => s.setDragWorldPos);
@@ -1611,7 +1643,9 @@ function DragGhost() {
       if (_ghostOverlayMats.has(m)) return _ghostOverlayMats.get(m)!;
       const c = m.clone();
       c.transparent = true;
-      (c as THREE.MeshStandardMaterial).opacity = Math.min((m as any).opacity ?? 1, 0.4);
+      if ("opacity" in c && typeof c.opacity === "number") {
+        c.opacity = Math.min(materialOpacity(m), 0.4);
+      }
       _ghostOverlayMats.set(m, c);
       return c;
     };
@@ -1647,16 +1681,13 @@ function DragGhost() {
     </group>
   );
 }
+/* eslint-enable react-hooks/refs */
 
 // ── Container Move Ghost (3D view) ──────────────────────────
 
-const moveValid = new THREE.MeshBasicMaterial({ color: "#2e7d32", transparent: true, opacity: 0.25 });
 const moveValidEdge = new THREE.MeshBasicMaterial({ color: "#2e7d32", transparent: true, opacity: 0.6, wireframe: true });
-const moveInvalid = new THREE.MeshBasicMaterial({ color: "#c62828", transparent: true, opacity: 0.25 });
 const moveInvalidEdge = new THREE.MeshBasicMaterial({ color: "#c62828", transparent: true, opacity: 0.6, wireframe: true });
-const moveSnap = new THREE.MeshBasicMaterial({ color: "#1565c0", transparent: true, opacity: 0.3 });
 const moveSnapEdge = new THREE.MeshBasicMaterial({ color: "#42a5f5", transparent: true, opacity: 0.7, wireframe: true });
-const moveStack = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.4 });
 const moveStackEdge = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.7, wireframe: true });
 
 function DragMoveGhost() {
@@ -1832,12 +1863,14 @@ function MoveGhostVisual({
     if (skinGroupRef.current && !skinReadyRef.current) {
       skinReadyRef.current = true;
       const cloneMat = (m: THREE.Material): THREE.Material => {
-        if (_ghostOverlayMats.has(m)) return _ghostOverlayMats.get(m)!;
-        const c = m.clone();
-        c.transparent = true;
-        (c as THREE.MeshStandardMaterial).opacity = Math.min((m as any).opacity ?? 1, 0.4);
-        _ghostOverlayMats.set(m, c);
-        return c;
+      if (_ghostOverlayMats.has(m)) return _ghostOverlayMats.get(m)!;
+      const c = m.clone();
+      c.transparent = true;
+        if ("opacity" in c && typeof c.opacity === "number") {
+          c.opacity = Math.min(materialOpacity(m), 0.4);
+        }
+      _ghostOverlayMats.set(m, c);
+      return c;
       };
       skinGroupRef.current.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
@@ -2025,7 +2058,7 @@ function WalkthroughScene() {
       <GroundManager />
 
       {/* Phase 8: HDRI environment for PBR reflections */}
-      <TimeOfDayEnvironment intensity={0.8} />
+      <TimeOfDayEnvironment intensity={0.45} />
 
       {visibleContainers.map((container) => (
         <ContainerMesh key={container.id} container={container} />
@@ -2052,8 +2085,7 @@ function WalkthroughScene() {
 const bpDragGhost = new THREE.MeshBasicMaterial({ color: "#1565c0", transparent: true, opacity: 0.25, depthTest: false });
 const bpDragGhostEdge = new THREE.MeshBasicMaterial({ color: "#1565c0", transparent: true, opacity: 0.6, depthTest: false, wireframe: true });
 const bpDragGhostSnap = new THREE.MeshBasicMaterial({ color: "#42a5f5", transparent: true, opacity: 0.35, depthTest: false });
-const bpDragGhostStack = new THREE.MeshBasicMaterial({ color: "#2e7d32", transparent: true, opacity: 0.3, depthTest: false });
-
+/* eslint-disable react-hooks/refs -- Blueprint drag ghost reads snap state updated by useFrame for render material choice. */
 function DragGhostBlueprint() {
   const dragContainer = useStore((s) => s.dragContainer);
   const setDragWorldPos = useStore((s) => s.setDragWorldPos);
@@ -2118,6 +2150,7 @@ function DragGhostBlueprint() {
     </group>
   );
 }
+/* eslint-enable react-hooks/refs */
 
 // ── Main Scene ──────────────────────────────────────────────
 
@@ -2156,6 +2189,7 @@ function QualityManager() {
   }, [config.textureQuality, invalidate, gl]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- WebGLRenderer toneMapping is a Three.js imperative renderer setting.
     gl.toneMapping = config.postProcessing ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
   }, [config.postProcessing, gl]);
 
@@ -2164,7 +2198,11 @@ function QualityManager() {
 
 function SceneExporter() {
   const { scene, camera } = useThree();
-  useEffect(() => { setExportScene(scene); (window as any).__scene = scene; (window as any).__camera = camera; }, [scene, camera]);
+  useEffect(() => {
+    setExportScene(scene);
+    window.__scene = scene;
+    window.__camera = camera;
+  }, [scene, camera]);
   return null;
 }
 

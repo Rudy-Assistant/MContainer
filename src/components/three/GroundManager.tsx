@@ -128,6 +128,7 @@ function TexturedGround({ presetId }: { presetId: GroundPresetId }) {
       tex.anisotropy = 8; // Higher anisotropy for oblique viewing
       tex.needsUpdate = true;
     }
+    // eslint-disable-next-line react-hooks/immutability -- Three.js texture instances are configured imperatively after loader creation.
     (rawTextures.map as THREE.Texture).colorSpace = THREE.SRGBColorSpace;
     return rawTextures;
   }, [rawTextures, preset.repeatX, preset.repeatY]);

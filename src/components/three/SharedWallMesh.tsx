@@ -59,7 +59,7 @@ export function getSharedWallConfig(
   const basePos = new THREE.Vector3(containerA.position.x, containerA.position.y, containerA.position.z);
 
   // Wall local offset from container center (in container's local space)
-  let wallLocalOffset = new THREE.Vector3(0, heightA / 2, 0);
+  const wallLocalOffset = new THREE.Vector3(0, heightA / 2, 0);
   let wallLocalRotation = 0; // Rotation relative to container's forward direction
 
   switch (wallSideA) {
@@ -109,19 +109,9 @@ export function getSharedWallConfig(
 export default function SharedWalls() {
   const containers = useStore((s) => s.containers);
 
-  // Derive a stable cache key from only the fields that affect shared walls.
-  // This prevents useMemo from recomputing on paint/furniture/voxelGrid changes.
-  const wallCacheKey = useMemo(() =>
-    Object.values(containers).map((c) =>
-      `${c.id}:${c.position.x},${c.position.y},${c.position.z}:${c.rotation}:${c.size}:${c.mergedWalls.join(';')}`
-    ).sort().join('|'),
-    [containers],
-  );
-
   const groupRef = useRef<THREE.Group>(null);
 
   // Collect all shared wall configs from adjacency data
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- wallCacheKey is a derived stable key
   const sharedWalls = useMemo(() => {
     const walls: SharedWallConfig[] = [];
     const processed = new Set<string>();
@@ -155,7 +145,7 @@ export default function SharedWalls() {
     });
 
     return walls;
-  }, [wallCacheKey]);
+  }, [containers]);
 
   // Make all shared walls interactable for raycasting
   useEffect(() => {

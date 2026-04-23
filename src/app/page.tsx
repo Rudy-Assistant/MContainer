@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useStore } from "@/store/useStore";
 import { ContainerSize, ViewMode } from "@/types/container";
-import { useFrameStore } from "@/store/frameStore";
 import Sidebar from "@/components/ui/Sidebar";
 import BudgetModal from "@/components/ui/BudgetModal";
 import WizardModal from "@/components/ui/WizardModal";
@@ -60,30 +59,6 @@ function useHydrationSeed() {
       }
     }
   }, [hasHydrated]);
-}
-
-// ── Canvas Hint Overlay ───────────────────────────────────────
-
-function CanvasHintOverlay() {
-  const viewMode = useStore((s) => s.viewMode);
-  const buildMode = useFrameStore((s) => s.buildMode);
-  const hint =
-    viewMode === ViewMode.Blueprint    ? "Click=select · Drag=move · Right-click=menu · G=group · Ctrl+Z=undo"
-    : viewMode === ViewMode.Walkthrough ? "WASD · Shift=sprint · Space=cycle face · V=exit"
-    :                                     "L-drag=orbit · R-drag=pan · Scroll=zoom · 1-9=hotbar · E=apply";
-  return (
-    <div style={{
-      position: 'absolute', bottom: 12, right: 16, zIndex: 30,
-      fontSize: 10, color: 'rgba(0,0,0,0.38)',
-      fontFamily: 'system-ui, sans-serif',
-      pointerEvents: 'none', userSelect: 'none',
-      background: 'rgba(255,255,255,0.55)',
-      backdropFilter: 'blur(6px)',
-      padding: '3px 8px', borderRadius: 6,
-    }}>
-      {hint}{buildMode ? ' · BUILD MODE (B)' : ''}
-    </div>
-  );
 }
 
 // ── Grab Mode Overlay ────────────────────────────────────────

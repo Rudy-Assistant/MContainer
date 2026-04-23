@@ -2,7 +2,7 @@
 
 import { Html } from '@react-three/drei';
 import { useStore } from '@/store/useStore';
-import { type SurfaceType, type VoxelFaces, CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
+import { type DoorConfig, type SurfaceType, type VoxelFaces, CONTAINER_DIMENSIONS, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
 import { useSelectedVoxel } from '@/hooks/useSelectedVoxel';
 import { getVoxelLayout } from '@/components/objects/ContainerSkin';
 
@@ -150,17 +150,17 @@ function FaceWidget({ surfaceType, containerId, voxelIndex, face }: {
         </button>
       </div>
 
-      {/* Door configuration */}
-      {isDoor && doorCfg && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <MiniToggle label="Hinge" options={['left', 'right']} value={doorCfg.hingeEdge}
-            onChange={v => useStore.getState().setDoorConfig(containerId, voxelIndex, face, { hingeEdge: v as any })} />
-          <MiniToggle label="Swing" options={['in', 'out']} value={doorCfg.swingDirection}
-            onChange={v => useStore.getState().setDoorConfig(containerId, voxelIndex, face, { swingDirection: v as any })} />
-          <MiniToggle label="Type" options={['swing', 'slide']} value={doorCfg.type}
-            onChange={v => useStore.getState().setDoorConfig(containerId, voxelIndex, face, { type: v as any })} />
-        </div>
-      )}
+          {/* Door configuration */}
+          {isDoor && doorCfg && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <MiniToggle label="Hinge" options={['left', 'right']} value={doorCfg.hingeEdge}
+            onChange={v => useStore.getState().setDoorConfig(containerId, voxelIndex, face, { hingeEdge: v as DoorConfig['hingeEdge'] })} />
+              <MiniToggle label="Swing" options={['in', 'out']} value={doorCfg.swingDirection}
+            onChange={v => useStore.getState().setDoorConfig(containerId, voxelIndex, face, { swingDirection: v as DoorConfig['swingDirection'] })} />
+              <MiniToggle label="Type" options={['swing', 'slide']} value={doorCfg.type}
+            onChange={v => useStore.getState().setDoorConfig(containerId, voxelIndex, face, { type: v as DoorConfig['type'] })} />
+            </div>
+          )}
 
       {/* Window profile cycle */}
       {isWindow && (

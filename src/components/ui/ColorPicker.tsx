@@ -19,6 +19,7 @@ export default function ColorPicker({ color, onChange, onClose }: ColorPickerPro
   const draggingH = useRef(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The picker mirrors an externally controlled color prop.
     setHexInput(color);
     const [h, s, v] = hexToHsv(color);
     setHue(h); setSat(s); setVal(v);

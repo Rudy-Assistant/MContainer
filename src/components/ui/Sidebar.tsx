@@ -10,7 +10,7 @@
  * returning to State A seamlessly.
  */
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { useStore } from "@/store/useStore";
 import {
   type Container,
@@ -25,8 +25,6 @@ import { FrameInspector } from "@/components/ui/FrameInspector";
 import FinishesPanel from "@/components/ui/finishes/FinishesPanel";
 import SkinEditor from "@/components/ui/SkinEditor";
 import { useSelectionTarget } from "@/hooks/useSelectionTarget";
-import { CONTAINER_PRESETS } from "@/config/containerPresets";
-import { CONTAINER_ROLES } from "@/config/containerRoles";
 import {
   Package, Box, Warehouse, ArrowLeft,
   Armchair, CookingPot, Bed, Bath, Laptop, UtensilsCrossed, Archive, Footprints,
@@ -36,41 +34,19 @@ import {
   Refrigerator, Flame, Droplets, Microwave,
   Lamp, Monitor, WashingMachine, TreePine, Sofa,
   Tv, BookOpen, Coffee, Shirt,
-  Palette, Scan, Grid2x2, Grid3x3,
+  Palette, Scan, Grid3x3,
 } from "lucide-react";
 import UserLibrary from "@/components/ui/UserLibrary";
 // Theme/Ground imports removed — selectors moved to TopToolbar Appearance popover
 
-// ── BOM formatting ────────────────────────────────────────────
-
-import { formatUSD as fmtUSD } from "@/utils/formatters";
-
 // ── Constants ────────────────────────────────────────────────
 
 // Theme-adaptive via CSS variables (set in globals.css :root / [data-theme="dark"])
-const BG       = "var(--surface-alt, #f8fafc)";
 const CARD     = "var(--btn-bg, #ffffff)";
 const BORDER   = "var(--border, #e2e8f0)";
 const ACCENT   = "var(--accent, #2563eb)";
 const TEXT     = "var(--text-main, #1e293b)";
 const TEXT_DIM  = "var(--text-muted, #64748b)";
-
-// ── Section header ───────────────────────────────────────────
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: "10px", fontWeight: 700, color: TEXT_DIM,
-      textTransform: "uppercase", letterSpacing: "0.08em", padding: "0 0 5px",
-    }}>
-      {children}
-    </div>
-  );
-}
-
-function Divider() {
-  return <div style={{ height: "1px", background: BORDER, flexShrink: 0 }} />;
-}
 
 // ═══════════════════════════════════════════════════════════
 // STATE A — LIBRARY
@@ -325,17 +301,13 @@ const SIZE_LABEL: Record<ContainerSize, string> = {
 function Inspector({
   container,
   containerId,
-  prevContainerId,
 }: {
   container: Container;
   containerId: string;
-  prevContainerId: string | null;
 }) {
   const saveContainerToLibrary = useStore((s) => s.saveContainerToLibrary);
   const renameContainer = useStore((s) => s.renameContainer);
   const frameMode = useStore((s) => s.frameMode);
-  const designComplexity = useStore((s) => s.designComplexity);
-  const setDesignComplexity = useStore((s) => s.setDesignComplexity);
   const previewCollapsed = useStore((s) => s.previewCollapsed);
   const setPreviewCollapsed = useStore((s) => s.setPreviewCollapsed);
   const gridCollapsed = useStore((s) => s.gridCollapsed);
@@ -346,7 +318,7 @@ function Inspector({
   const removeContainer = useStore((s) => s.removeContainer);
   // Primitive selector — only re-renders when the boolean flips, not on every voxel paint
   const hasContainerAbove = useStore((s) =>
-    Object.values(s.containers).some((c: any) => c.stackedOn === containerId)
+    Object.values(s.containers).some((c) => c.stackedOn === containerId)
   );
 
   const [editingName, setEditingName] = useState(false);
@@ -354,12 +326,6 @@ function Inspector({
 
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const target = useSelectionTarget();
-
-  // Sync local name when selection changes
-  useEffect(() => {
-    setNameValue(container.name || "");
-    setEditingName(false);
-  }, [containerId, container.name]);
 
   const commitName = useCallback(() => {
     const trimmed = nameValue.trim();
@@ -514,7 +480,10 @@ function Inspector({
               <select
                 value={container.interiorFinish ?? "raw"}
                 onChange={(e) => {
-                  useStore.getState().setInteriorFinish(containerId, e.target.value as any);
+                  useStore.getState().setInteriorFinish(
+                    containerId,
+                    e.target.value as NonNullable<Container["interiorFinish"]>
+                  );
                 }}
                 style={{
                   flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 4,
@@ -557,55 +526,6 @@ function Inspector({
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
-// BOM FOOTER
-// ═══════════════════════════════════════════════════════════
-
-function SidebarBOMFooter() {
-  const containerCount = useStore((s) => Object.keys(s.containers).length);
-  const getEstimate    = useStore((s) => s.getEstimate);
-  if (containerCount === 0) return null;
-  const est = getEstimate();
-  const bd  = est.breakdown;
-
-  return (
-    <div style={{
-      flexShrink: 0,
-      padding: "8px 14px",
-      borderTop: `1px solid #334155`,
-      background: "#1e293b",
-      display: "flex", alignItems: "center", gap: "0",
-    }}>
-      <span style={{
-        fontSize: "8px", fontWeight: 800, color: "#64748b",
-        textTransform: "uppercase", letterSpacing: "0.1em", marginRight: "10px",
-      }}>
-        BOM
-      </span>
-
-      {[
-        { label: "Steel", value: bd.containers, color: "#78909c" },
-        { label: "Glass", value: bd.modules,    color: "#4fc3f7" },
-        { label: "Cuts",  value: bd.cuts,        color: "#ff8a65" },
-      ].map(({ label, value, color }, i) => (
-        <div key={label} style={{ display: "flex", alignItems: "center", gap: "0" }}>
-          {i > 0 && <div style={{ width: "1px", height: "24px", background: "#334155", margin: "0 10px" }} />}
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "8px", color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
-            <span style={{ fontSize: "11px", fontWeight: 600, color }}>{fmtUSD(value)}</span>
-          </div>
-        </div>
-      ))}
-
-      <div style={{ width: "1px", height: "24px", background: "#334155", margin: "0 10px" }} />
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <span style={{ fontSize: "8px", color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>Total</span>
-        <span style={{ fontSize: "11px", fontWeight: 700, color: "#93c5fd" }}>{fmtUSD(bd.total)}</span>
       </div>
     </div>
   );
@@ -683,7 +603,7 @@ function DesignModePanel() {
               onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
             >
               <div style={{ fontWeight: 600, color: "#2563eb" }}>Pool Container</div>
-              <div style={{ fontSize: 10, color: TEXT_DIM, marginTop: 2 }}>Subterranean 40' HC — concrete basin</div>
+              <div style={{ fontSize: 10, color: TEXT_DIM, marginTop: 2 }}>Subterranean 40&apos; HC — concrete basin</div>
             </button>
           </div>
         )}
@@ -712,16 +632,6 @@ export default function Sidebar() {
   const voxelContainerId = selectedElements?.items[0]?.containerId ?? null;
   const selectedId  = selectionId ?? voxelContainerId;
   const container   = selectedId ? containers[selectedId] : null;
-
-  // Track previously selected container for "Match Style"
-  const prevIdRef = useRef<string | null>(null);
-  const [prevSelectedId, setPrevSelectedId] = useState<string | null>(null);
-  useEffect(() => {
-    if (selectedId && selectedId !== prevIdRef.current) {
-      setPrevSelectedId(prevIdRef.current);
-      prevIdRef.current = selectedId;
-    }
-  }, [selectedId]);
 
   // ★ Inspector auto-switch: show whenever a container is selected OR any voxel is selected
   const isInspecting = !!(container && selectedId);
@@ -911,9 +821,9 @@ export default function Sidebar() {
       }}>
         {isInspecting && container ? (
           <Inspector
+            key={selectedId}
             container={container}
             containerId={selectedId!}
-            prevContainerId={prevSelectedId}
           />
         ) : viewMode === ViewMode.Realistic3D ? (
           <DesignModePanel />

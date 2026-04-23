@@ -28,7 +28,7 @@ export default function ContainerContextMenu() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeMenu();
     };
-    const onClick = (e: MouseEvent) => {
+    const onClick = () => {
       closeMenu();
     };
     window.addEventListener("keydown", onKey);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useStore } from '@/store/useStore';
+import { useStore, type StoreState } from '@/store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Layers, Box } from 'lucide-react';
 import { ContainerPresetRow } from './ContainerPresetRow';
@@ -12,16 +12,16 @@ interface Props {
 
 export function ContainerTab({ containerId }: Props) {
   const { inspectorView, setInspectorView, frameMode, setFrameMode } = useStore(
-    useShallow((s: any) => ({
-      inspectorView: s.inspectorView as 'floor' | 'ceiling',
+    useShallow((s: StoreState) => ({
+      inspectorView: s.inspectorView,
       setInspectorView: s.setInspectorView,
-      frameMode: s.frameMode as boolean,
+      frameMode: s.frameMode,
       setFrameMode: s.setFrameMode,
     }))
   );
 
   const { containers, stampArea } = useStore(
-    useShallow((s: any) => ({
+    useShallow((s: StoreState) => ({
       containers: s.containers,
       stampArea: s.stampArea,
     }))
@@ -33,7 +33,7 @@ export function ContainerTab({ containerId }: Props) {
     const container = containers[containerId];
     if (!container?.voxelGrid) return;
     const activeIndices = container.voxelGrid
-      .map((v: any, i: number) => (v.active ? i : -1))
+      .map((v, i) => (v.active ? i : -1))
       .filter((i: number) => i >= 0);
     if (activeIndices.length > 0) {
       stampArea(containerId, activeIndices, preset.faces);

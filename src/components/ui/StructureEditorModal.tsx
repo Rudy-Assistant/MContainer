@@ -12,8 +12,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/store/useStore";
-import { CONTAINER_DIMENSIONS, WallSide } from "@/types/container";
-import { X, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { CONTAINER_DIMENSIONS } from "@/types/container";
+import { X, RotateCcw, EyeOff } from "lucide-react";
 
 // ── Element Key Definitions ──────────────────────────────────
 

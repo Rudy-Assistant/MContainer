@@ -9,7 +9,7 @@ import { ViewMode, type SurfaceType, type VoxelFaces, FURNITURE_CATALOG } from "
 import { MODULE_PRESETS, resolveModuleFaces } from "@/config/moduleCatalog";
 import { THEMES, type ThemeId } from "@/config/themes";
 
-import { useHotbarAutoSwitch, MATERIAL_SWATCHES, getVisibleSwatches } from '../../hooks/useHotbarAutoSwitch';
+import { useHotbarAutoSwitch, getVisibleSwatches } from '../../hooks/useHotbarAutoSwitch';
 
 // ── Room module slots for the Rooms tab ─────────────────────────
 const ROOM_SLOTS = MODULE_PRESETS.filter(p =>
@@ -98,8 +98,6 @@ const FIXED_PRESETS: Array<{
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
     contexts: ['wall', 'floor', 'roof'] },
 ];
-
-// MATERIAL_SWATCHES imported from useHotbarAutoSwitch
 
 // ── Human-readable surface names for tooltips ────────────────
 const SURFACE_NAME: Record<SurfaceType, string> = {
@@ -559,7 +557,6 @@ function svgFaceColor(s: SurfaceType, themeId?: ThemeId): string {
 export function SvgVoxelIcon({
   faces,
   size = 70,
-  activeFace,
   themeId,
 }: {
   faces: VoxelFaces;
@@ -644,12 +641,6 @@ export function SvgVoxelIcon({
       {!isFloorOnly && isDoor(faces.n) && (() => {
         // Show door as a rectangle cutout in the back wall
         const midX = (vx.B_BL[0] + vx.B_BR[0]) / 2;
-        const midTX = (vx.B_TL[0] + vx.B_TR[0]) / 2;
-        const doorH = 0.8; // 80% height
-        const dTL: [number,number] = [vx.B_BL[0] + (vx.B_TL[0]-vx.B_BL[0])*doorH*0.3 + (midTX-vx.B_TL[0])*0.2,
-                                       vx.B_BL[1] + (vx.B_TL[1]-vx.B_BL[1])*doorH];
-        const dTR: [number,number] = [vx.B_BR[0] + (vx.B_TR[0]-vx.B_BR[0])*doorH*0.3 + (midTX-vx.B_TR[0])*0.2,
-                                       vx.B_BR[1] + (vx.B_TR[1]-vx.B_BR[1])*doorH];
         return <>
           <polygon points={polyStr([vx.B_BL, vx.B_BR, vx.B_TR, vx.B_TL])}
             fill="#78909c" style={{ filter: 'brightness(0.65)' }}
@@ -746,7 +737,7 @@ export function SvgVoxelIcon({
 // Shows 3 visible faces (top, south, east) with surface-specific fills
 // and inner structural detail overlays for physical accuracy
 
-export function CssVoxelIcon({ faces, size = 20, activeFace, themeId }: { faces: VoxelFaces; size?: number; activeFace?: keyof VoxelFaces; themeId?: ThemeId }) {
+export function CssVoxelIcon({ faces, activeFace, themeId }: { faces: VoxelFaces; size?: number; activeFace?: keyof VoxelFaces; themeId?: ThemeId }) {
   const cubeSide = 44;                    // Uniform cube — game-standard isometric tile
   const wX = cubeSide;                    // South face width
   const wZ = cubeSide;                    // East face width
@@ -1081,7 +1072,10 @@ function PresetSchematicIcon({ faces, size = 48 }: { faces: VoxelFaces; size?: n
 /** Exported mini 3D icon component for hotbar slots. */
 export function MiniVoxel3D({ faces, size = 36, activeFace, themeId }: { faces: VoxelFaces; size?: number; activeFace?: keyof VoxelFaces; themeId?: ThemeId }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   if (!mounted) {
     return <CssVoxelIcon faces={faces} size={size * 0.72} activeFace={activeFace} themeId={themeId} />;
@@ -1110,24 +1104,19 @@ export function MiniVoxel3D({ faces, size = 36, activeFace, themeId }: { faces: 
 // ── Slot Button ─────────────────────────────────────────────
 
 function HotbarSlotButton({
-  slot, index, isActive, isCurrentMaterial, activeFace, onSelect, onHoverChange, themeId,
+  slot, index, isActive, isCurrentMaterial, onSelect,
 }: {
   slot: HotbarSlot;
   index: number;
   isActive: boolean;
   isCurrentMaterial: boolean;
-  activeFace?: keyof VoxelFaces;
   onSelect: (i: number) => void;
-  onHoverChange: (hoveredIndex: number | null) => void;
-  themeId?: ThemeId;
 }) {
   const accent = RARITY_ACCENT[slot.category];
 
   return (
     <button
       onClick={() => onSelect(index)}
-      onMouseEnter={() => onHoverChange(index)}
-      onMouseLeave={() => onHoverChange(null)}
       title={slot.label || `Slot ${slot.key}`}
       style={{
         width: 72,
@@ -1211,7 +1200,6 @@ export default function SmartHotbar() {
   const setActiveSlot = useStore((s) => s.setActiveHotbarSlot);
   const selection = useStore((s) => s.selection);
   const hoveredVoxelEdge = useStore((s) => s.hoveredVoxelEdge);
-  const hoveredVoxel = useStore((s) => s.hoveredVoxel);
   const faceContext = useStore((s) => s.faceContext);
   // facePreview hover removed (Sprint 15) — click to select, then click to apply
   // Module preset state
@@ -1245,15 +1233,24 @@ export default function SmartHotbar() {
   // Hotbar only shows on SELECTION (not hover) — stable for ghost preview workflow
   const showHotbar = hasSelection || hotbarHovered || isWalkthrough;
 
-  // Hover tooltip state
-  const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
-
   // ── Materials tab pagination (10 per page) ──
   const selectedFace = useStore((s) => s.selectedFace);
   const visibleSwatches = getVisibleSwatches(selectedFace);
   const materialPageCount = Math.ceil(visibleSwatches.length / 10);
-  const [materialPage, setMaterialPage] = useState(0);
-  useEffect(() => { setMaterialPage(0); }, [selectedFace]);
+  const [materialPager, setMaterialPager] = useState({ face: selectedFace, page: 0 });
+  const materialPage = materialPager.face === selectedFace
+    ? Math.min(materialPager.page, Math.max(materialPageCount - 1, 0))
+    : 0;
+  const setMaterialPageForSelectedFace = useCallback(
+    (update: number | ((page: number) => number)) => {
+      setMaterialPager((prev) => {
+        const currentPage = prev.face === selectedFace ? prev.page : 0;
+        const nextPage = typeof update === "function" ? update(currentPage) : update;
+        return { face: selectedFace, page: nextPage };
+      });
+    },
+    [selectedFace]
+  );
 
   // Eyedropper overlay — brief flash when activeBrush is set via Alt+click
   const activeBrush = useStore((s) => s.activeBrush);
@@ -1261,10 +1258,13 @@ export default function SmartHotbar() {
   const prevBrushRef = useRef<SurfaceType | null>(null);
   useEffect(() => {
     if (activeBrush && activeBrush !== prevBrushRef.current) {
-      setPickedName(SURFACE_NAME[activeBrush] ?? activeBrush);
-      const timer = setTimeout(() => setPickedName(null), 1500);
+      const showTimer = window.setTimeout(() => setPickedName(SURFACE_NAME[activeBrush] ?? activeBrush), 0);
+      const hideTimer = window.setTimeout(() => setPickedName(null), 1500);
       prevBrushRef.current = activeBrush;
-      return () => clearTimeout(timer);
+      return () => {
+        window.clearTimeout(showTimer);
+        window.clearTimeout(hideTimer);
+      };
     }
     prevBrushRef.current = activeBrush;
   }, [activeBrush]);
@@ -1328,7 +1328,7 @@ export default function SmartHotbar() {
         const curTab = useStore.getState().activeHotbarTab;
         if (curTab === 2) {
           // Materials tab: paginate forward
-          setMaterialPage(p => (p + 1) % materialPageCount);
+          setMaterialPageForSelectedFace(p => (p + 1) % materialPageCount);
         } else {
   
           cycleHotbarTab(1);
@@ -1340,7 +1340,7 @@ export default function SmartHotbar() {
         const curTab = useStore.getState().activeHotbarTab;
         if (curTab === 2) {
           // Materials tab: paginate backward
-          setMaterialPage(p => (p - 1 + materialPageCount) % materialPageCount);
+          setMaterialPageForSelectedFace(p => (p - 1 + materialPageCount) % materialPageCount);
         } else {
   
           cycleHotbarTab(-1);
@@ -1384,7 +1384,17 @@ export default function SmartHotbar() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeSlot, setActiveSlot, materialPage, materialPageCount]);
+  }, [
+    activeSlot,
+    setActiveSlot,
+    setActiveModulePreset,
+    rotateModuleOrientation,
+    cycleHotbarTab,
+    materialPage,
+    materialPageCount,
+    visibleSwatches,
+    setMaterialPageForSelectedFace,
+  ]);
 
   // Scroll-wheel cycling REMOVED (Sprint 14) — scroll now always means camera zoom.
   // Material cycling: use hotbar number keys (1-9) + click/E to apply.
@@ -1408,8 +1418,6 @@ export default function SmartHotbar() {
   const activePreset = activeSlot !== null && activeSlot < FIXED_PRESETS.length ? FIXED_PRESETS[activeSlot] : null;
   const activeAccent = activePreset ? RARITY_ACCENT[activePreset.category] : null;
   const activeLabel = activePreset?.label ?? null;
-
-  // hoveredSlot still used for visual highlight glow on buttons — label display is select-only
 
   // Dot+Ring indicator REMOVED (Sprint 15) — was visually noisy.
 
@@ -1561,10 +1569,7 @@ export default function SmartHotbar() {
                   index={i}
                   isActive={isActive}
                   isCurrentMaterial={currentMaterialSlot === i && !isActive}
-                  activeFace={isActive ? hoveredVoxelEdge?.face : undefined}
                   onSelect={handleSelect}
-                  onHoverChange={setHoveredSlot}
-                  themeId={currentTheme}
                 />
               </div>
             );
@@ -1663,7 +1668,7 @@ export default function SmartHotbar() {
         >
           {/* Prev page arrow */}
           <button
-            onClick={() => setMaterialPage(p => (p - 1 + materialPageCount) % materialPageCount)}
+            onClick={() => setMaterialPageForSelectedFace(p => (p - 1 + materialPageCount) % materialPageCount)}
             style={{
               background: "none", border: "none", cursor: "pointer",
               fontSize: 16, color: materialPage > 0 ? "#475569" : "#cbd5e1",
@@ -1747,7 +1752,7 @@ export default function SmartHotbar() {
 
           {/* Next page arrow */}
           <button
-            onClick={() => setMaterialPage(p => (p + 1) % materialPageCount)}
+            onClick={() => setMaterialPageForSelectedFace(p => (p + 1) % materialPageCount)}
             style={{
               background: "none", border: "none", cursor: "pointer",
               fontSize: 16, color: materialPage < materialPageCount - 1 ? "#475569" : "#cbd5e1",

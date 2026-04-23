@@ -45,19 +45,18 @@ import { useSelectedVoxel, getSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import { useSelectedVoxels, getSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import {
   type Container,
+  type LightPlacement,
   type SurfaceType,
   type VoxelFaces,
   CONTAINER_DIMENSIONS,
   VOXEL_COLS,
   VOXEL_ROWS,
-  VOXEL_LEVELS,
-  WallSide,
   ViewMode,
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
-import { type ThemeId, THEMES } from "@/config/themes";
-import { _themeMats, type ThemeMaterialSet, getMaterialForFace, getFrameThreeMaterial } from "@/config/materialCache";
+import { type ThemeId } from "@/config/themes";
+import { _themeMats, getMaterialForFace, getFrameThreeMaterial } from "@/config/materialCache";
 import type { FaceFinish } from "@/types/container";
 import { isRailingSurface } from "@/types/container";
 import {
@@ -66,10 +65,11 @@ import {
   RAILING_FOLD_SPEED, RAILING_FOLD_EXIT_SPEED,
   PILLAR_FOLD_SPEED,
 } from "@/config/unpackAnimations";
-import { getBayGroupForVoxel, getBayIndicesForVoxel } from "@/config/bayGroups";
-import { computePolePositions, computeRailPositions, type PolePosition, type RailPosition } from "@/utils/smartPoles";
-import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
+import { getBayIndicesForVoxel } from "@/config/bayGroups";
+import { computePolePositions, computeRailPositions } from "@/utils/smartPoles";
+import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER } from "@/config/highlightColors";
 import { makePoleKey, resolveFrameProperty, type PoleShape, type RailShape } from "@/config/frameMaterials";
+import { getBox, getCyl, getPoleGeometry, getRailGeometry } from "./containerSkinGeometry";
 import LightFixture from './LightFixture';
 import ElectricalPlate from './ElectricalPlate';
 import { formRegistry } from "@/config/formRegistry";
@@ -177,7 +177,6 @@ const DECK_THICK  = 0.05;   // deck plank slab thickness
 
 // Convenience aliases — updated per render by useThemeMats() hook
 let mSteel      = _themeMats.industrial.steel;
-let mSteelInner = _themeMats.industrial.steelInner;
 let mGlass      = _themeMats.industrial.glass;
 let mFrame      = _themeMats.industrial.frame;
 let mWood       = _themeMats.industrial.wood;
@@ -190,7 +189,6 @@ let mConcrete   = _themeMats.industrial.concrete;
 function syncThemeMats(theme: ThemeId) {
   const set = _themeMats[theme];
   mSteel      = set.steel;
-  mSteelInner = set.steelInner;
   mGlass      = set.glass;
   mFrame      = set.frame;
   mWood       = set.wood;
@@ -215,83 +213,15 @@ const mShoji = new THREE.MeshPhysicalMaterial({
   transmission: 0.6, transparent: true, opacity: 0.70, side: THREE.DoubleSide,
 });
 
-const mHover = new THREE.MeshStandardMaterial({
-  color: 0x00e5ff, emissive: new THREE.Color(0x00e5ff), emissiveIntensity: 0.25,
-  transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false,
-});
-const mGhost = new THREE.MeshStandardMaterial({
-  color: 0x00e5ff, emissive: new THREE.Color(0x00e5ff), emissiveIntensity: 0.22,
-  transparent: true, opacity: 0.20, side: THREE.DoubleSide, depthWrite: false,
-});
-// ── Emissive ceiling panel light — warm interior glow visible through glass ──
-const mCeilingLight = new THREE.MeshStandardMaterial({
-  color: 0xfff8f0,
-  emissive: new THREE.Color(0xffe8c0),
-  emissiveIntensity: 0.8,
-  metalness: 0.05,
-  roughness: 0.5,
-  side: THREE.DoubleSide,
-});
-
 // Transparent hit-box — opacity 0.001 guarantees raycaster intersection
 // while remaining invisible. Pure opacity:0 can skip raycasts in some R3F versions.
 const mHit = new THREE.MeshBasicMaterial({
   transparent: true, opacity: 0.001, side: THREE.DoubleSide, depthWrite: false,
   colorWrite: false,
 });
-const mSelect = new THREE.LineBasicMaterial({ color: HIGHLIGHT_COLOR_SELECT, depthTest: false });
 // Pre-allocated colors for mHit debug toggle (avoids allocation per toggle)
 const _COLOR_DEBUG_HIT = new THREE.Color(0x44aaff);
 const _COLOR_DEBUG_OFF = new THREE.Color(0xffffff);
-// Yellow emissive hover — always visible "E-cycle" indicator
-const mHoverWire = new THREE.LineBasicMaterial({ color: HIGHLIGHT_COLOR_HOVER, depthTest: false, linewidth: 2 });
-// Voxel-level edge outlines — hover=yellow, selected=blue. No solid fill.
-const mVoxelHoverLine  = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.55, depthTest: false });
-const mVoxelSelectLine = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_SELECT, transparent: true, opacity: 0.75, depthTest: false });
-const mHoverGlow = new THREE.MeshStandardMaterial({
-  color: HIGHLIGHT_HEX_HOVER, emissive: new THREE.Color(HIGHLIGHT_HEX_HOVER), emissiveIntensity: 0.3,
-  transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false,
-});
-// Edge-specific glow for Smart Edge hover
-const mEdgeGlow = new THREE.MeshStandardMaterial({
-  color: HIGHLIGHT_HEX_HOVER, emissive: new THREE.Color(HIGHLIGHT_HEX_HOVER), emissiveIntensity: 0.3,
-  transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false,
-});
-// ★ Phase 2 WYSIWYC: Cyan highlight for structural edge beams on hover
-const mEdgeBeamHover = new THREE.MeshStandardMaterial({
-  color: 0x06b6d4, emissive: new THREE.Color(0x06b6d4), emissiveIntensity: 0.6,
-  metalness: 0.7, roughness: 0.25,
-});
-// Structural edge beam dimensions
-const EDGE_BEAM_W = 0.04;  // beam cross-section width
-const EDGE_BEAM_D = 0.04;  // beam cross-section depth
-
-// ── Phase 2 WYSIWYC: Dashed bounding box for empty tile selection ──
-const mDashedHover = new THREE.LineDashedMaterial({
-  color: 0x06b6d4, dashSize: 0.15, gapSize: 0.10,
-  transparent: true, opacity: 0.7,
-});
-const mDashedSelect = new THREE.LineDashedMaterial({
-  color: 0x00e5ff, dashSize: 0.12, gapSize: 0.06,
-  transparent: true, opacity: 0.9,
-});
-
-// ── Baseplate materials (Phase 2 — Lego ground grid) ───────────
-const mBaseplate = new THREE.MeshBasicMaterial({
-  color: 0x455a64, transparent: true, opacity: 0.10,
-  side: THREE.DoubleSide, depthWrite: false,
-});
-const mBaseplateHover = new THREE.MeshBasicMaterial({
-  color: 0x00e5ff, transparent: true, opacity: 0.14,
-  side: THREE.DoubleSide, depthWrite: false,
-});
-const mBaseplateSelect = new THREE.MeshBasicMaterial({
-  color: 0x90caf9, transparent: true, opacity: 0.30,
-  side: THREE.DoubleSide, depthWrite: false,
-});
-const mBaseplateWire = new THREE.LineBasicMaterial({
-  color: 0x546e7a, transparent: true, opacity: 0.30,
-});
 
 import { nullRaycast } from '@/utils/nullRaycast';
 import { validateStaircasePlacement } from '@/utils/staircaseValidation';
@@ -303,69 +233,6 @@ const frameHoverMat = new THREE.MeshStandardMaterial({
 const frameSelectMat = new THREE.MeshStandardMaterial({
   color: HIGHLIGHT_HEX_SELECT, metalness: 0.85, roughness: 0.2, envMapIntensity: 0.8,
 });
-
-// ── Geometry caches ────────────────────────────────────────────
-
-const _box = new Map<string, THREE.BufferGeometry>();
-function getBox(w: number, h: number, d: number): THREE.BufferGeometry {
-  // Guard: clamp to minimum positive values to avoid degenerate geometry
-  const safeW = Math.max(w, 0.001);
-  const safeH = Math.max(h, 0.001);
-  const safeD = Math.max(d, 0.001);
-  const k = `${safeW.toFixed(3)}_${safeH.toFixed(3)}_${safeD.toFixed(3)}`;
-  if (!_box.has(k)) _box.set(k, new THREE.BoxGeometry(safeW, safeH, safeD));
-  return _box.get(k)!;
-}
-
-const _cyl = new Map<string, THREE.BufferGeometry>();
-function getCyl(r: number, h: number): THREE.BufferGeometry {
-  // Guard: clamp to minimum positive values to avoid degenerate geometry
-  const safeR = Math.max(r, 0.001);
-  const safeH = Math.max(h, 0.001);
-  const k = `${safeR.toFixed(3)}_${safeH.toFixed(3)}`;
-  if (!_cyl.has(k)) _cyl.set(k, new THREE.CylinderGeometry(safeR, safeR, safeH, 8));
-  return _cyl.get(k)!;
-}
-
-function getPoleGeometry(r: number, h: number, shape: PoleShape): THREE.BufferGeometry {
-  switch (shape) {
-    case 'Square':   return getBox(r * 2, h, r * 2);
-    case 'I-Beam':   return getBox(r * 2.5, h, r * 1.2);
-    case 'H-Beam':   return getBox(r * 1.2, h, r * 2.5);
-    default:         return getCyl(r, h);
-  }
-}
-
-function getRailGeometry(r: number, length: number, shape: RailShape): THREE.BufferGeometry {
-  switch (shape) {
-    case 'Square':   return getBox(r * 2, length, r * 2);
-    case 'Channel':  return getBox(r * 2.5, length, r * 1.5);
-    default:         return getCyl(r, length);
-  }
-}
-
-const _edges = new Map<string, THREE.BufferGeometry>();
-function getEdges(w: number, h: number, d: number): THREE.BufferGeometry {
-  const k = `${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}`;
-  if (!_edges.has(k)) {
-    const b = new THREE.BoxGeometry(w, h, d);
-    const eg = new THREE.EdgesGeometry(b);
-    // computeLineDistances required for LineDashedMaterial to render dashes
-    const pos = eg.attributes.position;
-    const dist: number[] = [];
-    const v0 = new THREE.Vector3(), v1 = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i += 2) {
-      v0.fromBufferAttribute(pos, i);
-      v1.fromBufferAttribute(pos, i + 1);
-      const d2 = v0.distanceTo(v1);
-      dist.push(0, d2);
-    }
-    eg.setAttribute('lineDistance', new THREE.Float32BufferAttribute(dist, 1));
-    _edges.set(k, eg);
-    b.dispose();
-  }
-  return _edges.get(k)!;
-}
 
 // ── Face Render Error Boundary ─────────────────────────────────
 // Catches silent Three.js render crashes in face components (e.g. degenerate
@@ -858,7 +725,7 @@ const WINDOW_PROFILES: Record<string, { sillRatio: number; headRatio: number }> 
 };
 
 /** Composite window face: stacked steel + glass + steel panels. */
-function WindowFace({ w, h, d, isNS, sillRatio, headRatio, frameMat }: {
+function WindowFace({ w, h, isNS, sillRatio, headRatio, frameMat }: {
   w: number; h: number; d: number; isNS: boolean;
   sillRatio: number; headRatio: number;
   frameMat?: THREE.MeshStandardMaterial;
@@ -1047,7 +914,7 @@ interface FaceProps {
   connectedEnd?: boolean;
   onEnter:    () => void;
   onLeave:    () => void;
-  onClick:    (e?: any) => void;
+  onClick:    (e?: ThreeEvent<MouseEvent>) => void;
   onDoubleClick?: () => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
   /** Whether this face's door/shoji is open */
@@ -1066,8 +933,8 @@ interface FaceProps {
 
 function SingleFace({
   dir, surface, colPitch, rowPitch, vHeight, vOffset,
-  activeBrush, isHovered, isVoxelSelected, connectedStart, connectedEnd,
-  onEnter, onLeave, onClick, onDoubleClick, onContextMenu, isOpen, doorState, doorConfig,
+  connectedStart, connectedEnd,
+  isOpen, doorState, doorConfig,
   wallCutScale = 1.0, faceFinish, theme: activeTheme,
 }: FaceProps) {
   const halfCol = colPitch / 2;
@@ -1120,7 +987,7 @@ function SingleFace({
   const displayIsRailing = isRailingSurface(displaySurface);
 
   /** Initialize railing fold state: rotation at -PI/2 (lying flat in floor) */
-  const initRailingFold = (g: THREE.Group, inner: THREE.Group | null) => {
+  const initRailingFold = useCallback((g: THREE.Group, inner: THREE.Group | null) => {
     // Railing fold pivot: bottom edge of face. Outer rotates, inner offsets children.
     const foldAxis = isNS ? 'x' : 'z';
     const foldSign = (dir === 'n' || dir === 'e') ? 1 : -1;
@@ -1130,14 +997,14 @@ function SingleFace({
     g.scale.set(1, 1, 1);
     g.position.set(0, -vHeight / 2, 0);
     if (inner) inner.position.set(0, vHeight / 2, 0);
-  };
+  }, [dir, isNS, vHeight]);
 
   /** Initialize wall scale state: Y-scale 0 at floor */
-  const initWallScale = (g: THREE.Group) => {
+  const initWallScale = useCallback((g: THREE.Group) => {
     g.scale.set(1, 0, 1);
     g.position.y = -vHeight / 2;
     g.rotation.set(0, 0, 0);
-  };
+  }, [vHeight]);
 
   useEffect(() => {
     if (prevSurface.current === null) {
@@ -1156,7 +1023,6 @@ function SingleFace({
           initWallScale(groupRef.current);
         }
       }
-      setDisplaySurface(surface);
       return;
     }
 
@@ -1177,6 +1043,7 @@ function SingleFace({
     exitingRef.current = false;
     animating.current = true;
     wasRailingRef.current = isRailing;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- displaySurface intentionally trails surface so exit/fold animations can render the prior face.
     setDisplaySurface(surface);
     if (groupRef.current) {
       if (isHoriz) {
@@ -1188,7 +1055,7 @@ function SingleFace({
         initWallScale(groupRef.current);
       }
     }
-  }, [surface, isHoriz, dir, isRailing, vHeight]);
+  }, [surface, isHoriz, dir, isRailing, vHeight, initRailingFold, initWallScale]);
 
   // Precompute direction-derived constants (stable for lifetime of this face)
   const foldAxis = isNS ? 'x' as const : 'z' as const;
@@ -1365,15 +1232,6 @@ function SingleFace({
     }
   }
 
-  // ★ Phase 7 OCCLUSION NUKE: Event handlers live on the HITBOX MESH ONLY.
-  // Visual meshes are siblings in the group but have NO handlers attached,
-  // so R3F's internal raycaster never tests them → definitive anti-occlusion.
-  const evtEnter = useCallback((e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); onEnter(); document.body.style.cursor = 'pointer'; }, [onEnter]);
-  const evtLeave = useCallback((e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); onLeave(); document.body.style.cursor = 'auto'; }, [onLeave]);
-  const evtClick = useCallback((e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onClick(); }, [onClick]);
-  const evtDbl   = useMemo(() => onDoubleClick ? (e: any) => { e.stopPropagation(); onDoubleClick(); } : undefined, [onDoubleClick]);
-  const evtCtx   = useMemo(() => onContextMenu ? (e: any) => { e.stopPropagation(); e.nativeEvent?.preventDefault?.(); onContextMenu(e); } : undefined, [onContextMenu]);
-
   // Drawbridge pivot: horizontal faces hinge at the -Z edge (north boundary)
   // so rotation.x creates a true fold-out/fold-down effect instead of center-spin.
   // Walls use no offset (scale animation only).
@@ -1414,8 +1272,7 @@ interface EdgeStripProps {
 }
 
 function VoxelEdgeStrip({
-  dir, colPitch, rowPitch, vHeight, vOffset,
-  containerId, voxelIndex, isEdgeHovered,
+  dir, colPitch, rowPitch, vHeight, isEdgeHovered,
 }: EdgeStripProps) {
   // ★ Purely visual — all interaction handled by floor hitbox Smart Edge
   const isNS    = dir === "n" || dir === "s";
@@ -1705,6 +1562,7 @@ function ExtensionUnpack({
   });
 
   // If no phase, render children directly at rest
+  // eslint-disable-next-line react-hooks/refs -- This animation wrapper intentionally short-circuits once its imperative unpack progress has settled.
   if (!phase && progressRef.current >= 1) {
     return <group>{children}</group>;
   }
@@ -1953,7 +1811,7 @@ export const BASEPLATE_STRIP = 0.53;      // Edge strip depth — wall selection
 function BaseplateCell({
   px, pz, colPitch, rowPitch, vHeight,
   containerId, voxelIndex,
-  clipFaces, isValid, isLocked,
+  clipFaces, isLocked,
   isHovered,
   onEnter, onLeave, onClick, onPointerDown, onContextMenu,
 }: {
@@ -1961,10 +1819,9 @@ function BaseplateCell({
   colPitch: number; rowPitch: number; vHeight: number;
   containerId: string; voxelIndex: number;
   clipFaces: VoxelFaces | null;
-  isValid: boolean;
   isLocked: boolean;
   isHovered: boolean;
-  onEnter: () => void; onLeave: () => void; onClick: (e?: any) => void;
+  onEnter: () => void; onLeave: () => void; onClick: (e?: ThreeEvent<MouseEvent>) => void;
   onPointerDown?: () => void;
   onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
 }) {
@@ -2100,11 +1957,9 @@ export default function ContainerSkin({
 }) {
   const debugMode         = useStore((s) => s.debugMode);
   const setSelectedElements = useStore((s) => s.setSelectedElements);
-  const setVoxelActive    = useStore((s) => s.setVoxelActive);
   const activeBrush       = useStore((s) => s.activeBrush);
   const setVoxelFace      = useStore((s) => s.setVoxelFace);
   const cycleVoxelFace    = useStore((s) => s.cycleVoxelFace);
-  const cycleVoxelTemplate = useStore((s) => s.cycleVoxelTemplate);
   const cycleBlockPreset   = useStore((s) => s.cycleBlockPreset);
   const select            = useStore((s) => s.select);
   const selectedVoxel     = useSelectedVoxel();
@@ -2112,11 +1967,6 @@ export default function ContainerSkin({
   const hoveredVoxelEdge  = useStore((s) => s.hoveredVoxelEdge);
   const setHoveredVoxel   = useStore((s) => s.setHoveredVoxel);
   const setHoveredVoxelEdge = useStore((s) => s.setHoveredVoxelEdge);
-  const clipboardVoxel    = useStore((s) => s.clipboardVoxel);
-  const activeHotbarSlot     = useStore((s) => s.activeHotbarSlot);
-  const activeModulePreset   = useStore((s) => s.activeModulePreset);
-  const hasToolEquipped      = activeHotbarSlot !== null || activeModulePreset !== null;
-  const stampFromHotbar      = useStore((s) => s.stampFromHotbar);
   const getStampFaces        = useStore((s) => s.getStampFaces);
   const getStampFootprint    = useStore((s) => s.getStampFootprint);
   const clearStairExit       = useStore((s) => s.clearStairExit);
@@ -2156,7 +2006,6 @@ export default function ContainerSkin({
   // ★ PILLAR 3: Subterranean Concrete Morph — basement containers auto-swap steel→concrete
   if (container.level < 0) {
     mSteel = mConcrete;
-    mSteelInner = mConcrete;
   }
 
   const [hovered, setHovered] = useState<string | null>(null);
@@ -2213,7 +2062,10 @@ export default function ContainerSkin({
     }
     return count;
   });
-  const fullyOccupiedFaces = useMemo(() => getFullyOccupiedFaces(useStore.getState().sceneObjects, container.id), [containerFaceObjectCount, container.id]);
+  const fullyOccupiedFaces = useMemo(() => {
+    void containerFaceObjectCount;
+    return getFullyOccupiedFaces(useStore.getState().sceneObjects, container.id);
+  }, [containerFaceObjectCount, container.id]);
 
   // ★ Fix 2: Clear stale hoveredVoxelEdge + pending leave timer on unmount or container change
   useEffect(() => {
@@ -2256,13 +2108,9 @@ export default function ContainerSkin({
 
   const dims      = CONTAINER_DIMENSIONS[container.size];
   const vHeight   = dims.height;                       // Y: 2.59m or 2.90m HC
-  const coreWidth = dims.length / 6;                   // X per core col: ~2.03m
-  const coreDepth = dims.width  / 2;                   // Z per core row: 1.22m
-  const foldDepth = dims.height;                       // halo outward projection = container height
   const vOffset   = vHeight / 2;
 
   /** Per-voxel layout: delegates to the exported pure function. */
-  // eslint-disable-next-line @typescript-eslint/no-shadow
   const getVoxelLayout = useCallback((col: number, row: number) => {
     const fD = dims.height;
     const cW = dims.length / 6;
@@ -2373,7 +2221,7 @@ export default function ContainerSkin({
         if ((activeLightType === 'ceiling' && faceName === 'top') ||
             (activeLightType === 'lamp' && faceName === 'bottom')) {
           const store = useStore.getState();
-          const existing = container.lights?.find((l: any) => l.voxelIndex === voxelIndex);
+          const existing = container.lights?.find((l: LightPlacement) => l.voxelIndex === voxelIndex);
           if (existing) {
             store.removeLight(container.id, voxelIndex);
           } else {
@@ -2429,7 +2277,7 @@ export default function ContainerSkin({
         cycleVoxelFace(container.id, voxelIndex, faceName);
       }
     },
-    [container.id, activeBrush, bucketMode, bucketSurface, selectedVoxel, setSelectedElements, setVoxelFace, cycleVoxelFace, paintFace]
+    [container.id, container.voxelGrid, container.lights, activeBrush, bucketMode, bucketSurface, selectedVoxel, setVoxelFace, cycleVoxelFace, paintFace]
   );
 
   const handleContextMenu = useCallback(
@@ -2524,7 +2372,7 @@ export default function ContainerSkin({
         }
       }
     });
-  }, [grid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [grid]);
 
   // ── Dollhouse Cutaway (Phase 9) ───────────────────────────
   // Uses ref instead of useState to avoid full ContainerSkin re-render from useFrame.
@@ -2627,7 +2475,6 @@ export default function ContainerSkin({
                 containerId={container.id}
                 voxelIndex={idx}
                 clipFaces={getStampFaces()}
-                isValid={true}
                 isLocked={!!lockedVoxels[`${container.id}_${idx}`]}
                 isHovered={hovered === baseKey || isInFootprint(col, row)}
                 onEnter={() => {
@@ -2659,6 +2506,7 @@ export default function ContainerSkin({
                   }, 250);
                 }}
                 onContextMenu={(e: ThreeEvent<MouseEvent>) => {
+                  e.stopPropagation();
                   if (bayIndicesForVoxel) {
                     useStore.getState().setSelectedElements({ type: 'bay', items: bayIndicesForVoxel.map((i: number) => ({ containerId: container.id, id: String(i) })) });
                   } else {
@@ -2730,9 +2578,12 @@ export default function ContainerSkin({
         // ── ACTIVE VOXEL → full face rendering with permanent hitboxes ──
 
         const isSelected =
+          (
           selectedVoxel?.containerId === container.id &&
           !selectedVoxel?.isExtension &&
-          selectedVoxel?.index === idx;
+          selectedVoxel?.index === idx
+          ) ||
+          !!(selectedVoxels?.containerId === container.id && selectedVoxels.indices.includes(idx));
 
         const isHaloVoxel =
           col === 0 || col === VOXEL_COLS - 1 ||
@@ -2814,13 +2665,13 @@ export default function ContainerSkin({
               doorConfig={voxel.doorConfig?.[dir]}
               onEnter={() => { setHovered(faceKey); useStore.getState().setHoverState({ hoveredVoxel: { containerId: container.id, index: idx }, hoveredVoxelEdge: null, hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null }); handlePaintDragMove(idx, dir); }}
               onLeave={() => { setHovered((k) => (k === faceKey ? null : k)); useStore.getState().setHoverState({ hoveredVoxel: null, hoveredVoxelEdge: null, hoveredBayGroup: null }); }}
-              onClick={(e?: any) => {
+              onClick={(e?: ThreeEvent<MouseEvent>) => {
                 // Ctrl+click starts drag-paint mode
                 if (e?.ctrlKey && handlePaintDragStart(idx, dir, true)) return;
                 handleClick(idx, dir);
               }}
               onDoubleClick={undefined}
-              onContextMenu={(e: any) => handleContextMenu(idx, dir, e.nativeEvent ?? e)}
+              onContextMenu={(e: ThreeEvent<MouseEvent>) => handleContextMenu(idx, dir, e.nativeEvent)}
               wallCutScale={wallCutScale}
               faceFinish={voxel.faceFinishes?.[dir]}
               theme={currentTheme}
@@ -2926,21 +2777,6 @@ export default function ContainerSkin({
                 });
                 document.body.style.cursor = 'pointer';
               };
-              const onLeaveShared = (e: ThreeEvent<PointerEvent>) => {
-                e.stopPropagation();
-                setHoveredVoxelEdge(null);
-                setFaceContext(null);
-                if (bayIndices) {
-                  useStore.getState().setHoveredBayGroup(null);
-                }
-                document.body.style.cursor = 'auto';
-                // Debounce clearing hoveredVoxel — gives cursor 250ms to travel between hitboxes or to SmartHotbar
-                if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
-                leaveTimerRef.current = setTimeout(() => {
-                  setHoveredVoxel(null);
-                  leaveTimerRef.current = null;
-                }, 250);
-              };
               // Debounced leave for edge strips / ceiling hitboxes — same pattern as onLeaveShared
               const onLeaveEdge = () => {
                 // hoveredEdge removed
@@ -3001,7 +2837,7 @@ export default function ContainerSkin({
               };
               // ★ MACRO: center click on already-selected block cycles full block presets
               // (Empty→Deck→Room→Sunroom→Balcony). Edge clicks remain face-specific (MICRO).
-              const onClickCenter = (e: ThreeEvent<MouseEvent>) => {
+              const onClickCenter = (e: ThreeEvent<MouseEvent> | ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
                 // ★ Object placement mode: intercept center clicks for floor/ceiling placement (Fix 8)
                 if (tryPlacementIntercept(container.id, idx, 'bottom')) return;
@@ -3019,7 +2855,7 @@ export default function ContainerSkin({
                 const sv = getSelectedVoxel();
                 const svs = getSelectedVoxels();
                 const isSelected =
-                  (sv?.containerId === container.id && !sv?.isExtension && (sv as any)?.index === idx) ||
+                  (sv?.containerId === container.id && sv.isExtension !== true && sv.index === idx) ||
                   (bayIndices && svs && svs.containerId === container.id &&
                    bayIndices.every((i: number) => svs.indices.includes(i)));
                 if (!isSelected) {
@@ -3042,7 +2878,7 @@ export default function ContainerSkin({
                   }
                 }
               };
-              const onClickEdge = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
+              const onClickEdge = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent> | ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
                 // ★ Object placement mode: intercept edge clicks to place scene objects (Fix 8)
                 if (tryPlacementIntercept(container.id, idx, face)) return;
@@ -3115,8 +2951,6 @@ export default function ContainerSkin({
                 cycleVoxelFace(container.id, idx, face);
               };
 
-              const halfX = voxW / 2;
-              const halfZ = voxD / 2;
               return (
                 <>
                   {/* ── All hitboxes — disabled in preview/ghost mode or frame mode ── */}
@@ -3149,7 +2983,7 @@ export default function ContainerSkin({
                               }}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
-                                onClickCenter(e as any);
+                                onClickCenter(e);
                               }}
                               onDoubleClick={(e: ThreeEvent<MouseEvent>) => {
                                 e.stopPropagation();
@@ -3270,7 +3104,7 @@ export default function ContainerSkin({
                               onPointerLeave={onLeaveEdge}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
-                                onClickEdge('top')(e as any);
+                                onClickEdge('top')(e);
                               }}
 
                               onContextMenu={onCtxShared('top')}
@@ -3482,6 +3316,13 @@ export default function ContainerSkin({
           <mesh
             geometry={getPoleGeometry(PILLAR_R, poleH, resolvedShapeName)}
             material={poleMat}
+            userData={{
+              frameElementType: 'pole',
+              frameElementKey: poleKey,
+              frameShape: resolvedShapeName,
+              frameMaterial: resolvedMatName,
+              containerId: container.id,
+            }}
             castShadow
             raycast={frameMode ? undefined : nullRaycast}
             onPointerOver={frameMode ? (e) => {
@@ -3538,6 +3379,13 @@ export default function ContainerSkin({
             rotation={railRot}
             geometry={getRailGeometry(FRAME_RAIL_R, length, resolvedRailShapeName)}
             material={railMat}
+            userData={{
+              frameElementType: 'rail',
+              frameElementKey: rail.key,
+              frameShape: resolvedRailShapeName,
+              frameMaterial: resolvedRailMatName,
+              containerId: container.id,
+            }}
             castShadow
             raycast={frameMode ? undefined : nullRaycast}
             onPointerOver={frameMode ? (e) => {

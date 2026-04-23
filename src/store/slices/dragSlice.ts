@@ -11,6 +11,7 @@
  */
 
 import {
+  type Container,
   type ContainerSize,
   type FurnitureType,
   type SurfaceType,
@@ -21,11 +22,20 @@ import {
 import type { HotbarSlot } from '../useStore';
 import { checkOverlap, getFullFootprint } from '@/store/spatialEngine';
 import { scheduleAdjacency } from '@/store/slices/containerSlice';
+import type { SliceGet, SliceSet } from './types';
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
-type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
-type Get = () => any;
+type DragRuntimeState = DragSlice & {
+  containers: Record<string, Container>;
+  hoveredVoxel: unknown;
+  hoveredVoxelEdge: unknown;
+  faceContext: unknown;
+  stackContainer: (topId: string, bottomId: string) => boolean;
+  refreshAdjacency: () => void;
+};
+type Set = SliceSet<DragRuntimeState>;
+type Get = SliceGet<DragRuntimeState>;
 
 /** Callback to access the temporal API (pause/resume). Set by useStore.ts after creation. */
 let _getTemporalApi: (() => { pause: () => void; resume: () => void }) | null = null;
@@ -172,7 +182,7 @@ export const createDragSlice = (set: Set, get: Get): DragSlice => ({
     }
 
     getTemporalApi().resume();
-    set((s: any) => ({
+    set((s) => ({
       dragMovingId: null,
       containers: {
         ...s.containers,

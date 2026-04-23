@@ -31,6 +31,15 @@ describe('selectedElements — typed selection context', () => {
     expect(useStore.getState().selectedElements?.items).toHaveLength(2);
   });
 
+  it('toggleElement switches type instead of mixing item contracts', () => {
+    useStore.getState().setSelectedElements({ type: 'frame', items: [{ containerId: 'c1', id: 'pole_nw' }] });
+    useStore.getState().toggleElement('c1', '11', 'bay');
+    expect(useStore.getState().selectedElements).toEqual({
+      type: 'bay',
+      items: [{ containerId: 'c1', id: '11' }],
+    });
+  });
+
   it('toggleElement removes existing item', () => {
     useStore.getState().setSelectedElements({ type: 'voxel', items: [{ containerId: 'c1', id: '10' }, { containerId: 'c1', id: '11' }] });
     useStore.getState().toggleElement('c1', '10');

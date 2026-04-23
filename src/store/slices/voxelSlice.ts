@@ -7,13 +7,13 @@
 
 import {
   type Container,
+  type BaySlot,
   ContainerSize,
   CONTAINER_DIMENSIONS,
   type FloorMaterialType,
   type SurfaceType,
   type VoxelFaces,
   type Voxel,
-  type SmartStairChanges,
   type ModuleOrientation,
   type DoorConfig,
   type FaceFinish,
@@ -35,12 +35,35 @@ import { getModulePreset, resolveModuleFaces, ORIENT_ROTATION } from '@/config/m
 import { getContainerPreset } from '@/config/containerPresets';
 import { v4 as uuid } from 'uuid';
 import type { FurnitureItem } from '@/types/container';
-import { FurnitureType, FURNITURE_CATALOG } from '@/types/container';
+import type { HotbarSlot } from '../useStore';
+import type { SliceGet, SliceSet } from './types';
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
-type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
-type Get = () => any;
+type VoxelRuntimeState = VoxelSlice & {
+  containers: Record<string, Container>;
+  furnitureIndex: Record<string, FurnitureItem>;
+  lockedVoxels: Record<string, boolean>;
+  designMode: 'smart' | 'manual';
+  hotbar: HotbarSlot[];
+  activeHotbarSlot: number | null;
+  customHotbar: (HotbarSlot | null)[];
+  activeCustomSlot: number | null;
+  moduleOrientation: ModuleOrientation;
+  addContainer: (size: ContainerSize, position: { x: number; y: number; z: number }) => string;
+  applyContainerPreset: (containerId: string, presetId: string) => void;
+  applyModule: (containerId: string, voxelIndex: number, moduleId: string, orientation: ModuleOrientation) => void;
+  applyStairsFromFace: VoxelSlice['applyStairsFromFace'];
+  applyDoorModule: VoxelSlice['applyDoorModule'];
+  applySmartRailing: VoxelSlice['applySmartRailing'];
+};
+type Set = SliceSet<VoxelRuntimeState>;
+type Get = SliceGet<VoxelRuntimeState>;
+type RailingContainer = Pick<Container, '_smartRailingChanges'>;
+type VoxelStoreRef = {
+  getState: () => VoxelRuntimeState;
+  temporal: { getState: () => { pause: () => void; resume: () => void } };
+};
 
 export interface VoxelSlice {
   setVoxelFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
@@ -91,8 +114,8 @@ export interface DoorConstraints {
 }
 
 // Reference to useStore — injected after store creation to avoid circular import.
-let _useStoreRef: any = null;
-export function setVoxelStoreRef(ref: any) { _useStoreRef = ref; }
+let _useStoreRef: VoxelStoreRef | null = null;
+export function setVoxelStoreRef(ref: VoxelStoreRef) { _useStoreRef = ref; }
 
 // ── Shared staircase constants ──────────────────────────────
 // STAIR SYSTEM DESIGN (unified):
@@ -256,7 +279,7 @@ const FACE_NEIGHBOR_DELTA: Record<string, { dr: number; dc: number }> = {
  */
 export function recomputeSmartRailings(
   grid: Voxel[],
-  container: any, // Container draft (Immer or spread)
+  container: RailingContainer, // Container draft (Immer or spread)
 ): void {
   const tracking: Record<string, SurfaceType> = container._smartRailingChanges ?? {};
   const newTracking: Record<string, SurfaceType> = {};
@@ -345,7 +368,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   setFloorMaterial: (id, material) => {
 
-    set((s: any) => ({
+    set((s) => ({
       containers: {
         ...s.containers,
         [id]: { ...s.containers[id], floorMaterial: material },
@@ -355,7 +378,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   setCeilingMaterial: (id, material) => {
 
-    set((s: any) => ({
+    set((s) => ({
       containers: {
         ...s.containers,
         [id]: { ...s.containers[id], ceilingMaterial: material },
@@ -370,11 +393,12 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     if (!c) return;
 
     // Atomic undo: pause temporal, apply all modules, then resume
-    const t = _useStoreRef.temporal.getState();
+    const t = _useStoreRef?.temporal.getState();
+    if (!t) return;
     t.pause();
 
     // Reset container to default first (clear previous modules + furniture)
-    set((s: any) => {
+    set((s) => {
       const container = s.containers[containerId];
       if (!container) return {};
       const defaultGrid = createDefaultVoxelGrid();
@@ -389,7 +413,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           },
         },
         furnitureIndex: Object.fromEntries(
-          Object.entries(s.furnitureIndex).filter(([, f]: [string, any]) => f.containerId !== containerId)
+          Object.entries(s.furnitureIndex).filter(([, f]) => f.containerId !== containerId)
         ),
       };
     });
@@ -403,7 +427,8 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   addContainerWithPreset: (size, position, presetId) => {
-    const t = _useStoreRef.temporal.getState();
+    const t = _useStoreRef?.temporal.getState();
+    if (!t) return '';
     t.pause();
     const id = get().addContainer(size, position);
     get().applyContainerPreset(id, presetId);
@@ -432,7 +457,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
     const faces = resolveModuleFaces(preset, orientation);
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -458,8 +483,6 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         const coreW = dims.length / 6;
         const coreD = dims.width / 2;
         const haloExt = dims.height;
-        const isHaloCol = col === 0 || col === VOXEL_COLS - 1;
-        const isHaloRow = row === 0 || row === VOXEL_ROWS - 1;
         let px: number;
         if (col === 0) px = dims.length / 2 + haloExt / 2;
         else if (col === VOXEL_COLS - 1) px = -(dims.length / 2 + haloExt / 2);
@@ -498,7 +521,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     const slot = hotbar[activeHotbarSlot];
     if (!slot?.faces) return;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -516,7 +539,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     if (voxelIndices.length === 0) return;
     const locked = get().lockedVoxels;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -536,7 +559,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     if (voxelIndices.length === 0) return;
     const locked = get().lockedVoxels;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const newGrid = [...c.voxelGrid];
@@ -613,7 +636,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       }
       return;
     }
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -758,7 +781,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       };
 
       // Recompute smart railings (stair placement may affect neighboring open-air voxels)
-      const railingContainer: any = { ...c, _smartRailingChanges: c._smartRailingChanges };
+      const railingContainer: RailingContainer = { _smartRailingChanges: c._smartRailingChanges };
       if (get().designMode !== 'manual') {
         recomputeSmartRailings(grid, railingContainer);
       }
@@ -813,7 +836,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   applyVerticalStairs: (containerId, voxelIndex, facing) => {
     if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -877,7 +900,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   applySmartRailing: (containerId, voxelIndex) => {
     if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -956,7 +979,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     // Phase 1: Set _stairExiting flag to trigger exit animation.
     // Stair data stays intact for rendering during animation.
     // clearStairExit does the actual cleanup after animation completes.
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -982,7 +1005,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   clearStairExit: (containerId, voxelIndex) => {
     // Phase 2: Actual stair data cleanup (called after exit animation completes).
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -997,7 +1020,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         // No smart tracking — just revert stair voxels to default
         const defaults = createDefaultVoxelGrid();
         grid[voxelIndex] = { ...defaults[voxelIndex] };
-        const rc: any = { ...c, _smartRailingChanges: c._smartRailingChanges };
+        const rc: RailingContainer = { _smartRailingChanges: c._smartRailingChanges };
         if (get().designMode !== 'manual') {
           recomputeSmartRailings(grid, rc);
         }
@@ -1044,7 +1067,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       }
 
       // Recompute smart railings after stair removal
-      const railingContainer: any = { ...c, _smartRailingChanges: c._smartRailingChanges };
+      const railingContainer: RailingContainer = { _smartRailingChanges: c._smartRailingChanges };
       if (get().designMode !== 'manual') {
         recomputeSmartRailings(grid, railingContainer);
       }
@@ -1055,7 +1078,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   convertToPool: (containerId) => {
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
       return {
@@ -1069,7 +1092,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   resetVoxelGrid: (containerId) => {
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: createDefaultVoxelGrid(), _smartRailingChanges: undefined } } };
@@ -1078,7 +1101,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   toggleVoxelLock: (containerId, voxelIndex) => {
     const key = `${containerId}_${voxelIndex}`;
-    set((s: any) => ({
+    set((s) => ({
       lockedVoxels: { ...s.lockedVoxels, [key]: !s.lockedVoxels[key] },
     }));
   },
@@ -1088,7 +1111,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   toggleDoorState: (containerId, voxelIndex, face) => {
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1120,7 +1143,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
     const cycle = getCycleForFace(face);
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c || !c.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1161,7 +1184,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       // 6. Floor + Ceiling + Window — glass-enclosed room
       { faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Glass_Pane', s: 'Glass_Pane', e: 'Glass_Pane', w: 'Glass_Pane' }, active: true },
     ];
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c || !c.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1183,7 +1206,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   setVoxelActive: (containerId, voxelIndex, active) => {
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
       const grid = c.voxelGrid ? [...c.voxelGrid] : createDefaultVoxelGrid();
@@ -1265,7 +1288,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
             if (!wall) return;
             const cnt = (ws === WallSide.Left || ws === WallSide.Right) ? longBayCount : shortBayCount;
             const bi  = Math.max(0, Math.min(cnt - 1, rawIdx));
-            const newBays = wall.bays.map((slot: any) =>
+            const newBays = wall.bays.map((slot: BaySlot) =>
               slot.index === bi ? { ...slot, module: createOpenVoid() } : slot
             );
             updatedWalls = { ...updatedWalls, [ws]: { ...wall, bays: newBays } };
@@ -1302,7 +1325,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     }
     if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
       const grid = c.voxelGrid ? [...c.voxelGrid] : createDefaultVoxelGrid();
@@ -1337,7 +1360,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   setVoxelAllFaces: (containerId, voxelIndex, mat) => {
     if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
       const grid = c.voxelGrid ? [...c.voxelGrid] : createDefaultVoxelGrid();
@@ -1357,7 +1380,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   setVoxelRoomTag: (containerId, voxelIndex, tag) => {
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1369,7 +1392,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   setDoorConfig: (containerId, voxelIndex, face, config) => {
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1430,7 +1453,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
     };
     const doorFace = OUTWARD[orientation];
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1485,7 +1508,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   paintFace: (containerId, voxelIndex, face, surface) => {
     if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1503,7 +1526,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   setFaceFinish: (containerId, voxelIndex, face, finish) => {
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1522,7 +1545,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   clearFaceFinish: (containerId, voxelIndex, face) => {
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -1596,7 +1619,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   setVoxelFaces: (containerId, voxelIndex, faces) => {
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];

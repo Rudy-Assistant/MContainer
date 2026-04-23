@@ -11,6 +11,7 @@ import { v4 as uuid } from "uuid";
 import {
   type Container,
   type ContainerPosition,
+  type BaySlot,
   ContainerSize,
   CONTAINER_DIMENSIONS,
   type FurnitureItem,
@@ -20,21 +21,15 @@ import {
   MAX_STACK_LEVEL,
   type PricingConfig,
   type PricingEstimate,
-  type FloorMaterialType,
   type WallModule,
   WallSide,
   type Zone,
   ModuleType,
   type SurfaceType,
   type VoxelFaces,
-  type Voxel,
-  type ModuleOrientation,
   VOXEL_COLS,
   VOXEL_ROWS,
   VOXEL_LEVELS,
-  VOXEL_COUNT,
-  LONG_WALL_BAYS,
-  SHORT_WALL_BAYS,
   type ElementConfig,
   type PoleConfig,
   type LightPlacement,
@@ -50,24 +45,58 @@ import {
 } from "@/types/factories";
 import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverlap, getFootprintAt, getFullFootprint, findEdgeSnap, voxelExtentsOverlap } from "@/store/spatialEngine";
 import defaultPricing from "@/config/pricing_config.json";
-import { getContainerRole, CONTAINER_ROLES } from "@/config/containerRoles";
+import { getContainerRole } from "@/config/containerRoles";
 import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from "@/types/container";
-import { type HotbarSlot, BLOCK_PRESETS, autoStairAscending } from "../useStore";
+import { BLOCK_PRESETS, autoStairAscending } from "../useStore";
 import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
+import type { SliceGet, SliceSet } from "./types";
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
-type SetFn = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
-type GetFn = () => any;
+type ContainerRuntimeState = ContainerSlice & {
+  selection: string[];
+  selectedFrameElement: { containerId: string; key: string; type: 'pole' | 'rail' } | null;
+  containerContextMenu: { x: number; y: number; containerId: string } | null;
+  sceneObjects: Record<string, unknown>;
+  designMode: 'smart' | 'manual';
+  hotbar: Array<{ faces: VoxelFaces | null; footprint?: [number, number] }>;
+  activeHotbarSlot: number | null;
+  customHotbar: Array<{ faces: VoxelFaces | null } | null>;
+  activeCustomSlot: number | null;
+  activeBrush: SurfaceType | null;
+  clipboardVoxel: VoxelFaces | null;
+  styleBrush: Partial<Record<keyof VoxelFaces, SurfaceType>> | null;
+  removeObjectsByContainer: (containerId: string) => void;
+  applyModule: (containerId: string, voxelIndex: number, moduleId: string, orientation: 'n' | 's' | 'e' | 'w') => void;
+  applyVerticalStairs: (containerId: string, voxelIndex: number, facing: 'n' | 's' | 'e' | 'w') => void;
+  paintFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, surface: SurfaceType) => void;
+  setVoxelFaces: (containerId: string, voxelIndex: number, faces: VoxelFaces) => void;
+  setFloorMaterial: (id: string, material: Container['floorMaterial']) => void;
+  setCeilingMaterial: (id: string, material: Container['ceilingMaterial']) => void;
+};
+type SetFn = SliceSet<ContainerRuntimeState>;
+type GetFn = SliceGet<ContainerRuntimeState>;
+type AdjacencyGetter = () => { refreshAdjacency: () => void };
+type SharedDesignPayload = {
+  containers?: Array<{
+    size: ContainerSize;
+    position: ContainerPosition;
+    level?: number;
+    rotation?: number;
+    voxelGrid?: Container['voxelGrid'];
+    interiorFinish?: Container['interiorFinish'];
+  }>;
+  stacking?: Array<{ topIndex: number; bottomIndex: number }>;
+};
 
 /**
  * Debounced adjacency recompute — cancels any pending rAF before scheduling a new one.
  * Prevents stale-position adjacency when addContainer + stackContainer fire back-to-back.
  */
 let _pendingAdjacencyRaf: number | null = null;
-export function scheduleAdjacency(get: GetFn) {
+export function scheduleAdjacency(get: AdjacencyGetter) {
   if (_pendingAdjacencyRaf !== null) cancelAnimationFrame(_pendingAdjacencyRaf);
   _pendingAdjacencyRaf = requestAnimationFrame(() => {
     _pendingAdjacencyRaf = null;
@@ -244,7 +273,7 @@ export interface ContainerSlice {
   removeRooftopDeck: (containerId: string) => void;
 
   // ── Shared Design Import ────────────────────────────────
-  importSharedDesign: (design: any) => void;
+  importSharedDesign: (design: SharedDesignPayload) => void;
 
   // ── Frame Configuration ────────────────────────────────────
   setFrameDefaults: (containerId: string, defaults: Partial<NonNullable<Container['frameDefaults']>>) => void;
@@ -390,7 +419,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           },
         },
         furnitureIndex: Object.fromEntries(
-          Object.entries(s.furnitureIndex).filter(([, f]: [string, any]) => f.containerId !== containerId)
+          Object.entries(s.furnitureIndex).filter(([, f]) => f.containerId !== containerId)
         ),
       };
     });
@@ -561,7 +590,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       // Compute what the footprint WOULD be after activation
       const cosA = Math.abs(Math.cos(c.rotation));
       const sinA = Math.abs(Math.sin(c.rotation));
-      let simFoot = { ...body };
+      const simFoot = { ...body };
       const expandDir = (dir: 'north' | 'south' | 'east' | 'west') => {
         if (dir === 'east')  { simFoot.maxX += haloExt * cosA; simFoot.maxZ += haloExt * sinA; }
         if (dir === 'west')  { simFoot.minX -= haloExt * cosA; simFoot.minZ -= haloExt * sinA; }
@@ -609,7 +638,6 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         const container = s.containers[containerId];
         if (!container?.voxelGrid) return {};
         const grid = [...container.voxelGrid];
-        let anyAnimated = false;
         for (let level = 0; level < VOXEL_LEVELS; level++) {
           for (let row = 0; row < VOXEL_ROWS; row++) {
             for (let col = 0; col < VOXEL_COLS; col++) {
@@ -628,7 +656,6 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
                   unpackPhase: 'reverse' as const,
                   _reverseOriginalPhase: originalPhase,
                 };
-                anyAnimated = true;
               } else if (voxel.moduleId || voxel.moduleOrientation || voxel.unpackPhase) {
                 // Already inactive but has stale fields — clear them
                 grid[idx] = {
@@ -666,7 +693,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             });
             get().applyModule(containerId, idx, 'deck_open', 'n');
             // Set unpack animation phase for cinematic extension deployment
-            set((s: any) => {
+            set((s) => {
               const container = s.containers[containerId];
               if (!container?.voxelGrid) return {};
               const grid = [...container.voxelGrid];
@@ -721,7 +748,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
   },
 
   clearUnpackPhase: (containerId, voxelIndex) => {
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -751,7 +778,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     set((s) => {
       const removed = s.containers[id];
       if (!removed) return { ...s };
-      const { [id]: _, ...rest } = s.containers;
+      const rest = { ...s.containers };
+      delete rest[id];
 
       // Clean up stacking references AND mergedWalls referencing removed container
       const containers = { ...rest };
@@ -783,7 +811,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       for (const z of Object.values(zones) as Zone[]) {
         z.containerIds = z.containerIds.filter((cid: string) => cid !== id);
         z.mergedWalls = z.mergedWalls.filter(
-          (mw: any) => mw.containerA !== id && mw.containerB !== id
+          (mw) => mw.containerA !== id && mw.containerB !== id
         );
       }
       return {
@@ -921,13 +949,14 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       const container = s.containers[item.containerId];
       if (!container) return s;
 
-      const { [furnitureId]: _, ...restIndex } = s.furnitureIndex;
+      const restIndex = { ...s.furnitureIndex };
+      delete restIndex[furnitureId];
       return {
         containers: {
           ...s.containers,
           [item.containerId]: {
             ...container,
-            furniture: container.furniture.filter((f: any) => f.id !== furnitureId),
+            furniture: container.furniture.filter((f) => f.id !== furnitureId),
           },
         },
         furnitureIndex: restIndex,
@@ -947,7 +976,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           ...s.containers,
           [item.containerId]: {
             ...container,
-            furniture: container.furniture.map((f: any) =>
+            furniture: container.furniture.map((f) =>
               f.id === furnitureId ? updated : f
             ),
           },
@@ -1069,7 +1098,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           if (c.mergedWalls.some((mw: string) => mw.endsWith(`:${side}`))) continue;
 
           const wallConfig = { ...walls[side] };
-          wallConfig.bays = wallConfig.bays.map((bay: any) => {
+          wallConfig.bays = wallConfig.bays.map((bay: BaySlot) => {
             let newModule;
             switch (preset) {
               case 'solid': newModule = createPanelSolid(); break;
@@ -1106,7 +1135,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
   removeZone: (id) =>
     set((s) => {
-      const { [id]: _, ...rest } = s.zones;
+      const rest = { ...s.zones };
+      delete rest[id];
       return { zones: rest };
     }),
 
@@ -1141,7 +1171,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             ...zone,
             containerIds: zone.containerIds.filter((id: string) => id !== containerId),
             mergedWalls: zone.mergedWalls.filter(
-              (mw: any) =>
+              (mw) =>
                 mw.containerA !== containerId && mw.containerB !== containerId
             ),
           },
@@ -1478,8 +1508,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         // Ensure mutable copies
         let aGrid = a.voxelGrid;
         let bGrid = b.voxelGrid;
-        let aPreMerge = { ...(a._preMergeWalls ?? {}) };
-        let bPreMerge = { ...(b._preMergeWalls ?? {}) };
+        const aPreMerge = { ...(a._preMergeWalls ?? {}) };
+        const bPreMerge = { ...(b._preMergeWalls ?? {}) };
         let aCopied = false;
         let bCopied = false;
 
@@ -1611,7 +1641,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
     // Check container is topmost (nothing stacked on it)
     const isTopmost = !Object.values(s.containers).some(
-      (other: any) => other.stackedOn === containerId
+      (other) => other.stackedOn === containerId
     );
     if (!isTopmost) return;
 
@@ -1737,7 +1767,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
   // ── Interior Lights ─────────────────────────────────────────
 
   addLight: (containerId, voxelIndex, type) =>
-    set((s: any) => {
+    set((s) => {
       const container = s.containers[containerId];
       if (!container) return {};
       const lights: LightPlacement[] = container.lights ?? [];
@@ -1754,7 +1784,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     }),
 
   removeLight: (containerId, voxelIndex) =>
-    set((s: any) => {
+    set((s) => {
       const container = s.containers[containerId];
       if (!container || !container.lights) return {};
       return {
@@ -2064,7 +2094,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     set((s) => ({
       containers: {
         ...s.containers,
-        [containerId]: { ...(s.containers as any)[containerId], appliedPreset: presetId },
+        [containerId]: { ...s.containers[containerId], appliedPreset: presetId },
       },
     }));
     temporalPause();
@@ -2111,7 +2141,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           // Batch all face changes in a single set() call for performance.
           // CRITICAL: Direction mapping matches codebase convention (row=X, col=Z):
           //   e → row+1, w → row-1, s → col+1, n → col-1
-          set((st: any) => {
+          set((st) => {
             const c = st.containers[containerId];
             if (!c?.voxelGrid) return st;
             const grid = [...c.voxelGrid];  // shallow array copy only
@@ -2152,10 +2182,10 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
         case 'set_all_floors': {
           if (!step.floorMaterial) break;
-          set((st: any) => {
+          set((st) => {
             const c = st.containers[containerId];
             if (!c?.voxelGrid) return st;
-            const grid = c.voxelGrid.map((v: any) =>
+            const grid = c.voxelGrid.map((v) =>
               v.active ? { ...v, faces: { ...v.faces, bottom: step.floorMaterial! } } : v
             );
             return { containers: { ...st.containers, [containerId]: { ...c, voxelGrid: grid } } };
@@ -2165,10 +2195,10 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
         case 'set_all_ceilings': {
           if (!step.ceilingMaterial) break;
-          set((st: any) => {
+          set((st) => {
             const c = st.containers[containerId];
             if (!c?.voxelGrid) return st;
-            const grid = c.voxelGrid.map((v: any) =>
+            const grid = c.voxelGrid.map((v) =>
               v.active ? { ...v, faces: { ...v.faces, top: step.ceilingMaterial! } } : v
             );
             return { containers: { ...st.containers, [containerId]: { ...c, voxelGrid: grid } } };
@@ -2226,7 +2256,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       // Mark all faces as user-painted (user explicitly stamped this voxel)
       const painted: Partial<Record<string, boolean>> = {};
       for (const k of Object.keys(faces)) painted[k] = true;
-      grid[voxelIndex] = { ...voxel, active: true, faces: { ...faces }, userPaintedFaces: painted as any };
+      grid[voxelIndex] = { ...voxel, active: true, faces: { ...faces }, userPaintedFaces: painted };
       return {
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
         };
@@ -2445,7 +2475,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       if (!c) return {};
       const isPole = isPoleKey(key);
       if (isPole) {
-        const { [key]: _, ...rest } = c.poleOverrides ?? {};
+        const rest = { ...(c.poleOverrides ?? {}) };
+        delete rest[key];
         return {
           containers: {
             ...s.containers,
@@ -2456,7 +2487,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           },
         };
       } else {
-        const { [key]: _, ...rest } = c.railOverrides ?? {};
+        const rest = { ...(c.railOverrides ?? {}) };
+        delete rest[key];
         return {
           containers: {
             ...s.containers,

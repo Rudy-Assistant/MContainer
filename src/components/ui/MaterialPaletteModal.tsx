@@ -14,8 +14,9 @@ function inputToHex(val: string): number {
 }
 
 function paletteToDraft(p: MaterialPalette): Omit<MaterialPalette, "id"> {
-  const { id, ...rest } = p;
-  return rest;
+  const rest: Partial<MaterialPalette> = { ...p };
+  delete rest.id;
+  return rest as Omit<MaterialPalette, "id">;
 }
 
 interface Props {

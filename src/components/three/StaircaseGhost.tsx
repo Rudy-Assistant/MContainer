@@ -19,18 +19,8 @@ import { nullRaycast } from "@/utils/nullRaycast";
 import { HIGHLIGHT_HEX_SELECT } from "@/config/highlightColors";
 import { validateStaircasePlacement } from "@/utils/staircaseValidation";
 
-const INVALID_COLOR = 0xff4444;
-
 const ghostMat = new THREE.MeshBasicMaterial({
   color: HIGHLIGHT_HEX_SELECT,
-  transparent: true,
-  opacity: 0.25,
-  depthWrite: false,
-  side: THREE.DoubleSide,
-});
-
-const invalidMat = new THREE.MeshBasicMaterial({
-  color: INVALID_COLOR,
   transparent: true,
   opacity: 0.25,
   depthWrite: false,

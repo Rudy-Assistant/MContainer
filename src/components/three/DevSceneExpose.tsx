@@ -6,6 +6,7 @@
 import { useThree } from "@react-three/fiber";
 import { useEffect } from "react";
 import type * as THREE from "three";
+import type { StoreState } from "@/store/useStore";
 
 declare global {
   interface Window {
@@ -23,8 +24,8 @@ export function DevSceneExpose() {
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
 
-    (window as any).__threeScene = scene;
-    (window as any).__threeRenderer = gl;
+    window.__threeScene = scene;
+    window.__threeRenderer = gl;
 
     window.__inspectScene = () => {
       const info = gl.info;
@@ -55,30 +56,38 @@ export function DevSceneExpose() {
         Record<string, unknown>
       >;
 
-      scene.traverse((obj: any) => {
-        if (obj.isMesh) {
+      scene.traverse((obj) => {
+        const inspectable = obj as THREE.Object3D & {
+          isMesh?: boolean;
+          isLight?: boolean;
+          isGroup?: boolean;
+          material?: THREE.Material | THREE.Material[];
+        };
+        if (inspectable.isMesh) {
           (results.meshCount as number)++;
-          if (obj.castShadow) (results.meshesWithCastShadow as number)++;
-          if (obj.receiveShadow)
+          if (inspectable.castShadow) (results.meshesWithCastShadow as number)++;
+          if (inspectable.receiveShadow)
             (results.meshesWithReceiveShadow as number)++;
-          const mat = obj.material;
-          if (mat) {
+          const material = inspectable.material;
+          const materials = Array.isArray(material) ? material : material ? [material] : [];
+          for (const mat of materials) {
             const type = mat.constructor.name;
             matTypes[type] = (matTypes[type] || 0) + 1;
-            if (mat.isMeshPhysicalMaterial) {
+            if ("isMeshPhysicalMaterial" in mat && mat.isMeshPhysicalMaterial) {
+              const physicalMat = mat as THREE.MeshPhysicalMaterial;
               physMats.push({
-                transmission: mat.transmission,
-                ior: mat.ior,
-                hasEnvMap: !!mat.envMap,
-                envMapIntensity: mat.envMapIntensity,
+                transmission: physicalMat.transmission,
+                ior: physicalMat.ior,
+                hasEnvMap: !!physicalMat.envMap,
+                envMapIntensity: physicalMat.envMapIntensity,
               });
             }
-            if (mat.normalMap) (results.normalMapsCount as number)++;
+            if ("normalMap" in mat && mat.normalMap) (results.normalMapsCount as number)++;
           }
           if (obj.userData?.isProp || obj.userData?.isFurniture)
             (results.propCount as number)++;
         }
-        if (obj.isLight) {
+        if (inspectable.isLight) {
           (results.lightsCount as number)++;
           lightTypes.push(obj.constructor.name);
         }
@@ -86,7 +95,7 @@ export function DevSceneExpose() {
         if (
           obj.position &&
           obj.position.y > 20 &&
-          (obj.name?.includes?.("Cloud") || obj.isGroup)
+          (obj.name?.includes?.("Cloud") || inspectable.isGroup)
         ) {
           results.cloudsPresent = true;
         }
@@ -102,7 +111,7 @@ export function DevSceneExpose() {
     };
 
     window.__inspectStore = () => {
-      const s = (window as any).__store?.getState?.();
+      const s: StoreState | undefined = window.__store?.getState?.();
       if (!s) return { error: "No store" };
       const containers = s.containers || {};
       const ids = Object.keys(containers);
@@ -110,8 +119,8 @@ export function DevSceneExpose() {
         containerCount: ids.length,
         containers: ids.map((id: string) => ({
           id: id.slice(0, 8),
-          type: containers[id].type,
-          levelIndex: containers[id].levelIndex,
+          size: containers[id].size,
+          level: containers[id].level,
           position: containers[id].position,
           role: containers[id].appliedRole,
           voxelCount: containers[id].voxelGrid?.length || 0,
@@ -128,8 +137,8 @@ export function DevSceneExpose() {
     return () => {
       delete window.__inspectScene;
       delete window.__inspectStore;
-      delete (window as any).__threeScene;
-      delete (window as any).__threeRenderer;
+      delete window.__threeScene;
+      delete window.__threeRenderer;
     };
   }, [scene, gl]);
 

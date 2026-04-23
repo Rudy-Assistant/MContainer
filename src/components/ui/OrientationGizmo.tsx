@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 
 // 5 axes: +Y, +X, -X, +Z, -Z (no -Y — looking up from underground is useless)

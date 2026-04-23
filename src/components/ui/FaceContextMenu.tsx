@@ -25,11 +25,6 @@ function getActions(surface: SurfaceType, face: keyof VoxelFaces): Array<{ label
     store.setVoxelFace(containerId, voxelIndex, face, s);
     store.setFaceContextMenuCtx(null);
   };
-  const toggleOpen = () => {
-    store.toggleOpenFace(containerId, voxelIndex, face);
-    store.setFaceContextMenuCtx(null);
-  };
-
   switch (surface) {
     case 'Door':
     case 'Glass_Shoji': {

@@ -310,9 +310,6 @@ export function findEdgeSnap(
     if (c.position.y > 0.5) continue;
 
     const cFoot = getFootprint(c);
-    const cHalfExtX = (cFoot.maxX - cFoot.minX) / 2;
-    const cHalfExtZ = (cFoot.maxZ - cFoot.minZ) / 2;
-
     // Check all 4 edge alignment scenarios:
     // New container's right edge → existing container's left edge
     const snapXRight = cFoot.minX - halfExtX;

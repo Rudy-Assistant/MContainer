@@ -41,6 +41,7 @@ export default function FinishesPanel() {
     // Face routing: always takes priority when a face is set
     if (selectedFace) {
       const tab = faceToTab(selectedFace);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- This panel mirrors external selection into its active tab.
       if (tab && (faceChanged || elTypeChanged)) setActiveTab(tab);
     } else if (elTypeChanged) {
       // Element-type routing: only when no face is set

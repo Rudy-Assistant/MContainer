@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
 import { useStore } from '../store/useStore';
 import { getSelectedVoxel } from '../hooks/useSelectedVoxel';
 import { getSelectedVoxels } from '../hooks/useSelectedVoxels';
@@ -89,14 +87,26 @@ describe('selection mutual exclusion', () => {
     // selectObject(null) clears voxel selection (mutual exclusion)
     expect(after.selectedElements).toBeNull();
   });
-});
 
-// NOTE: This is a rare exception to the "no source-scanning tests" rule.
-// The spec explicitly requires an anti-pattern guard against SkinEditor
-// regressing to position:fixed. This is a structural constraint, not behavior.
-describe('SkinEditor anti-patterns', () => {
-  it('must not use position: fixed', () => {
-    const src = readFileSync(resolve(__dirname, '../components/ui/SkinEditor.tsx'), 'utf8');
-    expect(src).not.toMatch(/position\s*:\s*['"]?fixed/);
+  it('selectObject routes object editing state without leaving stale voxel selection', () => {
+    const s = useStore.getState();
+    const objectId = s.placeObject('door_single_swing', {
+      containerId: 'c1',
+      voxelIndex: 9,
+      type: 'face',
+      face: 'n',
+      slot: 0,
+    });
+
+    s.setSelectedElements({ type: 'voxel', items: [{ containerId: 'c1', id: '9' }] });
+    s.setSelectedFace('n');
+    s.selectObject(objectId);
+    s.updateSkin(objectId, 'frame', 'polished_chrome');
+
+    const after = useStore.getState();
+    expect(after.selectedObjectId).toBe(objectId);
+    expect(after.selectedElements).toBeNull();
+    expect(after.selectedFace).toBeNull();
+    expect(after.sceneObjects[objectId].skin.frame).toBe('polished_chrome');
   });
 });

@@ -53,17 +53,18 @@ export default function FaceStrip({ containerId, indices }: {
   const setSelectedElements = useStore((s) => s.setSelectedElements);
   const [expandedFace, setExpandedFace] = useState<keyof VoxelFaces | null>(null);
 
-  if (!grid || indices.length === 0) return null;
-
-  const isSingle = indices.length === 1;
-
   const faceMaterials = useMemo(() => {
     const result: Record<keyof VoxelFaces, SurfaceType | null> = {} as Record<keyof VoxelFaces, SurfaceType | null>;
+    if (!grid || indices.length === 0) return result;
     for (const face of FACE_KEYS) {
       result[face] = resolvedFaceMaterial(grid, indices, face);
     }
     return result;
   }, [grid, indices]);
+
+  if (!grid || indices.length === 0) return null;
+
+  const isSingle = indices.length === 1;
 
   const handleDeselect = () => {
     setSelectedElements(null);

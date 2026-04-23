@@ -99,7 +99,7 @@ src/
   types/                  TypeScript type definitions
   hooks/                  Custom React hooks
   utils/                  Geometry, export, validation, spatial math
-  Testing/                79 behavioral test files
+  Testing/                Focused behavioral tests and regression coverage
 ```
 
 ## Scripts
@@ -139,12 +139,12 @@ npm run test:e2e         # Playwright end-to-end tests
 Tests are behavioral — they call real functions and assert on return values or state changes. No source-scanning tests.
 
 ```bash
-npx vitest run                  # Run all 307 tests
+npx vitest run                  # Run the full behavioral test suite
 npx vitest run --reporter=verbose  # Verbose output
 npx tsc --noEmit                # Type check (must be 0 errors)
 ```
 
-Test files live in `src/Testing/` (79 files covering store mutations, validation, spatial math, and rendering invariants).
+Test files live in `src/Testing/` and `src/__tests__/`, covering store mutations, validation, spatial math, and rendering invariants. Treat the command output as the source of truth for current counts.
 
 ## Documentation
 

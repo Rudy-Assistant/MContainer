@@ -5,7 +5,7 @@
  * Adjacency merge detection prevents double-balcony Z-fighting.
  */
 
-import { CONTAINER_DIMENSIONS, type ContainerSize, type Container, WallSide, ModuleType } from "@/types/container";
+import { CONTAINER_DIMENSIONS, type Container, WallSide, ModuleType } from "@/types/container";
 
 // ── Grid Constants ──────────────────────────────────────────
 export const GRID_STEP = 0.3; // 30cm — the universal snap increment

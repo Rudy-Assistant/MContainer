@@ -122,7 +122,6 @@ function SceneObjectMeshInner({
       }>
         <GlbFormMesh
           glbPath={form.glbPath}
-          form={form}
           resolvedSkin={resolvedSkin}
           worldPosition={worldPosition}
           worldRotation={worldRotation}
@@ -197,7 +196,7 @@ function ProceduralFormMesh({
       applyStyleEffects(mat, style.effects);
     }
     return mat;
-  }, [matDef?.color, matDef?.metalness, matDef?.roughness, style?.effects]);
+  }, [matDef?.color, matDef?.metalness, matDef?.roughness, style]);
 
   // Dispose material when it changes or component unmounts (Fix 4)
   useEffect(() => () => { material.dispose(); }, [material]);
@@ -229,6 +228,12 @@ function ProceduralFormMesh({
         ref={meshRef}
         geometry={geometry}
         material={material}
+        userData={{
+          sceneObjectId: objectId,
+          formId: form.id,
+          formCategory: form.category,
+          proceduralVertexCount: geometry.getAttribute('position')?.count ?? 0,
+        }}
         castShadow
         receiveShadow
         {...(placementMode ? { raycast: nullRaycast } : {})}
@@ -254,7 +259,6 @@ function ProceduralFormMesh({
 /** GLB model mesh with per-mesh skin material application. */
 function GlbFormMesh({
   glbPath,
-  form,
   resolvedSkin,
   worldPosition,
   worldRotation,
@@ -264,7 +268,6 @@ function GlbFormMesh({
   selectObject,
 }: {
   glbPath: string;
-  form: FormDefinition;
   resolvedSkin: Record<string, string>;
   worldPosition: [number, number, number];
   worldRotation: [number, number, number];
@@ -308,7 +311,7 @@ function GlbFormMesh({
     });
 
     return clone;
-  }, [scene, resolvedSkin, style?.effects]);
+  }, [scene, resolvedSkin, style]);
 
   // Dispose cloned materials AND geometries on unmount or when clone changes
   useEffect(() => {

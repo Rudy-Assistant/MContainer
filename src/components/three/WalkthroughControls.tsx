@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useEffect, useMemo, useCallback } from "react";
+import { useRef, useEffect, useMemo, useCallback, type ComponentRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { PointerLockControls } from "@react-three/drei";
 import { useStore } from "@/store/useStore";
-import { CONTAINER_DIMENSIONS, ViewMode, WallSide, ModuleType, FurnitureType, FURNITURE_CATALOG, type FloorMaterialType, VOXEL_COLS, VOXEL_ROWS } from "@/types/container";
+import { CONTAINER_DIMENSIONS, ViewMode, WallSide, ModuleType, FurnitureType, FURNITURE_CATALOG, type FloorMaterialType, type HingedWall, VOXEL_COLS, VOXEL_ROWS } from "@/types/container";
 import { getCycleForFace, getVoxelLayout } from "@/components/objects/ContainerSkin";
 
 // ── Constants ────────────────────────────────────────────────
@@ -30,23 +30,6 @@ function safeExitPointerLock() {
     // Ignore errors from unmounted/detached elements
   }
 }
-
-/** Re-acquire pointer lock on the canvas element */
-function safeRequestPointerLock() {
-  try {
-    const canvas = document.querySelector('canvas');
-    if (!canvas || !(canvas as Element).isConnected || !document.hasFocus()) return;
-    if (document.pointerLockElement) return;
-    canvas.requestPointerLock();
-  } catch {
-    // Ignore errors — element may have been detached between check and call
-  }
-}
-
-/** Track whether a menu is open — prevents re-locking during menu interaction */
-let _menuOpenFlag = false;
-function setMenuOpen(open: boolean) { _menuOpenFlag = open; }
-function isMenuOpen() { return _menuOpenFlag; }
 
 // ── Auto-Tour waypoint generation ────────────────────────────
 
@@ -152,10 +135,11 @@ function generateInteriorTourWaypoints(): { waypoints: THREE.Vector3[]; center: 
       const halfL = dims.length / 2, halfW = dims.width / 2;
       for (const side of [WallSide.Left, WallSide.Right, WallSide.Front, WallSide.Back] as const) {
         if (c.mergedWalls.some(mw => mw.endsWith(`:${side}`))) continue;
-        const hasDeck = c.walls[side].bays.some(bay =>
-          bay.module.type === ModuleType.HingedWall &&
-          (bay.module as any).foldsDown && (bay.module as any).openAmount > 0.5
-        );
+        const hasDeck = c.walls[side].bays.some((bay) => {
+          if (bay.module.type !== ModuleType.HingedWall) return false;
+          const hingedModule = bay.module as HingedWall;
+          return hingedModule.foldsDown && hingedModule.openAmount > 0.5;
+        });
         if (!hasDeck) continue;
         switch (side) {
           case WallSide.Left:  minZ = Math.min(minZ, c.position.z - halfW - dd); break;
@@ -297,7 +281,7 @@ function generateInteriorTourWaypoints(): { waypoints: THREE.Vector3[]; center: 
  * @see CLAUDE.md rule "WalkthroughControls.tsx is NOT a candidate for replacement"
  */
 export default function WalkthroughControls() {
-  const controlsRef = useRef<any>(null);
+  const controlsRef = useRef<ComponentRef<typeof PointerLockControls>>(null);
   const { camera, scene } = useThree();
   const containers = useStore((s) => s.containers);
   const viewLevel = useStore((s) => s.viewLevel);
@@ -321,13 +305,35 @@ export default function WalkthroughControls() {
 
   // Crosshair target state — expanded for all interactable types
   type CrosshairTarget =
-    | { kind: 'bay'; containerId: string; wallSide: WallSide; bayIndex: number; moduleType: ModuleType }
+    | { kind: 'bay'; containerId: string; wallSide?: WallSide; bayIndex: number; moduleType: ModuleType }
     | { kind: 'railing'; containerId: string; wallSide: WallSide; bayIndex: number }
     | { kind: 'edge'; containerId: string; wall: WallSide; bayIndex: number }
     | { kind: 'floor'; containerId: string }
     | { kind: 'corner'; containerId: string; cornerIndex: number }
     | { kind: 'structural'; containerId: string; elementKey: string }
     | { kind: 'roof'; containerId: string };
+
+  type WalkthroughUserData = {
+    isRailing?: boolean;
+    isRailingEdge?: boolean;
+    isBay?: boolean;
+    isFloor?: boolean;
+    isFloorEdge?: boolean;
+    isEdgeRail?: boolean;
+    isCorner?: boolean;
+    isCornerEdge?: boolean;
+    isStructural?: boolean;
+    isRoof?: boolean;
+    containerId: string;
+    wallSide: WallSide;
+    wall: WallSide;
+    bayIndex: number;
+    voxelIndex: number;
+    face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom';
+    moduleType: ModuleType;
+    cornerIndex: number;
+    elementKey: string;
+  };
 
   const targetRef = useRef<CrosshairTarget | null>(null);
   const hudLabelRef = useRef<string>('');
@@ -534,7 +540,6 @@ export default function WalkthroughControls() {
       if (c.voxelGrid) {
         const VOXEL_LEVELS = 2;
         const vHeight = dims.height / VOXEL_LEVELS;
-        const vOffset = vHeight / 2;
         const colPitch = dims.length / 6;
         const rowPitch = dims.width / (VOXEL_ROWS - 2); // 2 core rows
         const STEPS = 6;
@@ -839,7 +844,7 @@ export default function WalkthroughControls() {
       // Clear all keys on unmount
       for (const k of Object.keys(keys)) keys[k] = false;
     };
-  }, [setViewMode, toggleTarget, handleScroll]);
+  }, [setViewMode, toggleTarget, handleScroll, cycleVoxelFace]);
 
   // WU-6: Save FPV position on unmount so re-entry restores the last explored position
   useEffect(() => {
@@ -1083,7 +1088,7 @@ export default function WalkthroughControls() {
     let foundTarget = false;
 
     for (const hit of intersects) {
-      const ud = hit.object.userData;
+      const ud = hit.object.userData as WalkthroughUserData;
       if (!ud) continue;
 
       let newTarget: CrosshairTarget | null = null;
@@ -1105,7 +1110,7 @@ export default function WalkthroughControls() {
           useStore.getState().setFaceContext(faceCtx);
           const faceNames: Record<string, string> = { n: 'North', s: 'South', e: 'East', w: 'West', top: 'Roof', bottom: 'Floor' };
           label = `${faceNames[ud.face] ?? ud.face} face [scroll]`;
-          newTarget = { kind: 'bay', containerId: ud.containerId, wallSide: undefined as any, bayIndex: ud.voxelIndex, moduleType: ModuleType.OpenVoid };
+          newTarget = { kind: 'bay', containerId: ud.containerId, bayIndex: ud.voxelIndex, moduleType: ModuleType.OpenVoid };
         } else {
           const ws = ud.wallSide as WallSide;
           const bi = ud.bayIndex as number;

@@ -86,7 +86,7 @@ export function applyStyleEffects(
       // Screen-space / scene-level effects — handled by PostProcessingStack
       // and DappleGobo components, not material-time mutations:
       // salt_frost  — HueSaturation desaturation + BrightnessContrast + Outline (layer 11)
-      // soft_bloom  — Bloom luminanceThreshold lowered to 0.5
+      // soft_bloom  — Bloom threshold/intensity adjusted by PostProcessingStack
       // dappled_light — procedural gobo plane casting leaf-shaped shadows
       // edge_glow   — Outline with style color (layer 12)
       case 'salt_frost':

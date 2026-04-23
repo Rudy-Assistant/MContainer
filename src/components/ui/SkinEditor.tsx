@@ -16,7 +16,7 @@ import { useStore } from '@/store/useStore';
 import { formRegistry } from '@/config/formRegistry';
 import { materialRegistry } from '@/config/materialRegistry';
 import { getStyle, getQuickSkins } from '@/config/styleRegistry';
-import type { FormDefinition, QuickSkinPreset, StyleId } from '@/types/sceneObject';
+import type { FormDefinition, QuickSkinPreset } from '@/types/sceneObject';
 import FormThumbnail from '@/components/ui/FormThumbnails';
 
 // ── Theme-adaptive constants (mirrors Sidebar.tsx pattern) ────

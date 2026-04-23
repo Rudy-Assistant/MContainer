@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from '@/store/useStore';
-import { BLOCK_PRESETS, type BlockPresetId } from '@/config/blockPresets';
+import { BLOCK_PRESETS } from '@/config/blockPresets';
 import type { MaterialDef, VoxelFaces, SurfaceType } from '@/types/container';
 import { Lock, Unlock, Copy, RotateCcw } from 'lucide-react';
 import { PresetCard } from './PresetCard';
@@ -19,6 +19,7 @@ function PresetCardWithThumbnail({ preset, active, onClick, onMouseEnter, onMous
   return (
     <PresetCard
       content={thumbnail ? (
+        // eslint-disable-next-line @next/next/no-img-element -- These are generated data-URL canvas thumbnails, not network images.
         <img src={thumbnail} alt={preset.label}
           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 4 }} />
       ) : <IsometricVoxelSVG faces={preset.faces} />}

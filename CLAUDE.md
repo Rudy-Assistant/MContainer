@@ -14,7 +14,7 @@ This is **V1** (codebase: `C:\MHome\MContainer\`). V2 exists at `C:\MHome\` for 
 
 ```bash
 npm run dev          # Next.js dev server
-npm run test         # vitest run (782 tests)
+npm run test         # vitest run (full behavioral suite)
 npx tsc --noEmit     # Type check
 npm run gates        # Acceptance gates
 npm run quality      # Generate quality assessment
@@ -51,7 +51,7 @@ Every sprint follows this structure:
 5. **Implement**
 6. **Run `/simplify`**
 7. **`npx tsc --noEmit` → 0 errors**
-8. **`npx vitest run` → all 243 tests pass**
+8. **`npx vitest run` → full suite pass**
 9. **Browser verification** — walk through every checklist item, report PASS/FAIL verbatim
 10. **Update `MODUHOME-V1-ARCHITECTURE-v2.md`** if any architectural state changed
 
@@ -79,7 +79,7 @@ A feature cannot be rated PRODUCTION without a passing Playwright gate.
 V2 codebase is at `C:\MHome\` (parent of MContainer). It contains useful reference implementations for:
 - Adjacency auto-merge: `src/utils/adjacencyDetection.ts`
 - Zod hydration schema: `src/state/schemas.ts`
-- Behavioral test patterns: `src/Testing/` (267 behavioral tests, ignore the 38 source-scanning ones)
+- Behavioral test patterns: `src/Testing/` and `src/__tests__/` (behavioral tests only; do not copy source-scanning patterns)
 - Anti-pattern detection tests: `src/Testing/anti-patterns.test.ts`
 
 Do not modify V2 files. Read them for reference only.
@@ -127,7 +127,7 @@ during cleanup sprints. When in doubt, move to a secondary location rather than 
 Every sprint must complete ALL of these before being declared done:
 
 1. `npx tsc --noEmit` → 0 errors
-2. `npx vitest run` → all tests pass (782 currently)
+2. `npx vitest run` → all tests pass
 3. `node acceptance-gates.mjs` → all gates pass, 0 FAIL
 4. `node generate-quality-assessment.mjs` → CURRENT-QUALITY-ASSESSMENT.md updated
 5. Read ALL gate screenshots with view tool — describe what each shows

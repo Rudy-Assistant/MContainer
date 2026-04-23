@@ -119,7 +119,7 @@ const cardNameStyle: CSSProperties = {
   overflow: 'hidden',
   display: '-webkit-box',
   WebkitLineClamp: 2,
-  WebkitBoxOrient: 'vertical' as any,
+  WebkitBoxOrient: 'vertical',
   maxWidth: '100%',
   fontFamily: 'system-ui, sans-serif',
 };
@@ -179,12 +179,16 @@ export default function BottomPanel() {
   const totalPages = Math.ceil(forms.length / ITEMS_PER_PAGE);
   const visibleForms = forms.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
   // Reset page when category changes
-  useEffect(() => setPage(0), [category]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Pagination is derived local UI state and must reset when the selected category changes.
+    setPage(0);
+  }, [category]);
 
   // Auto-sync category when a SceneObject is selected
   useEffect(() => {
     if (selectedFormId) {
       const form = formRegistry.get(selectedFormId);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- The drawer mirrors selected object category into the visible tab.
       if (form) setCategory(form.category);
     }
   }, [selectedFormId]);

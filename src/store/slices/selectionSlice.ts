@@ -5,11 +5,27 @@
  */
 
 import type { SurfaceType, VoxelFaces, WallSide } from '@/types/container';
+import type { SliceGet, SliceSet } from './types';
 
 export type ElementType = 'frame' | 'wall' | 'floor' | 'ceiling' | 'voxel' | 'bay' | 'container';
 
-type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
-type Get = () => any;
+export type SelectedElements = {
+  type: ElementType;
+  items: Array<{ containerId: string; id: string }>;
+} | null;
+
+type SelectionRuntimeState = SelectionSlice & {
+  containers: Record<string, { voxelGrid?: Array<{ active?: boolean; faces: VoxelFaces }> }>;
+  lockedVoxels: Record<string, boolean>;
+  selectedObjectId: string | null;
+  hoveredVoxel: unknown;
+  hoveredEdge: unknown;
+  faceContext: unknown;
+  activeModulePreset: unknown;
+};
+
+type Set = SliceSet<SelectionRuntimeState>;
+type Get = SliceGet<SelectionRuntimeState>;
 
 export interface SelectionSlice {
   // Container selection
@@ -69,16 +85,13 @@ export interface SelectionSlice {
   copyVoxelStyle: (containerId: string, voxelIndex: number) => void;
 
   // Typed element selection context
-  selectedElements: {
-    type: ElementType;
-    items: Array<{ containerId: string; id: string }>;
-  } | null;
-  setSelectedElements: (sel: { type: ElementType; items: Array<{ containerId: string; id: string }> } | null) => void;
+  selectedElements: SelectedElements;
+  setSelectedElements: (sel: SelectedElements) => void;
   selectWithFace: (
-    sel: { type: ElementType; items: Array<{ containerId: string; id: string }> } | null,
+    sel: SelectedElements,
     face: keyof VoxelFaces | null
   ) => void;
-  toggleElement: (containerId: string, id: string) => void;
+  toggleElement: (containerId: string, id: string, type?: ElementType) => void;
 }
 
 export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
@@ -102,7 +115,7 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
   // ── Actions ────────────────────────────────────────────
 
   select: (id, additive = false) =>
-    set((s: any) => {
+    set((s) => {
       const newSel = additive
         ? s.selection.includes(id)
           ? s.selection.filter((sid: string) => sid !== id)
@@ -144,7 +157,7 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
     const clip = get().clipboardVoxel;
     if (!clip) return;
 
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -166,7 +179,7 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
     const containerId = sel.items[0].containerId;
     const indices = sel.items.map((it: { containerId: string; id: string }) => parseInt(it.id)).filter((n: number) => !isNaN(n));
     if (indices.length === 0) return;
-    set((s: any) => {
+    set((s) => {
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
@@ -201,7 +214,7 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
   setActiveHotbarSlot: (slot) => set({ activeHotbarSlot: slot, activeModulePreset: null }),
 
   setActiveCustomSlot: (index) => {
-    set((s: any) => ({
+    set((s) => ({
       activeCustomSlot: s.activeCustomSlot === index ? null : index,
       // Clear primary hotbar selection when activating custom
       activeHotbarSlot: index !== null ? null : s.activeHotbarSlot,
@@ -233,11 +246,13 @@ export const createSelectionSlice = (set: Set, get: Get): SelectionSlice => ({
     ...(sel === null ? { selectedFace: null } : face !== null ? { selectedFace: face } : {}),
   }),
 
-  toggleElement: (containerId, id) => set((s: any) => {
+  toggleElement: (containerId, id, type = 'voxel') => set((s) => {
     const curr = s.selectedElements;
-    // Bootstrap: if nothing selected, start a new voxel selection
-    if (!curr) return { selectedElements: { type: 'voxel', items: [{ containerId, id }] } };
-    const idx = curr.items.findIndex((it: any) => it.containerId === containerId && it.id === id);
+    // Bootstrap or type switch: start a new same-type selection.
+    if (!curr || curr.type !== type) {
+      return { selectedElements: { type, items: [{ containerId, id }] } };
+    }
+    const idx = curr.items.findIndex((it) => it.containerId === containerId && it.id === id);
     if (idx >= 0) {
       const items = [...curr.items];
       items.splice(idx, 1);

@@ -72,10 +72,7 @@ export function createSelectionGlowMaterial(
 /**
  * Hook for updating the time uniform in animation loop
  */
-export function useSelectionGlow(
-  material: THREE.ShaderMaterial | null,
-  isActive: boolean
-) {
+export function useSelectionGlow() {
   // Time update happens in the component using useFrame
   // This is just a helper type export
 }

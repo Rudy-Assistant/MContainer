@@ -7,6 +7,12 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
+declare global {
+  interface Window {
+    __exportGLB?: () => Promise<boolean>;
+  }
+}
+
 let _scene: THREE.Scene | null = null;
 
 /** Called from SceneExporter inside the R3F Canvas */
@@ -41,5 +47,5 @@ export async function exportSceneToGLB(): Promise<boolean> {
 
 // Expose on window for Playwright testing
 if (typeof window !== 'undefined') {
-  (window as any).__exportGLB = exportSceneToGLB;
+  window.__exportGLB = exportSceneToGLB;
 }

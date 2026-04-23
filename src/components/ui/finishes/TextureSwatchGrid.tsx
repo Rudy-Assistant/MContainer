@@ -44,6 +44,7 @@ function SwatchCard({ item, active, onSelect, onHoverItem, onLeaveItem }: {
   return (
     <PresetCard
       content={
+        // eslint-disable-next-line @next/next/no-img-element -- Swatches may be generated data URLs and fallback canvases, not optimizable route assets.
         <img
           src={src}
           alt={item.label}

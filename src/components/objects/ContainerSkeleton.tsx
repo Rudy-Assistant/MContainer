@@ -19,6 +19,7 @@
  */
 
 import { useCallback } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import {
   type Container,
@@ -49,6 +50,7 @@ const WALL_THICK = 0.08; // Hitbox thickness
 const POST_SIZE = 0.12;  // Fat post hitbox
 const BEAM_H = 0.10;     // Fat beam hitbox
 const CORNER_SIZE = 0.14; // Corner post hitbox (slightly bigger than regular post)
+type SkeletonPointerEvent = ThreeEvent<PointerEvent>;
 
 // ── Skeleton Bone Positions (Z-Axis Length Convention) ────────
 
@@ -150,7 +152,7 @@ export default function ContainerSkeleton({ container }: ContainerSkeletonProps)
 
   // ── Click Handlers ─────────────────────────────────────────
 
-  const handlePanelClick = useCallback((e: any, containerId: string, key: string) => {
+  const handlePanelClick = useCallback((e: SkeletonPointerEvent, containerId: string, key: string) => {
     e.stopPropagation();
     if (brush === "frame") return;
     if (e.nativeEvent?.shiftKey) {
@@ -160,7 +162,7 @@ export default function ContainerSkeleton({ container }: ContainerSkeletonProps)
     }
   }, [brush, applyBrush, selectAdditive]);
 
-  const handleFrameClick = useCallback((e: any, containerId: string, frameKey: string) => {
+  const handleFrameClick = useCallback((e: SkeletonPointerEvent, containerId: string, frameKey: string) => {
     e.stopPropagation();
     if (brush === "frame") {
       toggleFrame(containerId, frameKey);
@@ -172,7 +174,7 @@ export default function ContainerSkeleton({ container }: ContainerSkeletonProps)
     }
   }, [brush, toggleFrame, selectContainer, selectAdditive, focusPanel]);
 
-  const handleCornerClick = useCallback((e: any, containerId: string, cornerKey: string) => {
+  const handleCornerClick = useCallback((e: SkeletonPointerEvent, containerId: string, cornerKey: string) => {
     e.stopPropagation();
     if (brush === "frame") {
       toggleFrame(containerId, cornerKey);
@@ -184,7 +186,7 @@ export default function ContainerSkeleton({ container }: ContainerSkeletonProps)
     }
   }, [brush, toggleFrame, selectContainer, selectAdditive, focusPanel]);
 
-  const handleFloorClick = useCallback((e: any) => {
+  const handleFloorClick = useCallback((e: SkeletonPointerEvent) => {
     e.stopPropagation();
     if (e.nativeEvent?.shiftKey) {
       selectAdditive(container.id);
@@ -196,37 +198,37 @@ export default function ContainerSkeleton({ container }: ContainerSkeletonProps)
 
   // ── Hover Handlers ─────────────────────────────────────────
 
-  const handlePanelOver = useCallback((e: any, containerId: string, key: string) => {
+  const handlePanelOver = useCallback((e: SkeletonPointerEvent, containerId: string, key: string) => {
     e.stopPropagation();
     setHoveredPart({ type: "panel", containerId, panelKey: key });
   }, [setHoveredPart]);
 
-  const handlePanelOut = useCallback((e: any) => {
+  const handlePanelOut = useCallback((e: SkeletonPointerEvent) => {
     e.stopPropagation();
     setHoveredPart(null);
   }, [setHoveredPart]);
 
-  const handleBeamOver = useCallback((e: any, containerId: string, frameKey: string) => {
+  const handleBeamOver = useCallback((e: SkeletonPointerEvent, containerId: string, frameKey: string) => {
     e.stopPropagation();
     setHoveredPart({ type: "beam", containerId, frameKey });
   }, [setHoveredPart]);
 
-  const handlePostOver = useCallback((e: any, containerId: string, frameKey: string) => {
+  const handlePostOver = useCallback((e: SkeletonPointerEvent, containerId: string, frameKey: string) => {
     e.stopPropagation();
     setHoveredPart({ type: "post", containerId, frameKey });
   }, [setHoveredPart]);
 
-  const handleCornerOver = useCallback((e: any, containerId: string, cornerKey: string) => {
+  const handleCornerOver = useCallback((e: SkeletonPointerEvent, containerId: string, cornerKey: string) => {
     e.stopPropagation();
     setHoveredPart({ type: "corner", containerId, cornerKey });
   }, [setHoveredPart]);
 
-  const handleFloorOver = useCallback((e: any) => {
+  const handleFloorOver = useCallback((e: SkeletonPointerEvent) => {
     e.stopPropagation();
     setHoveredPart({ type: "floor", containerId: container.id });
   }, [container.id, setHoveredPart]);
 
-  const handlePartOut = useCallback((e: any) => {
+  const handlePartOut = useCallback((e: SkeletonPointerEvent) => {
     e.stopPropagation();
     setHoveredPart(null);
   }, [setHoveredPart]);

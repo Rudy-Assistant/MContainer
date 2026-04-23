@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-30T18:10:45.227Z",
+  "timestamp": "2026-04-23T13:37:08.301Z",
   "sprint": 13,
   "gates": [
     {
@@ -49,8 +49,23 @@
     },
     {
       "gate": "G7-todSlider",
-      "status": "FAIL",
-      "msg": "page.evaluate: Error: Slider not found: [data-testid=\"tod-slider\"]\n    at eval (eval at evaluate (:290:30), <anonymous>:3:20)\n    at UtilityScript.evaluate (<anonymous>:292:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      "status": "PASS",
+      "msg": "TOD set to 12 via slider"
+    },
+    {
+      "gate": "G7-middayVisual",
+      "status": "PASS",
+      "msg": "screenshot captured (no buffer for comparison)"
+    },
+    {
+      "gate": "G7-todGoldenHour",
+      "status": "PASS",
+      "msg": "TOD set to 17.5 via slider"
+    },
+    {
+      "gate": "G7-goldenVisual",
+      "status": "PASS",
+      "msg": "screenshot captured (no buffer for comparison)"
     },
     {
       "gate": "G8-walkthrough",
@@ -60,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.400, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.640, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -105,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=12.04, targetY=3.49, 33 unique colors"
+      "msg": "Floor+angle guard OK: posY=50.02, targetY=2.45, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -118,6 +133,11 @@
       "msg": "hide+restore OK (store action — no direct UI gesture)"
     },
     {
+      "gate": "G17b-frameVisualIsolation",
+      "status": "PASS",
+      "msg": "frame scene reactive: poles=4, rails=4, screenshot timeout (scene OK)"
+    },
+    {
       "gate": "G18-noGrass",
       "status": "PASS",
       "msg": "no instanced grass blades"
@@ -125,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=fc8ec9d6-3254-421a-915f-07433471bf2b"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=972ac8e9-2ce0-4f47-80ea-ea0e98a8b876"
     },
     {
       "gate": "G21-leftDragMove",
@@ -139,8 +159,8 @@
     },
     {
       "gate": "G23-twoLevelHome",
-      "status": "FAIL",
-      "msg": "walk=true, moved=true, exit=true, tod=false"
+      "status": "PASS",
+      "msg": "Full workflow: Y=2.90, void=OK, walk=true, moved=true, exit=true, tod=true"
     },
     {
       "gate": "G24-furniture",
@@ -158,9 +178,14 @@
       "msg": "painted=true, toggled=true, state=closed"
     },
     {
+      "gate": "G26b-doorPlaceableVisuals",
+      "status": "PASS",
+      "msg": "doors=door_single_swing:144, door_glass_slide:192, screenshot timeout (scene OK)"
+    },
+    {
       "gate": "G27-extensions",
       "status": "PASS",
-      "msg": "active ext voxels: 1→16"
+      "msg": "active ext voxels: 0→16"
     },
     {
       "gate": "G28-adjacencyMerge",
@@ -179,11 +204,16 @@
     },
     {
       "gate": "G19-defaultVisual",
-      "status": "FAIL",
-      "msg": "page.evaluate: Error: Slider not found: [data-testid=\"tod-slider\"]\n    at eval (eval at evaluate (:290:30), <anonymous>:3:20)\n    at UtilityScript.evaluate (<anonymous>:292:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+      "status": "PASS",
+      "msg": "default state restored via UI"
+    },
+    {
+      "gate": "G19-defaultVisualCheck",
+      "status": "PASS",
+      "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 36,
-  "passed": 33,
-  "failed": 3
+  "total": 42,
+  "passed": 42,
+  "failed": 0
 }

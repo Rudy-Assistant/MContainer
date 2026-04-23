@@ -9,8 +9,8 @@
  *   Section C: Presets — read-only master library from libraryPresets.ts
  */
 
-import { useState, useCallback, useRef } from "react";
-import { useStore, type HotbarSlot } from "@/store/useStore";
+import { useState, useCallback } from "react";
+import { useStore } from "@/store/useStore";
 import type { VoxelFaces } from "@/types/container";
 import { getSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import { CssVoxelIcon } from "@/components/ui/SmartHotbar";
@@ -166,7 +166,6 @@ export default function UserLibrary() {
   const libraryHomeDesigns = useStore((s) => s.libraryHomeDesigns);
   const removeLibraryItem = useStore((s) => s.removeLibraryItem);
   const setLibraryDragPayload = useStore((s) => s.setLibraryDragPayload);
-  const containers = useStore((s) => s.containers);
   const saveHomeDesign = useStore((s) => s.saveHomeDesign);
   const loadHomeDesign = useStore((s) => s.loadHomeDesign);
   const [savingHome, setSavingHome] = useState(false);

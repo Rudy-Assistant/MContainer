@@ -5,14 +5,14 @@
  */
 
 import LZString from 'lz-string';
-import type { Container, ContainerSize, ContainerPosition, SurfaceType } from '@/types/container';
+import type { Container, ContainerSize, ContainerPosition, Voxel } from '@/types/container';
 
 interface SharedContainer {
   size: ContainerSize;
   position: ContainerPosition;
   rotation: number;
   level: number;
-  voxelGrid?: any[];
+  voxelGrid?: Voxel[];
   interiorFinish?: 'raw' | 'plywood' | 'drywall' | 'painted';
 }
 

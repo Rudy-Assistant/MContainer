@@ -41,11 +41,20 @@ const N8AO_CONFIG = {
   distanceFalloff: 1.5,
 } as const;
 
-const BLOOM_CONFIG = {
-  luminanceThreshold: 0.85,
-  luminanceSmoothing: 0.1,
+export const BLOOM_CONFIG = {
+  luminanceThreshold: 1.08,
+  luminanceSmoothing: 0.08,
+  intensity: 0.45,
   mipmapBlur: true,
 } as const;
+
+export function getBloomSettings(hasSoftBloom: boolean) {
+  return {
+    luminanceThreshold: hasSoftBloom ? 0.78 : BLOOM_CONFIG.luminanceThreshold,
+    luminanceSmoothing: hasSoftBloom ? 0.18 : BLOOM_CONFIG.luminanceSmoothing,
+    intensity: hasSoftBloom ? 0.8 : BLOOM_CONFIG.intensity,
+  };
+}
 
 // Stable empty array to avoid re-renders when no style effects are active
 const EMPTY_EFFECTS: StyleEffect[] = [];
@@ -64,21 +73,19 @@ function PostProcessingEffects() {
   const softBloomEffect = effects.find((e) => e.type === 'soft_bloom');
   const edgeGlowEffect = effects.find((e) => e.type === 'edge_glow');
 
-  // soft_bloom: lower luminance threshold so light fixtures bloom more visibly
-  const bloomThreshold = softBloomEffect ? 0.5 : BLOOM_CONFIG.luminanceThreshold;
-  const bloomSmoothing = softBloomEffect ? 0.3 : BLOOM_CONFIG.luminanceSmoothing;
-  const bloomIntensity = softBloomEffect ? 1.5 : 1.0;
+  // soft_bloom: allow light fixtures to glow without washing out the sky.
+  const bloomSettings = getBloomSettings(!!softBloomEffect);
 
   // edge_glow: outline color from effect definition (memoize to avoid new Color per render)
   const edgeGlowColor = useMemo(
     () => edgeGlowEffect ? new THREE.Color(edgeGlowEffect.color ?? '#00ff88') : null,
-    [edgeGlowEffect?.color],
+    [edgeGlowEffect],
   );
 
   // salt_frost: frosty white-blue outline + desaturation
   const saltFrostColor = useMemo(
     () => saltFrostEffect ? new THREE.Color(saltFrostEffect.color ?? '#a8d8ff') : null,
-    [saltFrostEffect?.color],
+    [saltFrostEffect],
   );
 
   // Early return AFTER all hooks to avoid "fewer hooks" error
@@ -100,9 +107,9 @@ function PostProcessingEffects() {
     children.push(
       <Bloom
         key="bloom"
-        luminanceThreshold={bloomThreshold}
-        luminanceSmoothing={bloomSmoothing}
-        intensity={bloomIntensity}
+        luminanceThreshold={bloomSettings.luminanceThreshold}
+        luminanceSmoothing={bloomSettings.luminanceSmoothing}
+        intensity={bloomSettings.intensity}
         mipmapBlur
       />,
     );

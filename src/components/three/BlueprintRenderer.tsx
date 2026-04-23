@@ -289,10 +289,8 @@ function BlueprintContainer({ container }: { container: Container }) {
   const startContainerDrag      = useStore((s) => s.startContainerDrag);
   const renameContainer         = useStore((s) => s.renameContainer);
   const openContainerContextMenu = useStore((s) => s.openContainerContextMenu);
-  const dragMovingId            = useStore((s) => s.dragMovingId);
 
   const isSelected     = selection.includes(container.id);
-  const isBeingDragged = dragMovingId === container.id;
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(container.name);

@@ -15,19 +15,44 @@ import {
   type PricingConfig,
   type FurnitureItem,
   type Container,
+  type ExtensionConfig,
+  type Zone,
   ViewMode,
 } from '@/types/container';
 import { createDefaultVoxelGrid } from '@/types/factories';
 import defaultPricing from '@/config/pricing_config.json';
 import { getModelHome } from '@/config/modelHomes';
-import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from '@/types/container';
+import { DEFAULT_EXTENSION_CONFIG } from '@/types/container';
 import { scheduleAdjacency } from '@/store/slices/containerSlice';
 import type { HotbarSlot } from '../useStore';
+import type { SliceGet, SliceSet } from './types';
 
 // Use a lazy StoreState reference to avoid circular imports.
 // The slice function receives set/get typed to the full store.
-type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
-type Get = () => any;
+type LibraryRuntimeState = LibrarySlice & {
+  activeHotbarSlot: number | null;
+  containers: Record<string, Container>;
+  zones: Record<string, Zone>;
+  environment: Record<string, unknown>;
+  viewMode: ViewMode;
+  pricing: PricingConfig;
+  furnitureIndex: Record<string, FurnitureItem>;
+  selection: unknown[];
+  addContainer: (size: Container['size'], position: ContainerPosition, level: number, skipSmartPlacement?: boolean) => string;
+  applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
+  setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
+  stackContainer: (topId: string, bottomId: string) => boolean;
+  applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w') => void;
+  generateRooftopDeck: (containerId: string) => void;
+  refreshAdjacency: () => void;
+};
+type Set = SliceSet<LibraryRuntimeState>;
+type Get = SliceGet<LibraryRuntimeState>;
+type TemporalApi = { pause: () => void; resume: () => void };
+type ImportedContainer = Partial<Container> & Pick<Container, 'size' | 'position' | 'rotation' | 'walls'>;
+type ImportedProjectState = Partial<LibraryRuntimeState> & {
+  containers?: Record<string, ImportedContainer>;
+};
 
 export interface MaterialPalette {
   id: string;
@@ -88,10 +113,10 @@ export interface LibrarySlice {
 
 // We need access to useStore for temporal — import lazily to avoid circular deps.
 // The `get()` accessor already returns the full store at runtime.
-let _getTemporalApi: (() => any) | null = null;
+let _getTemporalApi: (() => TemporalApi) | null = null;
 
 /** Inject the temporal API accessor (called from useStore.ts after store creation) */
-export function setLibraryTemporalAccessor(accessor: () => any) {
+export function setLibraryTemporalAccessor(accessor: () => TemporalApi) {
   _getTemporalApi = accessor;
 }
 
@@ -141,12 +166,12 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
   savePalette: (palette) => {
     const id = uuid();
     const entry: MaterialPalette = { ...palette, id };
-    set((s: any) => ({ palettes: [...s.palettes, entry] }));
+    set((s) => ({ palettes: [...s.palettes, entry] }));
     return id;
   },
 
   updatePalette: (id, fields) => {
-    set((s: any) => ({
+    set((s) => ({
       palettes: s.palettes.map((p: MaterialPalette) =>
         p.id === id && !p.isBuiltIn ? { ...p, ...fields } : p
       ),
@@ -156,7 +181,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
   deletePalette: (id) => {
     const p = get().palettes.find((p: MaterialPalette) => p.id === id);
     if (p?.isBuiltIn) return; // Cannot delete built-ins
-    set((s: any) => ({ palettes: s.palettes.filter((p: MaterialPalette) => p.id !== id) }));
+    set((s) => ({ palettes: s.palettes.filter((p: MaterialPalette) => p.id !== id) }));
   },
 
   setActivePalette: (id) => set({ activePaletteId: id }),
@@ -164,7 +189,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
   saveBlockToLibrary: (label, faces) => {
     const id = uuid();
     const block: LibraryBlock = { id, label, faces: { ...faces }, category: 'user', createdAt: Date.now() };
-    set((s: any) => ({ libraryBlocks: [...s.libraryBlocks, block] }));
+    set((s) => ({ libraryBlocks: [...s.libraryBlocks, block] }));
     return id;
   },
 
@@ -174,7 +199,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     const id = uuid();
     const grid = c.voxelGrid ? structuredClone(c.voxelGrid) : createDefaultVoxelGrid();
     const entry: LibraryContainer = { id, label, size: c.size, voxelGrid: grid, category: 'user', createdAt: Date.now() };
-    set((s: any) => ({ libraryContainers: [...s.libraryContainers, entry] }));
+    set((s) => ({ libraryContainers: [...s.libraryContainers, entry] }));
     return id;
   },
 
@@ -203,7 +228,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       category: 'user',
       createdAt: Date.now(),
     };
-    set((s: any) => ({ libraryHomeDesigns: [...s.libraryHomeDesigns, design] }));
+    set((s) => ({ libraryHomeDesigns: [...s.libraryHomeDesigns, design] }));
     return id;
   },
 
@@ -226,7 +251,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       containerIds.push(id);
 
       // Apply saved voxel grid
-      set((s: any) => {
+      set((s) => {
         const c = s.containers[id];
         if (!c) return {};
         return {
@@ -245,7 +270,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
   },
 
   removeLibraryItem: (id) => {
-    set((s: any) => ({
+    set((s) => ({
       libraryBlocks: s.libraryBlocks.filter((b: LibraryBlock) => b.id !== id),
       libraryContainers: s.libraryContainers.filter((c: LibraryContainer) => c.id !== id),
       libraryHomeDesigns: s.libraryHomeDesigns.filter((d: LibraryHomeDesign) => d.id !== id),
@@ -253,7 +278,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
   },
 
   renameLibraryItem: (id, label) => {
-    set((s: any) => ({
+    set((s) => ({
       libraryBlocks: s.libraryBlocks.map((b: LibraryBlock) => b.id === id ? { ...b, label } : b),
       libraryContainers: s.libraryContainers.map((c: LibraryContainer) => c.id === id ? { ...c, label } : c),
       libraryHomeDesigns: s.libraryHomeDesigns.map((d: LibraryHomeDesign) => d.id === id ? { ...d, label } : d),
@@ -261,7 +286,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
   },
 
   setCustomHotbarSlot: (index, slot) => {
-    set((s: any) => {
+    set((s) => {
       const next = [...s.customHotbar];
       next[index] = slot;
       return { customHotbar: next };
@@ -279,13 +304,13 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
 
   importState: (json) => {
     try {
-      const parsed = JSON.parse(json) as any;
+      const parsed = JSON.parse(json) as ImportedProjectState;
 
       // Migrate old containers that lack new stacking/grouping/furniture fields
       const containers: Record<string, Container> = {};
       const furnitureIndex: Record<string, FurnitureItem> = {};
-      for (const [id, c] of Object.entries(parsed.containers ?? {}) as [string, any][]) {
-        const furniture = (c as Container).furniture ?? [];
+      for (const [id, c] of Object.entries(parsed.containers ?? {})) {
+        const furniture = c.furniture ?? [];
         containers[id] = {
           ...c,
           level: c.level ?? 0,
@@ -295,7 +320,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
           mergedWalls: c.mergedWalls ?? [],
           floorRemoved: c.floorRemoved ?? false,
           furniture,
-        };
+        } as Container;
         // Migrate HingedWall modules that lack outerWall field
         for (const wall of Object.values(containers[id].walls)) {
           for (const bay of (wall as unknown as { bays: Array<{ module: Record<string, unknown> }> }).bays) {
@@ -317,12 +342,12 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         pricing: parsed.pricing ?? (defaultPricing as unknown as PricingConfig),
         selection: [],
         furnitureIndex,
-        libraryBlocks: (parsed as Record<string, unknown>).libraryBlocks as LibraryBlock[] ?? [],
-        libraryContainers: (parsed as Record<string, unknown>).libraryContainers as LibraryContainer[] ?? [],
-        libraryHomeDesigns: (parsed as Record<string, unknown>).libraryHomeDesigns as LibraryHomeDesign[] ?? [],
-        customHotbar: (parsed as Record<string, unknown>).customHotbar as (HotbarSlot | null)[] ?? Array(10).fill(null),
-        palettes: (parsed as Record<string, unknown>).palettes as MaterialPalette[] ?? BUILT_IN_PALETTES,
-        activePaletteId: (parsed as Record<string, unknown>).activePaletteId as string ?? 'industrial',
+        libraryBlocks: parsed.libraryBlocks ?? [],
+        libraryContainers: parsed.libraryContainers ?? [],
+        libraryHomeDesigns: parsed.libraryHomeDesigns ?? [],
+        customHotbar: parsed.customHotbar ?? Array(10).fill(null),
+        palettes: parsed.palettes ?? BUILT_IN_PALETTES,
+        activePaletteId: parsed.activePaletteId ?? 'industrial',
       });
     } catch (e) {
       console.error("Failed to import state:", e);
@@ -355,7 +380,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       }
 
       if (mc.extensionConfig && mc.extensionConfig !== 'none') {
-        get().setAllExtensions(id, mc.extensionConfig, true);
+        get().setAllExtensions(id, mc.extensionConfig as ExtensionConfig, true);
         t?.pause();
       }
     }
@@ -386,7 +411,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
 
     // Generate rooftop deck on topmost container
     const topmost = containerIds.find((id) => {
-      return !Object.values(get().containers).some((other: any) => other.stackedOn === id);
+      return !Object.values(get().containers).some((other) => other.stackedOn === id);
     });
     if (topmost) {
       get().generateRooftopDeck(topmost);

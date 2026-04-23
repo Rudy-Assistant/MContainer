@@ -10,7 +10,7 @@ interface Props {
   onApply: (presetId: string) => void;
 }
 
-export function ContainerPresetRow({ containerId: _containerId, onApply }: Props) {
+export function ContainerPresetRow({ onApply }: Props) {
   const setGhostPreset = useStore((s) => s.setGhostPreset);
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 

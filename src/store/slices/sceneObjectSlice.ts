@@ -1,6 +1,7 @@
 import type { SceneObject, ObjectAnchor } from '@/types/sceneObject';
 import { formRegistry } from '@/config/formRegistry';
 import { getOccupiedSlots, canPlaceInSlot, canPlaceFloorObject } from '@/utils/slotOccupancy';
+import type { SliceGet, SliceSet } from './types';
 
 /** Shared validation for placeObject and duplicateObject (Fix 2). */
 function validateAnchor(
@@ -45,7 +46,7 @@ export interface SceneObjectSlice {
   removeObjectsByContainer: (containerId: string) => void;
 }
 
-export function createSceneObjectSlice(set: any, get: any): SceneObjectSlice {
+export function createSceneObjectSlice(set: SliceSet<SceneObjectSlice>, get: SliceGet<SceneObjectSlice>): SceneObjectSlice {
   return {
     sceneObjects: {},
 
@@ -63,34 +64,34 @@ export function createSceneObjectSlice(set: any, get: any): SceneObjectSlice {
         anchor,
       };
 
-      set((s: any) => {
+      set((s) => {
         s.sceneObjects[id] = obj;
       });
       return id;
     },
 
     removeObject: (objectId) => {
-      set((s: any) => {
+      set((s) => {
         delete s.sceneObjects[objectId];
       });
     },
 
     updateSkin: (objectId, slotId, materialId) => {
-      set((s: any) => {
+      set((s) => {
         const obj = s.sceneObjects[objectId];
         if (obj) obj.skin[slotId] = materialId;
       });
     },
 
     applyQuickSkin: (objectId, slots) => {
-      set((s: any) => {
+      set((s) => {
         const obj = s.sceneObjects[objectId];
         if (obj) obj.skin = { ...slots };
       });
     },
 
     updateObjectState: (objectId, key, value) => {
-      set((s: any) => {
+      set((s) => {
         const obj = s.sceneObjects[objectId];
         if (!obj) return;
         if (!obj.state) obj.state = {};
@@ -99,7 +100,7 @@ export function createSceneObjectSlice(set: any, get: any): SceneObjectSlice {
     },
 
     moveObject: (objectId, newAnchor) => {
-      set((s: any) => {
+      set((s) => {
         const obj = s.sceneObjects[objectId];
         if (obj) obj.anchor = newAnchor;
       });
@@ -112,7 +113,7 @@ export function createSceneObjectSlice(set: any, get: any): SceneObjectSlice {
       if (!validateAnchor(get().sceneObjects, source.formId, newAnchor)) return '';
 
       const id = crypto.randomUUID();
-      set((s: any) => {
+      set((s) => {
         s.sceneObjects[id] = {
           id,
           formId: source.formId,
@@ -124,9 +125,9 @@ export function createSceneObjectSlice(set: any, get: any): SceneObjectSlice {
     },
 
     removeObjectsByContainer: (containerId) => {
-      set((s: any) => {
+      set((s) => {
         for (const [id, obj] of Object.entries(s.sceneObjects)) {
-          if ((obj as SceneObject).anchor.containerId === containerId) {
+          if (obj.anchor.containerId === containerId) {
             delete s.sceneObjects[id];
           }
         }

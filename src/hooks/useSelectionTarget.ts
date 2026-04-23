@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { VoxelFaces } from '../types/container';
 import { VOXEL_COLS } from '../types/container';
 import { getBayGroupForVoxel } from '../config/bayGroups';
 import type { ElementType } from '../store/slices/selectionSlice';
+import type { StoreState } from '../store/useStore';
 
 export type FaceKey = keyof VoxelFaces;
 
@@ -67,21 +68,6 @@ export function deriveSelectionTarget(state: SelectionState): SelectionTarget {
   return { type: 'none' };
 }
 
-function selectionTargetEqual(a: SelectionTarget, b: SelectionTarget): boolean {
-  if (a.type !== b.type) return false;
-  if (a.type === 'none') return true;
-  if (a.type === 'container' && b.type === 'container') return a.containerId === b.containerId;
-  if (a.type === 'voxel' && b.type === 'voxel') return a.containerId === b.containerId && a.index === b.index;
-  if (a.type === 'face' && b.type === 'face') return a.containerId === b.containerId && a.index === b.index && a.face === b.face;
-  if (a.type === 'bay' && b.type === 'bay') {
-    return a.containerId === b.containerId && a.bayId === b.bayId && a.indices.length === b.indices.length;
-  }
-  if (a.type === 'bay-face' && b.type === 'bay-face') {
-    return a.containerId === b.containerId && a.bayId === b.bayId && a.indices.length === b.indices.length && a.face === b.face;
-  }
-  return false;
-}
-
 /**
  * Derives SelectionTarget from store state.
  * Uses useShallow for stable subscription to the 3 store fields,
@@ -89,15 +75,14 @@ function selectionTargetEqual(a: SelectionTarget, b: SelectionTarget): boolean {
  */
 export function useSelectionTarget(): SelectionTarget {
   const { selectedElements, selectedFace, selection } = useStore(
-    useShallow((s: any) => ({
+    useShallow((s: StoreState) => ({
       selectedElements: s.selectedElements,
       selectedFace: s.selectedFace,
       selection: s.selection,
     }))
   );
-  const prevRef = useRef<SelectionTarget>({ type: 'none' });
-  const next = deriveSelectionTarget({ selectedElements, selectedFace, selection });
-  if (selectionTargetEqual(next, prevRef.current)) return prevRef.current;
-  prevRef.current = next;
-  return next;
+  return useMemo(
+    () => deriveSelectionTarget({ selectedElements, selectedFace, selection }),
+    [selectedElements, selectedFace, selection],
+  );
 }

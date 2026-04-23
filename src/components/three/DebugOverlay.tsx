@@ -118,7 +118,6 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
   const hoveredVoxelEdge = useStore((s) =>
     s.hoveredVoxelEdge?.containerId === cid ? s.hoveredVoxelEdge : null
   );
-  if (!grid) return null;
 
   const vHeight = dims.height;
   const tileY = inspectorView === 'ceiling' ? vHeight + 0.02 : 0.02;
@@ -153,7 +152,7 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
         voxelIndices: group.voxelIndices,
       };
     });
-  }, [isSimpleMode, grid, dims]);
+  }, [isSimpleMode, dims]);
 
   // Detail mode: per-voxel tiles
   const voxelTiles = useMemo((): TileDef[] | null => {
@@ -174,15 +173,17 @@ function ContainerDebugFloorTiles({ container }: { container: Container }) {
       });
     }
     return result;
-  }, [isSimpleMode, grid, dims]);
+  }, [isSimpleMode, dims]);
 
-  const tiles = bayTiles || voxelTiles || [];
+  const tiles = useMemo(() => bayTiles || voxelTiles || [], [bayTiles, voxelTiles]);
 
   // Precompute hovered tile index (O(1) lookup instead of O(k) per tile)
   const hoveredTileIdx = useMemo(() => {
     if (!hoveredTileInfo) return -1;
     return tiles.findIndex(t => t.voxelIndices.includes(hoveredTileInfo.flatIdx));
   }, [hoveredTileInfo, tiles]);
+
+  if (!grid) return null;
 
   return (
     <group position={[container.position.x, container.position.y, container.position.z]}>

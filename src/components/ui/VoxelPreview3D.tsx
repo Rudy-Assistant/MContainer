@@ -20,15 +20,6 @@ import { FaceVisual, StairMesh } from "@/components/objects/ContainerSkin";
 
 // ── Surface cycle ──────────────────────────────────────────────
 
-const SURFACE_CYCLE: SurfaceType[] = [
-  "Open", "Solid_Steel", "Glass_Pane", "Railing_Glass", "Railing_Cable", "Deck_Wood",
-];
-
-function cycleSurface(current: SurfaceType, delta: number): SurfaceType {
-  const i = SURFACE_CYCLE.indexOf(current);
-  return SURFACE_CYCLE[(i + delta + SURFACE_CYCLE.length) % SURFACE_CYCLE.length];
-}
-
 const DIM_LABEL_STYLE: React.CSSProperties = {
   fontSize: '9px', color: '#64748b', whiteSpace: 'nowrap', pointerEvents: 'none',
 };
@@ -131,7 +122,7 @@ function PreviewPictureFrameHitbox({
 
 const PANEL_THICK = 0.06; // must match ContainerSkin's PANEL_THICK
 
-function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface, onCycle, onContextMenu, containerId, voxelIndex, xray = false }: {
+function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface, onCycle, onContextMenu, xray = false }: {
   face: keyof VoxelFaces;
   position: [number, number, number];
   nW: number; nH: number; nD: number;
@@ -139,8 +130,6 @@ function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface,
   surface: SurfaceType;
   onCycle: () => void;
   onContextMenu: (e: ThreeEvent<MouseEvent>) => void;
-  containerId: string;
-  voxelIndex: number;
   xray?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -404,8 +393,6 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
             isHoriz={config.isHoriz}
             surface={faces[config.face]}
             xray={config.face === 'n' || config.face === 'w'}
-            containerId={containerId}
-            voxelIndex={voxelIndex}
             onCycle={() => {
               // Always select the face
               setSelectedFace(config.face);

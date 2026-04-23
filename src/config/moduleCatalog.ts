@@ -4,7 +4,7 @@
  * Single-voxel room modules — each stamps 6 faces + optional furniture.
  * Orientation resolves abstract faces (inward/outward/left/right) to cardinal directions.
  */
-import type { ModulePreset, ModuleOrientation, VoxelFaces, SurfaceType } from '@/types/container';
+import type { ModulePreset, ModuleOrientation, VoxelFaces } from '@/types/container';
 import { FurnitureType } from '@/types/container';
 
 // ── Orientation Resolution ────────────────────────────────────

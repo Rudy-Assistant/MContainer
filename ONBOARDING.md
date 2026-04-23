@@ -22,7 +22,7 @@ npm run dev
 
 ```bash
 npx tsc --noEmit     # type check — must be 0 errors
-npx vitest run       # behavioral tests — must be 307 pass
+npx vitest run       # behavioral tests — full suite must pass
 ```
 
 ## Project structure
@@ -41,7 +41,7 @@ src/
     slices/             7 slice files — ALL business logic lives here
   types/                container.ts — the primary type definitions
   utils/                applyPalette, exportGLB, adjacencyDetection
-  Testing/              79 test files, 307 behavioral tests
+  Testing/              focused behavioral tests and regression coverage
 ```
 
 ## Key concepts
@@ -100,7 +100,7 @@ The middleware chain wraps all slices: `immer(zundo(persist(slices)))` (Immer in
 ## Before your first PR
 
 1. `npx tsc --noEmit` → 0 errors
-2. `npx vitest run` → 307 pass
+2. `npx vitest run` → full suite pass
 3. Open `localhost:3000` and manually verify your change looks correct in 3D view
 4. Check `CLAUDE.md` for the full list of invariants and anti-patterns
 

@@ -13,8 +13,8 @@
  *   - User can orbit independently; "Link" toggle re-enables sync
  */
 
-import { useLayoutEffect, useRef, useState, useCallback } from "react";
-import { Canvas, useThree, useFrame } from "@react-three/fiber";
+import { useLayoutEffect, useState } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -77,6 +77,7 @@ function CameraSync({
       const isoExtent = Math.max(expandedLen, expandedWid) * 0.85 + dims.height * 0.35;
       // Canvas is ~352px wide (sidebar 384 - padding). Target 90% fill.
       const zoom = 170 / isoExtent;
+      // eslint-disable-next-line react-hooks/immutability -- R3F cameras are imperative Three.js objects; this component owns the preview zoom.
       (camera as THREE.OrthographicCamera).zoom = Math.max(8, Math.min(40, zoom));
       camera.updateProjectionMatrix();
     }
@@ -359,39 +360,6 @@ function IsoEditorCanvas({
         zoomSpeed={0.8}
       />
     </>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
-// LAYER TOGGLE BUTTON
-// ═══════════════════════════════════════════════════════════
-
-function LayerBtn({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "3px 8px",
-        borderRadius: "5px",
-        border: active
-          ? "1px solid rgba(255,193,7,0.6)"
-          : "1px solid rgba(255,255,255,0.1)",
-        background: active ? "rgba(255,193,7,0.15)" : "rgba(255,255,255,0.05)",
-        color: active ? "#ffc107" : "#94a3b8",
-        fontSize: "10px", fontWeight: 600, cursor: "pointer",
-        transition: "all 120ms ease", letterSpacing: "0.03em",
-      }}
-    >
-      {active ? `${label} Hidden` : `Hide ${label}`}
-    </button>
   );
 }
 

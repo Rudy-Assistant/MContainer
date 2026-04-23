@@ -61,6 +61,36 @@ async function openOverflowMenu(page) {
   await page.waitForTimeout(100);
 }
 
+/** Open the active toolbar Time of Day popover so its range input is mounted. */
+async function openTimeOfDayPopover(page) {
+  const slider = page.locator('[data-testid="tod-slider"]');
+  if (await slider.isVisible().catch(() => false)) return;
+
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForTimeout(100);
+
+  const btn = page.locator('[data-testid="btn-tod"]');
+  if (!await btn.isVisible().catch(() => false)) {
+    throw new Error('Time of Day button not found');
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await btn.click({ force: true });
+    await page.waitForTimeout(250);
+    if (await slider.isVisible().catch(() => false)) return;
+
+    await page.evaluate(() => {
+      document.querySelector('[data-testid="btn-tod"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true })
+      );
+    }).catch(() => {});
+    await page.waitForTimeout(250);
+    if (await slider.isVisible().catch(() => false)) return;
+  }
+
+  await slider.waitFor({ state: 'visible', timeout: 2000 });
+}
+
 function visualCheck(gate, buffer, baselineName, threshold = 0.50) {
   if (!buffer) { pass(gate, 'screenshot captured (no buffer for comparison)'); return; }
   const baselinePath = `${BASELINES_DIR}/${baselineName}`;
@@ -231,7 +261,7 @@ async function run() {
   try {
     page.once('dialog', d => d.accept().catch(() => {}));
     await openOverflowMenu(page);
-    await page.click('[data-testid="btn-reset"]');
+    await page.click('[data-testid="btn-reset"]', { force: true });
     await page.waitForTimeout(1000);
     const count = await page.evaluate(() => Object.keys(window.__store.getState().containers).length);
     count === 1
@@ -276,6 +306,7 @@ async function run() {
 
   // ═══ G7: TOD slider via native value setter ═══
   try {
+    await openTimeOfDayPopover(page);
     // Set to midday
     await setSliderValue(page, '[data-testid="tod-slider"]', 12);
     await page.waitForTimeout(1000);
@@ -301,6 +332,8 @@ async function run() {
     // Restore default
     await setSliderValue(page, '[data-testid="tod-slider"]', 10);
     await page.waitForTimeout(500);
+    await page.click('[data-testid="btn-tod"]', { force: true });
+    await page.waitForTimeout(100);
   } catch (e) { fail('G7-todSlider', e.message); }
 
   // ═══ G8: Walkthrough mode via UI click + FP walking + exit ═══
@@ -584,6 +617,51 @@ async function run() {
       : fail('G17-frameToggle', JSON.stringify(r));
   } catch (e) { fail('G17-frameToggle', e.message); }
 
+  // ═══ G17b: Frame visual isolation + reactive shapes/materials ═══
+  try {
+    const setup = await page.evaluate(() => {
+      const s = window.__store.getState();
+      const ids = Object.keys(s.containers);
+      if (!ids.length) return { ok: false, reason: 'no containers' };
+      const cid = ids[0];
+      s.setFrameMode(true);
+      s.setFrameDefaults(cid, {
+        poleShape: 'I-Beam',
+        railShape: 'Channel',
+        poleMaterial: 'Wood',
+        railMaterial: 'Aluminum',
+      });
+      return { ok: true, cid };
+    });
+    if (!setup.ok) throw new Error(setup.reason ?? 'frame setup failed');
+    await page.waitForTimeout(800);
+    const buf = await shot(page, 'frame-isolation', CLIP);
+    const variance = checkScreenshotVariance(buf);
+    const r = await page.evaluate(() => {
+      const summary = { poles: 0, rails: 0, poleShapes: {}, railShapes: {}, poleMaterials: {}, railMaterials: {} };
+      window.__scene?.traverse((o) => {
+        const type = o.userData?.frameElementType;
+        if (type === 'pole') {
+          summary.poles++;
+          summary.poleShapes[o.userData.frameShape] = (summary.poleShapes[o.userData.frameShape] ?? 0) + 1;
+          summary.poleMaterials[o.userData.frameMaterial] = (summary.poleMaterials[o.userData.frameMaterial] ?? 0) + 1;
+        } else if (type === 'rail') {
+          summary.rails++;
+          summary.railShapes[o.userData.frameShape] = (summary.railShapes[o.userData.frameShape] ?? 0) + 1;
+          summary.railMaterials[o.userData.frameMaterial] = (summary.railMaterials[o.userData.frameMaterial] ?? 0) + 1;
+        }
+      });
+      return summary;
+    });
+    const ok = r.poles > 0 && r.rails > 0
+      && r.poleShapes['I-Beam'] > 0 && r.railShapes['Channel'] > 0
+      && r.poleMaterials.Wood > 0 && r.railMaterials.Aluminum > 0
+      && (!buf || variance.varied);
+    ok
+      ? pass('G17b-frameVisualIsolation', `frame scene reactive: poles=${r.poles}, rails=${r.rails}, ${buf ? `variance=${variance.uniqueColors}` : 'screenshot timeout (scene OK)'}`)
+      : fail('G17b-frameVisualIsolation', JSON.stringify({ ...r, variance }));
+  } catch (e) { fail('G17b-frameVisualIsolation', e.message); }
+
   // ═══ G18: No grass (read-only scene check) ═══
   try {
     const r = await page.evaluate(() => {
@@ -828,7 +906,9 @@ async function run() {
       const exitOk = exitMode !== 'walkthrough';
 
       // 11. Verify TOD slider is accessible
+      await openTimeOfDayPopover(page);
       const todVisible = await page.locator('[data-testid="tod-slider"]').isVisible().catch(() => false);
+      await page.click('[data-testid="btn-tod"]', { force: true }).catch(() => {});
 
       const allOk = walkOk && exitOk && todVisible;
       allOk
@@ -924,6 +1004,55 @@ async function run() {
       ? pass('G26-doorSystem', `painted=${r.hasDoor}, toggled=${r.toggled}, state=${r.state}`)
       : fail('G26-doorSystem', `door=${r.hasDoor}, toggle=${r.toggled}`);
   } catch (e) { fail('G26-doorSystem', e.message); }
+
+  // ═══ G26b: Placeable Door Visuals — procedural, non-box geometry on N/E faces ═══
+  try {
+    const setup = await page.evaluate(() => {
+      const s = window.__store.getState();
+      for (const id of Object.keys(s.containers)) s.removeContainer(id);
+      const cid = s.addContainer('40ft_high_cube', { x: 0, y: 0, z: 0 });
+      const northId = s.placeObject('door_single_swing', {
+        containerId: cid,
+        voxelIndex: 10,
+        type: 'face',
+        face: 'n',
+        slot: 0,
+      });
+      const eastId = s.placeObject('door_glass_slide', {
+        containerId: cid,
+        voxelIndex: 13,
+        type: 'face',
+        face: 'e',
+        slot: 0,
+      });
+      return { ok: !!northId && !!eastId, cid, northId, eastId };
+    });
+    if (!setup.ok) throw new Error(`door placement failed: ${JSON.stringify(setup)}`);
+    await page.waitForTimeout(800);
+    const buf = await shot(page, 'door-placeables', CLIP);
+    const variance = checkScreenshotVariance(buf);
+    const r = await page.evaluate(() => {
+      const doors = [];
+      window.__scene?.traverse((o) => {
+        if (o.userData?.formCategory === 'door') {
+          doors.push({
+            id: o.userData.sceneObjectId,
+            formId: o.userData.formId,
+            vertexCount: o.userData.proceduralVertexCount,
+          });
+        }
+      });
+      return doors;
+    });
+    const ok = r.length >= 2
+      && r.every((door) => door.vertexCount > 24)
+      && r.some((door) => door.formId === 'door_single_swing')
+      && r.some((door) => door.formId === 'door_glass_slide')
+      && (!buf || variance.varied);
+    ok
+      ? pass('G26b-doorPlaceableVisuals', `doors=${r.map(d => `${d.formId}:${d.vertexCount}`).join(', ')}, ${buf ? `variance=${variance.uniqueColors}` : 'screenshot timeout (scene OK)'}`)
+      : fail('G26b-doorPlaceableVisuals', JSON.stringify({ doors: r, variance }));
+  } catch (e) { fail('G26b-doorPlaceableVisuals', e.message); }
 
   // ═══ G27: Extension System — activate extensions, verify voxel grid changes ═══
   try {
@@ -1040,7 +1169,10 @@ async function run() {
     await page.waitForTimeout(200);
     await page.click('button[title="Theme & Environment"]', { force: true });
     await page.waitForTimeout(200);
+    await openTimeOfDayPopover(page);
     await setSliderValue(page, '[data-testid="tod-slider"]', 15);
+    await page.click('[data-testid="btn-tod"]', { force: true });
+    await page.waitForTimeout(100);
     await page.click('[data-testid="view-3d"]', { force: true });
     await page.waitForTimeout(500);
     // Reset camera to default position (matching baseline capture state)

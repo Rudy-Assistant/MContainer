@@ -12,14 +12,12 @@
  * Aesthetic: Clean Professional (white/shadow) with backdrop blur.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
 import {
   CONTAINER_DIMENSIONS,
   type FloorMaterialType,
-  type CornerConfig,
   type CornerName,
-  CORNER_NAMES,
   ModuleType,
   WallSide,
 } from "@/types/container";
@@ -52,8 +50,6 @@ const WALL_LABELS: Record<WallSide, string> = {
   [WallSide.Left]: "Left (West)",
   [WallSide.Right]: "Right (East)",
 };
-
-const WALL_SIDES = [WallSide.Front, WallSide.Back, WallSide.Left, WallSide.Right];
 
 export default function FloorDetailModal() {
   const target = useStore((s) => s.floorDetailTarget);
@@ -192,7 +188,6 @@ export default function FloorDetailModal() {
             <div className="relative" style={{ width: 320, height: 180 }}>
               {/* Back (North) edge */}
               <EdgeStrip
-                side={WallSide.Back}
                 label={WALL_LABELS[WallSide.Back]}
                 dominant={getWallDominant(WallSide.Back)}
                 deployed={deployedCount(WallSide.Back)}
@@ -203,7 +198,6 @@ export default function FloorDetailModal() {
 
               {/* Front (South) edge */}
               <EdgeStrip
-                side={WallSide.Front}
                 label={WALL_LABELS[WallSide.Front]}
                 dominant={getWallDominant(WallSide.Front)}
                 deployed={deployedCount(WallSide.Front)}
@@ -214,7 +208,6 @@ export default function FloorDetailModal() {
 
               {/* Left (West) edge */}
               <EdgeStrip
-                side={WallSide.Left}
                 label={WALL_LABELS[WallSide.Left]}
                 dominant={getWallDominant(WallSide.Left)}
                 deployed={deployedCount(WallSide.Left)}
@@ -225,7 +218,6 @@ export default function FloorDetailModal() {
 
               {/* Right (East) edge */}
               <EdgeStrip
-                side={WallSide.Right}
                 label={WALL_LABELS[WallSide.Right]}
                 dominant={getWallDominant(WallSide.Right)}
                 deployed={deployedCount(WallSide.Right)}
@@ -442,7 +434,6 @@ export default function FloorDetailModal() {
 // ── Edge Strip Sub-Component ────────────────────────────────
 
 interface EdgeStripProps {
-  side: WallSide;
   label: string;
   dominant: 'railing' | 'glass' | 'solid' | 'closet' | 'none' | null;
   deployed: number;
@@ -451,7 +442,7 @@ interface EdgeStripProps {
   position: "top" | "bottom" | "left" | "right";
 }
 
-function EdgeStrip({ side, label, dominant, deployed, isActive, onClick, position }: EdgeStripProps) {
+function EdgeStrip({ label, dominant, deployed, isActive, onClick, position }: EdgeStripProps) {
   const edgeColor = dominant
     ? EDGE_OPTIONS.find((o) => o.id === dominant)?.color ?? "#cfd8dc"
     : "#e0e0e0";

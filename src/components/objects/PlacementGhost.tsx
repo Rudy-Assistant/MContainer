@@ -25,21 +25,16 @@ export function PlacementGhost() {
 function PlacementGhostInner({ formId }: { formId: string }) {
   const form = formRegistry.get(formId);
   const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const material = useMemo(() => new THREE.MeshStandardMaterial({
+    color: VALID_COLOR,
+    transparent: true,
+    opacity: GHOST_OPACITY,
+    depthWrite: false,
+  }), []);
 
   // Cache last hovered face key to avoid recomputing slot occupancy every frame (Fix 9)
   const lastHoveredRef = useRef<string | null>(null);
   const cachedSlotRef = useRef<{ slot: number; valid: boolean }>({ slot: 0, valid: true });
-
-  // Create material once (lazy init via ref)
-  if (!materialRef.current) {
-    materialRef.current = new THREE.MeshStandardMaterial({
-      color: VALID_COLOR,
-      transparent: true,
-      opacity: GHOST_OPACITY,
-      depthWrite: false,
-    });
-  }
 
   const geometry = useMemo(() => {
     if (!form) return new THREE.BoxGeometry(0.5, 1, 0.1);
@@ -48,12 +43,12 @@ function PlacementGhostInner({ formId }: { formId: string }) {
 
   // Dispose geometry when it changes or component unmounts (Fix 4)
   useEffect(() => () => { geometry.dispose(); }, [geometry]);
+  useEffect(() => () => { material.dispose(); }, [material]);
 
   // Read hoveredVoxelEdge in useFrame to avoid re-render storms
   useFrame(() => {
     const mesh = meshRef.current;
-    const mat = materialRef.current;
-    if (!mesh || !mat || !form) return;
+    if (!mesh || !form) return;
 
     const state = useStore.getState();
     const hovered = state.hoveredVoxelEdge;
@@ -134,7 +129,7 @@ function PlacementGhostInner({ formId }: { formId: string }) {
     mesh.visible = true;
 
     // Green = valid placement, red = invalid
-    mat.color.copy(valid ? VALID_COLOR : INVALID_COLOR);
+    material.color.copy(valid ? VALID_COLOR : INVALID_COLOR);
   });
 
   if (!form) return null;
@@ -144,7 +139,7 @@ function PlacementGhostInner({ formId }: { formId: string }) {
       <mesh
         ref={meshRef}
         geometry={geometry}
-        material={materialRef.current!}
+        material={material}
         visible={false}
         raycast={() => {}}
       />

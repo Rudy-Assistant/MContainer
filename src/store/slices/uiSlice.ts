@@ -8,9 +8,16 @@
 import type { MaterialDef, SurfaceType, VoxelFaces } from '@/types/container';
 import type { DesignWarning } from '@/types/validation';
 import type { VoxelPayload } from '../useStore';
+import type { SliceGet, SliceSet } from './types';
 
-type Set = (partial: Record<string, unknown> | ((s: any) => Record<string, unknown>)) => void;
-type Get = () => any;
+type UiRuntimeState = UiSlice & {
+  activeHotbarSlot: number | null;
+  activeBrush: unknown;
+  selectedElements: unknown;
+  selectedFace: unknown;
+};
+type Set = SliceSet<UiRuntimeState>;
+type Get = SliceGet<UiRuntimeState>;
 
 export interface RecentItem {
   type: 'wallType' | 'finish';
@@ -223,12 +230,12 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   setHoveredPreviewFace: (face) => set({ hoveredPreviewFace: face }),
   setFaceContext: (ctx) => set({ faceContext: ctx }),
   setFacePreview: (p) => set({ facePreview: p }),
-  toggleDollhouse: () => set((s: any) => ({ dollhouseActive: !s.dollhouseActive })),
-  toggleFurnitureLabels: () => set((s: any) => ({ showFurnitureLabels: !s.showFurnitureLabels })),
+  toggleDollhouse: () => set((s) => ({ dollhouseActive: !s.dollhouseActive })),
+  toggleFurnitureLabels: () => set((s) => ({ showFurnitureLabels: !s.showFurnitureLabels })),
 
   activeHotbarTab: 1, // Default: Surfaces (was Rooms)
   setActiveHotbarTab: (tab) => set({ activeHotbarTab: tab }),
-  cycleHotbarTab: (dir) => set((s: any) => ({ activeHotbarTab: ((s.activeHotbarTab + dir) % 4 + 4) % 4 })),
+  cycleHotbarTab: (dir) => set((s) => ({ activeHotbarTab: ((s.activeHotbarTab + dir) % 4 + 4) % 4 })),
 
   showHotbar: false,
   toggleHotbar: () => set((s) => ({ showHotbar: !s.showHotbar })),
@@ -240,10 +247,10 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   setSelectedCeilingCategory: (cat) => set({ selectedCeilingCategory: cat }),
 
   activeFurniturePreset: null,
-  setActiveFurniturePreset: (type) => set({ activeFurniturePreset: type, activeLightType: null, activeHotbarSlot: null, activeBrush: null } as any),
+  setActiveFurniturePreset: (type) => set({ activeFurniturePreset: type, activeLightType: null, activeHotbarSlot: null, activeBrush: null }),
 
   activeLightType: null,
-  setActiveLightType: (type) => set({ activeLightType: type, activeFurniturePreset: null, activeHotbarSlot: null, activeBrush: null } as any),
+  setActiveLightType: (type) => set({ activeLightType: type, activeFurniturePreset: null, activeHotbarSlot: null, activeBrush: null }),
 
   lastStamp: null,
   setLastStamp: (s) => set({ lastStamp: s }),
@@ -264,7 +271,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   setInspectorView: (v: 'floor' | 'ceiling') => set({ inspectorView: v }),
 
   frameMode: false,
-  toggleFrameMode: () => set((s: any) => ({
+  toggleFrameMode: () => set((s) => ({
     frameMode: !s.frameMode,
     selectedFrameElement: null, // clear selection on toggle
   })),
@@ -283,7 +290,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   designMode: 'smart' as 'smart' | 'manual',
   setDesignMode: (mode) => set({ designMode: mode }),
-  toggleDesignMode: () => set((s: any) => ({ designMode: s.designMode === 'smart' ? 'manual' : 'smart' })),
+  toggleDesignMode: () => set((s) => ({ designMode: s.designMode === 'smart' ? 'manual' : 'smart' })),
 
   warnings: [] as DesignWarning[],
   setWarnings: (warnings) => set({ warnings }),
@@ -291,10 +298,10 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   setHoveredWarning: (id) => set({ hoveredWarning: id }),
 
   debugMode: false,
-  toggleDebugMode: () => set((s: any) => ({ debugMode: !s.debugMode })),
+  toggleDebugMode: () => set((s) => ({ debugMode: !s.debugMode })),
 
   sidebarCollapsed: false,
-  toggleSidebar: () => set((s: any) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
   isPaintDragging: false,
@@ -302,7 +309,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   darkMode: false,
   toggleDarkMode: () => {
-    const next = !(_get() as any).darkMode;
+    const next = !_get().darkMode;
     set({ darkMode: next });
     // Apply data-theme attribute to HTML element
     if (typeof document !== 'undefined') {
@@ -319,8 +326,8 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   // Recent items MRU list
   recentItems: [],
-  addRecentItem: (item) => set((s: any) => {
-    const filtered = (s.recentItems as RecentItem[]).filter((r) => r.value !== item.value);
+  addRecentItem: (item) => set((s) => {
+    const filtered = s.recentItems.filter((r) => r.value !== item.value);
     return { recentItems: [item, ...filtered].slice(0, 8) };
   }),
 
@@ -332,9 +339,9 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   // Global roof / skin visibility toggles
   hideRoof: false,
-  toggleHideRoof: () => set((s: any) => ({ hideRoof: !s.hideRoof })),
+  toggleHideRoof: () => set((s) => ({ hideRoof: !s.hideRoof })),
   hideSkin: false,
-  toggleHideSkin: () => set((s: any) => ({ hideSkin: !s.hideSkin })),
+  toggleHideSkin: () => set((s) => ({ hideSkin: !s.hideSkin })),
 
   // Staircase placement mode
   staircasePlacementMode: false,

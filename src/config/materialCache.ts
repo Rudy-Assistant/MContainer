@@ -185,7 +185,7 @@ export function applyQualityTextures(quality: TextureQuality, invalidate?: () =>
 
 let _currentQuality: TextureQuality = '1k';
 
-export let _themeMats: Record<ThemeId, ThemeMaterialSet> = {
+export const _themeMats: Record<ThemeId, ThemeMaterialSet> = {
   industrial: buildThemeMaterials(THEMES.industrial.materials),
   japanese:   buildThemeMaterials(THEMES.japanese.materials),
   desert:     buildThemeMaterials(THEMES.desert.materials),
