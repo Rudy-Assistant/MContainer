@@ -53,7 +53,12 @@ import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
 import { evaluateContainerArrangementCell, getContainerArrangementSpec } from "@/config/containerArrangements";
-import { compileDesignIntent, type DesignIntentSpec } from "@/config/designIntents";
+import {
+  compileMultiContainerDesignIntent,
+  compileSingleContainerDesignIntent,
+  type DesignIntentSpec,
+  type MultiContainerDesignIntentSpec,
+} from "@/config/designIntents";
 import type { SliceGet, SliceSet } from "./types";
 
 // Use a lazy StoreState reference to avoid circular imports.
@@ -247,6 +252,7 @@ export interface ContainerSlice {
   // ── Quick Setup Wizard ───────────────────────────────────
   applyWizardPreset: (containerId: string, presetId: string) => void;
   applyDesignIntent: (containerId: string, intent: DesignIntentSpec) => void;
+  applyMultiContainerDesignIntent: (intent: MultiContainerDesignIntentSpec) => string[];
 
   // ── Camera ────────────────────────────────────────────────
   saveWalkthroughPos: (position: [number, number, number], yaw: number) => void;
@@ -2319,7 +2325,11 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
   },
 
   applyDesignIntent: (containerId, intent) => {
-    const operations = compileDesignIntent(intent);
+    if (intent.kind !== 'single_container') {
+      throw new Error('applyDesignIntent only accepts single-container intents.');
+    }
+
+    const operations = compileSingleContainerDesignIntent(intent);
     const s = get();
 
     for (const op of operations) {
@@ -2344,6 +2354,48 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           break;
       }
     }
+  },
+
+  applyMultiContainerDesignIntent: (intent) => {
+    const operations = compileMultiContainerDesignIntent(intent);
+    const nodeMap = new Map<string, string>();
+
+    for (const op of operations) {
+      switch (op.type) {
+        case 'create_container': {
+          const containerId = get().addContainer(op.size, op.position, 0, true);
+          nodeMap.set(op.nodeId, containerId);
+          if (op.name) {
+            get().renameContainer(containerId, op.name);
+          }
+          break;
+        }
+        case 'stack_container': {
+          const topId = nodeMap.get(op.nodeId);
+          const bottomId = nodeMap.get(op.targetNodeId);
+          if (!topId || !bottomId) {
+            throw new Error(`Cannot stack unresolved nodes "${op.nodeId}" and "${op.targetNodeId}".`);
+          }
+          const success = get().stackContainer(topId, bottomId);
+          if (!success) {
+            throw new Error(`Failed to stack "${op.nodeId}" on "${op.targetNodeId}".`);
+          }
+          break;
+        }
+        case 'apply_single_container_intent': {
+          const containerId = nodeMap.get(op.nodeId);
+          if (!containerId) {
+            throw new Error(`Cannot apply intent to unresolved node "${op.nodeId}".`);
+          }
+          get().applyDesignIntent(containerId, op.intent);
+          break;
+        }
+      }
+    }
+
+    return intent.containers
+      .map((node) => nodeMap.get(node.id))
+      .filter((id): id is string => !!id);
   },
 
   // applyModule — moved to voxelSlice

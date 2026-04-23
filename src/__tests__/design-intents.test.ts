@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { compileDesignIntent, validateDesignIntent } from '@/config/designIntents';
+import {
+  compileDesignIntent,
+  parsePromptDesignIntentSchema,
+  validateDesignIntent,
+} from '@/config/designIntents';
 import { useStore } from '@/store/useStore';
 import { ContainerSize } from '@/types/container';
 
@@ -34,6 +38,26 @@ describe('design intent validation', () => {
     });
 
     expect(errors.join(' ')).toContain('Collapsed arrangements');
+  });
+
+  it('rejects multi-container overlaps on the same level', () => {
+    const errors = validateDesignIntent({
+      kind: 'multi_container',
+      containers: [
+        {
+          id: 'a',
+          size: ContainerSize.Standard40,
+          placement: { type: 'origin', position: { x: 0, y: 0, z: 0 } },
+        },
+        {
+          id: 'b',
+          size: ContainerSize.Standard40,
+          placement: { type: 'origin', position: { x: 0, y: 0, z: 0 } },
+        },
+      ],
+    });
+
+    expect(errors.join(' ')).toContain('overlaps');
   });
 });
 
@@ -73,5 +97,111 @@ describe('design intent compiler', () => {
     expect(container.appliedPreset).toBe('largest_glass');
     expect(container.floorMaterial).toBe('wood:light');
     expect(container.voxelGrid?.[27].faces.s).toBe('Door');
+  });
+
+  it('compiles a multi-container intent into create/stack/apply operations', () => {
+    const operations = compileDesignIntent({
+      kind: 'multi_container',
+      containers: [
+        {
+          id: 'base',
+          size: ContainerSize.HighCube40,
+          placement: { type: 'origin', position: { x: 0, y: 0, z: 0 } },
+          intent: { kind: 'single_container', arrangementId: 'max_closed' },
+        },
+        {
+          id: 'wing',
+          size: ContainerSize.HighCube40,
+          placement: { type: 'adjacent', target: 'base', side: 'east' },
+          intent: { kind: 'single_container', arrangementId: 'largest_glass' },
+        },
+        {
+          id: 'upper',
+          size: ContainerSize.HighCube40,
+          placement: { type: 'stack_on', target: 'base' },
+          intent: { kind: 'single_container', arrangementId: 'max_closed', rooftopDeck: true },
+        },
+      ],
+    });
+
+    expect(operations.map((op) => op.type)).toEqual([
+      'create_container',
+      'apply_single_container_intent',
+      'create_container',
+      'apply_single_container_intent',
+      'create_container',
+      'stack_container',
+      'apply_single_container_intent',
+    ]);
+  });
+
+  it('applies a multi-container intent through the store API', () => {
+    const ids = useStore.getState().applyMultiContainerDesignIntent({
+      kind: 'multi_container',
+      containers: [
+        {
+          id: 'base',
+          name: 'Base',
+          size: ContainerSize.HighCube40,
+          placement: { type: 'origin', position: { x: 0, y: 0, z: 0 } },
+          intent: { kind: 'single_container', arrangementId: 'max_closed' },
+        },
+        {
+          id: 'wing',
+          name: 'Wing',
+          size: ContainerSize.HighCube40,
+          placement: { type: 'adjacent', target: 'base', side: 'east' },
+          intent: { kind: 'single_container', arrangementId: 'largest_glass' },
+        },
+        {
+          id: 'upper',
+          name: 'Upper',
+          size: ContainerSize.HighCube40,
+          placement: { type: 'stack_on', target: 'base' },
+          intent: { kind: 'single_container', arrangementId: 'max_closed', rooftopDeck: true },
+        },
+      ],
+    });
+
+    expect(ids).toHaveLength(3);
+
+    const containers = ids.map((id) => useStore.getState().containers[id]);
+    const base = containers.find((container) => container.name === 'Base')!;
+    const wing = containers.find((container) => container.name === 'Wing')!;
+    const upper = containers.find((container) => container.name === 'Upper')!;
+
+    expect(wing.position.x).toBeGreaterThan(base.position.x);
+    expect(wing.position.y).toBe(base.position.y);
+    expect(upper.stackedOn).toBe(base.id);
+    expect(upper.position.x).toBe(base.position.x);
+    expect(upper.position.z).toBe(base.position.z);
+    expect(upper.position.y).toBeGreaterThan(base.position.y);
+    expect(wing.appliedPreset).toBe('largest_glass');
+  });
+});
+
+describe('prompt design schema parser', () => {
+  it('parses a compact prompt-facing schema into a validated multi-container intent', () => {
+    const intent = parsePromptDesignIntentSchema({
+      kind: 'multi_container',
+      containers: [
+        {
+          key: 'main',
+          arrangementId: 'max_closed',
+        },
+        {
+          key: 'sunroom',
+          arrangementId: 'largest_glass',
+          placement: { type: 'adjacent', target: 'main', side: 'east' },
+        },
+      ],
+    });
+
+    expect(intent.kind).toBe('multi_container');
+    if (intent.kind !== 'multi_container') return;
+    expect(intent.containers[0].size).toBe(ContainerSize.HighCube40);
+    expect(intent.containers[0].placement.type).toBe('origin');
+    expect(intent.containers[1].intent?.arrangementId).toBe('largest_glass');
+    expect(validateDesignIntent(intent)).toEqual([]);
   });
 });

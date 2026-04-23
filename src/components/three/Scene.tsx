@@ -501,7 +501,7 @@ export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
   return {
-    rayleigh: deepTwilight ? 3.0 : goldenHour ? 2.35 : 2.2,
+    rayleigh: deepTwilight ? 3.0 : goldenHour ? 2.35 : 2.6,
     turbidity: deepTwilight ? 5.0 : goldenHour ? 2.4 : 0.8,
     mieCoefficient: goldenHour ? 0.0025 : 0.0005,
     mieDirectionalG: goldenHour ? 0.72 : 0.65,
