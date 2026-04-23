@@ -52,6 +52,7 @@ import { BLOCK_PRESETS, autoStairAscending } from "../useStore";
 import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
+import { evaluateContainerArrangementCell, getContainerArrangementSpec } from "@/config/containerArrangements";
 import type { SliceGet, SliceSet } from "./types";
 
 // Use a lazy StoreState reference to avoid circular imports.
@@ -133,31 +134,6 @@ function temporalResume() {
 const _ROW_RANGE = Array.from({ length: VOXEL_ROWS }, (_, i) => i);
 const _COL_RANGE = Array.from({ length: VOXEL_COLS }, (_, i) => i);
 const _FACE_KEYS = ['top', 'bottom', 'n', 's', 'e', 'w'] as const;
-
-function isExtensionCell(row: number, col: number): boolean {
-  return row === 0 || row === VOXEL_ROWS - 1 || col === 0 || col === VOXEL_COLS - 1;
-}
-
-function openFaces(): VoxelFaces {
-  return { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' };
-}
-
-function exteriorPerimeterFaces(
-  row: number,
-  col: number,
-  wall: SurfaceType,
-  top: SurfaceType,
-  bottom: SurfaceType,
-): VoxelFaces {
-  return {
-    top,
-    bottom,
-    n: row === 0 ? wall : 'Open',
-    s: row === VOXEL_ROWS - 1 ? wall : 'Open',
-    e: col === VOXEL_COLS - 1 ? wall : 'Open',
-    w: col === 0 ? wall : 'Open',
-  };
-}
 
 // ── Structural Configuration Templates ──────────────────────
 function _brushToTemplate(brush: SurfaceType): VoxelFaces {
@@ -779,8 +755,23 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     const c = get().containers[containerId] as Container | undefined;
     if (!c?.voxelGrid) return;
 
-    if (arrangementId === 'retract_extensions') {
+    const arrangement = getContainerArrangementSpec(arrangementId);
+
+    if (arrangement.kind === 'retract') {
       get().setAllExtensions(containerId, 'none');
+      set((s) => {
+        const container = s.containers[containerId];
+        if (!container) return {};
+        return {
+          containers: {
+            ...s.containers,
+            [containerId]: {
+              ...container,
+              appliedPreset: arrangementId,
+            },
+          },
+        };
+      });
       return;
     }
 
@@ -813,36 +804,12 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         for (let row = 0; row < VOXEL_ROWS; row++) {
           for (let col = 0; col < VOXEL_COLS; col++) {
             const idx = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col;
-            const isExtension = isExtensionCell(row, col);
-            const animateExtension = isExtension && grid[idx]?.active !== true;
-
-            if (arrangementId === 'extend_shell') {
-              if (!isExtension) continue;
-              const faces: VoxelFaces = level === 0
-                ? exteriorPerimeterFaces(row, col, 'Solid_Steel', 'Solid_Steel', 'Deck_Wood')
-                : { ...openFaces(), top: 'Solid_Steel', bottom: 'Solid_Steel' };
-              setCell(idx, true, faces, animateExtension);
-              continue;
-            }
-
-            if (arrangementId === 'max_closed' || arrangementId === 'largest_glass') {
-              const wall = arrangementId === 'largest_glass' ? 'Glass_Pane' : 'Solid_Steel';
-              const faces: VoxelFaces = level === 0
-                ? exteriorPerimeterFaces(row, col, wall, 'Solid_Steel', 'Deck_Wood')
-                : { ...openFaces(), top: 'Solid_Steel', bottom: 'Solid_Steel' };
-              setCell(idx, true, faces, animateExtension);
-              continue;
-            }
-
-            if (arrangementId === 'wraparound_deck' || arrangementId === 'wraparound_patio') {
-              if (!isExtension) continue;
-              if (level > 0) {
-                setCell(idx, false, openFaces(), false);
-                continue;
-              }
-              const top = arrangementId === 'wraparound_deck' ? 'Solid_Steel' : 'Open';
-              setCell(idx, true, exteriorPerimeterFaces(row, col, 'Railing_Cable', top, 'Deck_Wood'), animateExtension);
-            }
+            const cell = evaluateContainerArrangementCell(arrangement, { level, row, col });
+            if (!cell) continue;
+            const animateExtension =
+              (row === 0 || row === VOXEL_ROWS - 1 || col === 0 || col === VOXEL_COLS - 1) &&
+              grid[idx]?.active !== true;
+            setCell(idx, cell.active, cell.faces, animateExtension);
           }
         }
       }
@@ -859,8 +826,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       };
     });
 
-    if (arrangementId === 'extend_shell' || arrangementId === 'max_closed' || arrangementId === 'largest_glass') {
-      get()._applyExtensionDoors(containerId, arrangementId === 'largest_glass' ? 'all_glass_interior' : 'all_interior');
+    if (arrangement.extensionDoorProfile) {
+      get()._applyExtensionDoors(containerId, arrangement.extensionDoorProfile);
     }
 
     temporalResume();
