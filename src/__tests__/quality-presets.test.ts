@@ -35,4 +35,10 @@ describe('Quality Presets', () => {
       expect(['flat', '1k', '2k']).toContain(preset.textureQuality);
     }
   });
+
+  it('does not request KTX2 assets until material transcodes are shipped', () => {
+    for (const preset of Object.values(QUALITY_PRESETS)) {
+      expect(preset.useKTX2).toBe(false);
+    }
+  });
 });

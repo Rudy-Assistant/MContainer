@@ -15,10 +15,27 @@ import type { StateStorage } from 'zustand/middleware';
  */
 const hasIndexedDB = typeof indexedDB !== 'undefined';
 
+export function sanitizePersistedStorageValue(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  if (value.trim() === '') return null;
+
+  try {
+    JSON.parse(value);
+    return value;
+  } catch {
+    return null;
+  }
+}
+
 export const idbStorage: StateStorage = {
   getItem: async (name) => {
     if (!hasIndexedDB) return null;
-    return (await get(name)) ?? null;
+    const value = await get(name);
+    const sanitized = sanitizePersistedStorageValue(value);
+    if (value !== null && sanitized === null) {
+      await del(name);
+    }
+    return sanitized;
   },
   setItem: async (name, value) => {
     if (!hasIndexedDB) return;

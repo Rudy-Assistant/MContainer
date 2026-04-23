@@ -26,6 +26,7 @@ import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
 import { HIGHLIGHT_COLOR_SELECT, HIGHLIGHT_COLOR_HOVER } from "@/config/highlightColors";
 import { SURFACE_COLORS } from "@/config/surfaceLabels";
 import { makePoleKey, makeRailKey } from "@/config/frameMaterials";
+import { filterSelectableGridIndices, getRectangularGridRange } from "@/utils/gridSelection";
 // Color legend removed — grid cells are transparent, highlight on hover/select only
 
 // ── Grid Cell ────────────────────────────────────────────────
@@ -291,6 +292,20 @@ function VoxelGrid({
 
   const levelOffset = level * VOXEL_ROWS * VOXEL_COLS;
 
+  const isSelectableVoxelIndex = useCallback((idx: number) => {
+    const raw = idx - levelOffset;
+    if (raw < 0 || raw >= VOXEL_ROWS * VOXEL_COLS) return false;
+    if (!voxelGrid[idx]?.active) return false;
+    return !lockedVoxels[`${containerId}_${idx}`];
+  }, [containerId, levelOffset, lockedVoxels, voxelGrid]);
+
+  const selectableRectangle = useCallback((start: number, end: number) => (
+    filterSelectableGridIndices(
+      getRectangularGridRange(start, end, levelOffset, VOXEL_COLS, VOXEL_ROWS),
+      isSelectableVoxelIndex,
+    )
+  ), [isSelectableVoxelIndex, levelOffset]);
+
   // Hover handlers — set store's hoveredVoxel so ContainerSkin highlights in 3D
   const handleHover = useCallback((idx: number) => {
     setHoveredVoxel({ containerId, index: idx });
@@ -338,6 +353,7 @@ function VoxelGrid({
     }
     if (e.ctrlKey || e.metaKey) {
       // Ctrl/Cmd+Click: toggle individual voxel in/out of multi-select
+      if (!isSelectableVoxelIndex(idx)) return;
       const curr = useStore.getState().selectedElements;
       const id = String(idx);
       const item = { containerId, id };
@@ -351,18 +367,19 @@ function VoxelGrid({
       }
       lastClickedRef.current = idx;
     } else if (e.shiftKey && lastClickedRef.current >= 0) {
-      // Shift+Click: fill linear range [anchor → idx] row-by-row
-      const a = Math.min(lastClickedRef.current, idx);
-      const b = Math.max(lastClickedRef.current, idx);
-      setSelectedElements({ type: 'bay', items: Array.from({ length: b - a + 1 }, (_, i) => ({ containerId, id: String(a + i) })) });
+      const selected = selectableRectangle(lastClickedRef.current, idx);
+      if (selected.length > 0) {
+        setSelectedElements({ type: 'bay', items: selected.map((i) => ({ containerId, id: String(i) })) });
+      }
       // anchor is NOT updated — allows extending range with successive Shift+Clicks
     } else {
       // Normal click: single select, clear multi-select
+      if (!isSelectableVoxelIndex(idx)) return;
       setSelectedElements({ type: 'voxel', items: [{ containerId, id: String(idx) }] });
       setMarqueeCells([]);
       lastClickedRef.current = idx;
     }
-  }, [containerId, setSelectedElements, toggleElement]);
+  }, [containerId, isSelectableVoxelIndex, selectableRectangle, setSelectedElements, toggleElement]);
 
   // Marquee drag: mouseDown starts drag, mouseEnter expands rect, mouseUp commits
   const handleCellMouseDown = useCallback((idx: number, e: React.MouseEvent) => {
@@ -374,25 +391,8 @@ function VoxelGrid({
 
   const handleCellMouseEnterDrag = useCallback((idx: number) => {
     if (!isDraggingRef.current || dragStartRef.current < 0) return;
-    const startRaw = dragStartRef.current - levelOffset;
-    const curRaw = idx - levelOffset;
-    if (startRaw < 0 || curRaw < 0) return;
-    const startRow = Math.floor(startRaw / VOXEL_COLS);
-    const startCol = startRaw % VOXEL_COLS;
-    const curRow = Math.floor(curRaw / VOXEL_COLS);
-    const curCol = curRaw % VOXEL_COLS;
-    const minRow = Math.min(startRow, curRow);
-    const maxRow = Math.max(startRow, curRow);
-    const minCol = Math.min(startCol, curCol);
-    const maxCol = Math.max(startCol, curCol);
-    const cells: number[] = [];
-    for (let r = minRow; r <= maxRow; r++) {
-      for (let c = minCol; c <= maxCol; c++) {
-        cells.push(levelOffset + r * VOXEL_COLS + c);
-      }
-    }
-    setMarqueeCells(cells);
-  }, [levelOffset]);
+    setMarqueeCells(selectableRectangle(dragStartRef.current, idx));
+  }, [selectableRectangle]);
 
   // Commit marquee on mouseUp (on window to catch releases outside grid)
   React.useEffect(() => {

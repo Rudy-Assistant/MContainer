@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, type ReactNode, Suspense, useMemo, useEffect } from "react";
+import { Component, type ReactNode, Suspense, useMemo } from "react";
 import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
 import { useStore } from "@/store/useStore";
@@ -74,13 +74,6 @@ const _uvRotAngle = Math.random() * Math.PI * 0.25; // 0–45° random rotation
 
 function GroundFallback({ presetId }: { presetId: GroundPresetId }) {
   const preset = GROUND_PRESETS[presetId];
-  useEffect(() => {
-    console.warn(
-      `[GroundManager] Texture load failed for preset "${presetId}". ` +
-      `Falling back to solid color. Check that texture files exist at ` +
-      `public/assets/materials/${preset.folder}/`
-    );
-  }, [presetId, preset.folder]);
   return (
     <mesh rotation={GROUND_ROTATION} position={GROUND_POSITION} receiveShadow raycast={nullRaycast}>
       <planeGeometry args={[GROUND_SIZE, GROUND_SIZE, GROUND_SEGMENTS, GROUND_SEGMENTS]} />

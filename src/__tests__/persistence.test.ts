@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@/store/useStore';
 import { ContainerSize } from '@/types/container';
 import { persistedStateSchema } from '@/store/persistSchema';
+import { sanitizePersistedStorageValue } from '@/store/idbStorage';
 
 function resetStore() {
   const initial = useStore.getInitialState();
@@ -115,5 +116,17 @@ describe('Persistence', () => {
     const invalid = { notContainers: {} };
     const result = persistedStateSchema.safeParse(invalid);
     expect(result.success).toBe(false);
+  });
+
+  it('PERS-7: corrupt persisted storage values are ignored before hydration parse', () => {
+    expect(sanitizePersistedStorageValue('')).toBeNull();
+    expect(sanitizePersistedStorageValue('   ')).toBeNull();
+    expect(sanitizePersistedStorageValue('{')).toBeNull();
+    expect(sanitizePersistedStorageValue(null)).toBeNull();
+  });
+
+  it('PERS-8: valid persisted storage JSON passes through unchanged', () => {
+    const value = JSON.stringify({ state: { containers: {} }, version: 0 });
+    expect(sanitizePersistedStorageValue(value)).toBe(value);
   });
 });

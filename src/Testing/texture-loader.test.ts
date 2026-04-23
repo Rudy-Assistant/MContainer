@@ -34,8 +34,11 @@ describe('applyTextures fallback', () => {
 
     applyTextures(mat, ktx2Paths, 2, 2, 0.6, invalidate, 'Corrugated_Steel');
 
-    // Since KTX2Loader is null, falls through to TextureLoader
+    // Since KTX2Loader is null, falls back to JPG paths through TextureLoader.
     expect(loadSpy).toHaveBeenCalledTimes(3);
+    expect(loadSpy.mock.calls[0][0]).toBe('/assets/materials/Corrugated_Steel/color.jpg');
+    expect(loadSpy.mock.calls[1][0]).toBe('/assets/materials/Corrugated_Steel/normal.jpg');
+    expect(loadSpy.mock.calls[2][0]).toBe('/assets/materials/Corrugated_Steel/roughness.jpg');
 
     THREE.TextureLoader.prototype.load = origLoad;
     mat.dispose();

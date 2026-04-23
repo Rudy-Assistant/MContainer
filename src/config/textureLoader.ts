@@ -76,6 +76,9 @@ export function applyTextures(
 ): void {
   const isKTX2 = paths.color.endsWith('.ktx2');
   const ktx2 = isKTX2 ? getKTX2Loader() : null;
+  const jpgFallbackPaths = isKTX2 && fallbackFolder ? getTexturePaths(fallbackFolder, '1k') : null;
+  const activePaths = isKTX2 && !ktx2 && jpgFallbackPaths ? jpgFallbackPaths : paths;
+  const activeUsesKTX2 = isKTX2 && ktx2 != null;
 
   const configure = (t: THREE.Texture) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -105,15 +108,15 @@ export function applyTextures(
     };
 
     const onError = () => {
-      console.warn(`[textureLoader] Failed to load ${url}`);
       // Fallback: on KTX2 error, retry with 1K JPG
       if (useKTX2 && fallbackFolder) {
         const jpgPaths = getTexturePaths(fallbackFolder, '1k');
         if (jpgPaths) {
-          console.warn(`[textureLoader] KTX2 failed for ${url}, falling back to 1K JPG`);
           loadChannel(channel, jpgPaths[channel], false);
+          return;
         }
       }
+      console.warn(`[textureLoader] Failed to load ${url}`);
     };
 
     if (useKTX2 && ktx2) {
@@ -123,8 +126,7 @@ export function applyTextures(
     }
   };
 
-  const useKTX2 = isKTX2 && ktx2 != null;
-  loadChannel('color', paths.color, useKTX2);
-  loadChannel('normal', paths.normal, useKTX2);
-  loadChannel('roughness', paths.roughness, useKTX2);
+  loadChannel('color', activePaths.color, activeUsesKTX2);
+  loadChannel('normal', activePaths.normal, activeUsesKTX2);
+  loadChannel('roughness', activePaths.roughness, activeUsesKTX2);
 }
