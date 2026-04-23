@@ -2177,6 +2177,17 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     const preset = WIZARD_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
 
+    if (preset.designIntent) {
+      get().applyDesignIntent(containerId, preset.designIntent);
+      set((s) => ({
+        containers: {
+          ...s.containers,
+          [containerId]: { ...s.containers[containerId], appliedPreset: presetId },
+        },
+      }));
+      return;
+    }
+
     // Force a tracked set() to snapshot current state as the undo baseline,
     // then pause so all wizard changes are invisible to undo history.
     set((s) => ({

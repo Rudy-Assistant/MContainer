@@ -1,4 +1,5 @@
 import type { ExtensionConfig, SurfaceType } from "@/types/container";
+import type { DesignIntentSpec } from "@/config/designIntents";
 
 export interface WizardStep {
   action: 'extensions' | 'rooftop_deck' | 'vertical_stairs' | 'paint_outer_walls'
@@ -19,6 +20,7 @@ export interface WizardPreset {
   description: string;
   icon: string;
   steps: WizardStep[];
+  designIntent?: DesignIntentSpec;
 }
 
 export const WIZARD_PRESETS: WizardPreset[] = [
@@ -27,6 +29,11 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Glass Box',
     description: 'Floor-to-ceiling glass walls on all sides. Maximum light and views.',
     icon: '🔲',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'largest_glass',
+      expectedOutcome: 'enclosed',
+    },
     steps: [
       { action: 'extensions', config: 'all_glass_interior' },
     ],
@@ -45,6 +52,11 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Open Plan',
     description: 'Full floor space with steel walls. No interior divisions.',
     icon: '📐',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'max_closed',
+      expectedOutcome: 'enclosed',
+    },
     steps: [
       { action: 'extensions', config: 'all_interior' },
     ],
@@ -54,6 +66,12 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Studio + Loft',
     description: 'Glass box with internal staircase to upper level.',
     icon: '🏠',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'largest_glass',
+      expectedOutcome: 'enclosed',
+      stairs: { voxelIndex: 9, facing: 's' },
+    },
     steps: [
       { action: 'extensions', config: 'all_glass_interior' },
       { action: 'vertical_stairs', stairVoxelIndex: 9, stairFacing: 's' },
@@ -64,6 +82,12 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Glass Home',
     description: 'Full extensions with glass walls, wood floors, open interior — maximum space.',
     icon: '🏡',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'largest_glass',
+      expectedOutcome: 'enclosed',
+      door: { voxelIndex: 27, face: 's' },
+    },
     steps: [
       { action: 'extensions', config: 'all_interior' },
       { action: 'open_interior_walls' },
@@ -77,6 +101,14 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Home + Roof Deck',
     description: 'Glass ground floor with stacked rooftop deck, stairs, and railings.',
     icon: '🌇',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'largest_glass',
+      expectedOutcome: 'enclosed',
+      door: { voxelIndex: 27, face: 's' },
+      rooftopDeck: true,
+      stairs: { voxelIndex: 14, facing: 's' },
+    },
     steps: [
       { action: 'extensions', config: 'all_interior' },
       { action: 'open_interior_walls' },
