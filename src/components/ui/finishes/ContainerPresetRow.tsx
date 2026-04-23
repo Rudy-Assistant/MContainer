@@ -4,10 +4,11 @@ import { useStore } from '@/store/useStore';
 import { ContainerPresetCard } from './ContainerPresetCard';
 import { IsometricVoxelSVG } from '../svg/IsometricVoxelSVG';
 import { CONTAINER_LEVEL_PRESETS } from '@/config/containerTabPresets';
+import type { ContainerArrangementId } from '@/types/container';
 
 interface Props {
   containerId: string;
-  onApply: (presetId: string) => void;
+  onApply: (presetId: ContainerArrangementId) => void;
 }
 
 export function ContainerPresetRow({ onApply }: Props) {
@@ -15,12 +16,13 @@ export function ContainerPresetRow({ onApply }: Props) {
   const clearGhostPreset = useStore((s) => s.clearGhostPreset);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, minWidth: 0 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6, minWidth: 0 }}>
       {CONTAINER_LEVEL_PRESETS.map(p => (
         <ContainerPresetCard
           key={p.id}
           content={<IsometricVoxelSVG faces={p.faces} size={48} />}
           label={p.label}
+          title={p.title}
           active={false}
           onClick={() => onApply(p.id)}
           onMouseEnter={() => setGhostPreset({ source: 'container', faces: p.faces, targetScope: 'container' })}

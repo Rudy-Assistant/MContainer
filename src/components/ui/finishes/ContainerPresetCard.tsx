@@ -6,6 +6,7 @@ import { PresetCard } from './PresetCard';
 interface ContainerPresetCardProps {
   content: ReactNode;
   label: string;
+  title?: string;
   active: boolean;
   onClick: () => void;
   onMouseEnter?: () => void;
@@ -13,7 +14,7 @@ interface ContainerPresetCardProps {
 }
 
 export function ContainerPresetCard({
-  content, label, active, onClick, onMouseEnter, onMouseLeave,
+  content, label, title, active, onClick, onMouseEnter, onMouseLeave,
 }: ContainerPresetCardProps) {
   return (
     <div style={{
@@ -25,6 +26,7 @@ export function ContainerPresetCard({
       <PresetCard
         content={content}
         label={label}
+        title={title}
         active={active}
         onClick={onClick}
         onMouseEnter={onMouseEnter}

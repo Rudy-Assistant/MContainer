@@ -424,6 +424,14 @@ export type ExtensionConfig = 'none' | 'all_deck' | 'all_interior' | 'all_glass_
 /** Default extension configuration for newly created containers */
 export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = 'all_deck';
 
+export type ContainerArrangementId =
+  | 'extend_shell'
+  | 'max_closed'
+  | 'largest_glass'
+  | 'wraparound_deck'
+  | 'wraparound_patio'
+  | 'retract_extensions';
+
 export interface ContainerRole {
   id: string;
   label: string;

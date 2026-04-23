@@ -27,6 +27,7 @@ import {
   ModuleType,
   type SurfaceType,
   type VoxelFaces,
+  type ContainerArrangementId,
   VOXEL_COLS,
   VOXEL_ROWS,
   VOXEL_LEVELS,
@@ -131,6 +132,32 @@ function temporalResume() {
 // Pre-allocated ranges for refreshAdjacency iteration (avoids per-pair allocation)
 const _ROW_RANGE = Array.from({ length: VOXEL_ROWS }, (_, i) => i);
 const _COL_RANGE = Array.from({ length: VOXEL_COLS }, (_, i) => i);
+const _FACE_KEYS = ['top', 'bottom', 'n', 's', 'e', 'w'] as const;
+
+function isExtensionCell(row: number, col: number): boolean {
+  return row === 0 || row === VOXEL_ROWS - 1 || col === 0 || col === VOXEL_COLS - 1;
+}
+
+function openFaces(): VoxelFaces {
+  return { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' };
+}
+
+function exteriorPerimeterFaces(
+  row: number,
+  col: number,
+  wall: SurfaceType,
+  top: SurfaceType,
+  bottom: SurfaceType,
+): VoxelFaces {
+  return {
+    top,
+    bottom,
+    n: row === 0 ? wall : 'Open',
+    s: row === VOXEL_ROWS - 1 ? wall : 'Open',
+    e: col === VOXEL_COLS - 1 ? wall : 'Open',
+    w: col === 0 ? wall : 'Open',
+  };
+}
 
 // ── Structural Configuration Templates ──────────────────────
 function _brushToTemplate(brush: SurfaceType): VoxelFaces {
@@ -174,6 +201,7 @@ export interface ContainerSlice {
   addPoolContainer: () => string;
   applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
   setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
+  applyContainerArrangement: (containerId: string, arrangementId: ContainerArrangementId) => void;
   removeContainer: (id: string) => void;
   updateContainerPosition: (id: string, position: ContainerPosition) => void;
   updateContainerRotation: (id: string, rotation: number) => void;
@@ -742,6 +770,97 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     // Apply auto-doors on body-extension boundaries (non-'none' configs)
     if (config !== 'none') {
       get()._applyExtensionDoors(containerId, config);
+    }
+
+    temporalResume();
+  },
+
+  applyContainerArrangement: (containerId, arrangementId) => {
+    const c = get().containers[containerId] as Container | undefined;
+    if (!c?.voxelGrid) return;
+
+    if (arrangementId === 'retract_extensions') {
+      get().setAllExtensions(containerId, 'none');
+      return;
+    }
+
+    temporalPause();
+    get()._restoreExtensionDoors(containerId);
+
+    set((s) => {
+      const container = s.containers[containerId];
+      if (!container?.voxelGrid) return {};
+      const grid = [...container.voxelGrid];
+      const locked = s.lockedVoxels;
+
+      const setCell = (idx: number, active: boolean, faces: VoxelFaces, animateExtension: boolean) => {
+        if (locked[`${containerId}_${idx}`]) return;
+        const voxel = grid[idx];
+        if (!voxel) return;
+        const nextFaces = { ...voxel.faces };
+        for (const face of _FACE_KEYS) nextFaces[face] = faces[face];
+        grid[idx] = {
+          ...voxel,
+          active,
+          faces: nextFaces,
+          moduleId: undefined,
+          moduleOrientation: undefined,
+          unpackPhase: active && animateExtension ? 'walls_deploy' as const : undefined,
+        };
+      };
+
+      for (let level = 0; level < VOXEL_LEVELS; level++) {
+        for (let row = 0; row < VOXEL_ROWS; row++) {
+          for (let col = 0; col < VOXEL_COLS; col++) {
+            const idx = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col;
+            const isExtension = isExtensionCell(row, col);
+            const animateExtension = isExtension && grid[idx]?.active !== true;
+
+            if (arrangementId === 'extend_shell') {
+              if (!isExtension) continue;
+              const faces: VoxelFaces = level === 0
+                ? exteriorPerimeterFaces(row, col, 'Solid_Steel', 'Solid_Steel', 'Deck_Wood')
+                : { ...openFaces(), top: 'Solid_Steel', bottom: 'Solid_Steel' };
+              setCell(idx, true, faces, animateExtension);
+              continue;
+            }
+
+            if (arrangementId === 'max_closed' || arrangementId === 'largest_glass') {
+              const wall = arrangementId === 'largest_glass' ? 'Glass_Pane' : 'Solid_Steel';
+              const faces: VoxelFaces = level === 0
+                ? exteriorPerimeterFaces(row, col, wall, 'Open', 'Deck_Wood')
+                : { ...openFaces(), top: 'Solid_Steel', bottom: 'Solid_Steel' };
+              setCell(idx, true, faces, animateExtension);
+              continue;
+            }
+
+            if (arrangementId === 'wraparound_deck' || arrangementId === 'wraparound_patio') {
+              if (!isExtension) continue;
+              if (level > 0) {
+                setCell(idx, false, openFaces(), false);
+                continue;
+              }
+              const top = arrangementId === 'wraparound_deck' ? 'Solid_Steel' : 'Open';
+              setCell(idx, true, exteriorPerimeterFaces(row, col, 'Railing_Cable', top, 'Deck_Wood'), animateExtension);
+            }
+          }
+        }
+      }
+
+      return {
+        containers: {
+          ...s.containers,
+          [containerId]: {
+            ...container,
+            voxelGrid: grid,
+            appliedPreset: arrangementId,
+          },
+        },
+      };
+    });
+
+    if (arrangementId === 'extend_shell' || arrangementId === 'max_closed' || arrangementId === 'largest_glass') {
+      get()._applyExtensionDoors(containerId, arrangementId === 'largest_glass' ? 'all_glass_interior' : 'all_interior');
     }
 
     temporalResume();

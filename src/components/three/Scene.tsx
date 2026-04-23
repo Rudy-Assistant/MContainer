@@ -169,11 +169,11 @@ function SunLight() {
         intensity={Math.min(Math.max(intensity * 0.65, 0.18), 1.25)}
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0005}
-        shadow-normalBias={0.002}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
+        shadow-normalBias={0.0005}
+        shadow-camera-left={-50}
+        shadow-camera-right={50}
+        shadow-camera-top={50}
+        shadow-camera-bottom={-50}
         shadow-camera-near={0.5}
         shadow-camera-far={120}
       />

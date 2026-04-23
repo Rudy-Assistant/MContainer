@@ -4,7 +4,7 @@ import { useStore, type StoreState } from '@/store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Layers, Box } from 'lucide-react';
 import { ContainerPresetRow } from './ContainerPresetRow';
-import { CONTAINER_LEVEL_PRESETS } from '@/config/containerTabPresets';
+import type { ContainerArrangementId } from '@/types/container';
 
 interface Props {
   containerId: string;
@@ -20,24 +20,14 @@ export function ContainerTab({ containerId }: Props) {
     }))
   );
 
-  const { containers, stampArea } = useStore(
+  const { applyContainerArrangement } = useStore(
     useShallow((s: StoreState) => ({
-      containers: s.containers,
-      stampArea: s.stampArea,
+      applyContainerArrangement: s.applyContainerArrangement,
     }))
   );
 
-  function handleApplyPreset(presetId: string) {
-    const preset = CONTAINER_LEVEL_PRESETS.find(p => p.id === presetId);
-    if (!preset) return;
-    const container = containers[containerId];
-    if (!container?.voxelGrid) return;
-    const activeIndices = container.voxelGrid
-      .map((v, i) => (v.active ? i : -1))
-      .filter((i: number) => i >= 0);
-    if (activeIndices.length > 0) {
-      stampArea(containerId, activeIndices, preset.faces);
-    }
+  function handleApplyPreset(presetId: ContainerArrangementId) {
+    applyContainerArrangement(containerId, presetId);
   }
 
   const iconBtnStyle = (active: boolean, disabled?: boolean): React.CSSProperties => ({
@@ -85,7 +75,7 @@ export function ContainerTab({ containerId }: Props) {
 
       {/* Container preset row */}
       <div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Presets</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Arrangements</div>
         <ContainerPresetRow containerId={containerId} onApply={handleApplyPreset} />
       </div>
     </div>

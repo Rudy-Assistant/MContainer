@@ -53,6 +53,7 @@ interface PresetCardProps {
   /** Icon font size when using `icon` prop (default 28). */
   iconSize?: number;
   label: string;
+  title?: string;
   active: boolean;
   onClick: () => void;
   onMouseEnter?: () => void;
@@ -68,7 +69,7 @@ interface PresetCardProps {
  * emoji/text icons with a standard raised background.
  */
 export function PresetCard({
-  content, icon, iconSize = 28, label, active, onClick, onMouseEnter, onMouseLeave,
+  content, icon, iconSize = 28, label, title, active, onClick, onMouseEnter, onMouseLeave,
 }: PresetCardProps) {
   const [hovered, setHovered] = useState(false);
   const prevActiveRef = useRef(active);
@@ -127,6 +128,7 @@ export function PresetCard({
 
   return (
     <button
+      title={title}
       onClick={onClick}
       onMouseEnter={() => {
         setHovered(true);

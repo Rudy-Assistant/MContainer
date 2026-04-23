@@ -1,35 +1,47 @@
-import type { VoxelFaces } from '@/types/container';
+import type { ContainerArrangementId, VoxelFaces } from '@/types/container';
 
 export interface ContainerLevelPreset {
-  id: string;
+  id: ContainerArrangementId;
   label: string;
+  title: string;
   faces: VoxelFaces;
 }
 
 export const CONTAINER_LEVEL_PRESETS: ContainerLevelPreset[] = [
   {
-    id: 'all_deck',
-    label: 'All Deck',
-    faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Railing_Cable', s: 'Railing_Cable', e: 'Railing_Cable', w: 'Railing_Cable' },
-  },
-  {
-    id: 'interior',
-    label: 'Interior',
+    id: 'extend_shell',
+    label: 'Shell',
+    title: 'Extend shell',
     faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
   },
   {
-    id: 'n_deck',
-    label: 'N Deck',
-    faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Railing_Cable', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
+    id: 'max_closed',
+    label: 'Max Box',
+    title: 'Maximum closed interior',
+    faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Solid_Steel', e: 'Solid_Steel', w: 'Solid_Steel' },
   },
   {
-    id: 's_deck',
-    label: 'S Deck',
-    faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Solid_Steel', s: 'Railing_Cable', e: 'Solid_Steel', w: 'Solid_Steel' },
+    id: 'largest_glass',
+    label: 'Glass Box',
+    title: 'Largest glass interior',
+    faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Glass_Pane', s: 'Glass_Pane', e: 'Glass_Pane', w: 'Glass_Pane' },
   },
   {
-    id: 'retract',
+    id: 'wraparound_deck',
+    label: 'Deck',
+    title: 'Covered wraparound deck',
+    faces: { top: 'Solid_Steel', bottom: 'Deck_Wood', n: 'Railing_Cable', s: 'Railing_Cable', e: 'Railing_Cable', w: 'Railing_Cable' },
+  },
+  {
+    id: 'wraparound_patio',
+    label: 'Patio',
+    title: 'Open wraparound patio',
+    faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Railing_Cable', s: 'Railing_Cable', e: 'Railing_Cable', w: 'Railing_Cable' },
+  },
+  {
+    id: 'retract_extensions',
     label: 'Retract',
-    faces: { top: 'Open', bottom: 'Deck_Wood', n: 'Half_Fold', s: 'Half_Fold', e: 'Solid_Steel', w: 'Solid_Steel' },
+    title: 'Retract extensions',
+    faces: { top: 'Open', bottom: 'Open', n: 'Open', s: 'Open', e: 'Open', w: 'Open' },
   },
 ];

@@ -11,20 +11,16 @@ function resetStore() {
 describe('container-level preset application', () => {
   beforeEach(resetStore);
 
-  it('applies Interior preset to all active body voxels', () => {
+  it('applies Max Box arrangement to full footprint with roof and floor surfaces', () => {
     const cid = useStore.getState().addContainer(ContainerSize.HighCube40);
-    const interior = CONTAINER_LEVEL_PRESETS.find(p => p.id === 'interior')!;
-    const grid = useStore.getState().containers[cid]!.voxelGrid!;
-    const activeIndices = grid.map((v, i) => v.active ? i : -1).filter(i => i >= 0);
-
-    for (const idx of activeIndices) {
-      useStore.getState().setVoxelFaces(cid, idx, interior.faces);
-    }
+    expect(CONTAINER_LEVEL_PRESETS.find(p => p.id === 'max_closed')).toBeDefined();
+    useStore.getState().applyContainerArrangement(cid, 'max_closed');
 
     const updated = useStore.getState().containers[cid]!.voxelGrid!;
-    for (const idx of activeIndices) {
-      expect(updated[idx].faces.top).toBe('Solid_Steel');
-      expect(updated[idx].faces.bottom).toBe('Deck_Wood');
-    }
+    expect(updated.filter(v => v.active)).toHaveLength(64);
+    expect(updated[0].faces.n).toBe('Solid_Steel');
+    expect(updated[9].faces.n).toBe('Open');
+    expect(updated[9].faces.bottom).toBe('Deck_Wood');
+    expect(updated[41].faces.top).toBe('Solid_Steel');
   });
 });
