@@ -53,6 +53,7 @@ import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
 import { evaluateContainerArrangementCell, getContainerArrangementSpec } from "@/config/containerArrangements";
+import { compileDesignIntent, type DesignIntentSpec } from "@/config/designIntents";
 import type { SliceGet, SliceSet } from "./types";
 
 // Use a lazy StoreState reference to avoid circular imports.
@@ -245,6 +246,7 @@ export interface ContainerSlice {
 
   // ── Quick Setup Wizard ───────────────────────────────────
   applyWizardPreset: (containerId: string, presetId: string) => void;
+  applyDesignIntent: (containerId: string, intent: DesignIntentSpec) => void;
 
   // ── Camera ────────────────────────────────────────────────
   saveWalkthroughPos: (position: [number, number, number], yaw: number) => void;
@@ -2303,6 +2305,34 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     }
 
     temporalResume();
+  },
+
+  applyDesignIntent: (containerId, intent) => {
+    const operations = compileDesignIntent(intent);
+    const s = get();
+
+    for (const op of operations) {
+      switch (op.type) {
+        case 'apply_arrangement':
+          s.applyContainerArrangement(containerId, op.arrangementId);
+          break;
+        case 'set_floor_material':
+          s.setFloorMaterial(containerId, op.material);
+          break;
+        case 'set_ceiling_material':
+          s.setCeilingMaterial(containerId, op.material);
+          break;
+        case 'add_door':
+          s.paintFace(containerId, op.voxelIndex, op.face, 'Door');
+          break;
+        case 'add_vertical_stairs':
+          s.applyVerticalStairs(containerId, op.voxelIndex, op.facing);
+          break;
+        case 'generate_rooftop_deck':
+          s.generateRooftopDeck(containerId);
+          break;
+      }
+    }
   },
 
   // applyModule — moved to voxelSlice
