@@ -45,8 +45,8 @@ export const CAMERA_MAX_DOWNWARD_ANGLE = 70 * (Math.PI / 180);
  * Values MUST match camera-controls ACTION exactly:
  * NONE=0, ROTATE=1, TRUCK=2, DOLLY=16 */
 export const CAMERA_MOUSE_BUTTONS = {
-  left: 1,    // ACTION.ROTATE
-  right: 2,   // ACTION.TRUCK
+  left: 2,    // ACTION.TRUCK
+  right: 1,   // ACTION.ROTATE
   middle: 2,  // ACTION.TRUCK
   wheel: 16,  // ACTION.DOLLY
 } as const;

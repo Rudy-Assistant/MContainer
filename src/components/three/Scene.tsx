@@ -997,7 +997,7 @@ function KeyboardPanControls() {
 }
 
 // (CameraBoundarySetup removed — setBoundary + boundaryEnclosesCamera over-constrained
-// TRUCK panning, making right-click feel locked. Polar angle constraints on <CameraControls>
+// TRUCK panning, making camera movement feel locked. Polar angle constraints on <CameraControls>
 // props + CameraFloorGuard NaN recovery are sufficient.)
 
 // WHY: module-level vectors avoid per-frame allocation (reused across all frames)
@@ -1010,11 +1010,11 @@ const _prevDesired = new THREE.Vector3(Infinity, Infinity, Infinity);
  *
  * CRITICAL DESIGN: Only actively lerps for a short settling period after `desired` changes.
  * Once the lerp target is close enough to the desired position, it STOPS calling setTarget().
- * This allows the user to freely TRUCK (right-drag pan) and WASD without the orbit target
+ * This allows the user to freely TRUCK (left-drag pan) and WASD without the orbit target
  * being yanked back to the container center every frame.
  *
  * Without this settling behavior, every frame would override the user's TRUCK pan position,
- * making right-click feel "locked" and WASD useless in orbit mode.
+ * making camera pan feel "locked" and WASD useless in orbit mode.
  */
 const LERP_SETTLE_THRESHOLD = 0.01; // Stop lerping when within 1cm of target
 

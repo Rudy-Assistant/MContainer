@@ -187,8 +187,9 @@ describe('Sprint 5 camera configuration', () => {
     expect(CAMERA_FLOOR_Y).toBeGreaterThan(0);
   });
 
-  it('right mouse button is ACTION.TRUCK (pan)', () => {
-    expect(CAMERA_MOUSE_BUTTONS.right).toBe(2);
+  it('left mouse button is ACTION.TRUCK and right mouse button is ACTION.ROTATE', () => {
+    expect(CAMERA_MOUSE_BUTTONS.left).toBe(2);
+    expect(CAMERA_MOUSE_BUTTONS.right).toBe(1);
   });
 
   it('zoom range is 3–60', () => {
