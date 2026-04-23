@@ -327,6 +327,43 @@ describe('Smart Staircase: Removal Cascade', () => {
 
     expect(useStore.getState().containers[lowerId].voxelGrid![42].faces.top).toBe('Solid_Steel');
   });
+
+  it('SMART-STAIR-13D: adjacent stair holes share an open interior edge and keep only the outer perimeter guarded', () => {
+    const id = addContainer();
+
+    useStore.getState().applyStairsFromFace(id, 10, 'n');
+    useStore.getState().applyStairsFromFace(id, 11, 'n');
+
+    const westHole = getVoxel(id, 42);
+    const eastHole = getVoxel(id, 43);
+
+    expect(westHole.faces.e).toBe('Open');
+    expect(eastHole.faces.w).toBe('Open');
+
+    expect(westHole.faces.n).toBe('Railing_Cable');
+    expect(westHole.faces.w).toBe('Railing_Cable');
+    expect(westHole.faces.s).toBe('Open');
+
+    expect(eastHole.faces.n).toBe('Railing_Cable');
+    expect(eastHole.faces.e).toBe('Railing_Cable');
+    expect(eastHole.faces.s).toBe('Open');
+  });
+
+  it('SMART-STAIR-13E: removing one stair from a shared opening restores guardrails only where the opening footprint shrinks', () => {
+    const id = addContainer();
+
+    useStore.getState().applyStairsFromFace(id, 10, 'n');
+    useStore.getState().applyStairsFromFace(id, 11, 'n');
+
+    useStore.getState().removeStairs(id, 11);
+    useStore.getState().clearStairExit(id, 11);
+
+    const remainingHole = getVoxel(id, 42);
+    expect(remainingHole.faces.e).toBe('Railing_Cable');
+    expect(remainingHole.faces.n).toBe('Railing_Cable');
+    expect(remainingHole.faces.w).toBe('Railing_Cable');
+    expect(remainingHole.faces.s).toBe('Open');
+  });
 });
 
 describe('Smart Staircase: Undo/Redo', () => {

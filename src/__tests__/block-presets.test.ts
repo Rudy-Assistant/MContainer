@@ -81,3 +81,29 @@ describe('applyBlockConfig — bay boundary', () => {
     expect(grid[18].faces.bottom).toBe('Deck_Wood');
   });
 });
+
+describe('applyBlockConfig — smart hole guards', () => {
+  beforeEach(resetStore);
+
+  it('ceiling preset on adjacent upper voxels creates an atrium opening with only the outer perimeter railed in smart mode', () => {
+    const cid = getContainerId();
+    useStore.setState({ designMode: 'smart' });
+
+    useStore.getState().applyBlockConfig(cid, [42, 43], 'ceiling');
+    const grid = useStore.getState().containers[cid]!.voxelGrid!;
+
+    expect(grid[42].faces.bottom).toBe('Open');
+    expect(grid[43].faces.bottom).toBe('Open');
+
+    expect(grid[42].faces.e).toBe('Open');
+    expect(grid[43].faces.w).toBe('Open');
+
+    expect(grid[42].faces.n).toBe('Railing_Cable');
+    expect(grid[42].faces.w).toBe('Railing_Cable');
+    expect(grid[42].faces.s).toBe('Railing_Cable');
+
+    expect(grid[43].faces.n).toBe('Railing_Cable');
+    expect(grid[43].faces.e).toBe('Railing_Cable');
+    expect(grid[43].faces.s).toBe('Railing_Cable');
+  });
+});

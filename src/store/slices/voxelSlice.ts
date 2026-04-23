@@ -60,6 +60,7 @@ type VoxelRuntimeState = VoxelSlice & {
 type Set = SliceSet<VoxelRuntimeState>;
 type Get = SliceGet<VoxelRuntimeState>;
 type RailingContainer = Pick<Container, '_smartRailingChanges'>;
+type HoleGuardContainer = Pick<Container, '_smartHoleGuardChanges'>;
 type VoxelStoreRef = {
   getState: () => VoxelRuntimeState;
   temporal: { getState: () => { pause: () => void; resume: () => void } };
@@ -271,6 +272,10 @@ const FACE_NEIGHBOR_DELTA: Record<string, { dr: number; dc: number }> = {
   n: { dr: -1, dc: 0 }, s: { dr: 1, dc: 0 },
   e: { dr: 0, dc: -1 }, w: { dr: 0, dc: 1 },
 };
+const HOLE_FACE_DELTA: Record<string, { dr: number; dc: number }> = {
+  n: { dr: -1, dc: 0 }, s: { dr: 1, dc: 0 },
+  e: { dr: 0, dc: 1 }, w: { dr: 0, dc: -1 },
+};
 
 /**
  * Recompute smart auto-railings for a container's voxel grid.
@@ -363,6 +368,103 @@ function trackSmartFaceChange(
   if (changedFaces[key] === undefined) {
     changedFaces[key] = original;
   }
+}
+
+function isSameLevelHoleVoxel(grid: Voxel[], idx: number): boolean {
+  const voxel = grid[idx];
+  return !!voxel?.active && voxel.voxelType !== 'stairs' && voxel.faces.bottom === 'Open';
+}
+
+function stairExitFaceForHole(grid: Voxel[], voxelIndex: number): 'n' | 's' | 'e' | 'w' | null {
+  const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
+  if (level > 0) {
+    const belowIdx = voxelIndex - VOXEL_ROWS * VOXEL_COLS;
+    const belowVoxel = grid[belowIdx];
+    if (
+      belowVoxel?.voxelType === 'stairs' &&
+      (belowVoxel.stairPart === 'lower' || belowVoxel.stairPart === 'single') &&
+      belowVoxel.stairAscending
+    ) {
+      return belowVoxel.stairAscending;
+    }
+  }
+
+  return null;
+}
+
+export function recomputeSmartHoleGuards(
+  grid: Voxel[],
+  container: HoleGuardContainer,
+): void {
+  const tracking: Record<string, SurfaceType> = container._smartHoleGuardChanges ?? {};
+  const newTracking: Record<string, SurfaceType> = {};
+  const desiredFaces = new Map<string, SurfaceType>();
+
+  for (let level = 1; level < VOXEL_LEVELS; level++) {
+    const base = level * VOXEL_ROWS * VOXEL_COLS;
+    for (let row = 0; row < VOXEL_ROWS; row++) {
+      for (let col = 0; col < VOXEL_COLS; col++) {
+        const idx = base + row * VOXEL_COLS + col;
+        const voxel = grid[idx];
+        if (!isSameLevelHoleVoxel(grid, idx)) continue;
+
+        const stairExitFace = stairExitFaceForHole(grid, idx);
+        for (const face of WALL_FACES) {
+          if (voxel.userPaintedFaces?.[face]) continue;
+
+          const delta = HOLE_FACE_DELTA[face];
+          const nr = row + delta.dr;
+          const nc = col + delta.dc;
+          const neighborInBounds = nr >= 0 && nr < VOXEL_ROWS && nc >= 0 && nc < VOXEL_COLS;
+          const neighborIdx = neighborInBounds ? base + nr * VOXEL_COLS + nc : -1;
+          const desired: SurfaceType =
+            neighborInBounds && isSameLevelHoleVoxel(grid, neighborIdx)
+              ? 'Open'
+              : stairExitFace === face
+                ? 'Open'
+                : 'Railing_Cable';
+          desiredFaces.set(`${idx}:${face}`, desired);
+        }
+      }
+    }
+  }
+
+  for (const [key, desired] of desiredFaces.entries()) {
+    const [idxStr, face] = key.split(':');
+    const idx = parseInt(idxStr, 10);
+    const voxel = grid[idx];
+    const typedFace = face as keyof VoxelFaces;
+    if (!voxel) continue;
+
+    if (voxel.faces[typedFace] !== desired) {
+      const original = tracking[key] ?? voxel.faces[typedFace];
+      newTracking[key] = original;
+      grid[idx] = {
+        ...voxel,
+        faces: { ...voxel.faces, [typedFace]: desired },
+      };
+    } else if (tracking[key] !== undefined) {
+      newTracking[key] = tracking[key];
+    }
+  }
+
+  for (const [key, originalSurface] of Object.entries(tracking)) {
+    if (desiredFaces.has(key)) continue;
+    const [idxStr, face] = key.split(':');
+    const idx = parseInt(idxStr, 10);
+    const voxel = grid[idx];
+    const typedFace = face as keyof VoxelFaces;
+    if (!voxel) continue;
+    if (voxel.userPaintedFaces?.[typedFace]) continue;
+    if (voxel.faces[typedFace] !== originalSurface) {
+      grid[idx] = {
+        ...voxel,
+        faces: { ...voxel.faces, [typedFace]: originalSurface },
+      };
+    }
+  }
+
+  container._smartHoleGuardChanges = Object.keys(newTracking).length > 0 ? newTracking : undefined;
 }
 
 function applyUpperHoleConsequences(
@@ -803,15 +905,25 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
       // Recompute smart railings (stair placement may affect neighboring open-air voxels)
       const railingContainer: RailingContainer = { _smartRailingChanges: c._smartRailingChanges };
+      const holeGuardContainer: HoleGuardContainer = { _smartHoleGuardChanges: c._smartHoleGuardChanges };
       if (get().designMode !== 'manual') {
         recomputeSmartRailings(grid, railingContainer);
+        recomputeSmartHoleGuards(grid, holeGuardContainer);
       }
 
       // Cross-container void: if stairs reach the top level, void floor of container above.
       const reachesTopLevel = level === VOXEL_LEVELS - 1 ||
         (aboveIdx < grid.length && Math.floor(aboveIdx / (VOXEL_ROWS * VOXEL_COLS)) === VOXEL_LEVELS - 1);
       if (reachesTopLevel && c.supporting.length > 0) {
-        let updatedContainers = { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges } };
+        let updatedContainers = {
+          ...s.containers,
+          [containerId]: {
+            ...c,
+            voxelGrid: grid,
+            _smartRailingChanges: railingContainer._smartRailingChanges,
+            _smartHoleGuardChanges: holeGuardContainer._smartHoleGuardChanges,
+          },
+        };
         for (const aboveId of c.supporting) {
           const above = s.containers[aboveId];
           if (!above?.voxelGrid) continue;
@@ -822,7 +934,20 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
             if (applyUpperHoleConsequences(aboveGrid, localIdx, ascending, externalChangedFaces)) {
               externalChanges.push({ containerId: aboveId, changedFaces: externalChangedFaces });
             }
-            updatedContainers = { ...updatedContainers, [aboveId]: { ...above, voxelGrid: aboveGrid } };
+            const aboveHoleGuardContainer: HoleGuardContainer = {
+              _smartHoleGuardChanges: above._smartHoleGuardChanges,
+            };
+            if (get().designMode !== 'manual') {
+              recomputeSmartHoleGuards(aboveGrid, aboveHoleGuardContainer);
+            }
+            updatedContainers = {
+              ...updatedContainers,
+              [aboveId]: {
+                ...above,
+                voxelGrid: aboveGrid,
+                _smartHoleGuardChanges: aboveHoleGuardContainer._smartHoleGuardChanges,
+              },
+            };
           }
         }
         grid[voxelIndex] = {
@@ -834,7 +959,12 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         };
         updatedContainers = {
           ...updatedContainers,
-          [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges },
+          [containerId]: {
+            ...c,
+            voxelGrid: grid,
+            _smartRailingChanges: railingContainer._smartRailingChanges,
+            _smartHoleGuardChanges: holeGuardContainer._smartHoleGuardChanges,
+          },
         };
         return { containers: updatedContainers };
       }
@@ -864,7 +994,12 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
             return {
               containers: {
                 ...s.containers,
-                [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges },
+                [containerId]: {
+                  ...c,
+                  voxelGrid: grid,
+                  _smartRailingChanges: railingContainer._smartRailingChanges,
+                  _smartHoleGuardChanges: holeGuardContainer._smartHoleGuardChanges,
+                },
                 [c.stackedOn]: { ...below, voxelGrid: belowGrid },
               },
             };
@@ -872,7 +1007,17 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         }
       }
 
-      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges } } };
+      return {
+        containers: {
+          ...s.containers,
+          [containerId]: {
+            ...c,
+            voxelGrid: grid,
+            _smartRailingChanges: railingContainer._smartRailingChanges,
+            _smartHoleGuardChanges: holeGuardContainer._smartHoleGuardChanges,
+          },
+        },
+      };
     });
   },
 
@@ -1064,10 +1209,22 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         const defaults = createDefaultVoxelGrid();
         grid[voxelIndex] = { ...defaults[voxelIndex] };
         const rc: RailingContainer = { _smartRailingChanges: c._smartRailingChanges };
+        const hc: HoleGuardContainer = { _smartHoleGuardChanges: c._smartHoleGuardChanges };
         if (get().designMode !== 'manual') {
           recomputeSmartRailings(grid, rc);
+          recomputeSmartHoleGuards(grid, hc);
         }
-        return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: rc._smartRailingChanges } } };
+        return {
+          containers: {
+            ...s.containers,
+            [containerId]: {
+              ...c,
+              voxelGrid: grid,
+              _smartRailingChanges: rc._smartRailingChanges,
+              _smartHoleGuardChanges: hc._smartHoleGuardChanges,
+            },
+          },
+        };
       }
 
       // Restore all tracked face changes
@@ -1102,6 +1259,26 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         };
       }
 
+      for (const externalChange of smartChanges.externalChanges ?? []) {
+        const target = updatedContainers[externalChange.containerId];
+        if (!target?.voxelGrid) continue;
+        const targetGrid = [...target.voxelGrid];
+        const targetHoleGuardContainer: HoleGuardContainer = {
+          _smartHoleGuardChanges: target._smartHoleGuardChanges,
+        };
+        if (get().designMode !== 'manual') {
+          recomputeSmartHoleGuards(targetGrid, targetHoleGuardContainer);
+        }
+        updatedContainers = {
+          ...updatedContainers,
+          [externalChange.containerId]: {
+            ...target,
+            voxelGrid: targetGrid,
+            _smartHoleGuardChanges: targetHoleGuardContainer._smartHoleGuardChanges,
+          },
+        };
+      }
+
       // Revert lower stair voxel to standard
       const defaults = createDefaultVoxelGrid();
       grid[voxelIndex] = {
@@ -1131,12 +1308,19 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
       // Recompute smart railings after stair removal
       const railingContainer: RailingContainer = { _smartRailingChanges: c._smartRailingChanges };
+      const holeGuardContainer: HoleGuardContainer = { _smartHoleGuardChanges: c._smartHoleGuardChanges };
       if (get().designMode !== 'manual') {
         recomputeSmartRailings(grid, railingContainer);
+        recomputeSmartHoleGuards(grid, holeGuardContainer);
       }
       updatedContainers = {
         ...updatedContainers,
-        [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges },
+        [containerId]: {
+          ...c,
+          voxelGrid: grid,
+          _smartRailingChanges: railingContainer._smartRailingChanges,
+          _smartHoleGuardChanges: holeGuardContainer._smartHoleGuardChanges,
+        },
       };
 
       return { containers: updatedContainers };
@@ -1673,11 +1857,15 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       grid[idx] = { ...voxel, active: preset.active, faces };
     }
 
-    const updatedContainer = { ...c, voxelGrid: grid };
+    const updatedContainer = {
+      ...c,
+      voxelGrid: grid,
+    };
 
     // Smart system: recompute auto-railings for newly-Open interior faces
     if (get().designMode !== 'manual') {
       recomputeSmartRailings(grid, updatedContainer);
+      recomputeSmartHoleGuards(grid, updatedContainer);
     }
 
     set({

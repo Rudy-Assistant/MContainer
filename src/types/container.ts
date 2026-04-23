@@ -191,6 +191,10 @@ export interface Container {
    *  Auto-railings are placed on fall-hazard edges (open-air + exposed).
    *  Excluded from persist (recomputed on hydration), included in temporal (undo). */
   _smartRailingChanges?: Record<string, SurfaceType>;
+  /** Original face surfaces saved before smart hole guards (key: "voxelIndex:face").
+   *  Hole guards place railings only on the outer perimeter of upper-level floor openings.
+   *  Excluded from persist (recomputed on hydration), included in temporal (undo). */
+  _smartHoleGuardChanges?: Record<string, SurfaceType>;
 
   // ── Smart Frame Configuration ────────────────────────────
   /** Container-level default style for all frame elements (poles + rails) */

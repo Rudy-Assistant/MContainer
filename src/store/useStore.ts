@@ -21,7 +21,13 @@ import { createUiSlice, type UiSlice } from "./slices/uiSlice";
 import { createSelectionSlice, type SelectionSlice } from "./slices/selectionSlice";
 import { createDragSlice, type DragSlice, setTemporalApiAccessor } from "./slices/dragSlice";
 import { createLibrarySlice, type LibrarySlice, setLibraryTemporalAccessor } from "./slices/librarySlice";
-import { createVoxelSlice, type VoxelSlice, setVoxelStoreRef, recomputeSmartRailings } from "./slices/voxelSlice";
+import {
+  createVoxelSlice,
+  type VoxelSlice,
+  setVoxelStoreRef,
+  recomputeSmartRailings,
+  recomputeSmartHoleGuards,
+} from "./slices/voxelSlice";
 import { createContainerSlice, type ContainerSlice, setContainerTemporalAccessor } from "./slices/containerSlice";
 import { createSceneObjectSlice, type SceneObjectSlice } from "./slices/sceneObjectSlice";
 import { THEMES, type ThemeId } from "@/config/themes";
@@ -216,13 +222,14 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     const { containers, zones, environment, viewMode, pricing, furnitureIndex,
             libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
             palettes, activePaletteId, currentTheme, activeStyle, sceneObjects } = state;
-    // Strip ephemeral _preMergeWalls, _preExtensionDoors, _smartRailingChanges, and voxel unpackPhase from persisted containers
+    // Strip ephemeral smart tracking and voxel-only animation state from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
       const rest: Container = { ...c };
       delete rest._preMergeWalls;
       delete rest._preExtensionDoors;
       delete rest._smartRailingChanges;
+      delete rest._smartHoleGuardChanges;
       // Strip ephemeral unpackPhase, _reverseOriginalPhase, _stairExiting from voxels (animation-only, never persisted)
       if (rest.voxelGrid) {
         rest.voxelGrid = rest.voxelGrid.map(v => {
@@ -281,15 +288,17 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
           }
         }
       }
-      // Rebuild smart railing tracking from persisted voxel state
-      // (_smartRailingChanges is stripped from persist but Railing_Cable faces are persisted)
+      // Rebuild smart railing / hole-guard tracking from persisted voxel state.
       if (state.containers) {
         for (const container of Object.values(state.containers)) {
           if (container.voxelGrid) {
             const grid = [...container.voxelGrid];
             const rc: Pick<Container, '_smartRailingChanges'> = { _smartRailingChanges: undefined };
+            const hc: Pick<Container, '_smartHoleGuardChanges'> = { _smartHoleGuardChanges: undefined };
             recomputeSmartRailings(grid, rc);
+            recomputeSmartHoleGuards(grid, hc);
             container._smartRailingChanges = rc._smartRailingChanges;
+            container._smartHoleGuardChanges = hc._smartHoleGuardChanges;
           }
         }
       }
