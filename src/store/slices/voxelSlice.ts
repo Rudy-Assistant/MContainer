@@ -353,6 +353,41 @@ export function recomputeSmartRailings(
   container._smartRailingChanges = Object.keys(newTracking).length > 0 ? newTracking : undefined;
 }
 
+function trackSmartFaceChange(
+  changedFaces: Record<string, SurfaceType>,
+  voxelIndex: number,
+  face: keyof VoxelFaces,
+  original: SurfaceType,
+): void {
+  const key = `${voxelIndex}:${face}`;
+  if (changedFaces[key] === undefined) {
+    changedFaces[key] = original;
+  }
+}
+
+function applyUpperHoleConsequences(
+  grid: Voxel[],
+  voxelIndex: number,
+  exitFace: 'n' | 's' | 'e' | 'w',
+  changedFaces: Record<string, SurfaceType>,
+): boolean {
+  const voxel = grid[voxelIndex];
+  if (!voxel?.active) return false;
+
+  const nextFaces = { ...voxel.faces };
+  trackSmartFaceChange(changedFaces, voxelIndex, 'bottom', voxel.faces.bottom);
+  nextFaces.bottom = 'Open';
+
+  for (const wallFace of ['n', 's', 'e', 'w'] as const) {
+    if (voxel.userPaintedFaces?.[wallFace]) continue;
+    trackSmartFaceChange(changedFaces, voxelIndex, wallFace, voxel.faces[wallFace]);
+    nextFaces[wallFace] = wallFace === exitFace ? 'Open' : 'Railing_Cable';
+  }
+
+  grid[voxelIndex] = { ...voxel, faces: nextFaces };
+  return true;
+}
+
 /**
  * createVoxelSlice — Voxel-level operations: face painting, stair placement, templates.
  *
@@ -657,6 +692,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
       // ── Smart change tracking: record all auto-modifications for reversal ──
       const changedFaces: Record<string, SurfaceType> = {};
+      const externalChanges: Array<{ containerId: string; changedFaces: Record<string, SurfaceType> }> = [];
 
       // Lower voxel (entry side — bottom half of stair run)
       const lowerPart = upperInBounds ? 'lower' : 'single';
@@ -697,23 +733,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       const localIdx = voxelIndex % (VOXEL_ROWS * VOXEL_COLS);
       const aboveIdx = (level + 1) * (VOXEL_ROWS * VOXEL_COLS) + localIdx;
       if (aboveIdx < grid.length && grid[aboveIdx]?.active) {
-        const aboveVoxel = grid[aboveIdx];
-        const aboveFaces = { ...aboveVoxel.faces };
-
-        // Track original bottom face
-        changedFaces[`${aboveIdx}:bottom`] = aboveVoxel.faces.bottom;
-        aboveFaces.bottom = 'Open';
-
-        // ── Smart Consequence: Railing around upper hole ──
-        const exitFace = ascending;
-        for (const wallFace of ['n', 's', 'e', 'w'] as const) {
-          if (!aboveVoxel.userPaintedFaces?.[wallFace]) {
-            changedFaces[`${aboveIdx}:${wallFace}`] = aboveVoxel.faces[wallFace];
-            aboveFaces[wallFace] = wallFace === exitFace ? 'Open' : 'Railing_Cable';
-          }
-        }
-
-        grid[aboveIdx] = { ...aboveVoxel, faces: aboveFaces };
+        applyUpperHoleConsequences(grid, aboveIdx, ascending, changedFaces);
       }
 
       // ── Smart Consequence: Clear entry wall on neighbor voxel ──
@@ -777,6 +797,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           changedFaces,
           upperVoxelIdx: actualUpperIdx,
           ascending,
+          externalChanges: externalChanges.length > 0 ? externalChanges : undefined,
         },
       };
 
@@ -797,13 +818,24 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           const aboveVoxel = above.voxelGrid[localIdx];
           if (aboveVoxel?.active) {
             const aboveGrid = [...above.voxelGrid];
-            aboveGrid[localIdx] = {
-              ...aboveVoxel,
-              faces: { ...aboveVoxel.faces, bottom: 'Open' },
-            };
+            const externalChangedFaces: Record<string, SurfaceType> = {};
+            if (applyUpperHoleConsequences(aboveGrid, localIdx, ascending, externalChangedFaces)) {
+              externalChanges.push({ containerId: aboveId, changedFaces: externalChangedFaces });
+            }
             updatedContainers = { ...updatedContainers, [aboveId]: { ...above, voxelGrid: aboveGrid } };
           }
         }
+        grid[voxelIndex] = {
+          ...grid[voxelIndex],
+          _smartStairChanges: {
+            ...grid[voxelIndex]._smartStairChanges!,
+            externalChanges: externalChanges.length > 0 ? externalChanges : undefined,
+          },
+        };
+        updatedContainers = {
+          ...updatedContainers,
+          [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges },
+        };
         return { containers: updatedContainers };
       }
 
@@ -815,9 +847,19 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           const belowVoxel = below.voxelGrid[belowIdx];
           if (belowVoxel?.active) {
             const belowGrid = [...below.voxelGrid];
+            const externalChangedFaces: Record<string, SurfaceType> = {};
+            trackSmartFaceChange(externalChangedFaces, belowIdx, 'top', belowVoxel.faces.top);
             belowGrid[belowIdx] = {
               ...belowVoxel,
               faces: { ...belowVoxel.faces, top: 'Open' },
+            };
+            externalChanges.push({ containerId: c.stackedOn, changedFaces: externalChangedFaces });
+            grid[voxelIndex] = {
+              ...grid[voxelIndex],
+              _smartStairChanges: {
+                ...grid[voxelIndex]._smartStairChanges!,
+                externalChanges: externalChanges.length > 0 ? externalChanges : undefined,
+              },
             };
             return {
               containers: {
@@ -1009,6 +1051,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       const c = s.containers[containerId];
       if (!c?.voxelGrid) return {};
       const grid = [...c.voxelGrid];
+      let updatedContainers = { ...s.containers };
 
       // Resolve upper voxel to lower (which owns _smartStairChanges)
       const resolved = resolveToLowerStair(grid, voxelIndex);
@@ -1037,6 +1080,26 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
             faces: { ...grid[idx].faces, [faceKey]: originalFace },
           };
         }
+      }
+
+      for (const externalChange of smartChanges.externalChanges ?? []) {
+        const target = updatedContainers[externalChange.containerId];
+        if (!target?.voxelGrid) continue;
+        const targetGrid = [...target.voxelGrid];
+        for (const [key, originalFace] of Object.entries(externalChange.changedFaces)) {
+          const [idxStr, faceKey] = key.split(':');
+          const idx = parseInt(idxStr, 10);
+          if (idx >= 0 && idx < targetGrid.length && targetGrid[idx]) {
+            targetGrid[idx] = {
+              ...targetGrid[idx],
+              faces: { ...targetGrid[idx].faces, [faceKey]: originalFace },
+            };
+          }
+        }
+        updatedContainers = {
+          ...updatedContainers,
+          [externalChange.containerId]: { ...target, voxelGrid: targetGrid },
+        };
       }
 
       // Revert lower stair voxel to standard
@@ -1071,8 +1134,12 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       if (get().designMode !== 'manual') {
         recomputeSmartRailings(grid, railingContainer);
       }
+      updatedContainers = {
+        ...updatedContainers,
+        [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges },
+      };
 
-      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid, _smartRailingChanges: railingContainer._smartRailingChanges } } };
+      return { containers: updatedContainers };
     });
   },
 

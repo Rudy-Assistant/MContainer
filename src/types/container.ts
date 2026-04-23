@@ -395,6 +395,11 @@ export interface SmartStairChanges {
   upperVoxelIdx?: number;
   /** Ascending direction used when stairs were placed */
   ascending: 'n' | 's' | 'e' | 'w';
+  /** Cross-container face changes keyed per affected container for stacked stair openings. */
+  externalChanges?: Array<{
+    containerId: string;
+    changedFaces: Record<string, SurfaceType>;
+  }>;
 }
 
 /** Union type for extension unpacking animation phases */

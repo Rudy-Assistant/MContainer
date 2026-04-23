@@ -287,6 +287,46 @@ describe('Smart Staircase: Removal Cascade', () => {
     expect(getVoxel(id, 10).voxelType).not.toBe('stairs');
     expect(getVoxel(id, 18).voxelType).not.toBe('stairs');
   });
+
+  it('SMART-STAIR-13B: stacked container above gets a guarded hole and removeStairs restores it', () => {
+    const lowerId = addContainer();
+    const upperId = addContainer();
+    useStore.getState().stackContainer(upperId, lowerId);
+    const original = { ...useStore.getState().containers[upperId].voxelGrid![10].faces };
+
+    useStore.getState().applyStairsFromFace(lowerId, 42, 'n');
+
+    const upperHole = useStore.getState().containers[upperId].voxelGrid![10];
+    expect(upperHole.faces.bottom).toBe('Open');
+    expect(upperHole.faces.s).toBe('Open');
+    expect(upperHole.faces.n).toBe('Railing_Cable');
+    expect(upperHole.faces.e).toBe('Railing_Cable');
+    expect(upperHole.faces.w).toBe('Railing_Cable');
+
+    useStore.getState().removeStairs(lowerId, 42);
+    useStore.getState().clearStairExit(lowerId, 42);
+
+    const restored = useStore.getState().containers[upperId].voxelGrid![10];
+    expect(restored.faces.bottom).toBe(original.bottom);
+    expect(restored.faces.n).toBe(original.n);
+    expect(restored.faces.s).toBe(original.s);
+    expect(restored.faces.e).toBe(original.e);
+    expect(restored.faces.w).toBe(original.w);
+  });
+
+  it('SMART-STAIR-13C: stairs in an upper stacked container restore the lower ceiling on removal', () => {
+    const lowerId = addContainer();
+    const upperId = addContainer();
+    useStore.getState().stackContainer(upperId, lowerId);
+
+    useStore.getState().applyStairsFromFace(upperId, 10, 'n');
+    expect(useStore.getState().containers[lowerId].voxelGrid![42].faces.top).toBe('Open');
+
+    useStore.getState().removeStairs(upperId, 10);
+    useStore.getState().clearStairExit(upperId, 10);
+
+    expect(useStore.getState().containers[lowerId].voxelGrid![42].faces.top).toBe('Solid_Steel');
+  });
 });
 
 describe('Smart Staircase: Undo/Redo', () => {
