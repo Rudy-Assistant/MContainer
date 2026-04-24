@@ -37,6 +37,9 @@ describe('Wizard presets', () => {
     expect(WIZARD_PRESETS.find(p => p.id === 'glass_box')?.designIntent).toBeDefined();
     expect(WIZARD_PRESETS.find(p => p.id === 'open_plan')?.designIntent).toBeDefined();
     expect(WIZARD_PRESETS.find(p => p.id === 'atrium_home')?.designIntent).toBeDefined();
+    expect(WIZARD_PRESETS.find(p => p.id === 'glass_atrium_home')?.designIntent).toBeDefined();
+    expect(WIZARD_PRESETS.find(p => p.id === 'roof_terrace_home')?.designIntent).toBeDefined();
+    expect(WIZARD_PRESETS.find(p => p.id === 'glass_terrace_home')?.designIntent).toBeDefined();
     expect(WIZARD_PRESETS.find(p => p.id === 'studio')?.designIntent).toBeDefined();
     expect(WIZARD_PRESETS.find(p => p.id === 'full_glass_home')?.designIntent).toBeDefined();
     expect(WIZARD_PRESETS.find(p => p.id === 'roof_deck_combo')?.designIntent).toBeDefined();

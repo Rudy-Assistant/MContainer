@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { ContainerSize, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
+import { recomputeSmartHoleGuards } from '@/store/slices/voxelSlice';
 
 function resetStore() {
   const initial = useStore.getInitialState();
@@ -363,6 +364,56 @@ describe('Smart Staircase: Removal Cascade', () => {
     expect(remainingHole.faces.n).toBe('Railing_Cable');
     expect(remainingHole.faces.w).toBe('Railing_Cable');
     expect(remainingHole.faces.s).toBe('Open');
+  });
+
+  it('SMART-STAIR-13F: hole guards follow actual walkable continuity, not only the stair ascent hint', () => {
+    const id = addContainer();
+    const container = useStore.getState().containers[id];
+    const grid = [...container.voxelGrid!];
+
+    grid[42] = {
+      ...grid[42],
+      faces: {
+        ...grid[42].faces,
+        bottom: 'Open',
+        n: 'Solid_Steel',
+        s: 'Solid_Steel',
+        e: 'Solid_Steel',
+        w: 'Solid_Steel',
+      },
+    };
+    grid[43] = {
+      ...grid[43],
+      active: true,
+      userPaintedFaces: {
+        ...grid[43].userPaintedFaces,
+        w: true,
+      },
+      faces: {
+        ...grid[43].faces,
+        w: 'Open',
+      },
+    };
+
+    const holeGuardContainer = { _smartHoleGuardChanges: container._smartHoleGuardChanges };
+    recomputeSmartHoleGuards(grid, holeGuardContainer);
+
+    useStore.setState((state) => ({
+      containers: {
+        ...state.containers,
+        [id]: {
+          ...state.containers[id],
+          voxelGrid: grid,
+          _smartHoleGuardChanges: holeGuardContainer._smartHoleGuardChanges,
+        },
+      },
+    }));
+
+    const hole = getVoxel(id, 42);
+    expect(hole.faces.e).toBe('Open');
+    expect(hole.faces.n).toBe('Railing_Cable');
+    expect(hole.faces.s).toBe('Railing_Cable');
+    expect(hole.faces.w).toBe('Railing_Cable');
   });
 });
 

@@ -8,17 +8,19 @@ export type ContainerArrangementOutcome =
 
 export type ContainerArrangementKind = 'retract' | 'structured';
 export type ContainerArrangementScope = 'full_footprint' | 'extensions_only';
-export type ContainerArrangementUpperLevelMode = 'full_shell' | 'clear_extensions';
+export type ContainerArrangementUpperLevelMode = 'full_shell' | 'clear_extensions' | 'extensions_only';
 export type ExtensionDoorProfile = 'all_interior' | 'all_glass_interior';
 
 export interface ContainerArrangementSpec {
   id: ContainerArrangementId;
   label: string;
   title: string;
+  hint: string;
   outcome: ContainerArrangementOutcome;
   kind: ContainerArrangementKind;
   level0Scope?: ContainerArrangementScope;
   perimeterWall?: SurfaceType;
+  upperPerimeterWall?: SurfaceType;
   roof?: SurfaceType;
   floor?: SurfaceType;
   upperLevelMode?: ContainerArrangementUpperLevelMode;
@@ -27,6 +29,7 @@ export interface ContainerArrangementSpec {
   extensionDoorProfile?: ExtensionDoorProfile;
   voidRows?: number[];
   voidCols?: number[];
+  tags?: string[];
 }
 
 export interface ArrangementCellInput {
@@ -74,6 +77,7 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     id: 'extend_shell',
     label: 'Shell',
     title: 'Extend shell',
+    hint: 'Extend the exterior envelope while keeping a continuous enclosed roof.',
     outcome: 'enclosed',
     kind: 'structured',
     level0Scope: 'extensions_only',
@@ -87,6 +91,7 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     id: 'max_closed',
     label: 'Max Box',
     title: 'Maximum closed interior',
+    hint: 'Full enclosed volume with open interior seams and no leftover cross-walls.',
     outcome: 'enclosed',
     kind: 'structured',
     level0Scope: 'full_footprint',
@@ -102,6 +107,7 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     id: 'largest_glass',
     label: 'Glass Box',
     title: 'Largest glass interior',
+    hint: 'Habitable full-shell enclosure with glazed perimeter walls and a solid roof.',
     outcome: 'enclosed',
     kind: 'structured',
     level0Scope: 'full_footprint',
@@ -117,6 +123,7 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     id: 'central_atrium',
     label: 'Atrium',
     title: 'Central atrium',
+    hint: 'Double-height central void with guarded upper edges and an enclosed perimeter shell.',
     outcome: 'enclosed',
     kind: 'structured',
     level0Scope: 'full_footprint',
@@ -129,11 +136,68 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     extensionDoorProfile: 'all_interior',
     voidRows: [1, 2],
     voidCols: [3, 4],
+    tags: ['Void', 'Guarded'],
+  },
+  {
+    id: 'glass_atrium',
+    label: 'Glass Atrium',
+    title: 'Glass atrium pavilion',
+    hint: 'Glazed perimeter shell around a guarded central light well.',
+    outcome: 'enclosed',
+    kind: 'structured',
+    level0Scope: 'full_footprint',
+    perimeterWall: 'Glass_Pane',
+    roof: 'Solid_Steel',
+    floor: 'Deck_Wood',
+    upperLevelMode: 'full_shell',
+    upperLevelRoof: 'Solid_Steel',
+    upperLevelFloor: 'Solid_Steel',
+    extensionDoorProfile: 'all_glass_interior',
+    voidRows: [1, 2],
+    voidCols: [3, 4],
+    tags: ['Glass', 'Void', 'Guarded'],
+  },
+  {
+    id: 'roof_terrace',
+    label: 'Roof Terrace',
+    title: 'Roof terrace shell',
+    hint: 'Enclosed lower volume with a usable upper terrace ring on the extension footprint.',
+    outcome: 'enclosed',
+    kind: 'structured',
+    level0Scope: 'full_footprint',
+    perimeterWall: 'Solid_Steel',
+    roof: 'Solid_Steel',
+    floor: 'Deck_Wood',
+    upperLevelMode: 'extensions_only',
+    upperPerimeterWall: 'Railing_Cable',
+    upperLevelRoof: 'Open',
+    upperLevelFloor: 'Deck_Wood',
+    extensionDoorProfile: 'all_interior',
+    tags: ['Terrace', 'Outdoor'],
+  },
+  {
+    id: 'glass_terrace',
+    label: 'Glass Terrace',
+    title: 'Glass terrace shell',
+    hint: 'Glass lower pavilion with an upper terrace ring and guarded exterior edges.',
+    outcome: 'enclosed',
+    kind: 'structured',
+    level0Scope: 'full_footprint',
+    perimeterWall: 'Glass_Pane',
+    roof: 'Solid_Steel',
+    floor: 'Deck_Wood',
+    upperLevelMode: 'extensions_only',
+    upperPerimeterWall: 'Railing_Cable',
+    upperLevelRoof: 'Open',
+    upperLevelFloor: 'Deck_Wood',
+    extensionDoorProfile: 'all_glass_interior',
+    tags: ['Glass', 'Terrace', 'Outdoor'],
   },
   {
     id: 'wraparound_deck',
     label: 'Deck',
     title: 'Covered wraparound deck',
+    hint: 'Extension-only outdoor deck with roof cover and railings around the exposed edge.',
     outcome: 'covered_outdoor',
     kind: 'structured',
     level0Scope: 'extensions_only',
@@ -146,6 +210,7 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     id: 'wraparound_patio',
     label: 'Patio',
     title: 'Open wraparound patio',
+    hint: 'Extension-only open patio with floor and guardrail perimeter.',
     outcome: 'open_outdoor',
     kind: 'structured',
     level0Scope: 'extensions_only',
@@ -158,8 +223,10 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     id: 'retract_extensions',
     label: 'Retract',
     title: 'Retract extensions',
+    hint: 'Collapse the added envelope back to the core container footprint.',
     outcome: 'collapsed',
     kind: 'retract',
+    tags: ['Reset'],
   },
 ];
 
@@ -217,6 +284,22 @@ export function evaluateContainerArrangementCell(
 
   if (spec.upperLevelMode === 'clear_extensions' && extension) {
     return { active: false, faces: openFaces() };
+  }
+
+  if (spec.upperLevelMode === 'extensions_only') {
+    if (!extension) {
+      return { active: false, faces: openFaces() };
+    }
+    return {
+      active: true,
+      faces: perimeterFaces(
+        row,
+        col,
+        spec.upperPerimeterWall ?? spec.perimeterWall!,
+        spec.upperLevelRoof ?? 'Open',
+        spec.upperLevelFloor ?? 'Deck_Wood',
+      ),
+    };
   }
 
   return null;

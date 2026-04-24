@@ -42,17 +42,17 @@ const N8AO_CONFIG = {
 } as const;
 
 export const BLOOM_CONFIG = {
-  luminanceThreshold: 1.14,
-  luminanceSmoothing: 0.08,
-  intensity: 0.28,
+  luminanceThreshold: 1.18,
+  luminanceSmoothing: 0.06,
+  intensity: 0.18,
   mipmapBlur: true,
 } as const;
 
 export function getBloomSettings(hasSoftBloom: boolean) {
   return {
-    luminanceThreshold: hasSoftBloom ? 0.92 : BLOOM_CONFIG.luminanceThreshold,
-    luminanceSmoothing: hasSoftBloom ? 0.16 : BLOOM_CONFIG.luminanceSmoothing,
-    intensity: hasSoftBloom ? 0.52 : BLOOM_CONFIG.intensity,
+    luminanceThreshold: hasSoftBloom ? 0.98 : BLOOM_CONFIG.luminanceThreshold,
+    luminanceSmoothing: hasSoftBloom ? 0.12 : BLOOM_CONFIG.luminanceSmoothing,
+    intensity: hasSoftBloom ? 0.32 : BLOOM_CONFIG.intensity,
   };
 }
 

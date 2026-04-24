@@ -76,6 +76,48 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     ],
   },
   {
+    id: 'glass_atrium_home',
+    label: 'Glass Atrium',
+    description: 'Glass perimeter with a double-height central light well and guarded upper opening.',
+    icon: '🪟',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'glass_atrium',
+      expectedOutcome: 'enclosed',
+    },
+    steps: [
+      { action: 'extensions', config: 'all_glass_interior' },
+    ],
+  },
+  {
+    id: 'roof_terrace_home',
+    label: 'Roof Terrace',
+    description: 'Enclosed lower shell with an upper terrace ring for outdoor circulation.',
+    icon: '🌤️',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'roof_terrace',
+      expectedOutcome: 'enclosed',
+    },
+    steps: [
+      { action: 'extensions', config: 'all_interior' },
+    ],
+  },
+  {
+    id: 'glass_terrace_home',
+    label: 'Glass Terrace',
+    description: 'Glass pavilion below with an upper terrace ring and guarded outdoor edges.',
+    icon: '🌇',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'glass_terrace',
+      expectedOutcome: 'enclosed',
+    },
+    steps: [
+      { action: 'extensions', config: 'all_glass_interior' },
+    ],
+  },
+  {
     id: 'studio',
     label: 'Studio + Loft',
     description: 'Glass box with internal staircase to upper level.',

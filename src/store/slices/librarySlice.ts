@@ -415,13 +415,16 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       }
     }
 
-    // Generate rooftop deck on topmost container
-    const topmost = containerIds.find((id) => {
-      return !Object.values(get().containers).some((other) => other.stackedOn === id);
-    });
-    if (topmost) {
-      get().generateRooftopDeck(topmost);
-      t?.pause();
+    // Only stacked compositions auto-promote their roof into a deck.
+    // Single-level model homes should preserve the arrangement they requested.
+    if (model.connections.some((conn) => conn.type === 'stacked')) {
+      const topmost = containerIds.find((id) => {
+        return !Object.values(get().containers).some((other) => other.stackedOn === id);
+      });
+      if (topmost) {
+        get().generateRooftopDeck(topmost);
+        t?.pause();
+      }
     }
 
     t?.resume();

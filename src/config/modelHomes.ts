@@ -242,6 +242,135 @@ export const MODEL_HOMES: ModelHome[] = [
     ],
     tags: ['atrium', 'gallery', '2br', 'light'],
   },
+  {
+    id: 'glass_atrium_pair',
+    label: 'Glass Atrium Pair',
+    description: 'Two adjacent 40ft containers as transparent atrium pavilions with a shared light-filled seam.',
+    icon: '🏛️',
+    containers: [
+      {
+        role: 'open_plan',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, 0],
+        extensionConfig: 'none',
+        arrangementId: 'glass_atrium',
+      },
+      {
+        role: 'open_plan',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, WIDTH],
+        extensionConfig: 'none',
+        arrangementId: 'glass_atrium',
+      },
+    ],
+    connections: [
+      { fromIndex: 0, toIndex: 1, type: 'adjacent' },
+    ],
+    tags: ['atrium', 'glass', 'gallery', 'light'],
+  },
+  {
+    id: 'stacked_atrium_tower',
+    label: 'Stacked Atrium Tower',
+    description: 'Two stacked 40ft containers with aligned atrium openings and an internal stair core tying the levels together.',
+    icon: '🧱',
+    containers: [
+      {
+        role: 'living_room',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, 0],
+        extensionConfig: 'none',
+        arrangementId: 'central_atrium',
+      },
+      {
+        role: 'open_plan',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, HEIGHT_STD, 0],
+        extensionConfig: 'none',
+        arrangementId: 'glass_atrium',
+      },
+    ],
+    connections: [
+      { fromIndex: 0, toIndex: 1, type: 'stacked', stairsVoxelIndex: 10 },
+    ],
+    tags: ['atrium', 'tower', 'stacked', 'vertical'],
+  },
+  {
+    id: 'gallery_wings',
+    label: 'Gallery Wings',
+    description: 'A glazed central atrium gallery with two enclosed side wings for living and sleeping zones.',
+    icon: '🪽',
+    containers: [
+      {
+        role: 'open_plan',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, 0],
+        extensionConfig: 'none',
+        arrangementId: 'glass_atrium',
+      },
+      {
+        role: 'living_room',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, -WIDTH],
+        extensionConfig: 'none',
+        arrangementId: 'max_closed',
+      },
+      {
+        role: 'bedroom',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, WIDTH],
+        extensionConfig: 'none',
+        arrangementId: 'max_closed',
+      },
+    ],
+    connections: [
+      { fromIndex: 0, toIndex: 1, type: 'adjacent' },
+      { fromIndex: 0, toIndex: 2, type: 'adjacent' },
+    ],
+    tags: ['gallery', 'wings', 'atrium', 'light'],
+  },
+  {
+    id: 'courtyard_compound',
+    label: 'Courtyard Compound',
+    description: 'Four enclosed terrace shells arranged around a central outdoor court.',
+    icon: '⬜',
+    containers: [
+      {
+        role: 'living_room',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, 0],
+        extensionConfig: 'none',
+        arrangementId: 'roof_terrace',
+      },
+      {
+        role: 'bedroom',
+        size: ContainerSize.Standard40,
+        relativePosition: [LENGTH_40, 0, 0],
+        extensionConfig: 'none',
+        arrangementId: 'roof_terrace',
+      },
+      {
+        role: 'open_plan',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, WIDTH * 2],
+        extensionConfig: 'none',
+        arrangementId: 'glass_terrace',
+      },
+      {
+        role: 'bedroom',
+        size: ContainerSize.Standard40,
+        relativePosition: [LENGTH_40, 0, WIDTH * 2],
+        extensionConfig: 'none',
+        arrangementId: 'roof_terrace',
+      },
+    ],
+    connections: [
+      { fromIndex: 0, toIndex: 1, type: 'adjacent' },
+      { fromIndex: 0, toIndex: 2, type: 'adjacent' },
+      { fromIndex: 1, toIndex: 3, type: 'adjacent' },
+      { fromIndex: 2, toIndex: 3, type: 'adjacent' },
+    ],
+    tags: ['courtyard', 'compound', 'terrace', 'outdoor'],
+  },
 ];
 
 // ── Lookup ───────────────────────────────────────────────────

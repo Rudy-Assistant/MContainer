@@ -375,8 +375,46 @@ function isSameLevelHoleVoxel(grid: Voxel[], idx: number): boolean {
   return !!voxel?.active && voxel.voxelType !== 'stairs' && voxel.faces.bottom === 'Open';
 }
 
-function stairExitFaceForHole(grid: Voxel[], voxelIndex: number): 'n' | 's' | 'e' | 'w' | null {
+function holeHasWalkableContinuation(
+  grid: Voxel[],
+  levelBase: number,
+  row: number,
+  col: number,
+  face: 'n' | 's' | 'e' | 'w',
+): boolean {
+  const delta = HOLE_FACE_DELTA[face];
+  const nr = row + delta.dr;
+  const nc = col + delta.dc;
+  if (nr < 0 || nr >= VOXEL_ROWS || nc < 0 || nc >= VOXEL_COLS) {
+    return false;
+  }
+
+  const neighborIdx = levelBase + nr * VOXEL_COLS + nc;
+  if (isSameLevelHoleVoxel(grid, neighborIdx)) {
+    return false;
+  }
+
+  const neighbor = grid[neighborIdx];
+  if (!neighbor?.active) {
+    return false;
+  }
+
+  const oppositeFace = STAIR_FLIP[face] as keyof VoxelFaces;
+  return neighbor.voxelType === 'stairs' || (
+    neighbor.faces[oppositeFace] === 'Open' &&
+    !!neighbor.userPaintedFaces?.[oppositeFace]
+  );
+}
+
+function stairExitFacesForHole(
+  grid: Voxel[],
+  voxelIndex: number,
+  row: number,
+  col: number,
+): globalThis.Set<'n' | 's' | 'e' | 'w'> {
+  const exitFaces = new globalThis.Set<'n' | 's' | 'e' | 'w'>();
   const level = Math.floor(voxelIndex / (VOXEL_ROWS * VOXEL_COLS));
+  const levelBase = level * VOXEL_ROWS * VOXEL_COLS;
   if (level > 0) {
     const belowIdx = voxelIndex - VOXEL_ROWS * VOXEL_COLS;
     const belowVoxel = grid[belowIdx];
@@ -385,11 +423,17 @@ function stairExitFaceForHole(grid: Voxel[], voxelIndex: number): 'n' | 's' | 'e
       (belowVoxel.stairPart === 'lower' || belowVoxel.stairPart === 'single') &&
       belowVoxel.stairAscending
     ) {
-      return belowVoxel.stairAscending;
+      exitFaces.add(belowVoxel.stairAscending);
     }
   }
 
-  return null;
+  for (const face of WALL_FACES) {
+    if (holeHasWalkableContinuation(grid, levelBase, row, col, face)) {
+      exitFaces.add(face);
+    }
+  }
+
+  return exitFaces;
 }
 
 export function recomputeSmartHoleGuards(
@@ -408,7 +452,7 @@ export function recomputeSmartHoleGuards(
         const voxel = grid[idx];
         if (!isSameLevelHoleVoxel(grid, idx)) continue;
 
-        const stairExitFace = stairExitFaceForHole(grid, idx);
+        const stairExitFaces = stairExitFacesForHole(grid, idx, row, col);
         for (const face of WALL_FACES) {
           if (voxel.userPaintedFaces?.[face]) continue;
 
@@ -420,7 +464,7 @@ export function recomputeSmartHoleGuards(
           const desired: SurfaceType =
             neighborInBounds && isSameLevelHoleVoxel(grid, neighborIdx)
               ? 'Open'
-              : stairExitFace === face
+              : stairExitFaces.has(face)
                 ? 'Open'
                 : 'Railing_Cable';
           desiredFaces.set(`${idx}:${face}`, desired);

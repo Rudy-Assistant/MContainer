@@ -73,4 +73,30 @@ describe('container arrangements', () => {
     expect(grid[idx(2, 4, 1)].faces.s).toBe('Railing_Cable');
     expect(grid[idx(2, 4, 1)].faces.w).toBe('Open');
   });
+
+  it('glass_atrium keeps the atrium void while glazing the perimeter shell', () => {
+    const id = addTestContainer();
+    useStore.getState().applyContainerArrangement(id, 'glass_atrium');
+    const grid = useStore.getState().containers[id].voxelGrid!;
+
+    expect(grid[idx(0, 1)].faces.n).toBe('Glass_Pane');
+    expect(grid[idx(3, 6)].faces.s).toBe('Glass_Pane');
+    expect(grid[idx(1, 3)].faces.top).toBe('Open');
+    expect(grid[idx(1, 3, 1)].faces.bottom).toBe('Open');
+    expect(grid[idx(1, 3, 1)].faces.n).toBe('Railing_Cable');
+    expect(grid[idx(1, 3, 1)].faces.e).toBe('Open');
+  });
+
+  it('roof_terrace creates an enclosed lower shell and upper extension terrace ring', () => {
+    const id = addTestContainer();
+    useStore.getState().applyContainerArrangement(id, 'roof_terrace');
+    const grid = useStore.getState().containers[id].voxelGrid!;
+
+    expect(grid[idx(1, 1)].faces.top).toBe('Solid_Steel');
+    expect(grid[idx(1, 1, 1)].active).toBe(false);
+    expect(grid[idx(0, 1, 1)].active).toBe(true);
+    expect(grid[idx(0, 1, 1)].faces.top).toBe('Open');
+    expect(grid[idx(0, 1, 1)].faces.bottom).toBe('Deck_Wood');
+    expect(grid[idx(0, 1, 1)].faces.n).toBe('Railing_Cable');
+  });
 });

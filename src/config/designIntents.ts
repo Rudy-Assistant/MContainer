@@ -51,9 +51,28 @@ export interface MultiContainerDesignIntentSpec {
   containers: MultiContainerNodeSpec[];
 }
 
+export type DesignConceptComposition =
+  | 'single_pavilion'
+  | 'gallery_wings'
+  | 'courtyard_compound'
+  | 'stacked_tower';
+
+export type DesignConceptEnvelope = 'steel' | 'glass';
+export type DesignConceptCirculation = 'flat' | 'atrium' | 'vertical';
+export type DesignConceptOutdoor = 'none' | 'terrace';
+
+export interface ConceptDesignIntentSpec {
+  kind: 'concept';
+  composition: DesignConceptComposition;
+  envelope?: DesignConceptEnvelope;
+  circulation?: DesignConceptCirculation;
+  outdoor?: DesignConceptOutdoor;
+}
+
 export type DesignIntentSpec =
   | SingleContainerDesignIntentSpec
-  | MultiContainerDesignIntentSpec;
+  | MultiContainerDesignIntentSpec
+  | ConceptDesignIntentSpec;
 
 export type SingleContainerDesignIntentOperation =
   | { type: 'apply_arrangement'; arrangementId: ContainerArrangementId }
@@ -116,7 +135,138 @@ type PromptMultiContainerDesignIntentSchema = {
 
 export type PromptDesignIntentSchema =
   | PromptSingleContainerDesignIntentSchema
-  | PromptMultiContainerDesignIntentSchema;
+  | PromptMultiContainerDesignIntentSchema
+  | {
+      kind: 'concept';
+      composition: DesignConceptComposition;
+      envelope?: DesignConceptEnvelope;
+      circulation?: DesignConceptCirculation;
+      outdoor?: DesignConceptOutdoor;
+    };
+
+function conceptArrangementId(
+  envelope: DesignConceptEnvelope,
+  circulation: DesignConceptCirculation,
+  outdoor: DesignConceptOutdoor,
+): ContainerArrangementId {
+  if (outdoor === 'terrace') {
+    return envelope === 'glass' ? 'glass_terrace' : 'roof_terrace';
+  }
+  if (circulation === 'atrium' || circulation === 'vertical') {
+    return envelope === 'glass' ? 'glass_atrium' : 'central_atrium';
+  }
+  return envelope === 'glass' ? 'largest_glass' : 'max_closed';
+}
+
+export function expandConceptDesignIntent(intent: ConceptDesignIntentSpec): DesignIntentSpec {
+  const envelope = intent.envelope ?? 'steel';
+  const circulation = intent.circulation ?? 'flat';
+  const outdoor = intent.outdoor ?? 'none';
+  const arrangementId = conceptArrangementId(envelope, circulation, outdoor);
+
+  switch (intent.composition) {
+    case 'single_pavilion':
+      return {
+        kind: 'single_container',
+        arrangementId,
+        expectedOutcome: 'enclosed',
+        rooftopDeck: outdoor === 'terrace' && circulation === 'vertical',
+      };
+    case 'gallery_wings':
+      return {
+        kind: 'multi_container',
+        containers: [
+          {
+            id: 'gallery',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'origin', position: { x: 0, y: 0, z: 0 } },
+            intent: {
+              kind: 'single_container',
+              arrangementId: conceptArrangementId(envelope, 'atrium', outdoor),
+              expectedOutcome: 'enclosed',
+            },
+          },
+          {
+            id: 'west_wing',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'adjacent', target: 'gallery', side: 'north' },
+            intent: {
+              kind: 'single_container',
+              arrangementId: envelope === 'glass' ? 'largest_glass' : 'max_closed',
+              expectedOutcome: 'enclosed',
+            },
+          },
+          {
+            id: 'east_wing',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'adjacent', target: 'gallery', side: 'south' },
+            intent: {
+              kind: 'single_container',
+              arrangementId: envelope === 'glass' ? 'largest_glass' : 'max_closed',
+              expectedOutcome: 'enclosed',
+            },
+          },
+        ],
+      };
+    case 'courtyard_compound':
+      return {
+        kind: 'multi_container',
+        containers: [
+          {
+            id: 'northwest',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'origin', position: { x: 0, y: 0, z: 0 } },
+            intent: { kind: 'single_container', arrangementId, expectedOutcome: 'enclosed' },
+          },
+          {
+            id: 'northeast',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'adjacent', target: 'northwest', side: 'east' },
+            intent: { kind: 'single_container', arrangementId, expectedOutcome: 'enclosed' },
+          },
+          {
+            id: 'southwest',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'adjacent', target: 'northwest', side: 'south', gap: CONTAINER_DIMENSIONS[DefaultContainerSize.HighCube40].width },
+            intent: { kind: 'single_container', arrangementId, expectedOutcome: 'enclosed' },
+          },
+          {
+            id: 'southeast',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'adjacent', target: 'southwest', side: 'east' },
+            intent: { kind: 'single_container', arrangementId, expectedOutcome: 'enclosed' },
+          },
+        ],
+      };
+    case 'stacked_tower':
+      return {
+        kind: 'multi_container',
+        containers: [
+          {
+            id: 'base',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'origin', position: { x: 0, y: 0, z: 0 } },
+            intent: {
+              kind: 'single_container',
+              arrangementId: conceptArrangementId(envelope, 'atrium', 'none'),
+              expectedOutcome: 'enclosed',
+            },
+          },
+          {
+            id: 'upper',
+            size: DefaultContainerSize.HighCube40,
+            placement: { type: 'stack_on', target: 'base' },
+            intent: {
+              kind: 'single_container',
+              arrangementId,
+              expectedOutcome: 'enclosed',
+              stairs: { voxelIndex: 10, facing: 's' },
+            },
+          },
+        ],
+      };
+  }
+}
 
 function resolveAdjacentPosition(
   target: ResolvedNodePlacement,
@@ -292,6 +442,9 @@ function validateMultiContainerIntent(intent: MultiContainerDesignIntentSpec): s
 }
 
 export function validateDesignIntent(intent: DesignIntentSpec): string[] {
+  if (intent.kind === 'concept') {
+    return validateDesignIntent(expandConceptDesignIntent(intent));
+  }
   if (intent.kind === 'single_container') {
     return validateSingleContainerIntent(intent);
   }
@@ -383,6 +536,9 @@ export function compileMultiContainerDesignIntent(
 }
 
 export function compileDesignIntent(intent: DesignIntentSpec): DesignIntentOperation[] {
+  if (intent.kind === 'concept') {
+    return compileDesignIntent(expandConceptDesignIntent(intent));
+  }
   if (intent.kind === 'single_container') {
     return compileSingleContainerDesignIntent(intent);
   }
@@ -390,6 +546,15 @@ export function compileDesignIntent(intent: DesignIntentSpec): DesignIntentOpera
 }
 
 export function parsePromptDesignIntentSchema(schema: PromptDesignIntentSchema): DesignIntentSpec {
+  if (schema.kind === 'concept') {
+    return {
+      kind: 'concept',
+      composition: schema.composition,
+      envelope: schema.envelope,
+      circulation: schema.circulation,
+      outdoor: schema.outdoor,
+    };
+  }
   if (schema.kind === 'single_container') {
     return {
       kind: 'single_container',

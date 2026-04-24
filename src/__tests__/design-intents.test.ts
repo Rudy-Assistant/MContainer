@@ -149,6 +149,19 @@ describe('design intent compiler', () => {
     ]);
   });
 
+  it('compiles a high-level concept intent onto the existing arrangement path', () => {
+    const operations = compileDesignIntent({
+      kind: 'concept',
+      composition: 'gallery_wings',
+      envelope: 'glass',
+      circulation: 'atrium',
+      outdoor: 'terrace',
+    });
+
+    expect(operations.map((op) => op.type)).toContain('create_container');
+    expect(operations.map((op) => op.type)).toContain('apply_single_container_intent');
+  });
+
   it('applies a multi-container intent through the store API', () => {
     const ids = useStore.getState().applyMultiContainerDesignIntent({
       kind: 'multi_container',
@@ -218,5 +231,19 @@ describe('prompt design schema parser', () => {
     expect(intent.containers[1].intent?.arrangementId).toBe('largest_glass');
     expect(intent.containers[0].intent?.arrangementId).toBe('central_atrium');
     expect(validateDesignIntent(intent)).toEqual([]);
+  });
+
+  it('parses a concept-facing schema into a validated concept intent', () => {
+    const intent = parsePromptDesignIntentSchema({
+      kind: 'concept',
+      composition: 'courtyard_compound',
+      envelope: 'glass',
+      circulation: 'atrium',
+      outdoor: 'terrace',
+    });
+
+    expect(intent.kind).toBe('concept');
+    expect(validateDesignIntent(intent)).toEqual([]);
+    expect(compileDesignIntent(intent).some((op) => op.type === 'create_container')).toBe(true);
   });
 });

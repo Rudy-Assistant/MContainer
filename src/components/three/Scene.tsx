@@ -167,23 +167,23 @@ function SunLight() {
         castShadow
         color={color}
         position={timeOfDay >= 5 && timeOfDay <= 21 ? [Math.max(sunPos.x, -80), Math.max(sunPos.y, 2.0), sunPos.z] : [20, 40, 20]}
-        intensity={Math.min(Math.max(intensity * 0.72, 0.2), 1.3)}
+        intensity={Math.min(Math.max(intensity * 0.64, 0.18), 1.15)}
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
-        shadow-bias={-0.00015}
-        shadow-normalBias={0.0002}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
+        shadow-bias={-0.00008}
+        shadow-normalBias={0.0001}
+        shadow-camera-left={-72}
+        shadow-camera-right={72}
+        shadow-camera-top={72}
+        shadow-camera-bottom={-72}
         shadow-camera-near={0.5}
-        shadow-camera-far={140}
+        shadow-camera-far={180}
       />
       <ambientLight
-        intensity={Math.max(intensity * 0.16, 0.08)}
-        color={timeOfDay > 5 && timeOfDay < 21 ? 0xd0e0f8 : 0x080818}
+        intensity={Math.max(intensity * 0.12, 0.06)}
+        color={timeOfDay > 5 && timeOfDay < 21 ? 0xc7d6ea : 0x080818}
       />
       <hemisphereLight
-        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.14, 0.06)]}
+        args={[hemiSkyColor, hemiGroundColor, Math.max(intensity * 0.1, 0.05)]}
       />
     </>
   );
@@ -501,8 +501,8 @@ export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
   return {
-    rayleigh: deepTwilight ? 3.0 : goldenHour ? 2.35 : 2.6,
-    turbidity: deepTwilight ? 5.0 : goldenHour ? 2.4 : 0.8,
+    rayleigh: deepTwilight ? 3.0 : goldenHour ? 2.4 : 2.8,
+    turbidity: deepTwilight ? 5.0 : goldenHour ? 2.5 : 1.1,
     mieCoefficient: goldenHour ? 0.0025 : 0.0005,
     mieDirectionalG: goldenHour ? 0.72 : 0.65,
   };
@@ -532,7 +532,7 @@ function SkyDome() {
       ? 0x1a1a3e
       : isGoldenHourTime(timeOfDay)
         ? 0xc48040
-        : 0x4a8ac0;  // Richer blue background for clearer sky
+        : 0x3c719c;  // Slightly deeper blue to avoid washed-out midday sky
 
   const bgColor = useMemo(() => new THREE.Color(bgHex), [bgHex]);
 
@@ -597,10 +597,10 @@ function GroundContactShadows() {
   return (
     <ContactShadows
       position={[0, 0.015, 0]}
-      opacity={0.16}
-      scale={140}
-      blur={2.2}
-      far={70}
+      opacity={0.22}
+      scale={160}
+      blur={1.8}
+      far={90}
       resolution={1024}
       color="#000000"
     />
@@ -1409,7 +1409,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
       <ValidationSubscriber />
 
       {/* Phase 8: HDRI environment for PBR reflections (visible corrugation reflections) */}
-      <TimeOfDayEnvironment intensity={0.28} />
+      <TimeOfDayEnvironment intensity={0.2} />
 
       {/* Distance fog — softens horizon edge */}
       <SceneFog />
@@ -2078,7 +2078,7 @@ function WalkthroughScene() {
       <GroundManager />
 
       {/* Phase 8: HDRI environment for PBR reflections */}
-      <TimeOfDayEnvironment intensity={0.28} />
+      <TimeOfDayEnvironment intensity={0.2} />
 
       {visibleContainers.map((container) => (
         <ContainerMesh key={container.id} container={container} />

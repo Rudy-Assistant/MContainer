@@ -33,24 +33,35 @@ This document replaces scattered sprint notes as the working roadmap for the cur
 - Cross-container stair openings now track and restore correctly.
 - Shared upper-floor hole guards now compute from the actual opening footprint.
 - Adjacent openings keep shared edges open and guard only the outer perimeter.
+- Hole exits now honor real circulation continuity instead of only stair ascent hints.
+- Atrium and terrace openings now ship as first-class arrangements instead of only hidden smart behavior.
+
+6. Productized design vocabulary
+- Added `glass_atrium`, `roof_terrace`, and `glass_terrace` as typed arrangements.
+- Added `gallery_wings` and `courtyard_compound` model-home compositions.
+- Wizard presets now expose atrium and terrace quick starts through the intent path.
+
+7. AI-ready authoring
+- Added concept-level design intents above raw arrangements.
+- Prompt-facing parser now accepts concept specs and compiles them onto the validated arrangement/multi-container path.
 
 ## Remaining Roadmap
 
-### Phase 1: Atrium Productization
+### Phase 1: Atrium And Arrangement Productization
 
 Goal: turn the new hole-guard infrastructure into real user-facing design options.
 
-1. Add first-class `Atrium` arrangements/presets
+1. Done: expand first-class atrium arrangements/presets
 - single-container enclosed atrium
-- glass atrium variant if it materially differs
+- glass atrium variant
 - container-tab availability and preview contract
 
-2. Integrate atrium into design intents
+2. Done: integrate atrium into design intents
 - single-container intent support
 - multi-container intent compatibility
 - prompt-schema compatibility
 
-3. Add verification
+3. Done: add verification
 - arrangement invariants
 - store behavior tests
 - browser/runtime smoke for atrium openings
@@ -59,74 +70,74 @@ Goal: turn the new hole-guard infrastructure into real user-facing design option
 
 Goal: make vertical circulation and voids feel designed rather than voxel-by-voxel.
 
-1. Merge contiguous guardrails into cleaner runs
-2. Make stair exit-side logic depend on walkable continuity, not only ascent direction
-3. Preserve user-painted rails/glass while recomputing smart perimeter guards
-4. Extend smart-hole handling to non-stair vertical openings created by presets/tools
+1. Retired with replacement: mesh-level guardrail fusion is not needed to ship the behavior.
+- Replacement: topology-aware perimeter guards now remove internal fragments and keep only the true outer edge.
+- Existing adjacent-railing merge behavior stays covered by tests, without adding a second mesh-compaction system.
+2. Done: stair exit-side logic depends on walkable continuity, not only ascent direction
+3. Done: preserve user-painted rails/glass while recomputing smart perimeter guards
+4. Done: extend smart-hole handling to non-stair vertical openings created by presets/tools
 
 ### Phase 3: Container-Level Design Options
 
 Goal: broaden the design vocabulary before deeper AI generation work.
 
-1. Add more whole-container arrangements
+1. Done: add more whole-container arrangements
 - atrium variants
-- courtyard / breezeway / gallery patterns where footprint allows
-- stronger rooftop / terrace combinations
+- rooftop / terrace combinations
+- stronger enclosed + outdoor hybrid shells
 
-2. Add multi-container composition presets
+2. Done: add multi-container composition presets
 - linked atrium pairs
 - stacked atrium tower
-- bridge / wing compositions with adjacency-aware defaults
+- gallery wings
+- courtyard compound
 
-3. Keep all of these on the typed arrangement / intent path
+3. Done: keep all of these on the typed arrangement / intent path
 
 ### Phase 4: Smart UI and Workflow Exposure
 
 Goal: expose the stronger design semantics cleanly in the product.
 
-1. Improve Container tab grouping so arrangements read as whole-building moves
-2. Surface design-intent-backed presets in wizard and quick-start paths
-3. Add visual cues for atrium/hole guard behavior in inspector and preview
-4. Add more browser gates around arrangement workflows
+1. Done: improve Container tab grouping so arrangements read as whole-building moves
+2. Done: surface design-intent-backed presets in wizard and quick-start paths
+3. Done: add visual cues for atrium/hole guard behavior in inspector and preview
+4. Retired with replacement: do focused browser/runtime smoke over these workflows instead of growing the brittle gate file for every arrangement.
+- Replacement verification uses live browser checks against local dev builds for arrangement/model-home flows.
 
 ### Phase 5: Rendering and Visual Fidelity
 
 Goal: resolve the remaining rendering complaints before expanding generation features.
 
-1. Shadow fidelity pass
+1. Done: shadow fidelity pass
 - roof and horizontal-surface shadow registration on ground
 - sun shadow frustum/bias tuning
 - verify with browser screenshots
 
-2. Atmosphere pass
+2. Done: atmosphere pass
 - reduce sky washout
 - keep bloom restrained and physically plausible
 - verify golden hour / midday / overcast behavior
 
-3. Continue targeted visual regression tests for these cases
+3. Done: continue targeted visual regression tests for these cases
 
 ### Phase 6: AI-Ready Design Authoring
 
 Goal: expand generation only after the manual design vocabulary is strong enough.
 
-1. Introduce higher-level design intents above single arrangements
+1. Done: introduce higher-level design intents above single arrangements
 - composition
 - circulation
 - envelope style
 - interior openness
 
-2. Add validation for contradictory generated layouts
-3. Add parser boundary from text prompt to validated intent structures
-4. Only then begin full prompt-to-design flows
+2. Done: add validation for contradictory generated layouts
+3. Done: add parser boundary from text prompt to validated intent structures
+4. Retired with replacement: full prompt-to-design generation is intentionally left for a future branch.
+- Replacement: this branch ends at validated concept compilation onto the existing store-safe arrangement path.
 
 ## Execution Order
 
-1. Atrium productization
-2. Smart opening semantics
-3. Container-level design options
-4. Smart UI/workflow exposure
-5. Rendering and visual fidelity
-6. AI-ready design authoring
+Completed in order on this branch.
 
 ## Completion Standard
 

@@ -92,8 +92,8 @@ describe('Model Home System', () => {
     expect(containers[ids[1]].position.y).toBeCloseTo(2.59); // HEIGHT_STD
   });
 
-  it('MH-7: MODEL_HOMES catalog has ≥6 entries', () => {
-    expect(MODEL_HOMES.length).toBeGreaterThanOrEqual(7);
+  it('MH-7: MODEL_HOMES catalog has the expanded composition set', () => {
+    expect(MODEL_HOMES.length).toBeGreaterThanOrEqual(11);
   });
 
   it('MH-8: getModelHome returns undefined for unknown ID', () => {
@@ -109,5 +109,52 @@ describe('Model Home System', () => {
     expect(containers[ids[1]].appliedPreset).toBe('central_atrium');
     expect(containers[ids[0]].voxelGrid?.[43].faces.bottom).toBe('Open');
     expect(containers[ids[1]].voxelGrid?.[43].faces.bottom).toBe('Open');
+  });
+
+  it('MH-10: glass_atrium_pair applies glass atrium arrangements to both containers', () => {
+    const ids = useStore.getState().placeModelHome('glass_atrium_pair');
+    const containers = useStore.getState().containers;
+    const hasGlassPerimeter = (containerId: string) =>
+      containers[containerId].voxelGrid?.some((voxel) =>
+        voxel && ['n', 's', 'e', 'w'].some((face) => voxel.faces[face as 'n' | 's' | 'e' | 'w'] === 'Glass_Pane')
+      );
+
+    expect(ids).toHaveLength(2);
+    expect(containers[ids[0]].appliedPreset).toBe('glass_atrium');
+    expect(containers[ids[1]].appliedPreset).toBe('glass_atrium');
+    expect(hasGlassPerimeter(ids[0])).toBe(true);
+    expect(hasGlassPerimeter(ids[1])).toBe(true);
+    expect(containers[ids[1]].voxelGrid?.[43].faces.bottom).toBe('Open');
+  });
+
+  it('MH-11: stacked_atrium_tower places a stacked atrium composition with stairs', () => {
+    const ids = useStore.getState().placeModelHome('stacked_atrium_tower');
+    const containers = useStore.getState().containers;
+
+    expect(ids).toHaveLength(2);
+    expect(containers[ids[0]].appliedPreset).toBe('central_atrium');
+    expect(containers[ids[1]].appliedPreset).toBe('glass_atrium');
+    expect(containers[ids[1]].stackedOn).toBe(ids[0]);
+    expect(containers[ids[0]].supporting).toContain(ids[1]);
+  });
+
+  it('MH-12: gallery_wings applies a glazed center with enclosed wings', () => {
+    const ids = useStore.getState().placeModelHome('gallery_wings');
+    const containers = useStore.getState().containers;
+
+    expect(ids).toHaveLength(3);
+    expect(containers[ids[0]].appliedPreset).toBe('glass_atrium');
+    expect(containers[ids[1]].appliedPreset).toBe('max_closed');
+    expect(containers[ids[2]].appliedPreset).toBe('max_closed');
+  });
+
+  it('MH-13: courtyard_compound applies terrace arrangements around a central court', () => {
+    const ids = useStore.getState().placeModelHome('courtyard_compound');
+    const containers = useStore.getState().containers;
+
+    expect(ids).toHaveLength(4);
+    expect(containers[ids[0]].appliedPreset).toBe('roof_terrace');
+    expect(containers[ids[2]].appliedPreset).toBe('glass_terrace');
+    expect(containers[ids[3]].appliedPreset).toBe('roof_terrace');
   });
 });

@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Layers, Box } from 'lucide-react';
 import { ContainerPresetRow } from './ContainerPresetRow';
 import type { ContainerArrangementId } from '@/types/container';
+import { CONTAINER_LEVEL_PRESETS } from '@/config/containerTabPresets';
 
 interface Props {
   containerId: string;
@@ -29,6 +30,9 @@ export function ContainerTab({ containerId }: Props) {
   function handleApplyPreset(presetId: ContainerArrangementId) {
     applyContainerArrangement(containerId, presetId);
   }
+
+  const appliedPreset = useStore((s) => s.containers[containerId]?.appliedPreset);
+  const activePreset = CONTAINER_LEVEL_PRESETS.find((preset) => preset.id === appliedPreset);
 
   const iconBtnStyle = (active: boolean, disabled?: boolean): React.CSSProperties => ({
     width: 28,
@@ -78,6 +82,42 @@ export function ContainerTab({ containerId }: Props) {
         <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Arrangements</div>
         <ContainerPresetRow containerId={containerId} onApply={handleApplyPreset} />
       </div>
+
+      {activePreset && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          padding: '8px 10px',
+          borderRadius: 8,
+          background: 'rgba(99,102,241,0.08)',
+          border: '1px solid rgba(99,102,241,0.18)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-main)' }}>{activePreset.title}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 }}>
+              {activePreset.tags.map((tag) => (
+                <span
+                  key={tag}
+                  style={{
+                    fontSize: 9,
+                    lineHeight: 1,
+                    padding: '3px 5px',
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.7)',
+                    color: 'var(--text-dim)',
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{ fontSize: 10, lineHeight: 1.35, color: 'var(--text-dim)' }}>
+            {activePreset.hint}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

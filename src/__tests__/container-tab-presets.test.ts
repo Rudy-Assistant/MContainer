@@ -29,5 +29,15 @@ describe('container-level preset application', () => {
     expect(preset).toBeDefined();
     expect(preset?.label).toBe('Atrium');
     expect(preset?.faces.top).toBe('Solid_Steel');
+    expect(preset?.category).toBe('Atrium');
+  });
+
+  it('groups glass atrium and outdoor presets by design intent', () => {
+    expect(CONTAINER_LEVEL_PRESETS.find((entry) => entry.id === 'glass_atrium')?.category).toBe('Atrium');
+    expect(CONTAINER_LEVEL_PRESETS.find((entry) => entry.id === 'roof_terrace')?.category).toBe('Terrace');
+    expect(CONTAINER_LEVEL_PRESETS.find((entry) => entry.id === 'glass_terrace')?.category).toBe('Terrace');
+    expect(CONTAINER_LEVEL_PRESETS.find((entry) => entry.id === 'largest_glass')?.category).toBe('Enclosed');
+    expect(CONTAINER_LEVEL_PRESETS.find((entry) => entry.id === 'wraparound_deck')?.category).toBe('Outdoor');
+    expect(CONTAINER_LEVEL_PRESETS.find((entry) => entry.id === 'retract_extensions')?.category).toBe('Reset');
   });
 });
