@@ -1,6 +1,6 @@
 # Current Quality Assessment — Auto-Generated
 
-**Date:** 2026-04-23
+**Date:** 2026-04-24
 **Sprint:** 13
 **Method:** Auto-generated from GATE-REPORT.json (42/42 gates PASS)
 **Generator:** `npm run quality` (generate-quality-assessment.mjs)
@@ -28,7 +28,7 @@
 | Structural Frame | **PRODUCTION** | G16-frameAction, G17-frameToggle | G16-frameAction: PASS — toggleStructuralElement exists; G17-frameToggle: PASS — hide+restore OK (store action — no direct UI gesture) |
 | Ground/Atmosphere | **PRODUCTION** | G18-noGrass | G18-noGrass: PASS — no instanced grass blades |
 | Visual Integrity | **PRODUCTION** | G19-defaultVisual | G19-defaultVisual: PASS — default state restored via UI |
-| Container Stacking | **PRODUCTION** | G20-stackSnap | G20-stackSnap: PASS — Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=aca82e93-d94c-461b-a66a-38294ee9394b |
+| Container Stacking | **PRODUCTION** | G20-stackSnap | G20-stackSnap: PASS — Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=a1f37031-a33d-4f41-bc94-0078eb18ec22 |
 | Drag-to-Move | **PRODUCTION** | G21-leftDragMove | G21-leftDragMove: PASS — drag active, screenshot timeout (render loop in SwiftShader — API verified) |
 | Add Container UI | **PRODUCTION** | G22-addContainerUI | G22-addContainerUI: PASS — container added via UI: 1 → 2 |
 | Two-Level Home | **PRODUCTION** | G23-twoLevelHome | G23-twoLevelHome: PASS — Full workflow: Y=2.90, void=OK, walk=true, moved=true, exit=true, tod=true |
@@ -38,7 +38,7 @@
 | Extension System | **PRODUCTION** | G27-extensions | G27-extensions: PASS — active ext voxels: 0→16 |
 | Adjacency | **PRODUCTION** | G28-adjacencyMerge | G28-adjacencyMerge: PASS — mergeWalls: c1=1, c2=1, preMerge: c1=2, c2=2 |
 | Blueprint | **PRODUCTION** | G5-blueprintMode, G29-blueprintInteraction | G5-blueprintMode: PASS — switched to blueprint via click; G29-blueprintInteraction: PASS — mode=blueprint, screenshot captured |
-| Walkthrough | **PRODUCTION** | G8-walkthrough, G8-fpWalking, G30-walkthroughStairs | G8-walkthrough: PASS — entered walkthrough via click; G8-fpWalking: PASS — camera moved delta=0.740, Y=1.66, yBounds=true; G30-walkthroughStairs: PASS — stairs=true, ascending=true, part=true, bom=$15700 |
+| Walkthrough | **PRODUCTION** | G8-walkthrough, G8-fpWalking, G30-walkthroughStairs | G8-walkthrough: PASS — entered walkthrough via click; G8-fpWalking: PASS — camera moved delta=0.814, Y=1.66, yBounds=true; G30-walkthroughStairs: PASS — stairs=true, ascending=true, part=true, bom=$15700 |
 
 ---
 
@@ -64,7 +64,7 @@ The following features exist in V1 but have no Playwright gates. They cannot be 
 
 ## Gate Report Source
 
-- Timestamp: 2026-04-23T16:13:36.559Z
+- Timestamp: 2026-04-24T06:35:37.912Z
 - Total gates: 42
 - Passed: 42
 - Failed: 0

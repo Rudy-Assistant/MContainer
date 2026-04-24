@@ -275,31 +275,45 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
       if (!result.success) {
         console.warn('ModuHome: Invalid persisted state, using defaults:', result.error);
       }
-      // Migrate legacy stairDir → stairAscending for persisted voxels
+      // Migrate legacy stairDir and rebuild smart guard tracking without mutating
+      // persisted objects. IndexedDB/zustand hydration can hand us frozen records.
       if (state.containers) {
-        for (const container of Object.values(state.containers)) {
-          if (!container?.voxelGrid) continue;
-          for (const voxel of container.voxelGrid) {
+        const containers: Record<string, Container> = {};
+        let changed = false;
+
+        for (const [id, container] of Object.entries(state.containers)) {
+          if (!container?.voxelGrid) {
+            containers[id] = container;
+            continue;
+          }
+
+          const grid = container.voxelGrid.map((voxel) => {
             const legacyVoxel = voxel as LegacyVoxel;
-            if (legacyVoxel.stairDir && !legacyVoxel.stairAscending) {
-              legacyVoxel.stairAscending = legacyVoxel.stairDir === 'ns' ? 'n' : 'e';
+            if (!legacyVoxel.stairDir) return voxel;
+            changed = true;
+            const migratedVoxel: LegacyVoxel = { ...legacyVoxel };
+            if (!migratedVoxel.stairAscending) {
+              migratedVoxel.stairAscending = migratedVoxel.stairDir === 'ns' ? 'n' : 'e';
             }
-            delete legacyVoxel.stairDir;
-          }
+            delete migratedVoxel.stairDir;
+            return migratedVoxel as Voxel;
+          });
+
+          const rc: Pick<Container, '_smartRailingChanges'> = { _smartRailingChanges: undefined };
+          const hc: Pick<Container, '_smartHoleGuardChanges'> = { _smartHoleGuardChanges: undefined };
+          recomputeSmartRailings(grid, rc);
+          recomputeSmartHoleGuards(grid, hc);
+          containers[id] = {
+            ...container,
+            voxelGrid: grid,
+            _smartRailingChanges: rc._smartRailingChanges,
+            _smartHoleGuardChanges: hc._smartHoleGuardChanges,
+          };
+          changed = true;
         }
-      }
-      // Rebuild smart railing / hole-guard tracking from persisted voxel state.
-      if (state.containers) {
-        for (const container of Object.values(state.containers)) {
-          if (container.voxelGrid) {
-            const grid = [...container.voxelGrid];
-            const rc: Pick<Container, '_smartRailingChanges'> = { _smartRailingChanges: undefined };
-            const hc: Pick<Container, '_smartHoleGuardChanges'> = { _smartHoleGuardChanges: undefined };
-            recomputeSmartRailings(grid, rc);
-            recomputeSmartHoleGuards(grid, hc);
-            container._smartRailingChanges = rc._smartRailingChanges;
-            container._smartHoleGuardChanges = hc._smartHoleGuardChanges;
-          }
+
+        if (changed) {
+          useStore.setState({ containers });
         }
       }
     }

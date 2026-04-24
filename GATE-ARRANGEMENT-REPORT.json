@@ -1,0 +1,183 @@
+{
+  "generatedAt": "2026-04-24T06:25:15.268Z",
+  "baseUrl": "http://localhost:3000",
+  "results": [
+    {
+      "name": "max_closed",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "max_closed",
+        "active": 64,
+        "glassFaces": 0,
+        "railingFaces": 0,
+        "openTop": 0,
+        "openBottomUpper": 0
+      },
+      "screenshot": {
+        "uniqueBuckets": 92,
+        "dominantRatio": 0.199,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "largest_glass",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "largest_glass",
+        "active": 64,
+        "glassFaces": 24,
+        "railingFaces": 0,
+        "openTop": 0,
+        "openBottomUpper": 0
+      },
+      "screenshot": {
+        "uniqueBuckets": 95,
+        "dominantRatio": 0.206,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "central_atrium",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "central_atrium",
+        "active": 64,
+        "glassFaces": 0,
+        "railingFaces": 8,
+        "openTop": 4,
+        "openBottomUpper": 4
+      },
+      "screenshot": {
+        "uniqueBuckets": 93,
+        "dominantRatio": 0.203,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "glass_atrium",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "glass_atrium",
+        "active": 64,
+        "glassFaces": 24,
+        "railingFaces": 8,
+        "openTop": 4,
+        "openBottomUpper": 4
+      },
+      "screenshot": {
+        "uniqueBuckets": 101,
+        "dominantRatio": 0.195,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "roof_terrace",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "roof_terrace",
+        "active": 52,
+        "glassFaces": 0,
+        "railingFaces": 24,
+        "openTop": 20,
+        "openBottomUpper": 0
+      },
+      "screenshot": {
+        "uniqueBuckets": 92,
+        "dominantRatio": 0.199,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "glass_terrace",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "glass_terrace",
+        "active": 52,
+        "glassFaces": 24,
+        "railingFaces": 24,
+        "openTop": 20,
+        "openBottomUpper": 0
+      },
+      "screenshot": {
+        "uniqueBuckets": 95,
+        "dominantRatio": 0.206,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "wraparound_deck",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "wraparound_deck",
+        "active": 44,
+        "glassFaces": 0,
+        "railingFaces": 24,
+        "openTop": 0,
+        "openBottomUpper": 0
+      },
+      "screenshot": {
+        "uniqueBuckets": 107,
+        "dominantRatio": 0.195,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "wraparound_patio",
+      "type": "arrangement",
+      "status": "pass",
+      "summary": {
+        "arrangementId": "wraparound_patio",
+        "active": 44,
+        "glassFaces": 0,
+        "railingFaces": 32,
+        "openTop": 20,
+        "openBottomUpper": 0
+      },
+      "screenshot": {
+        "uniqueBuckets": 107,
+        "dominantRatio": 0.195,
+        "brightRatio": 0.201
+      }
+    },
+    {
+      "name": "gallery_wings",
+      "type": "model-home",
+      "status": "pass",
+      "placed": 3,
+      "screenshot": {
+        "uniqueBuckets": 93,
+        "dominantRatio": 0.221,
+        "brightRatio": 0.211
+      }
+    },
+    {
+      "name": "courtyard_compound",
+      "type": "model-home",
+      "status": "pass",
+      "placed": 4,
+      "screenshot": {
+        "uniqueBuckets": 100,
+        "dominantRatio": 0.216,
+        "brightRatio": 0.222
+      }
+    },
+    {
+      "name": "stacked_atrium_tower",
+      "type": "model-home",
+      "status": "pass",
+      "placed": 2,
+      "screenshot": {
+        "uniqueBuckets": 107,
+        "dominantRatio": 0.208,
+        "brightRatio": 0.214
+      }
+    }
+  ]
+}

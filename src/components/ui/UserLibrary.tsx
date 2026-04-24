@@ -16,8 +16,10 @@ import { getSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import { CssVoxelIcon } from "@/components/ui/SmartHotbar";
 import { LIBRARY_PRESETS, PRESET_SECTIONS } from "@/config/libraryPresets";
 import { MODEL_HOMES } from "@/config/modelHomes";
+import { CONTAINER_ARRANGEMENT_SPECS } from "@/config/containerArrangements";
 import { Trash2, Box } from "lucide-react";
-import { ContainerSize } from "@/types/container";
+import { ContainerSize, type ContainerArrangementId } from "@/types/container";
+import { ArrangementThumbnailSVG } from "@/components/ui/svg/ArrangementThumbnailSVG";
 
 const TEXT     = "#1e293b";
 const TEXT_DIM = "#64748b";
@@ -151,6 +153,58 @@ function ContainerCard({
   );
 }
 
+function DesignCard({
+  label,
+  subtitle,
+  thumbnail,
+  accent,
+  onClick,
+  testId,
+}: {
+  label: string;
+  subtitle: string;
+  thumbnail: React.ReactNode;
+  accent: string;
+  onClick: () => void;
+  testId: string;
+}) {
+  return (
+    <button
+      data-testid={testId}
+      onClick={onClick}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "74px 1fr",
+        alignItems: "center",
+        gap: "9px",
+        padding: "7px 8px",
+        borderRadius: "8px",
+        border: `1px solid ${BORDER}`,
+        background: CARD,
+        cursor: "pointer",
+        textAlign: "left",
+        transition: "all 120ms ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = accent;
+        e.currentTarget.style.background = `${accent}08`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = BORDER;
+        e.currentTarget.style.background = CARD;
+      }}
+    >
+      {thumbnail}
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: TEXT }}>{label}</span>
+        <span style={{ display: "block", fontSize: "9px", color: TEXT_DIM, lineHeight: 1.25, marginTop: 2 }}>
+          {subtitle}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 // ── SIZE LABELS ─────────────────────────────────────────────
 const SIZE_LABELS: Record<ContainerSize, string> = {
   [ContainerSize.Standard20]: "20ft",
@@ -216,54 +270,60 @@ export default function UserLibrary() {
   const hasContainers = libraryContainers.length > 0;
 
   const placeModelHome = useStore((s) => s.placeModelHome);
+  const applyContainerArrangement = useStore((s) => s.applyContainerArrangement);
+  const addContainer = useStore((s) => s.addContainer);
+  const selectContainer = useStore((s) => s.select);
+
+  const applyArrangementDesign = useCallback((arrangementId: ContainerArrangementId) => {
+    const store = useStore.getState();
+    const targetId = store.selection[0] ?? Object.keys(store.containers)[0] ?? addContainer(ContainerSize.HighCube40);
+    if (!targetId) return;
+    store.setViewLevel(null);
+    applyContainerArrangement(targetId, arrangementId);
+    selectContainer(targetId);
+  }, [addContainer, applyContainerArrangement, selectContainer]);
+
+  const replaceWithModelHome = useCallback((modelId: string) => {
+    const store = useStore.getState();
+    const ids = Object.keys(store.containers);
+    if (ids.length > 0 && !window.confirm('This will replace your current design. Continue?')) return;
+    ids.forEach(id => store.removeContainer(id));
+    store.setViewLevel(null);
+    const placed = placeModelHome(modelId);
+    if (placed[0]) selectContainer(placed[0]);
+  }, [placeModelHome, selectContainer]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      {/* ── Designs ── */}
+      <SectionLabel>Designs</SectionLabel>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        {CONTAINER_ARRANGEMENT_SPECS.filter((spec) => spec.kind !== 'retract').map((spec) => (
+          <DesignCard
+            key={spec.id}
+            testId={`arrangement-design-${spec.id}`}
+            label={spec.label}
+            subtitle={spec.hint}
+            accent={spec.perimeterWall === 'Glass_Pane' ? "#2563eb" : spec.upperLevelMode === 'extensions_only' ? "#0f766e" : "#334155"}
+            thumbnail={<ArrangementThumbnailSVG arrangement={spec} size={74} />}
+            onClick={() => applyArrangementDesign(spec.id)}
+          />
+        ))}
+      </div>
+
       {/* ── Model Homes ── */}
       <SectionLabel>Model Homes</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
         {MODEL_HOMES.map((model) => (
-          <div
+          <DesignCard
             key={model.id}
-            data-testid={`model-home-${model.id}`}
-            onClick={() => {
-              const store = useStore.getState();
-              const ids = Object.keys(store.containers);
-              if (ids.length > 0 && !window.confirm('This will replace your current design. Continue?')) return;
-              ids.forEach(id => store.removeContainer(id));
-              placeModelHome(model.id);
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: "8px",
-              padding: "6px 8px", borderRadius: "7px",
-              border: `1px solid ${BORDER}`,
-              background: CARD,
-              cursor: "pointer",
-              transition: "all 100ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#10b981";
-              e.currentTarget.style.background = "#10b98108";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = BORDER;
-              e.currentTarget.style.background = CARD;
-            }}
-          >
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 26, height: 26, borderRadius: 5,
-              background: "#10b98112", fontSize: "14px",
-            }}>
-              {model.icon}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "11px", fontWeight: 600, color: TEXT }}>{model.label}</div>
-              <div style={{ fontSize: "9px", color: TEXT_DIM }}>
-                {model.containers.length} container{model.containers.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-          </div>
+            testId={`model-home-${model.id}`}
+            label={model.label}
+            subtitle={`${model.containers.length} container${model.containers.length !== 1 ? 's' : ''} · ${model.description}`}
+            accent="#10b981"
+            thumbnail={<ArrangementThumbnailSVG model={model} size={74} />}
+            onClick={() => replaceWithModelHome(model.id)}
+          />
         ))}
       </div>
 

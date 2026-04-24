@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-23T16:13:36.559Z",
+  "timestamp": "2026-04-24T06:35:37.912Z",
   "sprint": 13,
   "gates": [
     {
@@ -20,7 +20,7 @@
     {
       "gate": "G3b-webglAlive",
       "status": "PASS",
-      "msg": "WebGL alive, scene has 406 meshes (pixel variance low in headless — SwiftShader limitation)"
+      "msg": "WebGL alive, scene has 407 meshes (pixel variance low in headless — SwiftShader limitation)"
     },
     {
       "gate": "G4-resetButton",
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.740, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.814, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=aca82e93-d94c-461b-a66a-38294ee9394b"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=a1f37031-a33d-4f41-bc94-0078eb18ec22"
     },
     {
       "gate": "G21-leftDragMove",

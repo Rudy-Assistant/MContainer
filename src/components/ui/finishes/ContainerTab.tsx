@@ -83,6 +83,58 @@ export function ContainerTab({ containerId }: Props) {
         <ContainerPresetRow containerId={containerId} onApply={handleApplyPreset} />
       </div>
 
+      <div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Openings</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <button
+            data-testid="btn-opening-atrium"
+            type="button"
+            title="Create a guarded central atrium opening"
+            onClick={() => handleApplyPreset('central_atrium')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              minHeight: 30,
+              padding: '5px 7px',
+              borderRadius: 7,
+              border: `1px solid ${appliedPreset === 'central_atrium' ? 'var(--accent)' : 'var(--border)'}`,
+              background: appliedPreset === 'central_atrium' ? 'rgba(37,99,235,0.1)' : 'var(--btn-bg)',
+              color: 'var(--text-main)',
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: 700,
+            }}
+          >
+            <Layers size={13} />
+            Atrium
+          </button>
+          <button
+            data-testid="btn-opening-glass-atrium"
+            type="button"
+            title="Create a guarded central atrium opening with glass perimeter walls"
+            onClick={() => handleApplyPreset('glass_atrium')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              minHeight: 30,
+              padding: '5px 7px',
+              borderRadius: 7,
+              border: `1px solid ${appliedPreset === 'glass_atrium' ? 'var(--accent)' : 'var(--border)'}`,
+              background: appliedPreset === 'glass_atrium' ? 'rgba(37,99,235,0.1)' : 'var(--btn-bg)',
+              color: 'var(--text-main)',
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: 700,
+            }}
+          >
+            <Box size={13} />
+            Glass Void
+          </button>
+        </div>
+      </div>
+
       {activePreset && (
         <div style={{
           display: 'flex',

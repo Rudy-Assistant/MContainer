@@ -437,6 +437,25 @@ function FrameModeInvalidator() {
   return null;
 }
 
+function SceneChangeInvalidator() {
+  const { invalidate } = useThree();
+  const containers = useStore((s) => s.containers);
+  const environment = useStore((s) => s.environment);
+  const viewMode = useStore((s) => s.viewMode);
+  const viewLevel = useStore((s) => s.viewLevel);
+  const currentTheme = useStore((s) => s.currentTheme);
+  const activeStyle = useStore((s) => s.activeStyle);
+  const qualityPreset = useStore((s) => s.qualityPreset);
+
+  useEffect(() => {
+    invalidate();
+    const frame = requestAnimationFrame(() => invalidate());
+    return () => cancelAnimationFrame(frame);
+  }, [containers, environment, viewMode, viewLevel, currentTheme, activeStyle, qualityPreset, invalidate]);
+
+  return null;
+}
+
 /** Debounced validation subscriber — recomputes warnings when containers change */
 function ValidationSubscriber() {
   const { invalidate } = useThree();
@@ -1406,6 +1425,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
       <GroundManager />
       {/* PBRTextureLoader removed — textures now loaded by materialCache at module init */}
       <FrameModeInvalidator />
+      <SceneChangeInvalidator />
       <ValidationSubscriber />
 
       {/* Phase 8: HDRI environment for PBR reflections (visible corrugation reflections) */}

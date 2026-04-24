@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-04-24T06:26:49.619Z",
+  "baseUrl": "http://localhost:3000",
+  "results": [
+    {
+      "name": "morning-glass-atrium",
+      "time": 8,
+      "arrangement": "glass_atrium",
+      "status": "pass",
+      "metrics": {
+        "skyBuckets": 33,
+        "whiteRatio": 0.655,
+        "darkRatio": 0
+      }
+    },
+    {
+      "name": "midday-glass-atrium",
+      "time": 15,
+      "arrangement": "glass_atrium",
+      "status": "pass",
+      "metrics": {
+        "skyBuckets": 38,
+        "whiteRatio": 0.696,
+        "darkRatio": 0
+      }
+    },
+    {
+      "name": "golden-roof-terrace",
+      "time": 17.5,
+      "arrangement": "roof_terrace",
+      "status": "pass",
+      "metrics": {
+        "skyBuckets": 60,
+        "whiteRatio": 0,
+        "darkRatio": 0.083
+      }
+    },
+    {
+      "name": "dusk-roof-terrace",
+      "time": 19.25,
+      "arrangement": "roof_terrace",
+      "status": "pass",
+      "metrics": {
+        "skyBuckets": 38,
+        "whiteRatio": 0,
+        "darkRatio": 0.149
+      }
+    }
+  ]
+}
