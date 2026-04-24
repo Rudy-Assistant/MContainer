@@ -40,6 +40,7 @@ type LibraryRuntimeState = LibrarySlice & {
   selection: unknown[];
   addContainer: (size: Container['size'], position: ContainerPosition, level: number, skipSmartPlacement?: boolean) => string;
   applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
+  applyContainerArrangement: (containerId: string, arrangementId: import('@/types/container').ContainerArrangementId) => void;
   setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
   stackContainer: (topId: string, bottomId: string) => boolean;
   applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w') => void;
@@ -383,6 +384,11 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         get().setAllExtensions(id, mc.extensionConfig as ExtensionConfig, true);
         t?.pause();
       }
+
+      if (mc.arrangementId) {
+        get().applyContainerArrangement(id, mc.arrangementId);
+        t?.pause();
+      }
     }
 
     // Process connections
@@ -401,9 +407,9 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       }
     }
 
-    // Auto-expand extensions on containers that don't have explicit extensionConfig
+    // Auto-expand extensions only when the model home leaves extension behavior unspecified.
     for (const [i, mc] of model.containers.entries()) {
-      if (!mc.extensionConfig || mc.extensionConfig === 'none') {
+      if (!mc.extensionConfig && !mc.arrangementId) {
         get().setAllExtensions(containerIds[i], DEFAULT_EXTENSION_CONFIG, false);
         t?.pause();
       }

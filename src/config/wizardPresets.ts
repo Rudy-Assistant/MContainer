@@ -62,6 +62,20 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     ],
   },
   {
+    id: 'atrium_home',
+    label: 'Atrium Home',
+    description: 'Double-height central atrium with guarded upper opening and enclosed shell.',
+    icon: '🕳️',
+    designIntent: {
+      kind: 'single_container',
+      arrangementId: 'central_atrium',
+      expectedOutcome: 'enclosed',
+    },
+    steps: [
+      { action: 'extensions', config: 'all_interior' },
+    ],
+  },
+  {
     id: 'studio',
     label: 'Studio + Loft',
     description: 'Glass box with internal staircase to upper level.',

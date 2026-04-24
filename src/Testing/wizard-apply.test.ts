@@ -30,4 +30,15 @@ describe('applyWizardPreset new step actions', () => {
     // Body voxel at row=1,col=1 (idx=9) should have Deck_Wood top from rooftop_deck step
     expect(grid[9]!.faces.top).toBe('Deck_Wood');
   });
+
+  it('atrium_home applies the atrium arrangement through the wizard path', () => {
+    useStore.getState().applyWizardPreset(containerId, 'atrium_home');
+    const container = useStore.getState().containers[containerId]!;
+    const grid = container.voxelGrid!;
+
+    expect(container.appliedPreset).toBe('atrium_home');
+    expect(grid[11]!.faces.top).toBe('Open');
+    expect(grid[43]!.faces.bottom).toBe('Open');
+    expect(grid[43]!.faces.n).toBe('Railing_Cable');
+  });
 });

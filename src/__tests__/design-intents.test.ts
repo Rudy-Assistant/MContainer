@@ -99,6 +99,20 @@ describe('design intent compiler', () => {
     expect(container.voxelGrid?.[27].faces.s).toBe('Door');
   });
 
+  it('applies the atrium arrangement through the design-intent path', () => {
+    const containerId = addTestContainer();
+
+    useStore.getState().applyDesignIntent(containerId, {
+      kind: 'single_container',
+      arrangementId: 'central_atrium',
+    });
+
+    const container = useStore.getState().containers[containerId];
+    expect(container.appliedPreset).toBe('central_atrium');
+    expect(container.voxelGrid?.[43].faces.bottom).toBe('Open');
+    expect(container.voxelGrid?.[43].faces.n).toBe('Railing_Cable');
+  });
+
   it('compiles a multi-container intent into create/stack/apply operations', () => {
     const operations = compileDesignIntent({
       kind: 'multi_container',
@@ -187,7 +201,7 @@ describe('prompt design schema parser', () => {
       containers: [
         {
           key: 'main',
-          arrangementId: 'max_closed',
+          arrangementId: 'central_atrium',
         },
         {
           key: 'sunroom',
@@ -202,6 +216,7 @@ describe('prompt design schema parser', () => {
     expect(intent.containers[0].size).toBe(ContainerSize.HighCube40);
     expect(intent.containers[0].placement.type).toBe('origin');
     expect(intent.containers[1].intent?.arrangementId).toBe('largest_glass');
+    expect(intent.containers[0].intent?.arrangementId).toBe('central_atrium');
     expect(validateDesignIntent(intent)).toEqual([]);
   });
 });

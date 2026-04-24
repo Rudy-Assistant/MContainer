@@ -53,6 +53,7 @@ import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
 import { evaluateContainerArrangementCell, getContainerArrangementSpec } from "@/config/containerArrangements";
+import { recomputeSmartHoleGuards, recomputeSmartRailings } from "./voxelSlice";
 import {
   compileMultiContainerDesignIntent,
   compileSingleContainerDesignIntent,
@@ -837,6 +838,23 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     if (arrangement.extensionDoorProfile) {
       get()._applyExtensionDoors(containerId, arrangement.extensionDoorProfile);
     }
+
+    set((s) => {
+      const container = s.containers[containerId];
+      if (!container?.voxelGrid) return {};
+      const grid = [...container.voxelGrid];
+      const updatedContainer: Container = { ...container, voxelGrid: grid };
+      if (get().designMode !== 'manual') {
+        recomputeSmartRailings(grid, updatedContainer);
+        recomputeSmartHoleGuards(grid, updatedContainer);
+      }
+      return {
+        containers: {
+          ...s.containers,
+          [containerId]: updatedContainer,
+        },
+      };
+    });
 
     temporalResume();
   },

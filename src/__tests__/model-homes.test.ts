@@ -93,10 +93,21 @@ describe('Model Home System', () => {
   });
 
   it('MH-7: MODEL_HOMES catalog has ≥6 entries', () => {
-    expect(MODEL_HOMES.length).toBeGreaterThanOrEqual(6);
+    expect(MODEL_HOMES.length).toBeGreaterThanOrEqual(7);
   });
 
   it('MH-8: getModelHome returns undefined for unknown ID', () => {
     expect(getModelHome('nonexistent')).toBeUndefined();
+  });
+
+  it('MH-9: atrium_gallery applies atrium arrangements to both containers', () => {
+    const ids = useStore.getState().placeModelHome('atrium_gallery');
+    const containers = useStore.getState().containers;
+
+    expect(ids).toHaveLength(2);
+    expect(containers[ids[0]].appliedPreset).toBe('central_atrium');
+    expect(containers[ids[1]].appliedPreset).toBe('central_atrium');
+    expect(containers[ids[0]].voxelGrid?.[43].faces.bottom).toBe('Open');
+    expect(containers[ids[1]].voxelGrid?.[43].faces.bottom).toBe('Open');
   });
 });

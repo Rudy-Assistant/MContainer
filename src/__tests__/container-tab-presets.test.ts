@@ -23,4 +23,11 @@ describe('container-level preset application', () => {
     expect(updated[9].faces.bottom).toBe('Deck_Wood');
     expect(updated[41].faces.top).toBe('Solid_Steel');
   });
+
+  it('exposes Atrium in the container tab preset list', () => {
+    const preset = CONTAINER_LEVEL_PRESETS.find((entry) => entry.id === 'central_atrium');
+    expect(preset).toBeDefined();
+    expect(preset?.label).toBe('Atrium');
+    expect(preset?.faces.top).toBe('Solid_Steel');
+  });
 });

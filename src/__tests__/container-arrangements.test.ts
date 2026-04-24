@@ -56,4 +56,21 @@ describe('container arrangements', () => {
     expect(grid[idx(0, 1, 1)].active).toBe(false);
     expect(grid[idx(1, 1)].faces.n).toBe('Solid_Steel');
   });
+
+  it('central_atrium opens a shared upper-floor void and guards its perimeter', () => {
+    const id = addTestContainer();
+    useStore.getState().applyContainerArrangement(id, 'central_atrium');
+    const grid = useStore.getState().containers[id].voxelGrid!;
+
+    expect(grid.filter((voxel) => voxel.active)).toHaveLength(64);
+    expect(grid[idx(1, 3)].faces.top).toBe('Open');
+    expect(grid[idx(2, 4)].faces.top).toBe('Open');
+    expect(grid[idx(1, 3, 1)].faces.bottom).toBe('Open');
+    expect(grid[idx(2, 4, 1)].faces.bottom).toBe('Open');
+    expect(grid[idx(1, 3, 1)].faces.n).toBe('Railing_Cable');
+    expect(grid[idx(1, 3, 1)].faces.e).toBe('Open');
+    expect(grid[idx(1, 3, 1)].faces.w).toBe('Railing_Cable');
+    expect(grid[idx(2, 4, 1)].faces.s).toBe('Railing_Cable');
+    expect(grid[idx(2, 4, 1)].faces.w).toBe('Open');
+  });
 });

@@ -25,4 +25,13 @@ describe('container arrangement specs', () => {
     expect(patio?.outcome).toBe('open_outdoor');
     expect(patio?.roof).toBe('Open');
   });
+
+  it('defines atrium void cells without breaking the enclosed preview contract', () => {
+    const atrium = CONTAINER_ARRANGEMENT_SPECS.find((spec) => spec.id === 'central_atrium');
+
+    expect(atrium?.outcome).toBe('enclosed');
+    expect(atrium?.voidRows).toEqual([1, 2]);
+    expect(atrium?.voidCols).toEqual([3, 4]);
+    expect(getContainerArrangementPreviewFaces(atrium!).top).toBe('Solid_Steel');
+  });
 });

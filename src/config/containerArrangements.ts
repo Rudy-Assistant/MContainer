@@ -25,6 +25,8 @@ export interface ContainerArrangementSpec {
   upperLevelRoof?: SurfaceType;
   upperLevelFloor?: SurfaceType;
   extensionDoorProfile?: ExtensionDoorProfile;
+  voidRows?: number[];
+  voidCols?: number[];
 }
 
 export interface ArrangementCellInput {
@@ -44,6 +46,10 @@ function openFaces(): VoxelFaces {
 
 function isExtensionCell(row: number, col: number): boolean {
   return row === 0 || row === 3 || col === 0 || col === 7;
+}
+
+function isVoidCell(spec: ContainerArrangementSpec, row: number, col: number): boolean {
+  return !!spec.voidRows?.includes(row) && !!spec.voidCols?.includes(col);
 }
 
 function perimeterFaces(
@@ -106,6 +112,23 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     upperLevelRoof: 'Solid_Steel',
     upperLevelFloor: 'Solid_Steel',
     extensionDoorProfile: 'all_glass_interior',
+  },
+  {
+    id: 'central_atrium',
+    label: 'Atrium',
+    title: 'Central atrium',
+    outcome: 'enclosed',
+    kind: 'structured',
+    level0Scope: 'full_footprint',
+    perimeterWall: 'Solid_Steel',
+    roof: 'Solid_Steel',
+    floor: 'Deck_Wood',
+    upperLevelMode: 'full_shell',
+    upperLevelRoof: 'Solid_Steel',
+    upperLevelFloor: 'Solid_Steel',
+    extensionDoorProfile: 'all_interior',
+    voidRows: [1, 2],
+    voidCols: [3, 4],
   },
   {
     id: 'wraparound_deck',
@@ -171,7 +194,13 @@ export function evaluateContainerArrangementCell(
     if (spec.level0Scope === 'extensions_only' && !extension) return null;
     return {
       active: true,
-      faces: perimeterFaces(row, col, spec.perimeterWall!, spec.roof!, spec.floor!),
+      faces: perimeterFaces(
+        row,
+        col,
+        spec.perimeterWall!,
+        isVoidCell(spec, row, col) ? 'Open' : spec.roof!,
+        spec.floor!,
+      ),
     };
   }
 
@@ -181,7 +210,7 @@ export function evaluateContainerArrangementCell(
       faces: {
         ...openFaces(),
         top: spec.upperLevelRoof ?? 'Solid_Steel',
-        bottom: spec.upperLevelFloor ?? 'Solid_Steel',
+        bottom: isVoidCell(spec, row, col) ? 'Open' : (spec.upperLevelFloor ?? 'Solid_Steel'),
       },
     };
   }

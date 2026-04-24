@@ -437,6 +437,7 @@ export type ContainerArrangementId =
   | 'extend_shell'
   | 'max_closed'
   | 'largest_glass'
+  | 'central_atrium'
   | 'wraparound_deck'
   | 'wraparound_patio'
   | 'retract_extensions';

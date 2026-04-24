@@ -6,7 +6,7 @@
  * and connections (adjacency / stacking).
  */
 
-import { ContainerSize } from '@/types/container';
+import { ContainerSize, type ContainerArrangementId } from '@/types/container';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -15,6 +15,7 @@ export interface ModelHomeContainer {
   size: ContainerSize;
   relativePosition: [number, number, number];    // Offset from model home origin [x, y, z]
   extensionConfig?: string;                      // 'none' | 'all_deck' | etc.
+  arrangementId?: ContainerArrangementId;
 }
 
 export interface ModelHomeConnection {
@@ -212,6 +213,34 @@ export const MODEL_HOMES: ModelHome[] = [
       { fromIndex: 2, toIndex: 3, type: 'adjacent' },
     ],
     tags: ['family', '3br', 'compound', 'large'],
+  },
+
+  // ── 7. Atrium Gallery ────────────────────────────────────
+  {
+    id: 'atrium_gallery',
+    label: 'Atrium Gallery',
+    description: 'Two adjacent 40ft containers configured as enclosed atrium volumes for double-height circulation and light.',
+    icon: '🪟',
+    containers: [
+      {
+        role: 'open_plan',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, 0],
+        extensionConfig: 'none',
+        arrangementId: 'central_atrium',
+      },
+      {
+        role: 'open_plan',
+        size: ContainerSize.Standard40,
+        relativePosition: [0, 0, WIDTH],
+        extensionConfig: 'none',
+        arrangementId: 'central_atrium',
+      },
+    ],
+    connections: [
+      { fromIndex: 0, toIndex: 1, type: 'adjacent' },
+    ],
+    tags: ['atrium', 'gallery', '2br', 'light'],
   },
 ];
 
