@@ -55,6 +55,7 @@ import {
 } from "@/types/container";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { RAYCAST_LAYERS } from "@/utils/raycastLayers";
+import { passesFaceFilter } from "@/utils/faceFilter";
 import { type ThemeId } from "@/config/themes";
 import { _themeMats, getMaterialForFace, getFrameThreeMaterial } from "@/config/materialCache";
 import type { FaceFinish } from "@/types/container";
@@ -70,6 +71,22 @@ import { computePolePositions, computeRailPositions } from "@/utils/smartPoles";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER } from "@/config/highlightColors";
 import { makePoleKey, resolveFrameProperty, type PoleShape, type RailShape } from "@/config/frameMaterials";
 import { getBox, getCyl, getPoleGeometry, getRailGeometry } from "./containerSkinGeometry";
+import { getDoorTemplate, type DoorTemplateId } from "@/config/doorTemplates";
+import { getWindowTemplate, type WindowTemplateId } from "@/config/windowTemplates";
+import { getDoorSkinMaterials, getWindowSkinMaterials } from "@/utils/doorWindowSkinMaterials";
+import type { DoorSkinId } from "@/config/doorSkins";
+import type { WindowSkinId } from "@/config/windowSkins";
+import { getShelfTemplate } from "@/config/shelfTemplates";
+import { getCabinetTemplate } from "@/config/cabinetTemplates";
+import { getCabinetrySkinMaterials } from "@/utils/cabinetrySkinMaterials";
+import { getCounterTopThreeMaterial } from "@/utils/counterTopMaterials";
+import { getFixtureTemplate } from "@/config/fixtureTemplates";
+import { getFixtureMaterials } from "@/utils/fixtureMaterials";
+import { getDecorTemplate } from "@/config/decorTemplates";
+import { getDecorMaterials } from "@/utils/decorMaterials";
+import { getFloorOverlay, getCeilingOverlay } from "@/config/floorOverlays";
+import type { FixtureConfig, DecorConfig } from "@/types/container";
+import type { ShelfConfig, CabinetConfig, CabinetryAnchor } from "@/types/container";
 import LightFixture from './LightFixture';
 import ElectricalPlate from './ElectricalPlate';
 import { formRegistry } from "@/config/formRegistry";
@@ -392,25 +409,65 @@ function ConcreteFace({ w, h, d }: { w: number; h: number; d: number }) {
   );
 }
 
-/** Half-Fold face — half-height fold extension (1.45m). Renders as a steel
- *  panel covering the top half, with the bottom half open (fold-down hint). */
-function HalfFoldFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS: boolean }) {
+/**
+ * Hinged-wall rotation sign for the bottom (fold-down) panel. The renderer
+ * positions wall faces in world space without rotating the face geometry, so
+ * the panel needs to know which way is "outward" to fold the right direction:
+ *   's' wall → outward = +Z, panel rotates -π/2 around X (sign = -1)
+ *   'n' wall → outward = -Z, panel rotates +π/2 around X (sign = +1)
+ *   'e' wall → outward = +X, panel rotates +π/2 around Z (sign = +1)
+ *   'w' wall → outward = -X, panel rotates -π/2 around Z (sign = -1)
+ * Top panel (gull-wing awning) uses the opposite sign.
+ */
+function hingedBottomSign(dir: 'n' | 's' | 'e' | 'w' | null): number {
+  if (!dir) return -1;
+  return (dir === 'n' || dir === 'e') ? 1 : -1;
+}
+
+/** Half-Fold face — half-height fold extension (1.45m). Top half is a steel
+ *  panel; bottom half is a wood deck plank that folds down on a horizontal
+ *  hinge at mid-height. `openAmount` drives the rotation: 0 = vertical wall
+ *  (closed), 1 = horizontal deck folded outward. The animation is clamped
+ *  and lerped each frame so external openAmount changes ease in. */
+function HalfFoldFace({
+  w, h, d, isNS, dir, openAmount = 0,
+}: {
+  w: number; h: number; d: number; isNS: boolean;
+  dir: 'n' | 's' | 'e' | 'w' | null;
+  openAmount?: number;
+}) {
   const halfH = h / 2;
-  // Top half: steel panel
-  // Bottom half: wood deck plank (hinting at fold-down extension)
+  const sign = hingedBottomSign(dir);
+  const target = (openAmount < 0 ? 0 : openAmount > 1 ? 1 : openAmount) * (Math.PI / 2) * sign;
+  const pivotRef = useRef<THREE.Group>(null);
+  const currentRef = useRef(target);
+
+  useFrame((_, delta) => {
+    const lerp = 1 - Math.pow(0.001, delta);
+    currentRef.current += (target - currentRef.current) * lerp;
+    const g = pivotRef.current;
+    if (!g) return;
+    if (isNS) g.rotation.x = currentRef.current;
+    else      g.rotation.z = currentRef.current;
+  });
+
   return (
     <>
-      {/* Upper half — steel panel */}
+      {/* Upper half — static steel panel */}
       <group position={[0, halfH / 2, 0]}>
         <SteelFace w={w} h={halfH} d={d} />
       </group>
-      {/* Lower half — wood deck, planks horizontal (grain runs across face width) */}
-      <group position={[0, -halfH / 2, 0]}>
-        {isNS
-          ? <mesh geometry={getBox(w, DECK_THICK, halfH)} material={mWood} castShadow receiveShadow raycast={nullRaycast} />
-          : <mesh geometry={getBox(DECK_THICK, halfH, w)} material={mWood} castShadow receiveShadow raycast={nullRaycast} />}
+      {/* Lower half — fold-down wood deck panel. The pivot group sits at the
+          hinge line (y=0) and the panel mesh hangs from it at y=-halfH/2.
+          Rotation around X (NS) or Z (EW) swings the panel outward. */}
+      <group ref={pivotRef} position={[0, 0, 0]}>
+        <mesh
+          position={[0, -halfH / 2, 0]}
+          geometry={isNS ? getBox(w, halfH, d) : getBox(d, halfH, w)}
+          material={mWood} castShadow receiveShadow raycast={nullRaycast}
+        />
       </group>
-      {/* Hinge line at center */}
+      {/* Hinge line at mid-height */}
       <mesh position={[0, 0, 0]}
         geometry={isNS ? getBox(w, 0.03, PANEL_THICK + 0.01) : getBox(PANEL_THICK + 0.01, 0.03, d)}
         material={mFrame} castShadow raycast={nullRaycast} />
@@ -418,31 +475,61 @@ function HalfFoldFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS
   );
 }
 
-/** Gull-Wing face — split horizontally: top 50% folds up (awning), bottom 50% folds down (deck).
- *  Rendered as upper awning panel + lower deck panel with visible hinge at center. */
-function GullWingFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS: boolean }) {
+/** Gull-Wing face — both halves animate: top folds up into an awning, bottom
+ *  folds down into a deck. Driven by the same `openAmount` (0 = closed wall,
+ *  1 = both panels horizontal). Uses two pivot groups, opposite rotation
+ *  signs (top uses -bottomSign so it swings up rather than down). */
+function GullWingFace({
+  w, h, d, isNS, dir, openAmount = 0,
+}: {
+  w: number; h: number; d: number; isNS: boolean;
+  dir: 'n' | 's' | 'e' | 'w' | null;
+  openAmount?: number;
+}) {
   // Guard: degenerate dimensions → fall back to simple steel panel
   if (!w || !h || !d || !isFinite(w) || !isFinite(h) || !isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
     return <SteelFace w={Math.max(w || 0.1, 0.1)} h={Math.max(h || 0.1, 0.1)} d={Math.max(d || 0.1, 0.1)} />;
   }
   const halfH = h / 2;
-  // Ensure cylinder height is positive (avoids degenerate geometry)
   const cylH = Math.max(halfH * 0.3, 0.01);
+  const bottomSign = hingedBottomSign(dir);
+  const topSign = -bottomSign;
+  const clampOpen = openAmount < 0 ? 0 : openAmount > 1 ? 1 : openAmount;
+  const targetBottom = clampOpen * (Math.PI / 2) * bottomSign;
+  const targetTop    = clampOpen * (Math.PI / 2) * topSign;
+  const topRef = useRef<THREE.Group>(null);
+  const botRef = useRef<THREE.Group>(null);
+  const curTop = useRef(targetTop);
+  const curBot = useRef(targetBottom);
+
+  useFrame((_, delta) => {
+    const lerp = 1 - Math.pow(0.001, delta);
+    curTop.current += (targetTop    - curTop.current) * lerp;
+    curBot.current += (targetBottom - curBot.current) * lerp;
+    const t = topRef.current; const b = botRef.current;
+    if (t) { if (isNS) t.rotation.x = curTop.current; else t.rotation.z = curTop.current; }
+    if (b) { if (isNS) b.rotation.x = curBot.current; else b.rotation.z = curBot.current; }
+  });
+
   return (
     <>
-      {/* Upper half — awning (steel exterior facing up) */}
-      <group position={[0, halfH / 2, 0]}>
-        <SteelFace w={w} h={halfH} d={d} />
+      {/* Upper half — fold-up awning panel. Pivot at hinge (y=0), mesh at y=+halfH/2. */}
+      <group ref={topRef} position={[0, 0, 0]}>
+        <group position={[0, halfH / 2, 0]}>
+          <SteelFace w={w} h={halfH} d={d} />
+        </group>
       </group>
-      {/* Lower half — deck (wood exterior facing down when folded) */}
-      <group position={[0, -halfH / 2, 0]}>
-        <SteelFace w={w} h={halfH} d={d} />
+      {/* Lower half — fold-down deck panel. Pivot at hinge (y=0), mesh at y=-halfH/2. */}
+      <group ref={botRef} position={[0, 0, 0]}>
+        <group position={[0, -halfH / 2, 0]}>
+          <SteelFace w={w} h={halfH} d={d} />
+        </group>
       </group>
-      {/* Center hinge bar */}
+      {/* Center hinge bar — sits in the wall plane regardless of openAmount */}
       <mesh position={[0, 0, 0]}
         geometry={isNS ? getBox(w, 0.04, PANEL_THICK + 0.02) : getBox(PANEL_THICK + 0.02, 0.04, d)}
         material={mFrame} castShadow raycast={nullRaycast} />
-      {/* Awning support hint (small triangular bracket marks at ends) */}
+      {/* Awning support brackets at ends */}
       {[w / 2 - 0.08, -(w / 2 - 0.08)].map((x, i) => (
         <mesh key={i}
           position={isNS ? [x, halfH / 2, 0] : [0, halfH / 2, x]}
@@ -453,18 +540,24 @@ function GullWingFace({ w, h, d, isNS }: { w: number; h: number; d: number; isNS
   );
 }
 
-/** Hinged steel door panel — supports swing (pivot) and slide modes via doorState/doorConfig. */
+/** Door panel — template (geometry/motion) × skin (materials).
+ *
+ *  Template chooses how the panels split + how they animate; skin chooses
+ *  panel/frame/hardware materials. Special-case templates:
+ *    - dutch:       horizontal split, top + bottom panels
+ *    - garage_roll: horizontal slats stacked floor → ceiling
+ *    - barn:        single panel offset + visible track rail above
+ *    - bifold:      two panels fold along a center seam (approximated as
+ *                   2-panel swing for now)
+ *    - pivot:       single panel rotates around its own vertical center axis
+ */
 function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig, doorMat }: {
   w: number; h: number; d: number; isNS: boolean;
   isOpen?: boolean; doorState?: string;
   doorConfig?: import('@/types/container').DoorConfig;
   doorMat?: THREE.MeshStandardMaterial;
 }) {
-  const doorW = w * 0.92;
-  const halfW = w / 2;
-  const halfDoor = doorW / 2;
-
-  // Resolve config: doorConfig takes precedence, fallback to legacy doorState
+  // ─ Resolve config (legacy fallback for voxels w/o doorConfig) ─
   const cfg = doorConfig ?? {
     state: (doorState ?? 'closed') as import('@/types/container').DoorState,
     hingeEdge: 'right' as const,
@@ -472,61 +565,341 @@ function DoorFace({ w, h, d, isNS, isOpen, doorState, doorConfig, doorMat }: {
     slideDirection: 'positive' as const,
     type: (doorState === 'open_slide' ? 'slide' : 'swing') as 'slide' | 'swing',
   };
-  const isSlide = cfg.type === 'slide' || cfg.state === 'open_slide';
+  const templateId: DoorTemplateId = (cfg.template as DoorTemplateId | undefined) ?? 'single_swing';
+  const skinId: DoorSkinId | undefined = cfg.skin as DoorSkinId | undefined;
+  const tmpl = getDoorTemplate(templateId);
+  const skinMats = getDoorSkinMaterials(skinId);
+
+  // Frame material: faceFinish.frameColor override > skin frame > legacy mFrame.
+  const frameMat = doorMat ?? skinMats.frame;
+  const panelMat = skinMats.panel;
+  const hardwareMat = skinMats.hardware;
+
+  // ─ Geometry constants ─
+  const halfW = w / 2;
+  const motion = tmpl.motion;
+  const isSlide = motion === 'slide' || motion === 'roll' || cfg.type === 'slide' || cfg.state === 'open_slide';
+  const isPivot = motion === 'pivot';
+  const isFold = motion === 'fold';
+  const isRoll = motion === 'roll';
+  const isDutch = templateId === 'dutch';
+  const isBarn = templateId === 'barn';
   const shouldOpen = cfg.state === 'open_swing' || cfg.state === 'open_slide' || !!isOpen;
 
-  // Pivot at wall edge so the hinge is flush with the frame
   const hingeLeft = cfg.hingeEdge === 'left';
   const pivotSign = hingeLeft ? 1 : -1;
-  const pivotOffset = isNS ? halfW * pivotSign : 0;
-  const pivotOffsetZ = isNS ? 0 : halfW * pivotSign;
-  const panelX = isNS ? halfDoor * pivotSign : 0;
-  const panelZ = isNS ? 0 : halfDoor * pivotSign;
-
-  // Swing angle: direction determines which way door opens
   const swingSign = hingeLeft ? 1 : -1;
   const dirSign = cfg.swingDirection === 'in' ? 1 : -1;
-  const targetRotY = (shouldOpen && !isSlide) ? swingSign * dirSign * (Math.PI / 2) : 0;
-
   const slideSign = cfg.slideDirection === 'positive' ? 1 : -1;
-  const slideTarget = (shouldOpen && isSlide) ? slideSign * w : 0;
 
-  const rotRef = useRef(targetRotY);
-  const slideRef = useRef(slideTarget);
+  // Refs that live across re-renders
   const groupRef = useRef<THREE.Group>(null);
+  const leftPivot = useRef<THREE.Group>(null);
+  const rightPivot = useRef<THREE.Group>(null);
+  const slideRefL = useRef(0);
+  const slideRefR = useRef(0);
+  const rollRef = useRef(0);
+  const rotL = useRef(0);
+  const rotR = useRef(0);
+
+  // Targets (recompute every render — useFrame interpolates toward them)
+  const swingMag = Math.PI / 2;
+  const targetSwing = shouldOpen && !isSlide && !isRoll && !isPivot
+    ? swingSign * dirSign * swingMag
+    : 0;
+  const targetSwingFold = shouldOpen && isFold ? swingSign * dirSign * (swingMag * 0.95) : 0;
+  const targetPivot = shouldOpen && isPivot ? dirSign * (swingMag * 0.85) : 0;
+  const targetSlide = shouldOpen && isSlide ? slideSign * w * 0.95 : 0;
+  const targetRoll = shouldOpen && isRoll ? -h * 0.95 : 0;
+
   useFrame((_, delta) => {
-    if (!groupRef.current) return;
     const lerp = 1 - Math.pow(0.001, delta);
-    rotRef.current += (targetRotY - rotRef.current) * lerp;
-    slideRef.current += (slideTarget - slideRef.current) * lerp;
-    groupRef.current.rotation.y = rotRef.current;
-    if (isNS) {
-      groupRef.current.position.x = slideRef.current;
+    rotL.current += (targetSwing - rotL.current) * lerp;
+    rotR.current += (-targetSwing - rotR.current) * lerp;
+    slideRefL.current += (targetSlide - slideRefL.current) * lerp;
+    slideRefR.current += (-targetSlide - slideRefR.current) * lerp;
+    rollRef.current += (targetRoll - rollRef.current) * lerp;
+
+    if (tmpl.panels === 1) {
+      const g = groupRef.current;
+      if (!g) return;
+      if (isPivot) {
+        g.rotation.y = targetPivot === 0 ? rotL.current * 0 : rotL.current * (targetPivot / (swingSign * dirSign * swingMag));
+      } else {
+        g.rotation.y = rotL.current;
+      }
+      if (isSlide) {
+        if (isNS) g.position.x = slideRefL.current;
+        else g.position.z = slideRefL.current;
+      } else if (isRoll) {
+        g.position.y = rollRef.current;
+      }
     } else {
-      groupRef.current.position.z = slideRef.current;
+      const lp = leftPivot.current, rp = rightPivot.current;
+      if (lp) {
+        if (isFold) {
+          lp.rotation.y = rotL.current * (targetSwingFold / Math.max(0.0001, targetSwing || swingMag));
+        } else if (isSlide) {
+          if (isNS) lp.position.x = slideRefL.current * 0.5;
+          else lp.position.z = slideRefL.current * 0.5;
+        } else {
+          lp.rotation.y = rotL.current;
+        }
+      }
+      if (rp) {
+        if (isFold) {
+          rp.rotation.y = rotR.current * (targetSwingFold / Math.max(0.0001, targetSwing || swingMag));
+        } else if (isSlide) {
+          if (isNS) rp.position.x = -slideRefL.current * 0.5;
+          else rp.position.z = -slideRefL.current * 0.5;
+        } else {
+          rp.rotation.y = rotR.current;
+        }
+      }
     }
   });
 
+  // Frame surround geometry (always rendered)
+  // Door surround = backing panel + thin proud trim casing on the room-
+  // interior side. The trim casing sits 1cm proud of the wall so it catches
+  // light realistically (a real exterior door has a ~1.25" projection at
+  // the casing).
+  const TRIM_T = 0.01;
+  const TRIM_W = 0.06;
+  const FrameSurround = (
+    <>
+      <mesh
+        geometry={isNS ? getBox(w, h, d) : getBox(d, h, w)}
+        material={frameMat}
+        castShadow
+        raycast={nullRaycast}
+      />
+      {/* Top trim header */}
+      <mesh
+        position={isNS ? [0, h / 2 - TRIM_W / 2, d / 2 + TRIM_T / 2] : [d / 2 + TRIM_T / 2, h / 2 - TRIM_W / 2, 0]}
+        geometry={isNS ? getBox(w + 2 * TRIM_W, TRIM_W, TRIM_T) : getBox(TRIM_T, TRIM_W, w + 2 * TRIM_W)}
+        material={frameMat}
+        castShadow
+        raycast={nullRaycast}
+      />
+      {/* Side trim casings */}
+      <mesh
+        position={isNS ? [-w / 2 - TRIM_W / 2, 0, d / 2 + TRIM_T / 2] : [d / 2 + TRIM_T / 2, 0, -w / 2 - TRIM_W / 2]}
+        geometry={isNS ? getBox(TRIM_W, h, TRIM_T) : getBox(TRIM_T, h, TRIM_W)}
+        material={frameMat}
+        castShadow
+        raycast={nullRaycast}
+      />
+      <mesh
+        position={isNS ? [+w / 2 + TRIM_W / 2, 0, d / 2 + TRIM_T / 2] : [d / 2 + TRIM_T / 2, 0, +w / 2 + TRIM_W / 2]}
+        geometry={isNS ? getBox(TRIM_W, h, TRIM_T) : getBox(TRIM_T, h, TRIM_W)}
+        material={frameMat}
+        castShadow
+        raycast={nullRaycast}
+      />
+    </>
+  );
+
+  // Optional barn-track rail
+  const BarnTrack = isBarn ? (
+    <mesh
+      geometry={isNS ? getBox(w * 1.4, 0.05, d * 1.4) : getBox(d * 1.4, 0.05, w * 1.4)}
+      position={[0, h / 2 + 0.06, 0]}
+      material={hardwareMat}
+      castShadow
+      raycast={nullRaycast}
+    />
+  ) : null;
+
+  // ── Single-panel shapes ──────────────────────────────────────
+  if (tmpl.panels === 1) {
+    if (isRoll) {
+      // Garage roll-up: 5 horizontal slats. Slats animate up with the group.
+      const SLAT_COUNT = 5;
+      const slatH = (h * 0.95) / SLAT_COUNT;
+      const slats = [];
+      for (let i = 0; i < SLAT_COUNT; i++) {
+        const y = -h * 0.475 + slatH * (i + 0.5);
+        slats.push(
+          <mesh
+            key={`slat_${i}`}
+            geometry={isNS ? getBox(w * 0.95, slatH * 0.92, d * 0.6) : getBox(d * 0.6, slatH * 0.92, w * 0.95)}
+            position={[0, y, 0]}
+            material={panelMat}
+            castShadow
+            raycast={nullRaycast}
+          />
+        );
+      }
+      return (
+        <>
+          {FrameSurround}
+          <group ref={groupRef}>{slats}</group>
+        </>
+      );
+    }
+
+    // Pivot: single oversized panel pivots on its own vertical center axis
+    if (isPivot) {
+      const panelW = w * 0.96;
+      return (
+        <>
+          {FrameSurround}
+          <group ref={groupRef}>
+            <mesh
+              geometry={isNS ? getBox(panelW, h * 0.96, d * 0.5) : getBox(d * 0.5, h * 0.96, panelW)}
+              material={panelMat}
+              castShadow
+              raycast={nullRaycast}
+            />
+            <mesh
+              geometry={getCyl(0.018, 0.06)}
+              position={isNS ? [panelW * 0.4, -h * 0.1, 0] : [0, -h * 0.1, panelW * 0.4]}
+              material={hardwareMat}
+              castShadow
+              raycast={nullRaycast}
+            />
+          </group>
+        </>
+      );
+    }
+
+    // Standard single swing / slide / pocket / barn — panel pivots from one edge
+    const doorW = w * 0.92;
+    const halfDoor = doorW / 2;
+    const pivotOffset = isNS ? halfW * pivotSign : 0;
+    const pivotOffsetZ = isNS ? 0 : halfW * pivotSign;
+    const panelX = isNS ? halfDoor * pivotSign : 0;
+    const panelZ = isNS ? 0 : halfDoor * pivotSign;
+
+    return (
+      <>
+        {FrameSurround}
+        {BarnTrack}
+        <group position={isSlide ? [0, 0, 0] : [-pivotOffset, 0, -pivotOffsetZ]}>
+          <group ref={groupRef}>
+            <mesh
+              geometry={isNS ? getBox(doorW, h * 0.95, d * 0.95) : getBox(d * 0.95, h * 0.95, doorW)}
+              position={isSlide ? [0, 0, 0] : [panelX, 0, panelZ]}
+              material={panelMat}
+              castShadow
+              raycast={nullRaycast}
+            />
+            <mesh
+              geometry={getCyl(0.015, 0.05)}
+              position={isNS
+                ? [(isSlide ? doorW * 0.35 : panelX + doorW * 0.35 * -pivotSign), -h * 0.1, 0]
+                : [0, -h * 0.1, (isSlide ? doorW * 0.35 : panelZ + doorW * 0.35 * -pivotSign)]}
+              material={hardwareMat}
+              castShadow
+              raycast={nullRaycast}
+            />
+          </group>
+        </group>
+      </>
+    );
+  }
+
+  // ── Two-panel shapes ─────────────────────────────────────────
+
+  // Dutch: horizontal split — top & bottom hinge from same vertical edge.
+  if (isDutch) {
+    const halfH = h / 2;
+    const panelW = w * 0.92;
+    const halfDoor = panelW / 2;
+    const pivotOffset = isNS ? halfW * pivotSign : 0;
+    const pivotOffsetZ = isNS ? 0 : halfW * pivotSign;
+    const panelX = isNS ? halfDoor * pivotSign : 0;
+    const panelZ = isNS ? 0 : halfDoor * pivotSign;
+
+    return (
+      <>
+        {FrameSurround}
+        <group position={[-pivotOffset, 0, -pivotOffsetZ]}>
+          {/* Top half */}
+          <group ref={leftPivot} position={[0, halfH * 0.5, 0]}>
+            <mesh
+              geometry={isNS ? getBox(panelW, halfH * 0.92, d * 0.95) : getBox(d * 0.95, halfH * 0.92, panelW)}
+              position={[panelX, 0, panelZ]}
+              material={panelMat}
+              castShadow
+              raycast={nullRaycast}
+            />
+          </group>
+          {/* Bottom half */}
+          <group ref={rightPivot} position={[0, -halfH * 0.5, 0]}>
+            <mesh
+              geometry={isNS ? getBox(panelW, halfH * 0.92, d * 0.95) : getBox(d * 0.95, halfH * 0.92, panelW)}
+              position={[panelX, 0, panelZ]}
+              material={panelMat}
+              castShadow
+              raycast={nullRaycast}
+            />
+          </group>
+          {/* Center divider */}
+          <mesh
+            geometry={isNS ? getBox(panelW, 0.04, d * 0.95) : getBox(d * 0.95, 0.04, panelW)}
+            position={[panelX, 0, panelZ]}
+            material={frameMat}
+            castShadow
+            raycast={nullRaycast}
+          />
+        </group>
+      </>
+    );
+  }
+
+  // Standard 2-panel: split at center, each panel hinges from its own outer edge.
+  const panelW = w * 0.46;
+  const halfPanel = panelW / 2;
+  // Left panel hinges from -halfW; right panel hinges from +halfW
+  const leftHinge = isNS ? -halfW : 0;
+  const leftHingeZ = isNS ? 0 : -halfW;
+  const rightHinge = isNS ? +halfW : 0;
+  const rightHingeZ = isNS ? 0 : +halfW;
+  const leftPanelX = isNS ? +halfPanel : 0;
+  const leftPanelZ = isNS ? 0 : +halfPanel;
+  const rightPanelX = isNS ? -halfPanel : 0;
+  const rightPanelZ = isNS ? 0 : -halfPanel;
+
   return (
     <>
-      {/* Frame — steel surround (fixed) */}
-      <mesh geometry={isNS ? getBox(w, h, d) : getBox(d, h, w)} material={mFrame} castShadow raycast={nullRaycast} />
-      {/* Animated door panel — pivots from wall edge (swing) or translates (slide) */}
-      <group position={isSlide ? [0, 0, 0] : [-pivotOffset, 0, -pivotOffsetZ]}>
-        <group ref={groupRef}>
+      {FrameSurround}
+      {/* Left panel pivots from left edge */}
+      <group position={[leftHinge, 0, leftHingeZ]}>
+        <group ref={leftPivot}>
           <mesh
-            geometry={isNS ? getBox(doorW, h * 0.95, d * 0.95) : getBox(d * 0.95, h * 0.95, doorW)}
-            position={isSlide ? [0, 0, 0] : [panelX, 0, panelZ]}
-            material={doorMat ?? mSteel}
-            castShadow raycast={nullRaycast}
+            geometry={isNS ? getBox(panelW, h * 0.95, d * 0.95) : getBox(d * 0.95, h * 0.95, panelW)}
+            position={[leftPanelX, 0, leftPanelZ]}
+            material={panelMat}
+            castShadow
+            raycast={nullRaycast}
           />
           <mesh
-            geometry={getCyl(0.015, 0.05)}
-            position={isNS
-              ? [(isSlide ? 0 : panelX) + doorW * 0.35 * -pivotSign, -h * 0.1, 0]
-              : [0, -h * 0.1, (isSlide ? 0 : panelZ) + doorW * 0.35 * -pivotSign]}
-            material={mFrame}
-            castShadow raycast={nullRaycast}
+            geometry={getCyl(0.014, 0.045)}
+            position={isNS ? [leftPanelX + panelW * 0.35, -h * 0.1, 0] : [0, -h * 0.1, leftPanelZ + panelW * 0.35]}
+            material={hardwareMat}
+            castShadow
+            raycast={nullRaycast}
+          />
+        </group>
+      </group>
+      {/* Right panel pivots from right edge */}
+      <group position={[rightHinge, 0, rightHingeZ]}>
+        <group ref={rightPivot}>
+          <mesh
+            geometry={isNS ? getBox(panelW, h * 0.95, d * 0.95) : getBox(d * 0.95, h * 0.95, panelW)}
+            position={[rightPanelX, 0, rightPanelZ]}
+            material={panelMat}
+            castShadow
+            raycast={nullRaycast}
+          />
+          <mesh
+            geometry={getCyl(0.014, 0.045)}
+            position={isNS ? [rightPanelX - panelW * 0.35, -h * 0.1, 0] : [0, -h * 0.1, rightPanelZ - panelW * 0.35]}
+            material={hardwareMat}
+            castShadow
+            raycast={nullRaycast}
           />
         </group>
       </group>
@@ -724,43 +1097,1374 @@ const WINDOW_PROFILES: Record<string, { sillRatio: number; headRatio: number }> 
   Window_Half:       { sillRatio: 0.5,  headRatio: 1.0  },
 };
 
-/** Composite window face: stacked steel + glass + steel panels. */
-function WindowFace({ w, h, isNS, sillRatio, headRatio, frameMat }: {
+/** Composite window face. Template chooses geometry; skin chooses materials.
+ *  Motion is driven by `windowConfig.openAmount` (0..1):
+ *
+ *    - casement_single:      pane swings outward (rotateY) ~90°
+ *    - casement_double:      both panes swing outward from center mullion
+ *    - awning_top_hinge:     pane tilts outward at bottom (top-hinge)
+ *    - hopper_bottom_hinge:  pane tilts inward at top (bottom-hinge)
+ *    - tilt_turn:            tilts inward at top (hopper-style)
+ *    - sliding_horizontal:   right pane translates left past the fixed left
+ *    - double_hung:          lower sash slides up (offset by openAmount × sashH)
+ *    - jalousie:             every louvre rotates ~70° around its horizontal axis
+ *    - fixed_picture / clerestory / bay / corner: ignore openAmount
+ */
+function WindowFace({ w, h, isNS, sillRatio, headRatio, frameMat, windowConfig }: {
   w: number; h: number; d: number; isNS: boolean;
   sillRatio: number; headRatio: number;
   frameMat?: THREE.MeshStandardMaterial;
+  windowConfig?: import('@/types/container').WindowConfig;
 }) {
+  const tmplId: WindowTemplateId = (windowConfig?.template as WindowTemplateId | undefined) ?? 'fixed_picture';
+  const skinId: WindowSkinId | undefined = windowConfig?.skin as WindowSkinId | undefined;
+  const tmpl = getWindowTemplate(tmplId);
+  const skinMats = getWindowSkinMaterials(skinId);
+
+  // Material resolution: explicit faceFinish frameColor override > skin frame > legacy mSteel
+  const fm = frameMat ?? skinMats.frame;
+  const mullionMat = skinMats.mullion;
+  const glassMat = skinMats.glass;
+
+  // ── Motion refs (interpolated toward target openAmount each frame) ──
+  const targetOpen = Math.min(1, Math.max(0, windowConfig?.openAmount ?? 0));
+  const openRef = useRef(0);
+  const swingLRef = useRef<THREE.Group>(null);
+  const swingRRef = useRef<THREE.Group>(null);
+  const tiltRef = useRef<THREE.Group>(null);
+  const slideRef = useRef<THREE.Group>(null);
+  const sashRef = useRef<THREE.Group>(null);
+  const louvreRefs = useRef<(THREE.Group | null)[]>([]);
+
+  useFrame((_, dt) => {
+    const lerp = 1 - Math.pow(0.001, dt);
+    openRef.current += (targetOpen - openRef.current) * lerp;
+    const o = openRef.current;
+
+    // Casement: swing out 90° around Y axis
+    const swingMag = Math.PI / 2;
+    if (swingLRef.current) swingLRef.current.rotation.y = +swingMag * o;
+    if (swingRRef.current) swingRRef.current.rotation.y = -swingMag * o;
+
+    // Awning/hopper/tilt-turn: tilt around X (NS) or Z (EW)
+    if (tiltRef.current) {
+      const tiltMag = Math.PI / 3; // 60°
+      const sign = (tmplId === 'awning_top_hinge') ? -1 : 1; // hopper/tilt-turn tilt inward
+      const ang = tiltMag * sign * o;
+      if (isNS) tiltRef.current.rotation.x = ang;
+      else      tiltRef.current.rotation.z = ang;
+    }
+
+    // Sliding horizontal: translate right pane left by openAmount × halfWidth
+    if (slideRef.current) {
+      const dist = -w * 0.42 * o;
+      if (isNS) slideRef.current.position.x = dist;
+      else      slideRef.current.position.z = dist;
+    }
+
+    // Double-hung: slide lower sash upward
+    if (sashRef.current) {
+      const sashH = (headRatio - sillRatio) * h * 0.46;
+      sashRef.current.position.y = sashH * 0.92 * o;
+    }
+
+    // Jalousie: rotate every louvre around its horizontal axis
+    const louvreMag = (Math.PI / 180) * 70; // ~70°
+    for (const l of louvreRefs.current) {
+      if (!l) continue;
+      if (isNS) l.rotation.x = -louvreMag * o;
+      else      l.rotation.z = -louvreMag * o;
+    }
+  });
+
+  // Clerestory: thin strip of glass at top, rest is solid sill.
+  if (tmpl.id === 'fixed_clerestory') {
+    const stripH = h * 0.22;
+    const sillH = h - stripH;
+    return (
+      <group>
+        <mesh position={[0, -h / 2 + sillH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
+          <boxGeometry args={[isNS ? w : PANEL_THICK, sillH, isNS ? PANEL_THICK : w]} />
+          <primitive object={fm} attach="material" />
+        </mesh>
+        <mesh position={[0, h / 2 - stripH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
+          <boxGeometry args={[isNS ? w * 0.94 : PANEL_THICK * 0.5, stripH * 0.92, isNS ? PANEL_THICK * 0.5 : w * 0.94]} />
+          <primitive object={glassMat} attach="material" />
+        </mesh>
+      </group>
+    );
+  }
+
   const bottomH = sillRatio * h;
-  const midH    = (headRatio - sillRatio) * h;
-  const topH    = (1 - headRatio) * h;
-  const fm = frameMat ?? mSteel;
+  const topH = (1 - headRatio) * h;
+  const midH = (headRatio - sillRatio) * h;
+  const midY = -h / 2 + sillRatio * h + midH / 2;
+
+  // Sill (bottom) + transom (top) panels — same for most templates
+  const sillMesh = bottomH > 0.01 && (
+    <mesh position={[0, -h / 2 + bottomH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
+      <boxGeometry args={[isNS ? w : PANEL_THICK, bottomH, isNS ? PANEL_THICK : w]} />
+      <primitive object={fm} attach="material" />
+    </mesh>
+  );
+  const transomMesh = topH > 0.01 && (
+    <mesh position={[0, h / 2 - topH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
+      <boxGeometry args={[isNS ? w : PANEL_THICK, topH, isNS ? PANEL_THICK : w]} />
+      <primitive object={fm} attach="material" />
+    </mesh>
+  );
+
+  // Jalousie: horizontal louvre slats stacked between sill and head — each
+  // slat tilts open in unison driven by openAmount.
+  if (tmpl.id === 'jalousie') {
+    const SLATS = 5;
+    const slatH = (midH * 0.95) / SLATS;
+    const slatGap = (midH * 0.05) / (SLATS + 1);
+    louvreRefs.current = [];
+    const slats = [];
+    for (let i = 0; i < SLATS; i++) {
+      const y = (-h / 2 + sillRatio * h) + slatGap * (i + 1) + slatH * (i + 0.5);
+      slats.push(
+        <group
+          key={`louvre_${i}`}
+          position={[0, y, 0]}
+          ref={(g) => { louvreRefs.current[i] = g; }}
+        >
+          <mesh castShadow receiveShadow raycast={nullRaycast}>
+            <boxGeometry args={[isNS ? w * 0.9 : PANEL_THICK * 0.6, slatH, isNS ? PANEL_THICK * 0.6 : w * 0.9]} />
+            <primitive object={glassMat} attach="material" />
+          </mesh>
+        </group>
+      );
+    }
+    return <group>{sillMesh}{slats}{transomMesh}</group>;
+  }
+
+  // Double-hung: lower sash slides up by openAmount × sashH.
+  if (tmpl.id === 'double_hung') {
+    const sashH = midH * 0.46;
+    const lowerY = (-h / 2 + sillRatio * h) + sashH / 2 + midH * 0.02;
+    const upperY = (-h / 2 + sillRatio * h) + midH - sashH / 2 - midH * 0.02;
+    const mullionY = (-h / 2 + sillRatio * h) + midH / 2;
+    return (
+      <group>
+        {sillMesh}
+        {/* Lower sash — animated upward via sashRef */}
+        <group ref={sashRef} position={[0, lowerY, 0]}>
+          <mesh castShadow receiveShadow raycast={nullRaycast}>
+            <boxGeometry args={[isNS ? w * 0.92 : PANEL_THICK * 0.5, sashH, isNS ? PANEL_THICK * 0.5 : w * 0.92]} />
+            <primitive object={glassMat} attach="material" />
+          </mesh>
+        </group>
+        {/* Upper sash — fixed */}
+        <mesh position={[0, upperY, 0]} castShadow receiveShadow raycast={nullRaycast}>
+          <boxGeometry args={[isNS ? w * 0.92 : PANEL_THICK * 0.5, sashH, isNS ? PANEL_THICK * 0.5 : w * 0.92]} />
+          <primitive object={glassMat} attach="material" />
+        </mesh>
+        {/* Horizontal mullion */}
+        <mesh position={[0, mullionY, 0]} castShadow receiveShadow raycast={nullRaycast}>
+          <boxGeometry args={[isNS ? w * 0.94 : PANEL_THICK * 0.7, midH * 0.04, isNS ? PANEL_THICK * 0.7 : w * 0.94]} />
+          <primitive object={mullionMat} attach="material" />
+        </mesh>
+        {transomMesh}
+      </group>
+    );
+  }
+
+  // Casement double — both panes swing outward from center mullion.
+  if (tmpl.id === 'casement_double') {
+    const halfW = w * 0.46 / 2;
+    const leftCenter = -w * 0.23;
+    const rightCenter = +w * 0.23;
+    // Pivot is each pane's outer edge so the swing looks correct.
+    const leftHingeX = isNS ? -w / 2 : 0;
+    const leftHingeZ = isNS ? 0 : -w / 2;
+    const rightHingeX = isNS ? +w / 2 : 0;
+    const rightHingeZ = isNS ? 0 : +w / 2;
+    const leftPanelX = isNS ? leftCenter - leftHingeX : 0;
+    const leftPanelZ = isNS ? 0 : leftCenter - leftHingeZ;
+    const rightPanelX = isNS ? rightCenter - rightHingeX : 0;
+    const rightPanelZ = isNS ? 0 : rightCenter - rightHingeZ;
+    return (
+      <group>
+        {sillMesh}
+        <group ref={swingLRef} position={[leftHingeX, midY, leftHingeZ]}>
+          <mesh position={[leftPanelX, 0, leftPanelZ]} castShadow receiveShadow raycast={nullRaycast}>
+            <boxGeometry args={[isNS ? halfW * 2 - 0.04 : PANEL_THICK * 0.5, midH * 0.95, isNS ? PANEL_THICK * 0.5 : halfW * 2 - 0.04]} />
+            <primitive object={glassMat} attach="material" />
+          </mesh>
+        </group>
+        <group ref={swingRRef} position={[rightHingeX, midY, rightHingeZ]}>
+          <mesh position={[rightPanelX, 0, rightPanelZ]} castShadow receiveShadow raycast={nullRaycast}>
+            <boxGeometry args={[isNS ? halfW * 2 - 0.04 : PANEL_THICK * 0.5, midH * 0.95, isNS ? PANEL_THICK * 0.5 : halfW * 2 - 0.04]} />
+            <primitive object={glassMat} attach="material" />
+          </mesh>
+        </group>
+        {/* Vertical mullion (fixed) */}
+        <mesh position={[0, midY, 0]} castShadow receiveShadow raycast={nullRaycast}>
+          <boxGeometry args={[isNS ? 0.04 : PANEL_THICK * 0.7, midH * 0.95, isNS ? PANEL_THICK * 0.7 : 0.04]} />
+          <primitive object={mullionMat} attach="material" />
+        </mesh>
+        {transomMesh}
+      </group>
+    );
+  }
+
+  // Sliding horizontal — left pane fixed, right pane slides left.
+  if (tmpl.id === 'sliding_horizontal') {
+    const halfW = w * 0.46 / 2;
+    const leftCenter = -w * 0.23;
+    const rightCenter = +w * 0.23;
+    return (
+      <group>
+        {sillMesh}
+        {/* Left pane — fixed */}
+        <mesh position={isNS ? [leftCenter, midY, 0] : [0, midY, leftCenter]} castShadow receiveShadow raycast={nullRaycast}>
+          <boxGeometry args={[isNS ? halfW * 2 - 0.04 : PANEL_THICK * 0.5, midH * 0.95, isNS ? PANEL_THICK * 0.5 : halfW * 2 - 0.04]} />
+          <primitive object={glassMat} attach="material" />
+        </mesh>
+        {/* Right pane — slides via slideRef */}
+        <group ref={slideRef}>
+          <mesh
+            position={isNS ? [rightCenter, midY, PANEL_THICK * 0.18] : [PANEL_THICK * 0.18, midY, rightCenter]}
+            castShadow receiveShadow raycast={nullRaycast}
+          >
+            <boxGeometry args={[isNS ? halfW * 2 - 0.04 : PANEL_THICK * 0.4, midH * 0.95, isNS ? PANEL_THICK * 0.4 : halfW * 2 - 0.04]} />
+            <primitive object={glassMat} attach="material" />
+          </mesh>
+        </group>
+        {/* Vertical mullion (fixed) */}
+        <mesh position={[0, midY, 0]} castShadow receiveShadow raycast={nullRaycast}>
+          <boxGeometry args={[isNS ? 0.04 : PANEL_THICK * 0.7, midH * 0.95, isNS ? PANEL_THICK * 0.7 : 0.04]} />
+          <primitive object={mullionMat} attach="material" />
+        </mesh>
+        {transomMesh}
+      </group>
+    );
+  }
+
+  // Bay three-panel: three vertical panels with mullions
+  if (tmpl.id === 'bay_three_panel') {
+    const panelW = w / 3;
+    const centers = [-w / 3, 0, +w / 3];
+    return (
+      <group>
+        {sillMesh}
+        {centers.map((c, i) => (
+          <mesh
+            key={`bay_${i}`}
+            position={isNS ? [c, midY, 0] : [0, midY, c]}
+            castShadow receiveShadow raycast={nullRaycast}
+          >
+            <boxGeometry args={[isNS ? panelW * 0.9 : PANEL_THICK * 0.5, midH * 0.95, isNS ? PANEL_THICK * 0.5 : panelW * 0.9]} />
+            <primitive object={glassMat} attach="material" />
+          </mesh>
+        ))}
+        {/* Two vertical mullions */}
+        {[-w / 6, +w / 6].map((c, i) => (
+          <mesh
+            key={`bay_mul_${i}`}
+            position={isNS ? [c, midY, 0] : [0, midY, c]}
+            castShadow receiveShadow raycast={nullRaycast}
+          >
+            <boxGeometry args={[isNS ? 0.04 : PANEL_THICK * 0.7, midH * 0.95, isNS ? PANEL_THICK * 0.7 : 0.04]} />
+            <primitive object={mullionMat} attach="material" />
+          </mesh>
+        ))}
+        {transomMesh}
+      </group>
+    );
+  }
+
+  // Default: single pane between sill and transom. For casement_single,
+  // awning_top_hinge, hopper_bottom_hinge, tilt_turn, the pane is wrapped
+  // in an animated group so motion responds to openAmount.
+  const isCasement = tmpl.id === 'casement_single';
+  const isAwning = tmpl.id === 'awning_top_hinge';
+  const isHopper = tmpl.id === 'hopper_bottom_hinge' || tmpl.id === 'tilt_turn';
+  const paneMesh = (
+    <mesh castShadow receiveShadow raycast={nullRaycast}>
+      <boxGeometry args={[isNS ? w * 0.92 : PANEL_THICK * 0.5, midH * 0.95, isNS ? PANEL_THICK * 0.5 : w * 0.92]} />
+      <primitive object={glassMat} attach="material" />
+    </mesh>
+  );
+
+  if (isCasement) {
+    // Hinge on the right edge — group origin at hinge, pane offset toward center.
+    const hingeX = isNS ? +w / 2 : 0;
+    const hingeZ = isNS ? 0 : +w / 2;
+    const paneOffsetX = isNS ? -w * 0.46 : 0;
+    const paneOffsetZ = isNS ? 0 : -w * 0.46;
+    return (
+      <group>
+        {sillMesh}
+        <group ref={swingLRef} position={[hingeX, midY, hingeZ]}>
+          <group position={[paneOffsetX, 0, paneOffsetZ]}>{paneMesh}</group>
+        </group>
+        {transomMesh}
+      </group>
+    );
+  }
+
+  if (isAwning) {
+    // Top-hinge — pivot at top edge of mid section; pane offset downward to center.
+    const topY = (-h / 2 + sillRatio * h) + midH;
+    const paneOffsetY = -midH / 2;
+    return (
+      <group>
+        {sillMesh}
+        <group ref={tiltRef} position={[0, topY, 0]}>
+          <group position={[0, paneOffsetY, 0]}>{paneMesh}</group>
+        </group>
+        {transomMesh}
+      </group>
+    );
+  }
+
+  if (isHopper) {
+    // Bottom-hinge (or tilt-turn) — pivot at bottom edge; pane offset upward to center.
+    const bottomY = -h / 2 + sillRatio * h;
+    const paneOffsetY = +midH / 2;
+    return (
+      <group>
+        {sillMesh}
+        <group ref={tiltRef} position={[0, bottomY, 0]}>
+          <group position={[0, paneOffsetY, 0]}>{paneMesh}</group>
+        </group>
+        {transomMesh}
+      </group>
+    );
+  }
 
   return (
     <group>
-      {/* Bottom steel panel (sill) */}
-      {bottomH > 0.01 && (
-        <mesh position={[0, -h / 2 + bottomH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
-          <boxGeometry args={[isNS ? w : PANEL_THICK, bottomH, isNS ? PANEL_THICK : w]} />
-          <primitive object={fm} attach="material" />
-        </mesh>
-      )}
-      {/* Glass panel */}
-      <mesh position={[0, -h / 2 + sillRatio * h + midH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
-        <boxGeometry args={[isNS ? w * 0.92 : PANEL_THICK * 0.5, midH * 0.95, isNS ? PANEL_THICK * 0.5 : w * 0.92]} />
-        <primitive object={mGlass} attach="material" />
-      </mesh>
-      {/* Top steel panel (transom) */}
-      {topH > 0.01 && (
-        <mesh position={[0, h / 2 - topH / 2, 0]} castShadow receiveShadow raycast={nullRaycast}>
-          <boxGeometry args={[isNS ? w : PANEL_THICK, topH, isNS ? PANEL_THICK : w]} />
-          <primitive object={fm} attach="material" />
-        </mesh>
-      )}
+      {sillMesh}
+      <group position={[0, midY, 0]}>{paneMesh}</group>
+      {transomMesh}
     </group>
   );
 }
 
-export function FaceVisual({ surface, colPitch, rowPitch, vHeight, isNS, isEW, isHoriz, connectedStart, connectedEnd, isOpen, doorState, doorConfig }: {
+// ── Shelf + Cabinet overlays ─────────────────────────────────────
+//
+// These render ON TOP of the face's existing SurfaceType (Solid_Steel,
+// Wood_Hinoki, painted wall, …). The wall surface keeps rendering — the
+// overlay is in addition to it. Group is positioned in front of the wall
+// along the face normal so it doesn't Z-fight the surface mesh behind.
+
+/** Anchor offset along the face's height axis. */
+function anchorOffset(anchor: CabinetryAnchor | undefined, h: number, defaultAnchor: CabinetryAnchor): number {
+  const a = anchor ?? defaultAnchor;
+  if (a === 'top') return +h * 0.30;
+  if (a === 'bottom') return -h * 0.30;
+  return 0;
+}
+
+/** Forward direction (toward room interior) along face normal, +1 / -1. */
+function forwardSign(dir: 'n' | 's' | 'e' | 'w'): number {
+  // Walls' "interior" side: north face's interior is +Z (south of normal),
+  // south face is -Z, east is -X, west is +X. The face mesh sits on the
+  // outer edge; we want the overlay to extend into the room.
+  return (dir === 'n' || dir === 'w') ? +1 : -1;
+}
+
+interface OverlayMountProps {
+  h: number;
+  isNS: boolean;
+  dir: 'n' | 's' | 'e' | 'w';
+  /** Depth of the overlay (extends into the room from the wall). */
+  depth: number;
+  anchor: CabinetryAnchor;
+  defaultAnchor: CabinetryAnchor;
+  children: React.ReactNode;
+}
+
+/** Wraps overlay geometry in a group positioned in front of the wall and
+ *  shifted to the requested anchor point. Children render in a local frame
+ *  where x is along the face width, y is along the face height (centered),
+ *  and z extends into the room. */
+function OverlayMount({ h, isNS, dir, depth, anchor, defaultAnchor, children }: OverlayMountProps) {
+  const yOffset = anchorOffset(anchor, h, defaultAnchor);
+  const fSign = forwardSign(dir);
+  const inwardZ = isNS ? fSign * (PANEL_THICK / 2 + depth / 2) : 0;
+  const inwardX = !isNS ? fSign * (PANEL_THICK / 2 + depth / 2) : 0;
+  // For EW faces we rotate so the overlay's local X axis runs along the face
+  // width (which is along world Z for EW faces). Rotation aligns the local
+  // box geometry with the face plane.
+  const rotY = isNS ? 0 : Math.PI / 2;
+  return (
+    <group position={[inwardX, yOffset, inwardZ]} rotation={[0, rotY, 0]}>
+      {children}
+    </group>
+  );
+}
+
+/** Static shelf overlay. */
+function ShelfFace({ w, h, isNS, dir, shelfConfig }: {
+  w: number; h: number; isNS: boolean; dir: 'n' | 's' | 'e' | 'w';
+  shelfConfig: ShelfConfig;
+}) {
+  const tmpl = getShelfTemplate(shelfConfig.template);
+  const skinMats = getCabinetrySkinMaterials(shelfConfig.skin);
+
+  const bodyW = w * 0.85;
+  const bodyH = h * 0.55;
+  const depth = 0.25;
+  const PLANK_T = 0.025;
+
+  const planks: React.ReactNode[] = [];
+  // Generate evenly spaced shelves spanning the body height
+  for (let i = 0; i < tmpl.shelves; i++) {
+    const t = tmpl.shelves === 1 ? 0 : (i / (tmpl.shelves - 1) - 0.5);
+    const y = t * (bodyH - PLANK_T);
+    planks.push(
+      <mesh
+        key={`plank_${i}`}
+        position={[0, y, 0]}
+        geometry={getBox(bodyW, PLANK_T, depth)}
+        material={skinMats.body}
+        castShadow receiveShadow raycast={nullRaycast}
+      />
+    );
+  }
+
+  // Cube grid templates: vertical dividers between cubes
+  let dividers: React.ReactNode[] = [];
+  if (tmpl.id === 'cube_grid_2x2' || tmpl.id === 'cube_grid_3x2') {
+    const cols = tmpl.id === 'cube_grid_2x2' ? 2 : 3;
+    const dividerCount = cols - 1;
+    for (let i = 0; i < dividerCount; i++) {
+      const x = (i + 1) / cols * bodyW - bodyW / 2;
+      dividers.push(
+        <mesh
+          key={`div_${i}`}
+          position={[x, 0, 0]}
+          geometry={getBox(0.025, bodyH, depth)}
+          material={skinMats.body}
+          castShadow raycast={nullRaycast}
+        />
+      );
+    }
+  }
+
+  const sidePanels = tmpl.hasSidePanels ? (
+    <>
+      <mesh
+        position={[-bodyW / 2 + 0.012, 0, 0]}
+        geometry={getBox(0.025, bodyH, depth)}
+        material={skinMats.body}
+        castShadow raycast={nullRaycast}
+      />
+      <mesh
+        position={[+bodyW / 2 - 0.012, 0, 0]}
+        geometry={getBox(0.025, bodyH, depth)}
+        material={skinMats.body}
+        castShadow raycast={nullRaycast}
+      />
+    </>
+  ) : null;
+
+  const brackets = tmpl.hasBrackets ? (
+    <>
+      {[-bodyW / 2 + 0.1, +bodyW / 2 - 0.1].map((x, i) => (
+        <group key={`bkt_${i}`} position={[x, -PLANK_T, 0]}>
+          <mesh
+            position={[0, -0.06, 0]}
+            geometry={getBox(0.02, 0.12, 0.02)}
+            material={skinMats.handle}
+            castShadow raycast={nullRaycast}
+          />
+          <mesh
+            position={[0, -0.12, depth / 4]}
+            geometry={getBox(0.02, 0.02, depth * 0.5)}
+            material={skinMats.handle}
+            castShadow raycast={nullRaycast}
+          />
+        </group>
+      ))}
+    </>
+  ) : null;
+
+  // Ladder template: tilt the whole assembly slightly
+  const ladderTilt = tmpl.id === 'ladder' ? -0.12 : 0;
+
+  return (
+    <OverlayMount
+      h={h} isNS={isNS} dir={dir}
+      depth={depth}
+      anchor={shelfConfig.verticalAnchor ?? tmpl.defaultAnchor}
+      defaultAnchor={tmpl.defaultAnchor}
+    >
+      <group rotation={[ladderTilt, 0, 0]}>
+        {planks}
+        {dividers}
+        {sidePanels}
+        {brackets}
+      </group>
+    </OverlayMount>
+  );
+}
+
+// Cabinet animation constants — hoisted to module scope so useFrame doesn't
+// recompute every tick.
+const CABINET_SWING_MAG = (Math.PI / 180) * 95; // ~95° outward swing
+const CABINET_SLIDE_FRAC = 0.85;                 // drawer travel as fraction of depth
+const CABINET_SETTLE_EPSILON = 1e-3;             // when |open - target| drops below, halt updates
+
+// Emissive LED material cache — one material per (color, intensity) tuple.
+// Used by under-cabinet lights, picture lights, glass display interior glow.
+const _emissiveLEDCache = new Map<string, THREE.MeshStandardMaterial>();
+function getEmissiveLEDMaterial(color = '#fff4d6', intensity = 1.6): THREE.MeshStandardMaterial {
+  const key = `${color}|${intensity}`;
+  let mat = _emissiveLEDCache.get(key);
+  if (mat) return mat;
+  mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color),
+    emissive: new THREE.Color(color),
+    emissiveIntensity: intensity,
+    metalness: 0,
+    roughness: 0.4,
+  });
+  _emissiveLEDCache.set(key, mat);
+  return mat;
+}
+
+/** Cabinet overlay — body + animated doors/drawers per template parts. */
+function CabinetFace({ w, h, isNS, dir, cabinetConfig }: {
+  w: number; h: number; isNS: boolean; dir: 'n' | 's' | 'e' | 'w';
+  cabinetConfig: CabinetConfig;
+}) {
+  const tmpl = getCabinetTemplate(cabinetConfig.template);
+  const skinMats = getCabinetrySkinMaterials(cabinetConfig.skin);
+
+  const bodyW = w * tmpl.bodyWidth;
+  const bodyH = h * tmpl.bodyHeight;
+  const depth = 0.45;
+  const SHELL_T = 0.02;
+
+  const targetOpen = Math.min(1, Math.max(0, cabinetConfig.openAmount ?? 0));
+  const openRef = useRef(0);
+  const settledRef = useRef(false);
+  const lastTargetRef = useRef(targetOpen);
+  // Stable mutable arrays — sized to current parts list, indexed by part idx.
+  // Re-allocated only when the template changes (parts length differs), via
+  // useMemo. Avoids the StrictMode-double-render risk of resetting in render.
+  const motion = useMemo(() => ({
+    swingRefs: new Array<THREE.Group | null>(tmpl.parts.length).fill(null),
+    slideRefs: new Array<THREE.Group | null>(tmpl.parts.length).fill(null),
+    swingSigns: tmpl.parts.map((p) => p.kind === 'door' ? (p.hingeEdge === 'left' ? -1 : +1) : 0),
+  }), [tmpl]);
+
+  // Re-arm whenever the user changes openAmount.
+  if (lastTargetRef.current !== targetOpen) {
+    settledRef.current = false;
+    lastTargetRef.current = targetOpen;
+  }
+
+  useFrame((_, dt) => {
+    if (settledRef.current) return; // at rest — no matrix writes
+    const lerp = 1 - Math.pow(0.001, dt);
+    openRef.current += (targetOpen - openRef.current) * lerp;
+    if (Math.abs(openRef.current - targetOpen) < CABINET_SETTLE_EPSILON) {
+      openRef.current = targetOpen;
+      settledRef.current = true;
+    }
+    const o = openRef.current;
+    const slideDist = depth * CABINET_SLIDE_FRAC;
+    for (let i = 0; i < motion.swingRefs.length; i++) {
+      const g = motion.swingRefs[i];
+      if (!g) continue;
+      g.rotation.y = motion.swingSigns[i] * CABINET_SWING_MAG * o;
+    }
+    for (let i = 0; i < motion.slideRefs.length; i++) {
+      const g = motion.slideRefs[i];
+      if (!g) continue;
+      g.position.z = slideDist * o;
+    }
+  });
+
+  const PANEL_INSET = 0.005;
+
+  // Counter top slab — rendered above the body when the template supports it
+  // and the user has selected a material. Slightly oversized vs the body so
+  // adjacent voxel cabinets visually merge into a continuous run.
+  const COUNTER_T = 0.04;
+  const COUNTER_OVERHANG_W = w * 1.0;        // span the full voxel face for run continuity
+  const COUNTER_OVERHANG_D = depth + 0.04;   // 2cm front overhang on each side
+  const counterTop = (tmpl.supportsCounterTop && cabinetConfig.counterTop) ? (
+    <mesh
+      position={[0, +bodyH / 2 + COUNTER_T / 2, 0]}
+      geometry={getBox(COUNTER_OVERHANG_W, COUNTER_T, COUNTER_OVERHANG_D)}
+      material={getCounterTopThreeMaterial(cabinetConfig.counterTop)}
+      castShadow receiveShadow raycast={nullRaycast}
+    />
+  ) : null;
+
+  // Under-cabinet LED strip — emissive ribbon below the cabinet body.
+  // Visually meaningful for upper cabinets (wall_*) and tall pantry.
+  const underLight = cabinetConfig.underCabinetLight ? (
+    <mesh
+      position={[0, -bodyH / 2 - 0.012, depth / 2 - 0.05]}
+      geometry={getBox(bodyW * 0.95, 0.012, 0.04)}
+      material={getEmissiveLEDMaterial(cabinetConfig.underCabinetLightColor)}
+      raycast={nullRaycast}
+    />
+  ) : null;
+
+  // Glass display interior backlight — soft warm glow at back panel.
+  // Only meaningful for the glass display template.
+  const interiorGlow = (tmpl.id === 'glass_display_2door') ? (
+    <mesh
+      position={[0, 0, -depth / 2 + SHELL_T + 0.005]}
+      geometry={getBox(bodyW * 0.92, bodyH * 0.92, 0.005)}
+      material={getEmissiveLEDMaterial('#ffe8c0', 0.45)}
+      raycast={nullRaycast}
+    />
+  ) : null;
+
+  // Carcass — top, bottom, two sides, back
+  const carcass = (
+    <>
+      {/* back panel */}
+      <mesh
+        position={[0, 0, -depth / 2 + SHELL_T / 2]}
+        geometry={getBox(bodyW, bodyH, SHELL_T)}
+        material={skinMats.body}
+        castShadow receiveShadow raycast={nullRaycast}
+      />
+      {/* top */}
+      <mesh
+        position={[0, +bodyH / 2 - SHELL_T / 2, 0]}
+        geometry={getBox(bodyW, SHELL_T, depth)}
+        material={skinMats.body}
+        castShadow raycast={nullRaycast}
+      />
+      {/* bottom */}
+      <mesh
+        position={[0, -bodyH / 2 + SHELL_T / 2, 0]}
+        geometry={getBox(bodyW, SHELL_T, depth)}
+        material={skinMats.body}
+        castShadow raycast={nullRaycast}
+      />
+      {/* left side */}
+      <mesh
+        position={[-bodyW / 2 + SHELL_T / 2, 0, 0]}
+        geometry={getBox(SHELL_T, bodyH, depth)}
+        material={skinMats.body}
+        castShadow raycast={nullRaycast}
+      />
+      {/* right side */}
+      <mesh
+        position={[+bodyW / 2 - SHELL_T / 2, 0, 0]}
+        geometry={getBox(SHELL_T, bodyH, depth)}
+        material={skinMats.body}
+        castShadow raycast={nullRaycast}
+      />
+      {counterTop}
+      {underLight}
+      {interiorGlow}
+    </>
+  );
+
+  const partNodes = tmpl.parts.map((part, idx) => {
+    const partW = bodyW * part.region.w;
+    const partH = bodyH * part.region.h;
+    const partX = bodyW * part.region.x;
+    const partY = bodyH * part.region.y;
+    const handleMat = skinMats.handle;
+    const doorMat = part.glazed ? skinMats.glass : skinMats.door;
+
+    if (part.kind === 'door') {
+      // Hinge along the outer edge of the part region. Sign is precomputed
+      // in motion.swingSigns[idx] and consumed by useFrame.
+      const hingeSign = motion.swingSigns[idx];
+      const hingeX = partX + hingeSign * partW / 2;
+      const panelX = -hingeSign * partW / 2;
+      const insetSize = 0.06;
+      const innerW = partW - insetSize * 2;
+      const innerH = partH - insetSize * 2;
+      return (
+        <group
+          key={`part_${idx}`}
+          position={[hingeX, partY, depth / 2 - SHELL_T / 2 - PANEL_INSET]}
+          ref={(g) => { motion.swingRefs[idx] = g; }}
+        >
+          {/* Door panel */}
+          <mesh
+            position={[panelX, 0, 0]}
+            geometry={getBox(partW * 0.96, partH * 0.96, 0.018)}
+            material={doorMat}
+            castShadow receiveShadow raycast={nullRaycast}
+          />
+          {/* Shaker style: recessed inner panel border (a thin frame of body
+              colour around the door front, no inner cutout to keep mesh count low) */}
+          {skinMats.doorStyle === 'shaker' && !part.glazed && (
+            <mesh
+              position={[panelX, 0, 0.011]}
+              geometry={getBox(innerW, innerH, 0.005)}
+              material={skinMats.body}
+              castShadow raycast={nullRaycast}
+            />
+          )}
+          {/* Handle: small knob near the leading edge */}
+          <mesh
+            position={[panelX - hingeSign * (partW * 0.4), 0, 0.022]}
+            geometry={getCyl(0.012, 0.04)}
+            rotation={[Math.PI / 2, 0, 0]}
+            material={handleMat}
+            castShadow raycast={nullRaycast}
+          />
+        </group>
+      );
+    }
+
+    // Drawer: front panel + side walls; slides along +Z (toward room) when open.
+    const handleY = partH * 0.34;
+    return (
+      <group
+        key={`part_${idx}`}
+        position={[partX, partY, 0]}
+        ref={(g) => { motion.slideRefs[idx] = g; }}
+      >
+        {/* Drawer front */}
+        <mesh
+          position={[0, 0, depth / 2 - SHELL_T / 2 - PANEL_INSET]}
+          geometry={getBox(partW * 0.96, partH * 0.96, 0.022)}
+          material={doorMat}
+          castShadow receiveShadow raycast={nullRaycast}
+        />
+        {skinMats.doorStyle === 'shaker' && (
+          <mesh
+            position={[0, 0, depth / 2 - SHELL_T / 2 - PANEL_INSET + 0.012]}
+            geometry={getBox(partW * 0.84, partH * 0.84, 0.005)}
+            material={skinMats.body}
+            castShadow raycast={nullRaycast}
+          />
+        )}
+        {/* Handle: horizontal pull bar */}
+        <mesh
+          position={[0, handleY, depth / 2 - SHELL_T / 2 - PANEL_INSET + 0.025]}
+          geometry={getBox(partW * 0.4, 0.02, 0.022)}
+          material={handleMat}
+          castShadow raycast={nullRaycast}
+        />
+        {/* Side walls of the drawer box (visible when open) */}
+        <mesh
+          position={[-partW / 2 + 0.01, 0, 0]}
+          geometry={getBox(0.012, partH * 0.92, depth * 0.85)}
+          material={skinMats.body}
+          castShadow raycast={nullRaycast}
+        />
+        <mesh
+          position={[+partW / 2 - 0.01, 0, 0]}
+          geometry={getBox(0.012, partH * 0.92, depth * 0.85)}
+          material={skinMats.body}
+          castShadow raycast={nullRaycast}
+        />
+        <mesh
+          position={[0, -partH / 2 + 0.01, 0]}
+          geometry={getBox(partW * 0.92, 0.012, depth * 0.85)}
+          material={skinMats.body}
+          castShadow raycast={nullRaycast}
+        />
+      </group>
+    );
+  });
+
+  return (
+    <OverlayMount
+      h={h} isNS={isNS} dir={dir}
+      depth={depth}
+      anchor={cabinetConfig.verticalAnchor ?? tmpl.defaultAnchor}
+      defaultAnchor={tmpl.defaultAnchor}
+    >
+      {carcass}
+      {partNodes}
+    </OverlayMount>
+  );
+}
+
+// ── FixtureFace — appliances + bathroom fixtures ────────────────
+//
+// Each template has a distinct silhouette. To keep code manageable, geometry
+// is composed from a small set of primitives: body box (always), an
+// optional opening door (animates with openAmount), an optional secondary
+// shape (basin, tank, faucet, glass enclosure). A switch on template id
+// picks which primitives to render and where to place them.
+
+const FIXTURE_OPEN_MAG = (Math.PI / 180) * 70; // ~70° appliance door swing
+const FIXTURE_DEPTH = 0.55;                     // most appliances ~22-24" deep
+const FIXTURE_DEPTH_SHALLOW = 0.32;              // sinks, microwaves
+
+function FixtureFace({ w, h, isNS, dir, fixtureConfig }: {
+  w: number; h: number; isNS: boolean; dir: 'n' | 's' | 'e' | 'w';
+  fixtureConfig: FixtureConfig;
+}) {
+  const tmpl = getFixtureTemplate(fixtureConfig.template);
+  const mats = getFixtureMaterials(tmpl.paletteHint);
+
+  const bodyW = w * tmpl.bodyWidth;
+  const bodyH = h * tmpl.bodyHeight;
+  const isShallow = tmpl.id === 'microwave_otr'
+    || tmpl.id.startsWith('sink_')
+    || tmpl.id === 'toilet_wall_hung';
+  const depth = isShallow ? FIXTURE_DEPTH_SHALLOW : FIXTURE_DEPTH;
+
+  const targetOpen = Math.min(1, Math.max(0, fixtureConfig.openAmount ?? 0));
+  const openRef = useRef(0);
+  const settledRef = useRef(false);
+  const lastTargetRef = useRef(targetOpen);
+  const doorRef = useRef<THREE.Group>(null);
+
+  if (lastTargetRef.current !== targetOpen) {
+    settledRef.current = false;
+    lastTargetRef.current = targetOpen;
+  }
+
+  useFrame((_, dt) => {
+    if (!tmpl.hasOpeningDoor) return;
+    if (settledRef.current) return;
+    const lerp = 1 - Math.pow(0.001, dt);
+    openRef.current += (targetOpen - openRef.current) * lerp;
+    if (Math.abs(openRef.current - targetOpen) < 1e-3) {
+      openRef.current = targetOpen;
+      settledRef.current = true;
+    }
+    if (doorRef.current) {
+      // Fridge / wall oven / dishwasher / microwave / washer / dryer / range:
+      // door hinges along the LEFT edge of the body, swings outward.
+      // Range oven door hinges at the bottom (drop-down).
+      if (tmpl.id === 'range_4burner' || tmpl.id === 'range_6burner' || tmpl.id === 'wall_oven' || tmpl.id === 'dishwasher') {
+        doorRef.current.rotation.x = -FIXTURE_OPEN_MAG * openRef.current;
+      } else {
+        doorRef.current.rotation.y = FIXTURE_OPEN_MAG * openRef.current;
+      }
+    }
+  });
+
+  // Body box — common to nearly all fixtures (sinks/toilets get overridden below)
+  const bodyMesh = (
+    <mesh
+      position={[0, 0, 0]}
+      geometry={getBox(bodyW, bodyH, depth)}
+      material={mats.body}
+      castShadow receiveShadow raycast={nullRaycast}
+    />
+  );
+
+  // Opening door — pivot at left edge, panel offset to center
+  const doorPanel = tmpl.hasOpeningDoor ? (() => {
+    const isDropDown = tmpl.id === 'range_4burner' || tmpl.id === 'range_6burner' || tmpl.id === 'wall_oven' || tmpl.id === 'dishwasher';
+    if (isDropDown) {
+      // Door hinges at bottom edge; panel offset upward from pivot
+      const ovenH = tmpl.id === 'wall_oven' ? bodyH * 0.95 : bodyH * 0.6;
+      const pivotY = -bodyH / 2 + (tmpl.id === 'wall_oven' ? bodyH * 0.025 : 0.02);
+      return (
+        <group position={[0, pivotY, depth / 2 - 0.01]} ref={doorRef}>
+          <mesh
+            position={[0, ovenH / 2, 0]}
+            geometry={getBox(bodyW * 0.92, ovenH * 0.95, 0.02)}
+            material={mats.body}
+            castShadow raycast={nullRaycast}
+          />
+          {/* handle bar */}
+          <mesh
+            position={[0, ovenH * 0.95, 0.02]}
+            geometry={getBox(bodyW * 0.55, 0.025, 0.025)}
+            material={mats.knob}
+            castShadow raycast={nullRaycast}
+          />
+        </group>
+      );
+    }
+    // Side-hinge (fridge, washer, dryer, microwave, etc.)
+    const hingeX = -bodyW / 2;
+    const panelX = bodyW / 2;
+    return (
+      <group position={[hingeX, 0, depth / 2 - 0.01]} ref={doorRef}>
+        <mesh
+          position={[panelX, 0, 0]}
+          geometry={getBox(bodyW * 0.95, bodyH * 0.95, 0.02)}
+          material={mats.body}
+          castShadow raycast={nullRaycast}
+        />
+        {/* Vertical handle along the leading edge */}
+        <mesh
+          position={[panelX + bodyW * 0.42, 0, 0.02]}
+          geometry={getBox(0.025, bodyH * 0.6, 0.025)}
+          material={mats.knob}
+          castShadow raycast={nullRaycast}
+        />
+      </group>
+    );
+  })() : null;
+
+  // Template-specific feature meshes (signature shape that distinguishes the
+  // fixture from a generic box)
+  const signature = ((): React.ReactNode => {
+    switch (tmpl.id) {
+      case 'fridge_french_door':
+        // Two door split + freezer drawer below — render seam lines
+        return (
+          <>
+            <mesh position={[0, bodyH * 0.05, depth / 2 + 0.001]} geometry={getBox(bodyW * 0.96, 0.01, 0.01)} material={mats.trim} raycast={nullRaycast} />
+            <mesh position={[0, bodyH * 0.35, depth / 2 + 0.001]} geometry={getBox(0.01, bodyH * 0.55, 0.01)} material={mats.trim} raycast={nullRaycast} />
+          </>
+        );
+      case 'range_4burner':
+      case 'range_6burner': {
+        // 4 or 6 burner circles on the cooktop
+        const burners = tmpl.id === 'range_4burner' ? 4 : 6;
+        const cols = burners === 4 ? 2 : 3;
+        const rows = 2;
+        const dots: React.ReactNode[] = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const x = (c - (cols - 1) / 2) * (bodyW / (cols + 0.5));
+            const z = (r - (rows - 1) / 2) * (depth / (rows + 0.5));
+            dots.push(
+              <mesh
+                key={`burner_${r}_${c}`}
+                position={[x, bodyH / 2 + 0.015, z]}
+                geometry={getCyl(0.05, 0.005)}
+                material={mats.trim}
+                raycast={nullRaycast}
+              />
+            );
+          }
+        }
+        return <>{dots}</>;
+      }
+      case 'sink_kitchen_double':
+      case 'sink_kitchen_single': {
+        const basinW = tmpl.id === 'sink_kitchen_double' ? bodyW * 0.4 : bodyW * 0.85;
+        const basinD = depth * 0.85;
+        const basins = tmpl.id === 'sink_kitchen_double' ? [-bodyW * 0.22, +bodyW * 0.22] : [0];
+        return (
+          <>
+            {basins.map((x, i) => (
+              <mesh
+                key={`basin_${i}`}
+                position={[x, -bodyH / 2 + 0.01, 0]}
+                geometry={getBox(basinW, 0.04, basinD)}
+                material={mats.body}
+                castShadow receiveShadow raycast={nullRaycast}
+              />
+            ))}
+            {/* Faucet — gooseneck approximated as vertical + horizontal cylinder */}
+            <mesh
+              position={[0, bodyH * 0.3, -depth * 0.35]}
+              geometry={getCyl(0.018, bodyH * 0.6)}
+              material={mats.knob}
+              castShadow raycast={nullRaycast}
+            />
+            <mesh
+              position={[0, bodyH * 0.6, -depth * 0.18]}
+              geometry={getBox(0.02, 0.02, depth * 0.4)}
+              material={mats.knob}
+              castShadow raycast={nullRaycast}
+            />
+          </>
+        );
+      }
+      case 'sink_pedestal': {
+        // Bowl on top + tapered pedestal below
+        return (
+          <>
+            <mesh position={[0, bodyH * 0.45, 0]} geometry={getCyl(bodyW * 0.5, bodyH * 0.18)} material={mats.body} castShadow raycast={nullRaycast} />
+            <mesh position={[0, -bodyH * 0.05, 0]} geometry={getCyl(bodyW * 0.18, bodyH * 0.6)} material={mats.body} castShadow raycast={nullRaycast} />
+            <mesh position={[0, bodyH * 0.6, -depth * 0.3]} geometry={getCyl(0.018, bodyH * 0.25)} material={mats.knob} castShadow raycast={nullRaycast} />
+          </>
+        );
+      }
+      case 'sink_vessel': {
+        return <mesh position={[0, bodyH * 0.5, 0]} geometry={getCyl(bodyW * 0.4, bodyH * 0.7)} material={mats.body} castShadow raycast={nullRaycast} />;
+      }
+      case 'toilet_standard': {
+        // Bowl + tank
+        return (
+          <>
+            <mesh position={[0, -bodyH * 0.25, depth * 0.05]} geometry={getCyl(bodyW * 0.45, bodyH * 0.45)} material={mats.body} castShadow raycast={nullRaycast} />
+            <mesh position={[0, +bodyH * 0.15, -depth * 0.32]} geometry={getBox(bodyW * 0.85, bodyH * 0.55, depth * 0.25)} material={mats.body} castShadow raycast={nullRaycast} />
+          </>
+        );
+      }
+      case 'toilet_wall_hung': {
+        return <mesh position={[0, 0, depth * 0.2]} geometry={getBox(bodyW * 0.85, bodyH, depth * 0.6)} material={mats.body} castShadow raycast={nullRaycast} />;
+      }
+      case 'shower_stall': {
+        // Glass enclosure: 3 sides of glass, top open
+        return (
+          <>
+            <mesh position={[0, 0, depth / 2 - 0.01]} geometry={getBox(bodyW * 0.96, bodyH * 0.96, 0.012)} material={mats.glass} raycast={nullRaycast} />
+            <mesh position={[-bodyW / 2 + 0.006, 0, 0]} geometry={getBox(0.012, bodyH * 0.96, depth)} material={mats.glass} raycast={nullRaycast} />
+            <mesh position={[+bodyW / 2 - 0.006, 0, 0]} geometry={getBox(0.012, bodyH * 0.96, depth)} material={mats.glass} raycast={nullRaycast} />
+            {/* Shower head on back wall */}
+            <mesh position={[0, bodyH * 0.4, -depth / 2 + 0.05]} geometry={getCyl(0.08, 0.03)} material={mats.knob} castShadow raycast={nullRaycast} />
+          </>
+        );
+      }
+      case 'bathtub_alcove': {
+        // Tub: hollow rim around basin
+        return (
+          <>
+            <mesh position={[0, -bodyH * 0.1, 0]} geometry={getBox(bodyW * 0.95, bodyH * 0.7, depth * 0.85)} material={mats.body} castShadow raycast={nullRaycast} />
+            <mesh position={[bodyW * 0.42, bodyH * 0.4, -depth * 0.3]} geometry={getCyl(0.018, bodyH * 0.4)} material={mats.knob} castShadow raycast={nullRaycast} />
+          </>
+        );
+      }
+      default:
+        return null;
+    }
+  })();
+
+  // Toilets, sinks, tubs render their signature shape INSTEAD of the body box.
+  // Appliances render the body box AND the door + signature shapes.
+  const skipBody = tmpl.id.startsWith('sink_') || tmpl.id.startsWith('toilet_') || tmpl.id === 'shower_stall' || tmpl.id === 'bathtub_alcove';
+
+  return (
+    <OverlayMount
+      h={h} isNS={isNS} dir={dir}
+      depth={depth}
+      anchor={fixtureConfig.verticalAnchor ?? tmpl.defaultAnchor}
+      defaultAnchor={tmpl.defaultAnchor}
+    >
+      {!skipBody && bodyMesh}
+      {doorPanel}
+      {signature}
+    </OverlayMount>
+  );
+}
+
+// ── FloorOverlayMesh — rugs, runners, area mats ──────────────────
+//
+// Sits flat on the voxel floor. Single low-profile mesh.
+
+const _floorOverlayMatCache = new Map<string, THREE.MeshStandardMaterial>();
+function getFloorOverlayMaterial(primaryColor: string): THREE.MeshStandardMaterial {
+  let m = _floorOverlayMatCache.get(primaryColor);
+  if (m) return m;
+  m = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(primaryColor),
+    metalness: 0,
+    roughness: 0.9,
+  });
+  _floorOverlayMatCache.set(primaryColor, m);
+  return m;
+}
+
+function FloorOverlayMesh({ colPitch, rowPitch, vHeight, floorOverlayConfig }: {
+  colPitch: number; rowPitch: number; vHeight: number;
+  floorOverlayConfig: import('@/types/container').FloorOverlayConfig;
+}) {
+  const tmpl = getFloorOverlay(floorOverlayConfig.template);
+  const w = colPitch * tmpl.bodyWidth;
+  const d = rowPitch * tmpl.bodyDepth;
+  const RUG_THICK = 0.012;
+  return (
+    <mesh
+      position={[0, -vHeight / 2 + RUG_THICK / 2 + 0.025, 0]}
+      geometry={getBox(w, RUG_THICK, d)}
+      material={getFloorOverlayMaterial(tmpl.primaryColor)}
+      castShadow receiveShadow raycast={nullRaycast}
+    />
+  );
+}
+
+// ── CeilingOverlayMesh — fans, pendants, recessed lights, beams ──
+
+function CeilingOverlayMesh({ colPitch, rowPitch, vHeight, ceilingOverlayConfig }: {
+  colPitch: number; rowPitch: number; vHeight: number;
+  ceilingOverlayConfig: import('@/types/container').CeilingOverlayConfig;
+}) {
+  const tmpl = getCeilingOverlay(ceilingOverlayConfig.template);
+  const ceilingY = +vHeight / 2 - 0.05;
+  const bodyMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: new THREE.Color(tmpl.bodyColor),
+    metalness: 0.4,
+    roughness: 0.5,
+  }), [tmpl.bodyColor]);
+  const lightMat = useMemo(() => tmpl.illuminated
+    ? getEmissiveLEDMaterial('#fff4d6', 1.4)
+    : null,
+  [tmpl.illuminated]);
+
+  if (tmpl.kind === 'fan') {
+    return (
+      <group position={[0, ceilingY, 0]}>
+        {/* Mounting plate */}
+        <mesh position={[0, -0.04, 0]} geometry={getCyl(0.08, 0.04)} material={bodyMat} raycast={nullRaycast} />
+        {/* Down rod */}
+        <mesh position={[0, -0.16, 0]} geometry={getCyl(0.015, 0.18)} material={bodyMat} raycast={nullRaycast} />
+        {/* Hub */}
+        <mesh position={[0, -0.27, 0]} geometry={getCyl(0.06, 0.04)} material={bodyMat} raycast={nullRaycast} />
+        {/* 3 blades */}
+        {[0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((angle, i) => (
+          <mesh
+            key={`b${i}`}
+            position={[Math.cos(angle) * 0.4, -0.27, Math.sin(angle) * 0.4]}
+            rotation={[0, -angle, 0]}
+            geometry={getBox(0.5, 0.01, 0.12)}
+            material={bodyMat}
+            raycast={nullRaycast}
+          />
+        ))}
+        {/* Light bulb hanging below */}
+        {lightMat && (
+          <mesh position={[0, -0.36, 0]} geometry={getCyl(0.08, 0.06)} material={lightMat} raycast={nullRaycast} />
+        )}
+      </group>
+    );
+  }
+  if (tmpl.kind === 'pendant') {
+    const cluster = tmpl.id === 'pendant_cluster_3' ? [-0.2, 0, 0.2] : [0];
+    return (
+      <group position={[0, ceilingY, 0]}>
+        {cluster.map((dx, i) => {
+          const drop = 0.4 + i * 0.08;
+          return (
+            <group key={i} position={[dx, 0, 0]}>
+              {/* Cord */}
+              <mesh position={[0, -drop / 2, 0]} geometry={getCyl(0.005, drop)} material={bodyMat} raycast={nullRaycast} />
+              {/* Shade */}
+              <mesh position={[0, -drop, 0]} geometry={getCyl(0.08, 0.1)} material={bodyMat} raycast={nullRaycast} />
+              {/* Bulb */}
+              {lightMat && <mesh position={[0, -drop - 0.04, 0]} geometry={getCyl(0.05, 0.05)} material={lightMat} raycast={nullRaycast} />}
+            </group>
+          );
+        })}
+      </group>
+    );
+  }
+  if (tmpl.kind === 'recessed') {
+    const grid = tmpl.id === 'recessed_grid_6' ? { cols: 3, rows: 2 } : { cols: 2, rows: 2 };
+    const items: React.ReactNode[] = [];
+    for (let r = 0; r < grid.rows; r++) {
+      for (let c = 0; c < grid.cols; c++) {
+        const x = (c - (grid.cols - 1) / 2) * (colPitch / (grid.cols + 1));
+        const z = (r - (grid.rows - 1) / 2) * (rowPitch / (grid.rows + 1));
+        items.push(
+          <group key={`r${r}c${c}`} position={[x, ceilingY, z]}>
+            <mesh position={[0, -0.005, 0]} geometry={getCyl(0.06, 0.012)} material={bodyMat} raycast={nullRaycast} />
+            {lightMat && <mesh position={[0, -0.012, 0]} geometry={getCyl(0.05, 0.005)} material={lightMat} raycast={nullRaycast} />}
+          </group>
+        );
+      }
+    }
+    return <>{items}</>;
+  }
+  // Beams
+  const beamCount = tmpl.id === 'beam_run_3' ? 3 : 1;
+  const beams: React.ReactNode[] = [];
+  for (let i = 0; i < beamCount; i++) {
+    const x = beamCount === 1 ? 0 : (i - (beamCount - 1) / 2) * (colPitch / (beamCount + 1));
+    beams.push(
+      <mesh
+        key={`beam_${i}`}
+        position={[x, ceilingY - 0.06, 0]}
+        geometry={getBox(0.12, 0.12, rowPitch * 0.95)}
+        material={bodyMat}
+        castShadow raycast={nullRaycast}
+      />
+    );
+  }
+  return <>{beams}</>;
+}
+
+// ── DecorFace — wall art, mirrors, TVs, clocks (static overlay) ──
+
+const DECOR_DEPTH = 0.04;
+const DECOR_FRAME_T = 0.025;
+
+function DecorFace({ w, h, isNS, dir, decorConfig }: {
+  w: number; h: number; isNS: boolean; dir: 'n' | 's' | 'e' | 'w';
+  decorConfig: DecorConfig;
+}) {
+  const tmpl = getDecorTemplate(decorConfig.template);
+  const mats = getDecorMaterials(decorConfig.palette);
+
+  const bodyW = w * tmpl.bodyWidth;
+  const bodyH = h * tmpl.bodyHeight;
+  const isMirror = tmpl.id === 'mirror_round' || tmpl.id === 'mirror_rectangular';
+  const isClock = tmpl.id === 'wall_clock_round';
+  const noFrame = decorConfig.palette === 'no_frame' || tmpl.id === 'tapestry' || tmpl.id === 'floating_canvas' || tmpl.isTV;
+
+  // Inner image area (inside the frame)
+  const innerW = bodyW - DECOR_FRAME_T * 2;
+  const innerH = bodyH - DECOR_FRAME_T * 2;
+  const innerMat = isMirror ? mats.mirror : tmpl.isTV ? mats.tvScreen : mats.image;
+
+  // Frame ring (4 thin boxes around the perimeter) — skipped when noFrame
+  const frame = !noFrame ? (
+    <>
+      <mesh position={[0, +bodyH / 2 - DECOR_FRAME_T / 2, 0]} geometry={getBox(bodyW, DECOR_FRAME_T, DECOR_DEPTH)} material={mats.frame} castShadow raycast={nullRaycast} />
+      <mesh position={[0, -bodyH / 2 + DECOR_FRAME_T / 2, 0]} geometry={getBox(bodyW, DECOR_FRAME_T, DECOR_DEPTH)} material={mats.frame} castShadow raycast={nullRaycast} />
+      <mesh position={[-bodyW / 2 + DECOR_FRAME_T / 2, 0, 0]} geometry={getBox(DECOR_FRAME_T, bodyH, DECOR_DEPTH)} material={mats.frame} castShadow raycast={nullRaycast} />
+      <mesh position={[+bodyW / 2 - DECOR_FRAME_T / 2, 0, 0]} geometry={getBox(DECOR_FRAME_T, bodyH, DECOR_DEPTH)} material={mats.frame} castShadow raycast={nullRaycast} />
+    </>
+  ) : null;
+
+  // Picture light — small downward-pointing brass arm above the frame.
+  // Cosmetic only (emissive bulb, no real point light).
+  const pictureLight = decorConfig.pictureLight ? (
+    <group position={[0, +bodyH / 2 + 0.06, 0]}>
+      {/* Mounting arm */}
+      <mesh position={[0, 0.04, -DECOR_DEPTH / 2]} geometry={getBox(0.025, 0.08, 0.01)} material={mats.frame} castShadow raycast={nullRaycast} />
+      {/* Hood */}
+      <mesh position={[0, 0.085, 0]} geometry={getBox(bodyW * 0.7, 0.025, 0.06)} material={mats.frame} castShadow raycast={nullRaycast} />
+      {/* Bulb */}
+      <mesh position={[0, 0.07, 0.015]} geometry={getBox(bodyW * 0.6, 0.012, 0.012)} material={getEmissiveLEDMaterial('#fff4d6', 1.8)} raycast={nullRaycast} />
+    </group>
+  ) : null;
+
+  // Round mirror / clock — single circular mesh overrides the rectangle frame
+  const isRound = tmpl.id === 'mirror_round' || tmpl.id === 'wall_clock_round';
+  if (isRound) {
+    const radius = Math.min(bodyW, bodyH) / 2;
+    return (
+      <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+        {!noFrame && (
+          <mesh position={[0, 0, 0]} geometry={getCyl(radius, DECOR_FRAME_T)} rotation={[Math.PI / 2, 0, 0]} material={mats.frame} castShadow raycast={nullRaycast} />
+        )}
+        <mesh position={[0, 0, DECOR_FRAME_T / 2 + 0.001]} geometry={getCyl(radius * 0.92, 0.005)} rotation={[Math.PI / 2, 0, 0]} material={isClock ? mats.image : mats.mirror} castShadow raycast={nullRaycast} />
+        {isClock && (
+          <>
+            {/* Hour hand */}
+            <mesh position={[0, radius * 0.2, DECOR_FRAME_T]} geometry={getBox(0.012, radius * 0.5, 0.005)} material={mats.frame} raycast={nullRaycast} />
+            {/* Minute hand */}
+            <mesh position={[radius * 0.3, 0, DECOR_FRAME_T]} geometry={getBox(radius * 0.6, 0.008, 0.005)} material={mats.frame} raycast={nullRaycast} />
+          </>
+        )}
+      </OverlayMount>
+    );
+  }
+
+  // Gallery-3 = three small frames in a row
+  if (tmpl.id === 'gallery_3') {
+    const cellW = bodyW / 3.2;
+    const xs = [-bodyW / 3, 0, +bodyW / 3];
+    return (
+      <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+        {xs.map((x, i) => (
+          <group key={`f${i}`} position={[x, 0, 0]}>
+            <mesh position={[0, +bodyH / 2 - DECOR_FRAME_T / 2, 0]} geometry={getBox(cellW, DECOR_FRAME_T, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[0, -bodyH / 2 + DECOR_FRAME_T / 2, 0]} geometry={getBox(cellW, DECOR_FRAME_T, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[-cellW / 2 + DECOR_FRAME_T / 2, 0, 0]} geometry={getBox(DECOR_FRAME_T, bodyH, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[+cellW / 2 - DECOR_FRAME_T / 2, 0, 0]} geometry={getBox(DECOR_FRAME_T, bodyH, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[0, 0, DECOR_DEPTH / 2 - 0.005]} geometry={getBox(cellW - DECOR_FRAME_T * 2, bodyH - DECOR_FRAME_T * 2, 0.008)} material={mats.image} raycast={nullRaycast} />
+          </group>
+        ))}
+      </OverlayMount>
+    );
+  }
+
+  // Gallery 2×2 grid
+  if (tmpl.id === 'gallery_grid') {
+    const cellW = bodyW / 2.1;
+    const cellH = bodyH / 2.1;
+    const positions: [number, number][] = [
+      [-bodyW / 4, +bodyH / 4],
+      [+bodyW / 4, +bodyH / 4],
+      [-bodyW / 4, -bodyH / 4],
+      [+bodyW / 4, -bodyH / 4],
+    ];
+    return (
+      <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+        {positions.map(([x, y], i) => (
+          <group key={`g${i}`} position={[x, y, 0]}>
+            <mesh position={[0, +cellH / 2 - DECOR_FRAME_T / 2, 0]} geometry={getBox(cellW, DECOR_FRAME_T, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[0, -cellH / 2 + DECOR_FRAME_T / 2, 0]} geometry={getBox(cellW, DECOR_FRAME_T, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[-cellW / 2 + DECOR_FRAME_T / 2, 0, 0]} geometry={getBox(DECOR_FRAME_T, cellH, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[+cellW / 2 - DECOR_FRAME_T / 2, 0, 0]} geometry={getBox(DECOR_FRAME_T, cellH, DECOR_DEPTH)} material={mats.frame} raycast={nullRaycast} />
+            <mesh position={[0, 0, DECOR_DEPTH / 2 - 0.005]} geometry={getBox(cellW - DECOR_FRAME_T * 2, cellH - DECOR_FRAME_T * 2, 0.008)} material={mats.image} raycast={nullRaycast} />
+          </group>
+        ))}
+      </OverlayMount>
+    );
+  }
+
+  // Window treatments: curtains, blinds, roman shade
+  if (tmpl.id === 'curtain_drape') {
+    // Two vertical fabric panels with subtle column suggestion
+    const panelW = bodyW * 0.46;
+    const fabricMat = new THREE.MeshStandardMaterial({ color: mats.frame.color, roughness: 0.92, metalness: 0 });
+    return (
+      <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+        <mesh position={[-bodyW * 0.235, 0, 0]} geometry={getBox(panelW, bodyH, 0.04)} material={fabricMat} castShadow />
+        <mesh position={[+bodyW * 0.235, 0, 0]} geometry={getBox(panelW, bodyH, 0.04)} material={fabricMat} castShadow />
+        {/* Curtain rod */}
+        <mesh position={[0, +bodyH / 2 + 0.04, 0]} geometry={getBox(bodyW * 1.05, 0.02, 0.02)} material={mats.frame} />
+      </OverlayMount>
+    );
+  }
+  if (tmpl.id === 'blinds_horizontal') {
+    const SLATS = 12;
+    const slatH = bodyH / (SLATS + 1);
+    const slats: React.ReactNode[] = [];
+    for (let i = 0; i < SLATS; i++) {
+      const y = -bodyH / 2 + slatH * (i + 0.7);
+      slats.push(<mesh key={i} position={[0, y, 0]} geometry={getBox(bodyW, slatH * 0.75, 0.012)} material={mats.image} />);
+    }
+    return (
+      <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+        {slats}
+      </OverlayMount>
+    );
+  }
+  if (tmpl.id === 'blinds_vertical') {
+    const SLATS = 10;
+    const slatW = bodyW / (SLATS + 1);
+    const slats: React.ReactNode[] = [];
+    for (let i = 0; i < SLATS; i++) {
+      const x = -bodyW / 2 + slatW * (i + 0.7);
+      slats.push(<mesh key={i} position={[x, 0, 0]} geometry={getBox(slatW * 0.75, bodyH, 0.012)} material={mats.image} />);
+    }
+    return (
+      <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+        {slats}
+      </OverlayMount>
+    );
+  }
+  if (tmpl.id === 'roman_shade') {
+    // Stacked fabric folds — 5 thin horizontal layers
+    const FOLDS = 5;
+    const foldH = bodyH / (FOLDS + 1);
+    const folds: React.ReactNode[] = [];
+    for (let i = 0; i < FOLDS; i++) {
+      const y = bodyH / 2 - foldH * (i + 0.5);
+      folds.push(<mesh key={i} position={[0, y, 0.005 + i * 0.001]} geometry={getBox(bodyW, foldH * 1.1, 0.02)} material={mats.frame} castShadow />);
+    }
+    return (
+      <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+        {folds}
+      </OverlayMount>
+    );
+  }
+
+  // Default: rectangular framed picture / mirror / tapestry / canvas / TV
+  return (
+    <OverlayMount h={h} isNS={isNS} dir={dir} depth={DECOR_DEPTH} anchor={decorConfig.verticalAnchor ?? tmpl.defaultAnchor} defaultAnchor={tmpl.defaultAnchor}>
+      {frame}
+      <mesh
+        position={[0, 0, DECOR_DEPTH / 2 - 0.005]}
+        geometry={getBox(noFrame ? bodyW : innerW, noFrame ? bodyH : innerH, 0.008)}
+        material={innerMat}
+        castShadow raycast={nullRaycast}
+      />
+      {tmpl.hasGlass && !isMirror && (
+        <mesh
+          position={[0, 0, DECOR_DEPTH / 2 + 0.001]}
+          geometry={getBox(innerW, innerH, 0.003)}
+          material={mats.glass}
+          raycast={nullRaycast}
+        />
+      )}
+      {pictureLight}
+    </OverlayMount>
+  );
+}
+
+export function FaceVisual({ surface, colPitch, rowPitch, vHeight, isNS, isEW, isHoriz, connectedStart, connectedEnd, isOpen, doorState, doorConfig, windowConfig, dir, shelfConfig, cabinetConfig, fixtureConfig, decorConfig }: {
   surface: SurfaceType;
   colPitch: number;
   rowPitch: number;
@@ -773,13 +2477,33 @@ export function FaceVisual({ surface, colPitch, rowPitch, vHeight, isNS, isEW, i
   isOpen?: boolean;
   doorState?: string;
   doorConfig?: import('@/types/container').DoorConfig;
+  windowConfig?: import('@/types/container').WindowConfig;
+  /** Direction of this face — required for overlay mounting. */
+  dir?: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom';
+  shelfConfig?: import('@/types/container').ShelfConfig;
+  cabinetConfig?: import('@/types/container').CabinetConfig;
+  fixtureConfig?: import('@/types/container').FixtureConfig;
+  decorConfig?: import('@/types/container').DecorConfig;
 }) {
   const bW = isNS ? colPitch : isEW ? PANEL_THICK : colPitch;
   const bH = isNS ? vHeight  : isEW ? vHeight     : PANEL_THICK;
   const bD = isNS ? PANEL_THICK : isEW ? rowPitch  : rowPitch;
   const spanW = isNS ? colPitch : rowPitch;
+  const wallDir = (dir === 'n' || dir === 's' || dir === 'e' || dir === 'w') ? dir : null;
+  const overlay = wallDir && (shelfConfig || cabinetConfig || fixtureConfig || decorConfig) ? (
+    <>
+      {shelfConfig && <ShelfFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} shelfConfig={shelfConfig} />}
+      {cabinetConfig && <CabinetFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} cabinetConfig={cabinetConfig} />}
+      {fixtureConfig && <FixtureFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} fixtureConfig={fixtureConfig} />}
+      {decorConfig && <DecorFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} decorConfig={decorConfig} />}
+    </>
+  ) : null;
 
-  if (surface === "Open" || surface === "Stairs") return null;
+  if (surface === "Open" || surface === "Stairs") {
+    // Open faces still render shelf/cabinet overlays — useful when the user
+    // wants a free-floating shelf with no wall behind (e.g. on a half-wall).
+    return overlay ?? null;
+  }
   if (isHoriz) {
     if (surface === "Deck_Wood")    return <DeckWood w={colPitch} d={rowPitch} />;
     if (surface === "Concrete")     return <ConcreteFace w={bW} h={bH} d={bD} />;
@@ -788,30 +2512,33 @@ export function FaceVisual({ surface, colPitch, rowPitch, vHeight, isNS, isEW, i
     const ROOF_THICK = 0.08;
     return <mesh geometry={getBox(colPitch, ROOF_THICK, rowPitch)} material={mSteel} castShadow receiveShadow raycast={nullRaycast} />;
   }
-  switch (surface) {
-    case "Solid_Steel":   return <SteelFace w={bW} h={bH} d={bD} />;
-    case "Glass_Pane":    return <GlassFace w={bW} h={bH} d={bD} isNS={isNS} />;
-    case "Wall_Washi":    return <mesh geometry={getBox(bW, bH, bD)} material={mWashi} castShadow raycast={nullRaycast} />;
-    case "Glass_Shoji":   return <ShojiSlide w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} />;
-    case "Wood_Hinoki":   return <mesh geometry={getBox(bW, bH, bD)} material={mHinoki} castShadow raycast={nullRaycast} />;
-    case "Railing_Cable": return <RailingCable spanW={spanW} spanH={vHeight} isNS={isNS}
-      connectedStart={connectedStart} connectedEnd={connectedEnd} />;
-    case "Railing_Glass": return <RailingGlass spanW={spanW} spanH={vHeight} isNS={isNS}
-      connectedStart={connectedStart} connectedEnd={connectedEnd} />;
-    case "Deck_Wood":     return <SteelFace w={bW} h={bH} d={bD} />;
-    case "Concrete":      return <ConcreteFace w={bW} h={bH} d={bD} />;
-    case "Half_Fold":     return <HalfFoldFace w={bW} h={bH} d={bD} isNS={isNS} />;
-    case "Gull_Wing":     return <GullWingFace w={bW} h={bH} d={bD} isNS={isNS} />;
-    case "Door":          return <DoorFace w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} doorState={doorState} doorConfig={doorConfig} />;
-    case "Window_Standard":
-    case "Window_Sill":
-    case "Window_Clerestory":
-    case "Window_Half": {
-      const profile = WINDOW_PROFILES[surface];
-      return <WindowFace w={bW} h={bH} d={bD} isNS={isNS} sillRatio={profile.sillRatio} headRatio={profile.headRatio} />;
+  const surfaceNode: React.ReactNode = (() => {
+    switch (surface) {
+      case "Solid_Steel":   return <SteelFace w={bW} h={bH} d={bD} />;
+      case "Glass_Pane":    return <GlassFace w={bW} h={bH} d={bD} isNS={isNS} />;
+      case "Wall_Washi":    return <mesh geometry={getBox(bW, bH, bD)} material={mWashi} castShadow raycast={nullRaycast} />;
+      case "Glass_Shoji":   return <ShojiSlide w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} />;
+      case "Wood_Hinoki":   return <mesh geometry={getBox(bW, bH, bD)} material={mHinoki} castShadow raycast={nullRaycast} />;
+      case "Railing_Cable": return <RailingCable spanW={spanW} spanH={vHeight} isNS={isNS}
+        connectedStart={connectedStart} connectedEnd={connectedEnd} />;
+      case "Railing_Glass": return <RailingGlass spanW={spanW} spanH={vHeight} isNS={isNS}
+        connectedStart={connectedStart} connectedEnd={connectedEnd} />;
+      case "Deck_Wood":     return <SteelFace w={bW} h={bH} d={bD} />;
+      case "Concrete":      return <ConcreteFace w={bW} h={bH} d={bD} />;
+      case "Half_Fold":     return <HalfFoldFace w={bW} h={bH} d={bD} isNS={isNS} dir={wallDir} openAmount={0} />;
+      case "Gull_Wing":     return <GullWingFace w={bW} h={bH} d={bD} isNS={isNS} dir={wallDir} openAmount={0} />;
+      case "Door":          return <DoorFace w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} doorState={doorState} doorConfig={doorConfig} />;
+      case "Window_Standard":
+      case "Window_Sill":
+      case "Window_Clerestory":
+      case "Window_Half": {
+        const profile = WINDOW_PROFILES[surface];
+        return <WindowFace w={bW} h={bH} d={bD} isNS={isNS} sillRatio={profile.sillRatio} headRatio={profile.headRatio} windowConfig={windowConfig} />;
+      }
+      default:              return null;
     }
-    default:              return null;
-  }
+  })();
+  return overlay ? <>{surfaceNode}{overlay}</> : surfaceNode;
 }
 
 // ── Adjacency culling ──────────────────────────────────────────
@@ -921,8 +2648,25 @@ interface FaceProps {
   isOpen?: boolean;
   /** Door state: 'closed' | 'open_swing' | 'open_slide' */
   doorState?: string;
-  /** Door configuration (hinge, swing, type) */
+  /** Door configuration (hinge, swing, type, template, skin) */
   doorConfig?: import('@/types/container').DoorConfig;
+  /** Window configuration (template, skin) */
+  windowConfig?: import('@/types/container').WindowConfig;
+  /** Optional shelf overlay — renders ON TOP of the surface. */
+  shelfConfig?: import('@/types/container').ShelfConfig;
+  /** Optional cabinet overlay — renders ON TOP of the surface. */
+  cabinetConfig?: import('@/types/container').CabinetConfig;
+  /** Optional fixture overlay — appliances + bathroom fixtures. */
+  fixtureConfig?: import('@/types/container').FixtureConfig;
+  /** Optional decor overlay — pictures, mirrors, TVs, clocks. */
+  decorConfig?: import('@/types/container').DecorConfig;
+  /** Optional floor overlay — rugs, runners. Renders flat on the voxel floor. */
+  floorOverlayConfig?: import('@/types/container').FloorOverlayConfig;
+  /** Optional ceiling overlay — fans, pendants, recessed lights, beams. */
+  ceilingOverlayConfig?: import('@/types/container').CeilingOverlayConfig;
+  /** Hinged-wall animation state (Half_Fold + Gull_Wing). 0 = closed wall,
+   *  1 = panels fully folded outward into deck/awning. */
+  hingedConfig?: import('@/types/container').HingedConfig;
   /** Wall cut scale: 1.0=full, 0.5=half, 0.05=down. Only affects wall faces (n/s/e/w). */
   wallCutScale?: number;
   /** Per-face finish overrides (paint, tint, frameColor, etc.) */
@@ -934,7 +2678,8 @@ interface FaceProps {
 function SingleFace({
   dir, surface, colPitch, rowPitch, vHeight, vOffset,
   connectedStart, connectedEnd,
-  isOpen, doorState, doorConfig,
+  isOpen, doorState, doorConfig, windowConfig, shelfConfig, cabinetConfig, fixtureConfig, decorConfig,
+  floorOverlayConfig, ceilingOverlayConfig, hingedConfig,
   wallCutScale = 1.0, faceFinish, theme: activeTheme,
 }: FaceProps) {
   const halfCol = colPitch / 2;
@@ -1151,85 +2896,111 @@ function SingleFace({
   // Render the VISUAL material layer using displaySurface (lags during exit animation)
   // displaySurface holds the OLD surface during exit animation so the visual stays until fold-in completes.
   function renderVisual() {
+    const wallDir = (dir === 'n' || dir === 's' || dir === 'e' || dir === 'w') ? dir : null;
+    const overlay = wallDir && (shelfConfig || cabinetConfig || fixtureConfig || decorConfig) ? (
+      <>
+        {shelfConfig && <ShelfFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} shelfConfig={shelfConfig} />}
+        {cabinetConfig && <CabinetFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} cabinetConfig={cabinetConfig} />}
+        {fixtureConfig && <FixtureFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} fixtureConfig={fixtureConfig} />}
+        {decorConfig && <DecorFace w={spanW} h={vHeight} isNS={isNS} dir={wallDir} decorConfig={decorConfig} />}
+      </>
+    ) : null;
+    // Floor/ceiling overlays render on horizontal faces only — bottom = rugs,
+    // top = ceiling fixtures.
+    const horizOverlay = isHoriz ? (
+      <>
+        {dir === 'bottom' && floorOverlayConfig && (
+          <FloorOverlayMesh colPitch={colPitch} rowPitch={rowPitch} vHeight={vHeight} floorOverlayConfig={floorOverlayConfig} />
+        )}
+        {dir === 'top' && ceilingOverlayConfig && (
+          <CeilingOverlayMesh colPitch={colPitch} rowPitch={rowPitch} vHeight={vHeight} ceilingOverlayConfig={ceilingOverlayConfig} />
+        )}
+      </>
+    ) : null;
+    const wrap = (node: React.ReactNode) => overlay ? <>{node}{overlay}</> : node;
+
     const s = displaySurface;
-    if (s === "Open") return null;
-    if (isHoriz) {
-      if (s === "Deck_Wood")    return <DeckWood w={colPitch} d={rowPitch} />;
-      if (s === "Concrete")     return <ConcreteFace w={bW} h={bH} d={bD} />;
-      if (s === "Floor_Tatami") return <mesh geometry={getBox(colPitch, 0.04, rowPitch)} material={mTatami} castShadow receiveShadow raycast={nullRaycast} />;
-      if (s === "Wood_Hinoki")  return <mesh geometry={getBox(colPitch, 0.04, rowPitch)} material={mHinoki} castShadow receiveShadow raycast={nullRaycast} />;
-      const ROOF_THICK = 0.08;
-      // Both roof (top) and floor (bottom) use steel — emissive ceiling glow removed
-      // (mCeilingLight was causing white-out on roof when viewed from above)
-      const panelMat = faceFinish?.paint || faceFinish?.material
-        ? getMaterialForFace('Solid_Steel', faceFinish, activeTheme) as THREE.MeshStandardMaterial
-        : mSteel;
-      if (dir === 'top' && faceFinish?.light && faceFinish.light !== 'none') {
+    if (s === "Open") return overlay ?? null;
+    const surfaceNode: React.ReactNode = (() => {
+      if (isHoriz) {
+        if (s === "Deck_Wood")    return <DeckWood w={colPitch} d={rowPitch} />;
+        if (s === "Concrete")     return <ConcreteFace w={bW} h={bH} d={bD} />;
+        if (s === "Floor_Tatami") return <mesh geometry={getBox(colPitch, 0.04, rowPitch)} material={mTatami} castShadow receiveShadow raycast={nullRaycast} />;
+        if (s === "Wood_Hinoki")  return <mesh geometry={getBox(colPitch, 0.04, rowPitch)} material={mHinoki} castShadow receiveShadow raycast={nullRaycast} />;
+        const ROOF_THICK = 0.08;
+        const panelMat = faceFinish?.paint || faceFinish?.material
+          ? getMaterialForFace('Solid_Steel', faceFinish, activeTheme) as THREE.MeshStandardMaterial
+          : mSteel;
+        if (dir === 'top' && faceFinish?.light && faceFinish.light !== 'none') {
+          return (
+            <>
+              <mesh geometry={getBox(colPitch, ROOF_THICK, rowPitch)} material={panelMat} castShadow receiveShadow raycast={nullRaycast} />
+              <LightFixture type={faceFinish.light} lightColor={faceFinish.lightColor} colPitch={colPitch} rowPitch={rowPitch} vHeight={vHeight} />
+            </>
+          );
+        }
         return (
-          <>
-            <mesh geometry={getBox(colPitch, ROOF_THICK, rowPitch)} material={panelMat} castShadow receiveShadow raycast={nullRaycast} />
-            <LightFixture type={faceFinish.light} lightColor={faceFinish.lightColor} colPitch={colPitch} rowPitch={rowPitch} vHeight={vHeight} />
-          </>
+          <mesh
+            geometry={getBox(colPitch, ROOF_THICK, rowPitch)}
+            material={panelMat}
+            castShadow
+            receiveShadow
+            raycast={nullRaycast}
+          />
         );
       }
-      return (
-        <mesh
-          geometry={getBox(colPitch, ROOF_THICK, rowPitch)}
-          material={panelMat}
-          castShadow
-          receiveShadow
-          raycast={nullRaycast}
-        />
-      );
-    }
-    switch (s) {
-      case "Solid_Steel": {
-        const wallMesh = (faceFinish?.paint || faceFinish?.material)
-          ? <mesh geometry={getBox(bW, bH, bD)} material={getMaterialForFace('Solid_Steel', faceFinish, activeTheme)} castShadow receiveShadow raycast={nullRaycast} />
-          : <SteelFace w={bW} h={bH} d={bD} />;
-        if (!isHoriz && faceFinish?.electrical && faceFinish.electrical !== 'none') {
-          return <>{wallMesh}<ElectricalPlate type={faceFinish.electrical} dir={dir as 'n' | 's' | 'e' | 'w'} /></>;
+      switch (s) {
+        case "Solid_Steel": {
+          const wallMesh = (faceFinish?.paint || faceFinish?.material)
+            ? <mesh geometry={getBox(bW, bH, bD)} material={getMaterialForFace('Solid_Steel', faceFinish, activeTheme)} castShadow receiveShadow raycast={nullRaycast} />
+            : <SteelFace w={bW} h={bH} d={bD} />;
+          if (!isHoriz && faceFinish?.electrical && faceFinish.electrical !== 'none') {
+            return <>{wallMesh}<ElectricalPlate type={faceFinish.electrical} dir={dir as 'n' | 's' | 'e' | 'w'} /></>;
+          }
+          return wallMesh;
         }
-        return wallMesh;
+        case "Glass_Pane": {
+          const tintMat = faceFinish?.tint
+            ? getMaterialForFace('Glass_Pane', faceFinish, activeTheme) as THREE.MeshPhysicalMaterial
+            : undefined;
+          return <GlassFace w={bW} h={bH} d={bD} isNS={isNS} glassMat={tintMat} />;
+        }
+        case "Wall_Washi":    return <mesh geometry={getBox(bW, bH, bD)} material={mWashi} castShadow raycast={nullRaycast} />;
+        case "Glass_Shoji":   return <ShojiSlide w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} />;
+        case "Wood_Hinoki":   return <mesh geometry={getBox(bW, bH, bD)} material={mHinoki} castShadow raycast={nullRaycast} />;
+        case "Railing_Cable": return <RailingCable spanW={spanW} spanH={vHeight} isNS={isNS}
+          connectedStart={connectedStart} connectedEnd={connectedEnd} />;
+        case "Railing_Glass": return <RailingGlass spanW={spanW} spanH={vHeight} isNS={isNS}
+          connectedStart={connectedStart} connectedEnd={connectedEnd} />;
+        case "Deck_Wood":     return <SteelFace w={bW} h={bH} d={bD} />;
+        case "Concrete":      return <ConcreteFace w={bW} h={bH} d={bD} />;
+        case "Half_Fold":     return <HalfFoldFace w={bW} h={bH} d={bD} isNS={isNS} dir={dir as 'n' | 's' | 'e' | 'w'} openAmount={hingedConfig?.openAmount ?? 0} />;
+        case "Gull_Wing":     return <GullWingFace w={bW} h={bH} d={bD} isNS={isNS} dir={dir as 'n' | 's' | 'e' | 'w'} openAmount={hingedConfig?.openAmount ?? 0} />;
+        case "Door": {
+          const effectiveDoorConfig = faceFinish?.doorStyle && doorConfig
+            ? { ...doorConfig, type: faceFinish.doorStyle as 'swing' | 'slide' }
+            : doorConfig;
+          const dMat = faceFinish?.frameColor
+            ? getMaterialForFace('Door', faceFinish, activeTheme) as THREE.MeshStandardMaterial
+            : undefined;
+          return <DoorFace w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} doorState={doorState} doorConfig={effectiveDoorConfig} doorMat={dMat} />;
+        }
+        case "Window_Standard":
+        case "Window_Sill":
+        case "Window_Clerestory":
+        case "Window_Half": {
+          const profile = WINDOW_PROFILES[s];
+          const wFrameMat = faceFinish?.frameColor
+            ? getMaterialForFace(s, faceFinish, activeTheme) as THREE.MeshStandardMaterial
+            : undefined;
+          return <WindowFace w={bW} h={bH} d={bD} isNS={isNS} sillRatio={profile.sillRatio} headRatio={profile.headRatio} frameMat={wFrameMat} windowConfig={windowConfig} />;
+        }
+        default:              return null;
       }
-      case "Glass_Pane": {
-        const tintMat = faceFinish?.tint
-          ? getMaterialForFace('Glass_Pane', faceFinish, activeTheme) as THREE.MeshPhysicalMaterial
-          : undefined;
-        return <GlassFace w={bW} h={bH} d={bD} isNS={isNS} glassMat={tintMat} />;
-      }
-      case "Wall_Washi":    return <mesh geometry={getBox(bW, bH, bD)} material={mWashi} castShadow raycast={nullRaycast} />;
-      case "Glass_Shoji":   return <ShojiSlide w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} />;
-      case "Wood_Hinoki":   return <mesh geometry={getBox(bW, bH, bD)} material={mHinoki} castShadow raycast={nullRaycast} />;
-      case "Railing_Cable": return <RailingCable spanW={spanW} spanH={vHeight} isNS={isNS}
-        connectedStart={connectedStart} connectedEnd={connectedEnd} />;
-      case "Railing_Glass": return <RailingGlass spanW={spanW} spanH={vHeight} isNS={isNS}
-        connectedStart={connectedStart} connectedEnd={connectedEnd} />;
-      case "Deck_Wood":     return <SteelFace w={bW} h={bH} d={bD} />;
-      case "Concrete":      return <ConcreteFace w={bW} h={bH} d={bD} />;
-      case "Half_Fold":     return <HalfFoldFace w={bW} h={bH} d={bD} isNS={isNS} />;
-      case "Gull_Wing":     return <GullWingFace w={bW} h={bH} d={bD} isNS={isNS} />;
-      case "Door": {
-        const effectiveDoorConfig = faceFinish?.doorStyle && doorConfig
-          ? { ...doorConfig, type: faceFinish.doorStyle as 'swing' | 'slide' }
-          : doorConfig;
-        const dMat = faceFinish?.frameColor
-          ? getMaterialForFace('Door', faceFinish, activeTheme) as THREE.MeshStandardMaterial
-          : undefined;
-        return <DoorFace w={bW} h={bH} d={bD} isNS={isNS} isOpen={isOpen} doorState={doorState} doorConfig={effectiveDoorConfig} doorMat={dMat} />;
-      }
-      case "Window_Standard":
-      case "Window_Sill":
-      case "Window_Clerestory":
-      case "Window_Half": {
-        const profile = WINDOW_PROFILES[s];
-        const wFrameMat = faceFinish?.frameColor
-          ? getMaterialForFace(s, faceFinish, activeTheme) as THREE.MeshStandardMaterial
-          : undefined;
-        return <WindowFace w={bW} h={bH} d={bD} isNS={isNS} sillRatio={profile.sillRatio} headRatio={profile.headRatio} frameMat={wFrameMat} />;
-      }
-      default:              return null;
-    }
+    })();
+    return horizOverlay
+      ? <>{wrap(surfaceNode)}{horizOverlay}</>
+      : wrap(surfaceNode);
   }
 
   // Drawbridge pivot: horizontal faces hinge at the -Z edge (north boundary)
@@ -1828,6 +3599,9 @@ function BaseplateCell({
   const showHolo = isHovered && !!clipFaces;
 
   const onEnterFace = (face: keyof VoxelFaces) => (e: ThreeEvent<PointerEvent>) => {
+    // Face filter: when set, ignore hover on faces that don't match. Lets the
+    // user dial in to ceilings/floors that are hard to hit in busy scenes.
+    if (!passesFaceFilter(face, useStore.getState().faceFilter)) return;
     e.stopPropagation();
     onEnter();
     useStore.getState().setHoveredVoxelEdge({ containerId, voxelIndex, face });
@@ -1839,8 +3613,13 @@ function BaseplateCell({
     useStore.getState().setHoveredVoxelEdge(null);
     document.body.style.cursor = 'auto';
   };
-  const onClickFace = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onClick(e); };
-  const onDownFace = (e: ThreeEvent<PointerEvent>) => {
+  const onClickFace = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent>) => {
+    if (!passesFaceFilter(face, useStore.getState().faceFilter)) return;
+    e.stopPropagation();
+    onClick(e);
+  };
+  const onDownFace = (face: keyof VoxelFaces) => (e: ThreeEvent<PointerEvent>) => {
+    if (!passesFaceFilter(face, useStore.getState().faceFilter)) return;
     e.stopPropagation();
     // WHY no startContainerDrag here: ContainerMesh handles drag with a 5px threshold.
     // Calling startContainerDrag immediately on pointer-down caused the blue screen bug —
@@ -1858,23 +3637,23 @@ function BaseplateCell({
         userData={{ isBay: true, containerId, voxelIndex, face: 'bottom' }}
         onPointerEnter={onEnterFace('bottom')}
         onPointerLeave={onLeaveFace}
-        onClick={onClickFace}
-        onPointerDown={onDownFace}
+        onClick={onClickFace('bottom')}
+        onPointerDown={onDownFace('bottom')}
         onContextMenu={onContextMenu ? (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); (e.nativeEvent as MouseEvent)?.preventDefault?.(); onContextMenu(e); } : undefined}
       />
       {/* ★ Wall-face edge strips at floor level (matches active voxel paradigm — never blocks floor quads) */}
       <mesh position={[0, BASEPLATE_FLOOR_Y, -rowPitch / 2 + BASEPLATE_STRIP / 2]} geometry={getBox(colPitch, 0.1, BASEPLATE_STRIP)} material={mHit}
         userData={{ isBay: true, containerId, voxelIndex, face: 'n' }}
-        onPointerEnter={onEnterFace('n')} onPointerLeave={onLeaveFace} onClick={onClickFace} onPointerDown={onDownFace} />
+        onPointerEnter={onEnterFace('n')} onPointerLeave={onLeaveFace} onClick={onClickFace('n')} onPointerDown={onDownFace('n')} />
       <mesh position={[0, BASEPLATE_FLOOR_Y, rowPitch / 2 - BASEPLATE_STRIP / 2]} geometry={getBox(colPitch, 0.1, BASEPLATE_STRIP)} material={mHit}
         userData={{ isBay: true, containerId, voxelIndex, face: 's' }}
-        onPointerEnter={onEnterFace('s')} onPointerLeave={onLeaveFace} onClick={onClickFace} onPointerDown={onDownFace} />
+        onPointerEnter={onEnterFace('s')} onPointerLeave={onLeaveFace} onClick={onClickFace('s')} onPointerDown={onDownFace('s')} />
       <mesh position={[colPitch / 2 - BASEPLATE_STRIP / 2, BASEPLATE_FLOOR_Y, 0]} geometry={getBox(BASEPLATE_STRIP, 0.1, rowPitch)} material={mHit}
         userData={{ isBay: true, containerId, voxelIndex, face: 'e' }}
-        onPointerEnter={onEnterFace('e')} onPointerLeave={onLeaveFace} onClick={onClickFace} onPointerDown={onDownFace} />
+        onPointerEnter={onEnterFace('e')} onPointerLeave={onLeaveFace} onClick={onClickFace('e')} onPointerDown={onDownFace('e')} />
       <mesh position={[-colPitch / 2 + BASEPLATE_STRIP / 2, BASEPLATE_FLOOR_Y, 0]} geometry={getBox(BASEPLATE_STRIP, 0.1, rowPitch)} material={mHit}
         userData={{ isBay: true, containerId, voxelIndex, face: 'w' }}
-        onPointerEnter={onEnterFace('w')} onPointerLeave={onLeaveFace} onClick={onClickFace} onPointerDown={onDownFace} />
+        onPointerEnter={onEnterFace('w')} onPointerLeave={onLeaveFace} onClick={onClickFace('w')} onPointerDown={onDownFace('w')} />
 
       {/* ★ Ghost hologram when stamp tool is active */}
       {showHolo && (
@@ -1958,6 +3737,24 @@ export default function ContainerSkin({
   const debugMode         = useStore((s) => s.debugMode);
   const setSelectedElements = useStore((s) => s.setSelectedElements);
   const activeBrush       = useStore((s) => s.activeBrush);
+  // Interactive-tool detection — drives whether inactive extension voxels
+  // render their `BaseplateCell` hitboxes. Without this gate, the hitboxes
+  // (5cm-tall colorWrite:false boxes at extension positions) leak faint
+  // rectangular artifacts onto the grass under certain shadow/postprocess
+  // combinations — root cause of the 2026-04-25 "afterburn next to a
+  // selected container" bug. Hitboxes are only useful when the user is
+  // actually targeting an extension cell (placement, stamp, or paint), so
+  // gate them on those tools being active. Default browse view = no
+  // hitboxes = no artifacts.
+  const isContainerSelected = useStore((s) => s.selection.includes(container.id));
+  const activeHotbarSlot   = useStore((s) => s.activeHotbarSlot);
+  const activePlacementFormId = useStore((s) => s.activePlacementFormId);
+  const renderBaseplate = (
+    isContainerSelected ||
+    activeBrush !== null ||
+    activeHotbarSlot !== null ||
+    activePlacementFormId !== null
+  );
   const setVoxelFace      = useStore((s) => s.setVoxelFace);
   const cycleVoxelFace    = useStore((s) => s.cycleVoxelFace);
   const cycleBlockPreset   = useStore((s) => s.cycleBlockPreset);
@@ -1978,6 +3775,14 @@ export default function ContainerSkin({
   const dollhouseActive      = useStore((s) => s.dollhouseActive);
   const currentTheme         = useStore((s) => s.currentTheme);
   const lockedVoxels         = useStore((s) => s.lockedVoxels);
+  // Face filter — when not 'all', hit meshes whose face doesn't match get
+  // nullRaycast so the raycaster passes through them and lands on the
+  // intended face's hitbox. Read here so the component re-renders when the
+  // filter changes; the helper below is used inline in raycast={...} props.
+  const faceFilter           = useStore((s) => s.faceFilter);
+  const gateRaycast = (face: 'top' | 'bottom' | 'n' | 's' | 'e' | 'w') => (
+    passesFaceFilter(face, faceFilter) ? undefined : nullRaycast
+  );
   const setFaceContext       = useStore((s) => s.setFaceContext);
   const hoveredVoxel         = useStore((s) => s.hoveredVoxel);
   const selectedVoxels       = useSelectedVoxels();
@@ -2462,6 +4267,13 @@ export default function ContainerSkin({
 
         // ── INACTIVE VOXEL → Phase 2 Baseplate + Phase 1 permanent face hitboxes ──
         if (!isActive) {
+          // Suppress the baseplate hitboxes entirely when no interactive tool
+          // is active — they're invisible by design (mHit material has
+          // colorWrite:false) but still leak onto the grass via the
+          // shadow/postprocess pipeline in some combinations. The user can
+          // still re-activate extension voxels by selecting the container
+          // first (which re-enables the hitboxes).
+          if (!renderBaseplate) return null;
           const baseKey = `base_${idx}`;
           return (
             <group key={idx}>
@@ -2503,7 +4315,7 @@ export default function ContainerSkin({
                   leaveTimerRef.current = setTimeout(() => {
                     setHoveredVoxel(null);
                     leaveTimerRef.current = null;
-                  }, 250);
+                  }, 100);
                 }}
                 onContextMenu={(e: ThreeEvent<MouseEvent>) => {
                   e.stopPropagation();
@@ -2663,6 +4475,14 @@ export default function ContainerSkin({
               isOpen={isFaceOpen}
               doorState={voxel.doorStates?.[dir]}
               doorConfig={voxel.doorConfig?.[dir]}
+              windowConfig={voxel.windowConfig?.[dir]}
+              shelfConfig={voxel.shelfConfig?.[dir]}
+              cabinetConfig={voxel.cabinetConfig?.[dir]}
+              fixtureConfig={voxel.fixtureConfig?.[dir]}
+              decorConfig={voxel.decorConfig?.[dir]}
+              floorOverlayConfig={voxel.floorOverlay?.[dir]}
+              ceilingOverlayConfig={voxel.ceilingOverlay?.[dir]}
+              hingedConfig={voxel.hingedConfig?.[dir]}
               onEnter={() => { setHovered(faceKey); useStore.getState().setHoverState({ hoveredVoxel: { containerId: container.id, index: idx }, hoveredVoxelEdge: null, hoveredBayGroup: bayIndicesForVoxel ? { containerId: container.id, indices: bayIndicesForVoxel } : null }); handlePaintDragMove(idx, dir); }}
               onLeave={() => { setHovered((k) => (k === faceKey ? null : k)); useStore.getState().setHoverState({ hoveredVoxel: null, hoveredVoxelEdge: null, hoveredBayGroup: null }); }}
               onClick={(e?: ThreeEvent<MouseEvent>) => {
@@ -2879,6 +4699,8 @@ export default function ContainerSkin({
                 }
               };
               const onClickEdge = (face: keyof VoxelFaces) => (e: ThreeEvent<MouseEvent> | ThreeEvent<PointerEvent>) => {
+                // Face filter — let the user dial in to ceiling/floor/wall picks.
+                if (!passesFaceFilter(face, useStore.getState().faceFilter)) return;
                 e.stopPropagation();
                 // ★ Object placement mode: intercept edge clicks to place scene objects (Fix 8)
                 if (tryPlacementIntercept(container.id, idx, face)) return;
@@ -2933,6 +4755,7 @@ export default function ContainerSkin({
                 }
               };
               const onEnterEdge = (face: keyof VoxelFaces) => (e: ThreeEvent<PointerEvent>) => {
+                if (!passesFaceFilter(face, useStore.getState().faceFilter)) return;
                 onEnterShared(e);
                 setHoveredVoxelEdge({ containerId: container.id, voxelIndex: idx, face });
                 setFaceContext('wall');
@@ -2970,7 +4793,9 @@ export default function ContainerSkin({
                               position={[0, FLOOR_Y, 0]}
                               material={mHit}
                               userData={{ isBay: true }}
+                              raycast={gateRaycast('bottom')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
+                                if (!passesFaceFilter('bottom', useStore.getState().faceFilter)) return;
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
                                 useStore.getState().setHoverState({
@@ -2982,6 +4807,7 @@ export default function ContainerSkin({
                                 document.body.style.cursor = 'pointer';
                               }}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
+                                if (!passesFaceFilter('bottom', useStore.getState().faceFilter)) return;
                                 e.stopPropagation();
                                 onClickCenter(e);
                               }}
@@ -3003,6 +4829,7 @@ export default function ContainerSkin({
                               position={[0, FLOOR_Y, -voxD / 2 + 0.1]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 'n' }}
+                              raycast={gateRaycast('n')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3022,6 +4849,7 @@ export default function ContainerSkin({
                               position={[0, FLOOR_Y, +voxD / 2 - 0.1]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 's' }}
+                              raycast={gateRaycast('s')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3041,6 +4869,7 @@ export default function ContainerSkin({
                               position={[+voxW / 2 - 0.1, FLOOR_Y, 0]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 'e' }}
+                              raycast={gateRaycast('e')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3060,6 +4889,7 @@ export default function ContainerSkin({
                               position={[-voxW / 2 + 0.1, FLOOR_Y, 0]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 'w' }}
+                              raycast={gateRaycast('w')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3090,7 +4920,9 @@ export default function ContainerSkin({
                               position={[0, +vOffset + 0.12, 0]}
                               material={mHit}
                               userData={{ isBay: true }}
+                              raycast={gateRaycast('top')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
+                                if (!passesFaceFilter('top', useStore.getState().faceFilter)) return;
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
                                 useStore.getState().setHoverState({
@@ -3103,6 +4935,7 @@ export default function ContainerSkin({
                               }}
                               onPointerLeave={onLeaveEdge}
                               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
+                                if (!passesFaceFilter('top', useStore.getState().faceFilter)) return;
                                 e.stopPropagation();
                                 onClickEdge('top')(e);
                               }}
@@ -3115,6 +4948,7 @@ export default function ContainerSkin({
                               position={[0, CEIL_Y, -voxD / 2 + 0.1]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 'n' }}
+                              raycast={gateRaycast('n')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3139,6 +4973,7 @@ export default function ContainerSkin({
                               position={[0, CEIL_Y, +voxD / 2 - 0.1]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 's' }}
+                              raycast={gateRaycast('s')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3163,6 +4998,7 @@ export default function ContainerSkin({
                               position={[+voxW / 2 - 0.1, CEIL_Y, 0]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 'e' }}
+                              raycast={gateRaycast('e')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3187,6 +5023,7 @@ export default function ContainerSkin({
                               position={[-voxW / 2 + 0.1, CEIL_Y, 0]}
                               material={mHit}
                               userData={{ isBay: true, containerId: container.id, voxelIndex: idx, face: 'w' }}
+                              raycast={gateRaycast('w')}
                               onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
                                 e.stopPropagation();
                                 if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
@@ -3234,7 +5071,7 @@ export default function ContainerSkin({
                   leaveTimerRef.current = setTimeout(() => {
                     setHoveredVoxel(null);
                     leaveTimerRef.current = null;
-                  }, 250);
+                  }, 100);
                 }}
               />
             )}
@@ -3298,8 +5135,11 @@ export default function ContainerSkin({
 
       {/* WU-10: Structural pillars at convex outer corners of active voxels.
           For L1+ containers, poles extend to ground (containerY below voxel origin).
-          Suppress poles on topmost elevated container (no structural purpose — poles would extend upward into air). */}
-      {!(container.supporting?.length === 0 && containerY > 0) && pillarPositions.map(({ px, pz, row, col, corner }, i) => {
+          The smart-poles algorithm already restricts placement to structural corners
+          (voxels with a roof or a floor), so topmost-but-has-deck-extensions containers
+          still render support posts under their perimeter floor corners — satisfying
+          the "no unsupported floor corner" invariant of ModuHome's smart building rules. */}
+      {pillarPositions.map(({ px, pz, row, col, corner }, i) => {
         const poleH = vHeight + containerY;
         const poleYShift = vOffset - containerY / 2;
         const legacyKey = `deck_pole_${i}`;
@@ -3357,7 +5197,7 @@ export default function ContainerSkin({
       })}
 
       {/* Frame rails — horizontal members connecting adjacent poles */}
-      {!(container.supporting?.length === 0 && containerY > 0) && railPositions.map((rail) => {
+      {railPositions.map((rail) => {
         const railOverride = container.railOverrides?.[rail.key];
         if (railOverride?.visible === false) return null;
         const isSelectedRail = selectedFrameElement?.containerId === container.id && selectedFrameElement.key === rail.key;

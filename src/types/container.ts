@@ -160,6 +160,9 @@ export interface Container {
   };
   /** Whether the roof is intact or removed (for stacking / open-air) */
   roofRemoved: boolean;
+  /** Roof shape — flat (default), parapet, gable, shed, butterfly, green.
+   *  Cosmetic geometry above the container body. See roofTypes.ts. */
+  roofType?: RoofTypeRef;
   /** Whether the main floor is removed (for double/triple-height Great Room atrium) */
   floorRemoved: boolean;
   /** Floor surface material. Defaults to interior wood if undefined. */
@@ -280,6 +283,117 @@ export interface DoorConfig {
   swingDirection: 'in' | 'out';
   slideDirection: 'positive' | 'negative';
   type: 'swing' | 'slide';
+  /** Door TEMPLATE — geometric archetype (single_swing, french_double, …).
+   *  Templates live in `src/config/doorTemplates.ts`. Optional for backward
+   *  compat — when absent the renderer treats it as 'single_swing'. */
+  template?: import('@/config/doorTemplates').DoorTemplateId;
+  /** Door SKIN — finish/material applied on top of the template (oak,
+   *  walnut, painted white, glazed aluminium, …). Skins live in
+   *  `src/config/doorSkins.ts`. Decoupled from template so the same shape
+   *  can be reskinned without touching geometry. */
+  skin?: import('@/config/doorSkins').DoorSkinId;
+}
+
+/** Window equivalent of DoorConfig. Stored on the voxel under
+ *  `windowConfig?: Partial<Record<keyof VoxelFaces, WindowConfig>>` (see
+ *  the Voxel interface below). Pure data, renderer-consumed. */
+export interface WindowConfig {
+  template: import('@/config/windowTemplates').WindowTemplateId;
+  skin: import('@/config/windowSkins').WindowSkinId;
+  /** Open percentage (0..1) for templates that animate (casement, awning,
+   *  hopper, sliding, double-hung, tilt-turn, jalousie). Fixed templates
+   *  ignore this. */
+  openAmount?: number;
+}
+
+/** Hinged-wall animation config — drives the fold-down (Half_Fold) and
+ *  gull-wing (Gull_Wing) wall surfaces. Stored on the voxel under
+ *  `hingedConfig?: Partial<Record<keyof VoxelFaces, HingedConfig>>`.
+ *
+ *  `openAmount` is a 0..1 progress: 0 = closed (panel coplanar with wall),
+ *  1 = fully open. The renderer drives the rotation in `useFrame` so changes
+ *  animate smoothly rather than snap. The pattern mirrors the door swing
+ *  interpolator in `DoorFace`. Only `Half_Fold` and `Gull_Wing` SurfaceTypes
+ *  honor this config; other surfaces ignore it. */
+export interface HingedConfig {
+  /** 0 = closed (vertical wall panel), 1 = fully open. Defaults to 0 when
+   *  the voxel has no entry for that face. */
+  openAmount: number;
+}
+
+/** Vertical anchor for shelf/cabinet overlays — picks a third of the wall
+ *  height. Templates declare a default; users can override per face. */
+export type CabinetryAnchor = 'top' | 'mid' | 'bottom';
+
+/** Shelf overlay config — sits ON TOP of whatever SurfaceType the face has.
+ *  Stored under `voxel.shelfConfig?.[face]`. Static; no animation. */
+export interface ShelfConfig {
+  template: import('@/config/shelfTemplates').ShelfTemplateId;
+  skin: import('@/config/cabinetrySkins').CabinetrySkinId;
+  verticalAnchor?: CabinetryAnchor;
+}
+
+/** Floor overlay config — rugs, runners, area mats. Stored under
+ *  `voxel.floorOverlay?.[face]` where face is 'bottom' (rendered on the
+ *  voxel's floor) or 'top' (rendered above the voxel ceiling, viewed from
+ *  the level above). */
+export interface FloorOverlayConfig {
+  template: import('@/config/floorOverlays').FloorOverlayId;
+}
+
+/** Per-container roof shape — flat (default), parapet, gable, shed,
+ *  butterfly, green. Stored on Container as `roofType`. */
+export type RoofTypeRef = import('@/config/roofTypes').RoofTypeId;
+
+/** Ceiling overlay config — fans, pendants, recessed lights, beams.
+ *  Stored under `voxel.ceilingOverlay?.[face]` (typically 'top'). */
+export interface CeilingOverlayConfig {
+  template: import('@/config/floorOverlays').CeilingOverlayId;
+}
+
+/** Decor overlay config — wall art, mirrors, TVs, clocks. Static (no
+ *  animation). Stored under `voxel.decorConfig?.[face]`. */
+export interface DecorConfig {
+  template: import('@/config/decorTemplates').DecorTemplateId;
+  palette: import('@/config/decorTemplates').DecorPaletteId;
+  verticalAnchor?: CabinetryAnchor;
+  /** When true, render a downward-pointing picture light above the frame.
+   *  Cosmetic only (emissive bulb + arm); no real point light. */
+  pictureLight?: boolean;
+}
+
+/** Fixture overlay config — appliances (fridge, range, dishwasher, microwave,
+ *  washer, dryer) and bathroom fixtures (sink, toilet, shower, tub).
+ *  Stored under `voxel.fixtureConfig?.[face]`. */
+export interface FixtureConfig {
+  template: import('@/config/fixtureTemplates').FixtureTemplateId;
+  verticalAnchor?: CabinetryAnchor;
+  /** 0..1 — opens the appliance door (fridge, oven, dishwasher, washer, etc.).
+   *  Ignored for fixtures without `hasOpeningDoor`. */
+  openAmount?: number;
+}
+
+/** Cabinet overlay config — sits ON TOP of whatever SurfaceType the face has.
+ *  Stored under `voxel.cabinetConfig?.[face]`. Templates declare doors and
+ *  drawers; openAmount drives animation for both motion types. */
+export interface CabinetConfig {
+  template: import('@/config/cabinetTemplates').CabinetTemplateId;
+  skin: import('@/config/cabinetrySkins').CabinetrySkinId;
+  verticalAnchor?: CabinetryAnchor;
+  /** 0..1 — animates door swing AND drawer slide simultaneously. */
+  openAmount?: number;
+  /** Optional counter top slab on top of the cabinet body. Adjacent voxel
+   *  faces with the same counterTop material render as a continuous run
+   *  (kitchen counter, vanity slab, etc.). Only rendered for templates
+   *  that allow it (base_* and bathroom_vanity); other templates ignore
+   *  this field. */
+  counterTop?: import('@/config/counterTopMaterials').CounterTopMaterialId;
+  /** When true, an emissive LED strip renders under the cabinet body —
+   *  cosmetic only (no real point light) to keep render budget flat.
+   *  Visually meaningful only for upper cabinets (wall_*) and tall pantry. */
+  underCabinetLight?: boolean;
+  /** Hex tint of the LED strip. Default warm white. */
+  underCabinetLightColor?: string;
 }
 
 /** Six inset face materials for one voxel cell */
@@ -324,6 +438,36 @@ export interface Voxel {
   doorStates?: Partial<Record<keyof VoxelFaces, DoorState>>;
   /** Per-face door configuration (smart placement, hinge side, swing direction) */
   doorConfig?: Partial<Record<keyof VoxelFaces, DoorConfig>>;
+  /** Per-face window configuration — template + skin + open amount. Set when
+   *  a face has a `Window_*` SurfaceType and the user picks a non-default
+   *  template/skin from the picker. Absent = renderer uses surface-implied
+   *  defaults (existing single-template behaviour). */
+  windowConfig?: Partial<Record<keyof VoxelFaces, WindowConfig>>;
+  /** Per-face hinged-wall animation state. Drives Half_Fold + Gull_Wing
+   *  surface animations: 0 = closed (vertical), 1 = fully open. Only walls
+   *  with a `Half_Fold` or `Gull_Wing` SurfaceType render the rotated
+   *  geometry; other surfaces ignore the field. */
+  hingedConfig?: Partial<Record<keyof VoxelFaces, HingedConfig>>;
+  /** Optional shelf overlay per face — renders ON TOP of the SurfaceType.
+   *  See ShelfConfig. Multiple faces of the same voxel can carry independent
+   *  shelf configs; absence means no shelf on that face. */
+  shelfConfig?: Partial<Record<keyof VoxelFaces, ShelfConfig>>;
+  /** Optional cabinet overlay per face — renders ON TOP of the SurfaceType.
+   *  See CabinetConfig. */
+  cabinetConfig?: Partial<Record<keyof VoxelFaces, CabinetConfig>>;
+  /** Optional fixture overlay per face — appliances + bathroom fixtures.
+   *  See FixtureConfig. */
+  fixtureConfig?: Partial<Record<keyof VoxelFaces, FixtureConfig>>;
+  /** Optional decor overlay per face — pictures, mirrors, TVs, clocks.
+   *  See DecorConfig. */
+  decorConfig?: Partial<Record<keyof VoxelFaces, DecorConfig>>;
+  /** Optional floor overlay per voxel — rugs, runners. Renders ON TOP of the
+   *  voxel's floor (bottom face). One overlay per voxel; the data is keyed
+   *  by face for symmetry with other overlays but only 'bottom' is meaningful. */
+  floorOverlay?: Partial<Record<keyof VoxelFaces, FloorOverlayConfig>>;
+  /** Optional ceiling overlay per voxel — fans, pendants, recessed grids,
+   *  beams. Keyed by face; only 'top' is meaningful in normal usage. */
+  ceilingOverlay?: Partial<Record<keyof VoxelFaces, CeilingOverlayConfig>>;
   /** 2-voxel staircase part: 'lower'=bottom half treads, 'upper'=top half treads, 'single'=legacy full-height */
   stairPart?: 'lower' | 'upper' | 'single';
   /** Module preset ID (e.g. 'kitchen_full') — set by applyModule */
@@ -433,17 +577,26 @@ export type ExtensionConfig = 'none' | 'all_deck' | 'all_interior' | 'all_glass_
 /** Default extension configuration for newly created containers */
 export const DEFAULT_EXTENSION_CONFIG: ExtensionConfig = 'all_deck';
 
-export type ContainerArrangementId =
-  | 'extend_shell'
-  | 'max_closed'
-  | 'largest_glass'
-  | 'central_atrium'
-  | 'glass_atrium'
-  | 'roof_terrace'
-  | 'glass_terrace'
-  | 'wraparound_deck'
-  | 'wraparound_patio'
-  | 'retract_extensions';
+/** Canonical list of arrangement IDs. Exported as a literal tuple so both the
+ *  `ContainerArrangementId` union (TS) and the runtime Zod enum in
+ *  `designIntents.ts` can derive from one source — prevents drift when a new
+ *  arrangement is added. */
+export const CONTAINER_ARRANGEMENT_IDS = [
+  'extend_shell',
+  'max_closed',
+  'largest_glass',
+  'central_atrium',
+  'glass_atrium',
+  'framed_glass_box',
+  'framed_glass_atrium',
+  'roof_terrace',
+  'glass_terrace',
+  'wraparound_deck',
+  'wraparound_patio',
+  'retract_extensions',
+] as const;
+
+export type ContainerArrangementId = typeof CONTAINER_ARRANGEMENT_IDS[number];
 
 export interface ContainerRole {
   id: string;
@@ -530,6 +683,20 @@ export enum FurnitureType {
   Plant = "plant",
   FloorLamp = "floor_lamp",
   Rug = "rug",
+  // Seating + dining (room-preset essentials)
+  DiningChair = "dining_chair",
+  BarStool = "bar_stool",
+  Sectional = "sectional",
+  Loveseat = "loveseat",
+  Ottoman = "ottoman",
+  SideTable = "side_table",
+  ConsoleTable = "console_table",
+  // Bedroom (room-preset essentials)
+  BedKing = "bed_king",
+  Wardrobe = "wardrobe",
+  Vanity = "vanity",
+  // Storage
+  KitchenIsland = "kitchen_island",
 }
 
 export interface FurnitureDimensions {
@@ -599,6 +766,20 @@ export const FURNITURE_CATALOG: FurnitureCatalogEntry[] = [
   { type: FurnitureType.Plant,        label: "Plant",          dims: { length: 0.4, width: 0.4, height: 0.8 },  color: 0x4caf50, cost: 100,  glb: '/assets/furniture/decor-plant.glb' },
   { type: FurnitureType.FloorLamp,    label: "Floor Lamp",     dims: { length: 0.35, width: 0.35, height: 1.6 },color: 0xffd54f, cost: 200,  glb: '/assets/furniture/decor-floor-lamp.glb' },
   { type: FurnitureType.Rug,          label: "Rug",            dims: { length: 2.0, width: 1.4, height: 0.02 }, color: 0x7b1fa2, cost: 300,  glb: '/assets/furniture/decor-rug.glb' },
+  // ── Seating + dining (room-preset essentials) ──
+  { type: FurnitureType.DiningChair,  label: "Dining Chair",   dims: { length: 0.45, width: 0.45, height: 0.9 }, color: 0xa1887f, cost: 120, glb: '/assets/furniture/dining-chair.glb' },
+  { type: FurnitureType.BarStool,     label: "Bar Stool",      dims: { length: 0.4, width: 0.4, height: 1.05 },  color: 0x6d4c41, cost: 180, glb: '/assets/furniture/bar-stool.glb' },
+  { type: FurnitureType.Sectional,    label: "Sectional Sofa", dims: { length: 2.8, width: 1.7, height: 0.85 },  color: 0x8a8a8a, cost: 1800, glb: '/assets/furniture/living-sectional.glb' },
+  { type: FurnitureType.Loveseat,     label: "Loveseat",       dims: { length: 1.5, width: 0.9, height: 0.85 },  color: 0x9e9e9e, cost: 700, glb: '/assets/furniture/living-loveseat.glb' },
+  { type: FurnitureType.Ottoman,      label: "Ottoman",        dims: { length: 0.7, width: 0.55, height: 0.42 }, color: 0xa1887f, cost: 250, glb: '/assets/furniture/living-ottoman.glb' },
+  { type: FurnitureType.SideTable,    label: "Side Table",     dims: { length: 0.5, width: 0.5, height: 0.55 },  color: 0xd7ccc8, cost: 200, glb: '/assets/furniture/living-side-table.glb' },
+  { type: FurnitureType.ConsoleTable, label: "Console Table",  dims: { length: 1.4, width: 0.4, height: 0.8 },   color: 0xd7ccc8, cost: 380, glb: '/assets/furniture/console-table.glb' },
+  // ── Bedroom (room-preset essentials) ──
+  { type: FurnitureType.BedKing,      label: "King Bed",       dims: { length: 2.0, width: 2.0, height: 0.5 },   color: 0xa1887f, cost: 1800, glb: '/assets/furniture/bedroom-bed-king.glb' },
+  { type: FurnitureType.Wardrobe,     label: "Wardrobe",       dims: { length: 1.6, width: 0.6, height: 2.2 },   color: 0x8d6e63, cost: 1100, glb: '/assets/furniture/bedroom-wardrobe.glb' },
+  { type: FurnitureType.Vanity,       label: "Vanity",         dims: { length: 1.2, width: 0.45, height: 0.78 }, color: 0xbcaaa4, cost: 540, glb: '/assets/furniture/bedroom-vanity.glb' },
+  // ── Kitchen island ──
+  { type: FurnitureType.KitchenIsland,label: "Kitchen Island", dims: { length: 1.8, width: 0.9, height: 0.9 },   color: 0x90a4ae, cost: 2400, glb: '/assets/furniture/kitchen-island.glb' },
 ];
 
 // ── Zones & Grouping ────────────────────────────────────────
@@ -658,6 +839,9 @@ export interface PricingEstimate {
     modules: number;
     cuts: number;
     sceneObjects?: number;
+    /** Wall-feature overlays — shelves, cabinets, fixtures, decor, counter
+     *  tops. Summed across all voxel faces in all containers. */
+    overlays?: number;
     total: number;
   };
 }

@@ -33,6 +33,7 @@ import { getCycleForFace } from '@/config/surfaceCycles';
 import { BLOCK_PRESETS, type BlockPresetId } from '@/config/blockPresets';
 import { getModulePreset, resolveModuleFaces, ORIENT_ROTATION } from '@/config/moduleCatalog';
 import { getContainerPreset } from '@/config/containerPresets';
+import { getRoomPreset as _getRoomPreset } from '@/config/roomPresets';
 import { v4 as uuid } from 'uuid';
 import type { FurnitureItem } from '@/types/container';
 import type { HotbarSlot } from '../useStore';
@@ -97,6 +98,83 @@ export interface VoxelSlice {
   isStaircaseMacro: () => boolean;
   setVoxelRoomTag: (containerId: string, voxelIndex: number, tag: string | undefined) => void;
   setDoorConfig: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, config: Partial<DoorConfig>) => void;
+  setWindowConfig: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').WindowConfig>,
+  ) => void;
+  /** Set or update the hinged-wall animation state on a face. Drives
+   *  Half_Fold + Gull_Wing animations (0 = closed, 1 = open). Only meaningful
+   *  when the face's SurfaceType is Half_Fold or Gull_Wing. Pass `null` to
+   *  clear the entry (resets to closed). */
+  setHingedConfig: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').HingedConfig> | null,
+  ) => void;
+  /** Set or update a shelf overlay on a face. Pass `null` to remove the
+   *  shelf from that face. Partial updates merge with existing config. */
+  setShelfConfig: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').ShelfConfig> | null,
+  ) => void;
+  /** Set or update a cabinet overlay on a face. Pass `null` to remove the
+   *  cabinet from that face. Partial updates merge with existing config. */
+  setCabinetConfig: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').CabinetConfig> | null,
+  ) => void;
+  /** Set or update a fixture overlay (appliance or bathroom fixture) on a
+   *  face. Pass `null` to remove. */
+  setFixtureConfig: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').FixtureConfig> | null,
+  ) => void;
+  /** Apply a celebrated-design room preset (Frankfurt galley, Susanka master,
+   *  5×8 wet-wall bath, etc.) starting at the given anchor voxel. Walks the
+   *  preset's footprint (cols × rows in BODY voxel space, 0-indexed from
+   *  rows 1-2 cols 1-6), placing furniture + overlays + finishes. Returns
+   *  null on success, or an error string if the preset doesn't fit. */
+  applyRoomPreset: (
+    containerId: string,
+    anchorBodyCol: number,
+    anchorBodyRow: number,
+    presetId: import('@/config/roomPresets').RoomPresetId,
+    level?: 0 | 1,
+  ) => string | null;
+
+  /** Set or update a decor overlay (picture, mirror, TV) on a face. Pass
+   *  `null` to remove. */
+  setDecorConfig: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').DecorConfig> | null,
+  ) => void;
+  /** Set or remove a floor overlay (rug, runner) on a voxel face — only
+   *  meaningful on `'bottom'` (floor surface). Pass null to remove. */
+  setFloorOverlay: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').FloorOverlayConfig> | null,
+  ) => void;
+  /** Set or remove a ceiling overlay (fan, pendant, recessed grid, beams).
+   *  Only meaningful on `'top'`. */
+  setCeilingOverlay: (
+    containerId: string,
+    voxelIndex: number,
+    face: keyof VoxelFaces,
+    config: Partial<import('@/types/container').CeilingOverlayConfig> | null,
+  ) => void;
   applyDoorModule: (containerId: string, voxelIndex: number, orientation: ModuleOrientation) => void;
   getDoorConstraints: (containerId: string, voxelIndex: number, face: keyof VoxelFaces) => DoorConstraints;
   setFaceFinish: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, finish: Partial<FaceFinish>) => void;
@@ -126,11 +204,18 @@ export function setVoxelStoreRef(ref: VoxelStoreRef) { _useStoreRef = ref; }
 // - stairAscending ('n'|'s'|'e'|'w') is the canonical direction field.
 // - stairPart ('lower'|'upper'|'single') identifies entry vs ascent voxel in 2-voxel pairs.
 //   BOM counts only 'lower'/'single' to avoid double-counting.
-export const STAIR_FLIP: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
-export const ASCEND_DELTA: Record<string, { dr: number; dc: number }> = {
-  n: { dr: -1, dc: 0 }, s: { dr: 1, dc: 0 },
-  e: { dc: -1, dr: 0 }, w: { dc: 1, dr: 0 },
-};
+// - Rule consequences (SR-01/05/06/09) are now PURE helpers in stairEnforcement.ts;
+//   re-exported here so existing imports keep compiling.
+export { STAIR_FLIP, ASCEND_DELTA, buildStairFaces } from '@/utils/stairEnforcement';
+import {
+  STAIR_FLIP,
+  ASCEND_DELTA,
+  buildStairFaces,
+  computeFloorVoid,
+  computeEntryWallClear,
+  computeLateralRailings,
+  computeCrossContainerVoid,
+} from '@/utils/stairEnforcement';
 
 /** If voxelIndex is an upper stair voxel, return the lower voxel's index. Otherwise return voxelIndex unchanged.
  *  Returns null if the redirect is invalid (out of bounds, no matching stair). */
@@ -150,17 +235,7 @@ function resolveToLowerStair(grid: Voxel[], voxelIndex: number): number | null {
   return lowerIdx;
 }
 
-function buildStairFaces(isNS: boolean, part: 'lower' | 'upper' | 'single'): VoxelFaces {
-  const isUpper = part === 'upper';
-  return {
-    top: isUpper ? 'Deck_Wood' : 'Open',
-    bottom: isUpper ? 'Open' : 'Deck_Wood',
-    n: isNS ? 'Open' : 'Solid_Steel',
-    s: isNS ? 'Open' : 'Solid_Steel',
-    e: isNS ? 'Solid_Steel' : 'Open',
-    w: isNS ? 'Solid_Steel' : 'Open',
-  };
-}
+// buildStairFaces moved to stairEnforcement.ts — imported + re-exported above.
 
 /** Compute smart door config — hinge on side away from obstacles (stairs). */
 function _computeSmartDoorConfig(
@@ -301,9 +376,21 @@ export function recomputeSmartRailings(
 
       for (const face of WALL_FACES) {
         if (v.userPaintedFaces?.[face]) continue;   // user override
-        // Structural fold surfaces (Gull_Wing, Half_Fold) act as enclosures — skip auto-railing
+        // Intentional architectural envelope surfaces — fold panels (act as
+        // enclosures), framed windows, glazed walls, doors, shoji, washi.
+        // None of these should be silently rewritten to railings just
+        // because the cell above is open. Without this guard the
+        // framed_glass_box / framed_glass_atrium arrangements lose every
+        // perimeter Window_Standard the moment the topmost level promotes
+        // its roof to a deck.
         const currentSurface = v.faces[face as keyof VoxelFaces];
-        if (currentSurface === 'Gull_Wing' || currentSurface === 'Half_Fold') continue;
+        if (
+          currentSurface === 'Gull_Wing' || currentSurface === 'Half_Fold' ||
+          currentSurface === 'Glass_Pane' || currentSurface === 'Door' ||
+          currentSurface === 'Window_Standard' || currentSurface === 'Window_Sill' ||
+          currentSurface === 'Window_Clerestory' || currentSurface === 'Window_Half' ||
+          currentSurface === 'Glass_Shoji' || currentSurface === 'Wall_Washi'
+        ) continue;
         const delta = FACE_NEIGHBOR_DELTA[face];
         const nr = row + delta.dr;
         const nc = col + delta.dc;
@@ -511,28 +598,9 @@ export function recomputeSmartHoleGuards(
   container._smartHoleGuardChanges = Object.keys(newTracking).length > 0 ? newTracking : undefined;
 }
 
-function applyUpperHoleConsequences(
-  grid: Voxel[],
-  voxelIndex: number,
-  exitFace: 'n' | 's' | 'e' | 'w',
-  changedFaces: Record<string, SurfaceType>,
-): boolean {
-  const voxel = grid[voxelIndex];
-  if (!voxel?.active) return false;
-
-  const nextFaces = { ...voxel.faces };
-  trackSmartFaceChange(changedFaces, voxelIndex, 'bottom', voxel.faces.bottom);
-  nextFaces.bottom = 'Open';
-
-  for (const wallFace of ['n', 's', 'e', 'w'] as const) {
-    if (voxel.userPaintedFaces?.[wallFace]) continue;
-    trackSmartFaceChange(changedFaces, voxelIndex, wallFace, voxel.faces[wallFace]);
-    nextFaces[wallFace] = wallFace === exitFace ? 'Open' : 'Railing_Cable';
-  }
-
-  grid[voxelIndex] = { ...voxel, faces: nextFaces };
-  return true;
-}
+// applyUpperHoleConsequences superseded by computeFloorVoid (SR-01) in stairEnforcement.ts.
+// Local alias retained for call sites in this file that still reference the old name.
+const applyUpperHoleConsequences = computeFloorVoid;
 
 /**
  * createVoxelSlice — Voxel-level operations: face painting, stair placement, templates.
@@ -545,6 +613,48 @@ function applyUpperHoleConsequences(
  *
  * @see types/container.ts for VoxelFaces, SurfaceType, and coordinate system
  */
+
+/** Shared per-face overlay config setter used by setShelfConfig +
+ *  setCabinetConfig. Handles the merge-or-remove pattern uniformly so the two
+ *  actions stay in lockstep. Pass `config: null` to remove the overlay from
+ *  the face; pass a partial to merge with existing.
+ *
+ *  TKey is the field name on Voxel ('shelfConfig' | 'cabinetConfig'); TVal
+ *  is the config interface stored under that field.
+ */
+function _setOverlayConfig<
+  TKey extends 'shelfConfig' | 'cabinetConfig' | 'fixtureConfig' | 'decorConfig' | 'floorOverlay' | 'ceilingOverlay',
+  TVal extends object,
+>(
+  set: Set,
+  containerId: string,
+  voxelIndex: number,
+  face: keyof VoxelFaces,
+  key: TKey,
+  config: Partial<TVal> | null,
+  buildMerged: (existing: TVal | undefined, c: Partial<TVal>) => TVal,
+): void {
+  set((s) => {
+    const c = s.containers[containerId];
+    if (!c?.voxelGrid) return {};
+    const grid = [...c.voxelGrid];
+    const voxel = grid[voxelIndex];
+    if (!voxel) return {};
+    const existingMap = (voxel[key] ?? {}) as Partial<Record<keyof VoxelFaces, TVal>>;
+    let nextMap: Partial<Record<keyof VoxelFaces, TVal>>;
+    if (config === null) {
+      nextMap = { ...existingMap };
+      delete nextMap[face];
+    } else {
+      nextMap = { ...existingMap, [face]: buildMerged(existingMap[face], config) };
+    }
+    grid[voxelIndex] = { ...voxel, [key]: nextMap };
+    return {
+      containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
+    };
+  });
+}
+
 export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
   setFloorMaterial: (id, material) => {
@@ -1818,6 +1928,250 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
         };
     });
+  },
+
+  setWindowConfig: (containerId, voxelIndex, face, config) => {
+    // Per-voxel-face window template/skin selection. Merges with any
+    // existing config for that face so partial updates (just the skin, just
+    // the template) work without erasing other fields.
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      const voxel = grid[voxelIndex];
+      if (!voxel) return {};
+      const existing = voxel.windowConfig?.[face];
+      const merged: import('@/types/container').WindowConfig = {
+        template: config.template ?? existing?.template ?? 'fixed_picture',
+        skin: config.skin ?? existing?.skin ?? 'aluminum_black',
+        openAmount: config.openAmount ?? existing?.openAmount,
+      };
+      const nextWindowConfig = { ...(voxel.windowConfig ?? {}), [face]: merged };
+      grid[voxelIndex] = { ...voxel, windowConfig: nextWindowConfig };
+      return {
+        containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
+      };
+    });
+  },
+
+  setHingedConfig: (containerId, voxelIndex, face, config) => {
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c?.voxelGrid) return {};
+      const grid = [...c.voxelGrid];
+      const voxel = grid[voxelIndex];
+      if (!voxel) return {};
+      // Null clears the entry, resetting that face to closed (0) implicitly.
+      if (config === null) {
+        if (!voxel.hingedConfig?.[face]) return {};
+        const next = { ...(voxel.hingedConfig ?? {}) };
+        delete next[face];
+        grid[voxelIndex] = { ...voxel, hingedConfig: next };
+        return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+      }
+      const existing = voxel.hingedConfig?.[face];
+      const rawAmount = config.openAmount ?? existing?.openAmount ?? 0;
+      // Clamp to [0,1] so out-of-range inputs can't flip the panel inside-out.
+      const clamped = rawAmount < 0 ? 0 : rawAmount > 1 ? 1 : rawAmount;
+      const merged: import('@/types/container').HingedConfig = { openAmount: clamped };
+      const nextHingedConfig = { ...(voxel.hingedConfig ?? {}), [face]: merged };
+      grid[voxelIndex] = { ...voxel, hingedConfig: nextHingedConfig };
+      return {
+        containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } },
+      };
+    });
+  },
+
+  setShelfConfig: (containerId, voxelIndex, face, config) =>
+    _setOverlayConfig<'shelfConfig', import('@/types/container').ShelfConfig>(
+      set, containerId, voxelIndex, face, 'shelfConfig', config,
+      (existing, c) => ({
+        template: c.template ?? existing?.template ?? 'wall_unit_3',
+        skin: c.skin ?? existing?.skin ?? 'oak_natural',
+        verticalAnchor: c.verticalAnchor ?? existing?.verticalAnchor,
+      }),
+    ),
+
+  setCabinetConfig: (containerId, voxelIndex, face, config) =>
+    _setOverlayConfig<'cabinetConfig', import('@/types/container').CabinetConfig>(
+      set, containerId, voxelIndex, face, 'cabinetConfig', config,
+      (existing, c) => ({
+        template: c.template ?? existing?.template ?? 'wall_2door',
+        skin: c.skin ?? existing?.skin ?? 'shaker_white',
+        verticalAnchor: c.verticalAnchor ?? existing?.verticalAnchor,
+        openAmount: c.openAmount ?? existing?.openAmount,
+        counterTop: c.counterTop ?? existing?.counterTop,
+        underCabinetLight: c.underCabinetLight ?? existing?.underCabinetLight,
+        underCabinetLightColor: c.underCabinetLightColor ?? existing?.underCabinetLightColor,
+      }),
+    ),
+
+  setFixtureConfig: (containerId, voxelIndex, face, config) =>
+    _setOverlayConfig<'fixtureConfig', import('@/types/container').FixtureConfig>(
+      set, containerId, voxelIndex, face, 'fixtureConfig', config,
+      (existing, c) => ({
+        template: c.template ?? existing?.template ?? 'sink_kitchen_double',
+        verticalAnchor: c.verticalAnchor ?? existing?.verticalAnchor,
+        openAmount: c.openAmount ?? existing?.openAmount,
+      }),
+    ),
+
+  setDecorConfig: (containerId, voxelIndex, face, config) =>
+    _setOverlayConfig<'decorConfig', import('@/types/container').DecorConfig>(
+      set, containerId, voxelIndex, face, 'decorConfig', config,
+      (existing, c) => ({
+        template: c.template ?? existing?.template ?? 'framed_picture_landscape',
+        palette: c.palette ?? existing?.palette ?? 'frame_black',
+        verticalAnchor: c.verticalAnchor ?? existing?.verticalAnchor,
+        pictureLight: c.pictureLight ?? existing?.pictureLight,
+      }),
+    ),
+
+  setFloorOverlay: (containerId, voxelIndex, face, config) =>
+    _setOverlayConfig<'floorOverlay', import('@/types/container').FloorOverlayConfig>(
+      set, containerId, voxelIndex, face, 'floorOverlay', config,
+      (existing, c) => ({
+        template: c.template ?? existing?.template ?? 'rug_wool_grey',
+      }),
+    ),
+
+  setCeilingOverlay: (containerId, voxelIndex, face, config) =>
+    _setOverlayConfig<'ceilingOverlay', import('@/types/container').CeilingOverlayConfig>(
+      set, containerId, voxelIndex, face, 'ceilingOverlay', config,
+      (existing, c) => ({
+        template: c.template ?? existing?.template ?? 'pendant_single',
+      }),
+    ),
+
+  applyRoomPreset: (containerId, anchorBodyCol, anchorBodyRow, presetId, level) => {
+    const preset = _getRoomPreset(presetId);
+    if (!preset) return `Unknown preset: ${presetId}`;
+    // Resolve target level: explicit arg > preset default > 0
+    const targetLevel: 0 | 1 = level ?? preset.defaultLevel ?? 0;
+    if (
+      anchorBodyCol < 0 ||
+      anchorBodyRow < 0 ||
+      anchorBodyCol + preset.cols > 6 ||
+      anchorBodyRow + preset.rows > 2
+    ) {
+      return `Preset "${preset.label}" (${preset.cols}×${preset.rows}) does not fit at body anchor (${anchorBodyCol}, ${anchorBodyRow}).`;
+    }
+
+    const s = get();
+    const c = s.containers[containerId];
+    if (!c?.voxelGrid) return `Container ${containerId} has no voxel grid.`;
+    const colP = CONTAINER_DIMENSIONS[c.size].length / 6;
+    const rowP = CONTAINER_DIMENSIONS[c.size].width / 2;
+    const levelHeight = CONTAINER_DIMENSIONS[c.size].height;
+    // Voxel grid is laid out [level0_voxels, level1_voxels]; offset by level
+    // to address the upper floor.
+    const levelOffset = targetLevel * VOXEL_ROWS * VOXEL_COLS;
+
+    const toVoxelIndex = (localCol: number, localRow: number): number => {
+      const containerCol = anchorBodyCol + 1 + localCol;
+      const containerRow = anchorBodyRow + 1 + localRow;
+      return levelOffset + containerRow * VOXEL_COLS + containerCol;
+    };
+
+    // Furniture Y is the floor of the target level so multi-story stacks correctly.
+    const toLocalMeters = (localCol: number, localRow: number, dx = 0, dz = 0): { x: number; y: number; z: number } => {
+      const containerCol = anchorBodyCol + 1 + localCol;
+      const containerRow = anchorBodyRow + 1 + localRow;
+      const x = -(containerCol - 3.5) * colP + dx;
+      const y = targetLevel * levelHeight;
+      const z = (containerRow - 1.5) * rowP + dz;
+      return { x, y, z };
+    };
+
+    // 1) Furniture
+    const newFurniture = preset.furniture.map((f) => {
+      const { x, y, z } = toLocalMeters(f.localCol, f.localRow, f.dx, f.dz);
+      return {
+        id: `${presetId}_${f.type}_${Math.random().toString(36).slice(2, 9)}`,
+        type: f.type,
+        position: { x, y, z },
+        rotation: f.rotation ?? 0,
+        containerId,
+      } as import('@/types/container').FurnitureItem;
+    });
+
+    // 2) Overlays — applied via the existing per-overlay setters so all
+    //    invariants (merge semantics, defaults) are enforced.
+    set((state) => {
+      const cont = state.containers[containerId];
+      if (!cont?.voxelGrid) return {};
+      const grid = [...cont.voxelGrid];
+      for (const ov of preset.overlays) {
+        const idx = toVoxelIndex(ov.localCol, ov.localRow);
+        const voxel = grid[idx];
+        if (!voxel) continue;
+        // Build the right config shape per kind
+        // PresetOverlay is a discriminated union on `kind`, so each branch
+        // gets the correctly-narrowed template + skin types automatically.
+        if (ov.kind === 'cabinet') {
+          grid[idx] = {
+            ...voxel,
+            cabinetConfig: {
+              ...(voxel.cabinetConfig ?? {}),
+              [ov.face]: {
+                template: ov.template,
+                skin: ov.skin,
+                verticalAnchor: ov.verticalAnchor,
+                counterTop: ov.counterTop,
+                underCabinetLight: ov.underCabinetLight,
+              },
+            },
+          };
+        } else if (ov.kind === 'shelf') {
+          grid[idx] = {
+            ...voxel,
+            shelfConfig: {
+              ...(voxel.shelfConfig ?? {}),
+              [ov.face]: {
+                template: ov.template,
+                skin: ov.skin,
+                verticalAnchor: ov.verticalAnchor,
+              },
+            },
+          };
+        } else if (ov.kind === 'fixture') {
+          grid[idx] = {
+            ...voxel,
+            fixtureConfig: {
+              ...(voxel.fixtureConfig ?? {}),
+              [ov.face]: {
+                template: ov.template,
+                verticalAnchor: ov.verticalAnchor,
+              },
+            },
+          };
+        } else if (ov.kind === 'decor') {
+          grid[idx] = {
+            ...voxel,
+            decorConfig: {
+              ...(voxel.decorConfig ?? {}),
+              [ov.face]: {
+                template: ov.template,
+                palette: ov.skin,
+                verticalAnchor: ov.verticalAnchor,
+                pictureLight: ov.pictureLight,
+              },
+            },
+          };
+        }
+      }
+      // Append furniture
+      const updated = {
+        ...cont,
+        voxelGrid: grid,
+        furniture: [...(cont.furniture ?? []), ...newFurniture],
+      };
+      return {
+        containers: { ...state.containers, [containerId]: updated },
+      };
+    });
+
+    return null;
   },
 
   setFaceFinish: (containerId, voxelIndex, face, finish) => {

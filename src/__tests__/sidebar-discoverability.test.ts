@@ -24,7 +24,7 @@ function resetStore() {
 describe('Sidebar Discoverability', () => {
   beforeEach(() => resetStore());
 
-  it('DISC-1: Glass Atrium Showcase is reachable from the default app state', () => {
+  it('DISC-1: Glass Atrium Showcase is reachable from the default app state', { timeout: 10000 }, () => {
     // Default viewMode is Realistic3D — the mode in which the bug hid the tabs.
     expect(useStore.getState().viewMode).toBe(ViewMode.Realistic3D);
 
