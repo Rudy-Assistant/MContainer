@@ -26,6 +26,9 @@
   --dock-active: #93c5fd;
   --hotbar-bg: rgba(255, 255, 255, 0.07);
   --hotbar-border: rgba(0, 0, 0, 0.06);
+  --hotbar-slot-bg: rgba(255, 255, 255, 0.55);
+  --hotbar-slot-border: rgba(15, 23, 42, 0.12);
+  --hotbar-slot-label: #1e293b;
   --modal-backdrop: rgba(0, 0, 0, 0.4);
   --modal-bg: #ffffff;
   --success: #10b981;
@@ -60,6 +63,9 @@
   --dock-active: #60a5fa;
   --hotbar-bg: rgba(15, 23, 42, 0.07);
   --hotbar-border: rgba(59, 130, 246, 0.15);
+  --hotbar-slot-bg: rgba(15, 23, 42, 0.55);
+  --hotbar-slot-border: rgba(59, 130, 246, 0.18);
+  --hotbar-slot-label: #f8fafc;
   --modal-backdrop: rgba(0, 0, 0, 0.7);
   --modal-bg: #12161c;
   --success: #10b981;
@@ -96,15 +102,116 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Light↔Dark mode crossfade — without this, the entire viewport
+   * jump-cuts between palettes the moment the user toggles the theme.
+   * 280ms reads as a deliberate sweep rather than a reload flash. */
+  transition: background-color 280ms ease, color 280ms ease;
+}
+
+/* Major theme-bound surfaces crossfade only the *colour* properties, so
+ * the theme swap reads as one cohesive sweep without overriding the
+ * faster hover transitions buttons carry via their own classes. We
+ * deliberately scope to layout-level wrappers, not buttons/inputs. */
+.modal-content,
+.dropdown-menu {
+  transition: background-color 280ms ease, color 280ms ease, border-color 280ms ease;
 }
 
 /* ═══ Modal backdrop (shared across all modals) ═══ */
+/* Backdrop fades from clear → blurred-tint over 180ms.  Layered so the
+ * content card can scale-in independently (see .modal-content). */
 .modal-backdrop {
   position: absolute;
   inset: 0;
   background: var(--modal-backdrop, rgba(0, 0, 0, 0.4));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  animation: modal-backdrop-in 180ms ease-out;
+}
+@keyframes modal-backdrop-in {
+  from { opacity: 0; backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+  to   { opacity: 1; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+}
+
+/* Modal card entrance — apply to the content panel of every modal.
+ * Subtle scale-in (0.96 → 1) + fade gives a "settling" feel that reads as
+ * "this card just floated in" rather than "popped on screen". 220ms is the
+ * sweet spot — long enough to perceive, short enough not to block input. */
+.modal-content {
+  animation: modal-content-in 220ms cubic-bezier(0.34, 1.18, 0.64, 1) both;
+  transform-origin: center;
+}
+@keyframes modal-content-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+
+/* Symmetric exit — when the modal's wrapper carries data-state="closing",
+ * the backdrop and content animate OUT in lockstep with the enter timing
+ * (slightly faster). Without this, modals just disappear in one frame
+ * which reads as a glitch rather than a deliberate dismiss. */
+[data-state="closing"] .modal-backdrop {
+  animation: modal-backdrop-out 160ms ease-in both;
+}
+[data-state="closing"] .modal-content {
+  animation: modal-content-out 180ms cubic-bezier(0.4, 0, 0.78, 0.34) both;
+}
+@keyframes modal-backdrop-out {
+  from { opacity: 1; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  to   { opacity: 0; backdrop-filter: blur(0);   -webkit-backdrop-filter: blur(0);   }
+}
+@keyframes modal-content-out {
+  from { opacity: 1; transform: scale(1)    translateY(0); }
+  to   { opacity: 0; transform: scale(0.97) translateY(4px); }
+}
+
+/* Dropdown / popover menus (Settings menu, theme picker, etc.) — fly out of
+ * the top-right corner so the eye tracks "menu came from that button".
+ * Pairs with the exit animation below via [data-state="closing"]. */
+.dropdown-menu {
+  animation: dropdown-in 140ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top right;
+}
+@keyframes dropdown-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+[data-state="closing"].dropdown-menu,
+[data-state="closing"] .dropdown-menu {
+  animation: dropdown-out 120ms ease-in both;
+}
+@keyframes dropdown-out {
+  from { opacity: 1; transform: scale(1)    translateY(0);    }
+  to   { opacity: 0; transform: scale(0.97) translateY(-3px); }
+}
+
+/* Ghost-pop animation — fires when applying a preset (see uiSlice.triggerGhostPop).
+ * Subtle bounce on the affected face panels so the apply reads as "snap-into-place". */
+@keyframes ghost-pop {
+  0%   { transform: scale(0.92); opacity: 0.4; }
+  55%  { transform: scale(1.06); opacity: 1;   }
+  100% { transform: scale(1);    opacity: 1;   }
+}
+
+/* Scene-level fade overlay used by ResetCanvas / view-mode transitions.
+ * Renders absolute over the canvas; .scene-fade-active sets opacity to 1
+ * (briefly), then back to 0 — gives a clean "blink" so abrupt scene
+ * mutations don't read as glitches. */
+.scene-fade-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--background, #f4f6f8);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease-out;
+  z-index: 30;
+}
+.scene-fade-overlay.scene-fade-active {
+  /* !important needed — Tailwind v4 layer ordering puts a default opacity
+   * reset at higher specificity in the cascade, which beats the plain class
+   * selector (verified via getComputedStyle returning 0 even with the active
+   * class applied). */
+  opacity: 1 !important;
 }
 
 /* ═══ Range slider ═══ */
@@ -183,4 +290,29 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
   border: 2px solid var(--surface, #fff);
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+/* ── Mobile / touch input rules ────────────────────────────── */
+
+/* Canvas owns pinch/pan — the browser must NOT intercept them as scroll. */
+canvas {
+  touch-action: none;
+}
+
+/* Larger hit targets on touch (Apple HIG + Material both ≥44px).
+ * Buttons render at ~28px on desktop; bump on coarse-pointer devices. */
+@media (pointer: coarse) {
+  button,
+  [role="button"] {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* Disable hover-only highlights on touch — they leave sticky :hover state
+ * after a tap that users can't dismiss. */
+@media (hover: none) {
+  .hover-toolbar-btn:hover,
+  .hover-surface-alt:hover,
+  .hover-accent-icon:hover { background: transparent !important; color: inherit !important; }
 }

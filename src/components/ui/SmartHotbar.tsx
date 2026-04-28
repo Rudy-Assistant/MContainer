@@ -1121,8 +1121,10 @@ function HotbarSlotButton({
       style={{
         width: 72,
         borderRadius: 8,
-        border: isActive ? `2px solid ${accent}` : `1px solid rgba(255,255,255,0.12)`,
-        background: isActive ? `${accent}20` : "rgba(0,0,0,0.35)",
+        border: isActive
+          ? `2px solid ${accent}`
+          : `1px solid var(--hotbar-slot-border)`,
+        background: isActive ? `${accent}20` : "var(--hotbar-slot-bg)",
         cursor: "pointer",
         position: "relative",
         display: "flex",
@@ -1145,7 +1147,8 @@ function HotbarSlotButton({
       <span style={{
         position: "absolute", top: 2, left: 4,
         fontSize: 9, fontWeight: 800,
-        color: isActive ? accent : "rgba(255,255,255,0.5)",
+        color: isActive ? accent : "var(--hotbar-slot-label)",
+        opacity: isActive ? 1 : 0.55,
         lineHeight: 1, fontFamily: "monospace", zIndex: 2,
       }}>
         {slot.key === 0 ? "0" : String(slot.key)}
@@ -1174,12 +1177,13 @@ function HotbarSlotButton({
         </div>
       )}
 
-      {/* Label — pure white, no shadow */}
+      {/* Label — theme-aware via --hotbar-slot-label so text stays readable
+          on both light and dark hotbar backgrounds. */}
       {slot.label && (
         <span style={{
           fontSize: 9, fontWeight: 700,
-          color: "#ffffff",
-          lineHeight: 1.1, letterSpacing: "0.01em",
+          color: "var(--hotbar-slot-label)",
+          lineHeight: 1.1, letterSpacing: "0.02em",
           marginTop: 1, marginBottom: 2,
           whiteSpace: "nowrap",
           overflow: "hidden",
@@ -1480,8 +1484,8 @@ export default function SmartHotbar() {
               style={{
                 padding: "4px 14px", borderRadius: 6, border: "none", cursor: "pointer",
                 fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
-                background: hotbarMode === mode ? "#3b82f6" : "transparent",
-                color: hotbarMode === mode ? "#fff" : "#64748b",
+                background: hotbarMode === mode ? "var(--accent)" : "transparent",
+                color: hotbarMode === mode ? "#fff" : "var(--text-muted)",
                 transition: "all 120ms ease",
               }}
             >
@@ -1616,8 +1620,8 @@ export default function SmartHotbar() {
                   width: 80,
                   height: 80,
                   borderRadius: 7,
-                  border: isActive ? "2px solid #3b82f6" : "1px solid #e2e8f0",
-                  background: isActive ? "rgba(59,130,246,0.08)" : "#fafafa",
+                  border: isActive ? "2px solid var(--accent)" : "1px solid var(--hotbar-slot-border)",
+                  background: isActive ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "var(--hotbar-slot-bg)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -1632,7 +1636,7 @@ export default function SmartHotbar() {
                 <div style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                   <CssVoxelIcon faces={resolveModuleFaces(mod, 'n')} size={40} themeId={currentTheme} />
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? "#3b82f6" : "#64748b", textAlign: "center", lineHeight: 1.1 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: isActive ? "var(--accent)" : "var(--hotbar-slot-label)", textAlign: "center", lineHeight: 1.1 }}>
                   {mod.label}
                 </span>
                 {isActive && (
@@ -1704,7 +1708,7 @@ export default function SmartHotbar() {
                     width: 62,
                     height: 52,
                     borderRadius: 6,
-                    border: isActive ? "2px solid #2563eb" : "1px solid #d1d5db",
+                    border: isActive ? "2px solid var(--accent)" : "1px solid var(--hotbar-slot-border)",
                     cursor: "pointer",
                     display: "flex",
                     flexDirection: "column",
@@ -1715,7 +1719,7 @@ export default function SmartHotbar() {
                     overflow: "hidden",
                     flexShrink: 0,
                     position: "relative",
-                    boxShadow: isActive ? "0 0 0 1px #2563eb40, 0 2px 8px #2563eb20" : "0 1px 2px rgba(0,0,0,0.06)",
+                    boxShadow: isActive ? "0 0 0 1px var(--accent-muted), 0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent)" : "0 1px 2px rgba(0,0,0,0.06)",
                   }}
                 >
                   {/* Flat material swatch */}
@@ -1729,7 +1733,8 @@ export default function SmartHotbar() {
                   {/* Hotkey badge */}
                   <span style={{
                     position: "absolute", top: 2, left: 3,
-                    fontSize: 7, fontWeight: 800, color: "rgba(0,0,0,0.35)",
+                    fontSize: 7, fontWeight: 800, color: "var(--hotbar-slot-label)",
+                    opacity: 0.45,
                     lineHeight: 1, zIndex: 2,
                   }}>
                     {hotkey}
@@ -1737,7 +1742,7 @@ export default function SmartHotbar() {
                   {/* Label */}
                   <span style={{
                     fontSize: 8, fontWeight: 700,
-                    color: isActive ? "#2563eb" : "#64748b",
+                    color: isActive ? "var(--accent)" : "var(--text-muted)",
                     lineHeight: 1, letterSpacing: 0.3,
                     textTransform: "uppercase",
                     padding: "2px 0 3px",
@@ -1802,8 +1807,8 @@ export default function SmartHotbar() {
                   width: 80,
                   height: 80,
                   borderRadius: 7,
-                  border: isActive ? "2px solid #f59e0b" : "1px solid #e2e8f0",
-                  background: isActive ? "rgba(245,158,11,0.08)" : "#fafafa",
+                  border: isActive ? "2px solid var(--warning)" : "1px solid var(--hotbar-slot-border)",
+                  background: isActive ? "color-mix(in srgb, var(--warning) 10%, transparent)" : "var(--hotbar-slot-bg)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -1814,16 +1819,16 @@ export default function SmartHotbar() {
                   transition: "all 120ms ease",
                 }}
               >
-                <svg viewBox="0 0 32 32" width={28} height={28} fill={isActive ? "#f59e0b" : "#607080"} opacity={0.7}>
+                <svg viewBox="0 0 32 32" width={28} height={28} fill={isActive ? "var(--warning)" : "var(--text-muted)"} opacity={0.8}>
                   <LightSilhouette type={lightType} />
                 </svg>
-                <span style={{ fontSize: 7, fontWeight: 700, color: isActive ? "#f59e0b" : "#64748b", textAlign: "center", lineHeight: 1.1 }}>
+                <span style={{ fontSize: 7, fontWeight: 700, color: isActive ? "var(--warning)" : "var(--hotbar-slot-label)", textAlign: "center", lineHeight: 1.1 }}>
                   {label}
                 </span>
               </div>
             );
           })}
-          <div style={{ width: 1, background: "#e2e8f0", margin: "4px 2px", flexShrink: 0 }} />
+          <div style={{ width: 1, background: "var(--hotbar-slot-border)", margin: "4px 2px", flexShrink: 0 }} />
           {/* ── Furniture items ── */}
           {FURNITURE_CATALOG.slice(0, 10).map((entry) => {
             const isActive = useStore.getState().activeFurniturePreset === entry.type;
@@ -1842,8 +1847,8 @@ export default function SmartHotbar() {
                   width: 80,
                   height: 80,
                   borderRadius: 7,
-                  border: isActive ? "2px solid #22c55e" : "1px solid #e2e8f0",
-                  background: isActive ? "rgba(34,197,94,0.08)" : "#fafafa",
+                  border: isActive ? "2px solid var(--success)" : "1px solid var(--hotbar-slot-border)",
+                  background: isActive ? "color-mix(in srgb, var(--success) 10%, transparent)" : "var(--hotbar-slot-bg)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -1854,10 +1859,10 @@ export default function SmartHotbar() {
                   transition: "all 120ms ease",
                 }}
               >
-                <svg viewBox="0 0 32 32" width={28} height={28} fill={isActive ? "#22c55e" : "#607080"} opacity={0.7}>
+                <svg viewBox="0 0 32 32" width={28} height={28} fill={isActive ? "var(--success)" : "var(--text-muted)"} opacity={0.8}>
                   <FurnitureSilhouette type={entry.type} />
                 </svg>
-                <span style={{ fontSize: 8, fontWeight: 700, color: isActive ? "#22c55e" : "#64748b", textAlign: "center", lineHeight: 1.1 }}>
+                <span style={{ fontSize: 8, fontWeight: 700, color: isActive ? "var(--success)" : "var(--hotbar-slot-label)", textAlign: "center", lineHeight: 1.1 }}>
                   {entry.label}
                 </span>
               </div>

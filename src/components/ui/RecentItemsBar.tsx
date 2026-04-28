@@ -36,10 +36,16 @@ export default function RecentItemsBar() {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6,
       padding: '4px 12px', height: 40,
-      background: 'rgba(15, 23, 42, 0.95)',
-      borderTop: '1px solid #1e293b',
+      background: 'var(--hotbar-bg)',
+      backdropFilter: 'blur(16px) saturate(1.4)',
+      WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+      borderTop: '1px solid var(--hotbar-border)',
     }}>
-      <span style={{ fontSize: 10, color: '#64748b', marginRight: 4, whiteSpace: 'nowrap' }}>Recent:</span>
+      <span style={{
+        fontSize: 10, color: 'var(--text-muted)', marginRight: 4,
+        whiteSpace: 'nowrap', letterSpacing: '0.04em', fontWeight: 600,
+        textTransform: 'uppercase',
+      }}>Recent</span>
       {recentItems.map((item, i) => (
         <button
           key={item.value + '-' + i}
@@ -48,15 +54,17 @@ export default function RecentItemsBar() {
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
             padding: '3px 8px', borderRadius: 4,
-            border: '1px solid #334155', background: '#1e293b',
-            color: '#cbd5e1', cursor: 'pointer', fontSize: 10,
+            border: '1px solid var(--hotbar-slot-border)',
+            background: 'var(--hotbar-slot-bg)',
+            color: 'var(--hotbar-slot-label)',
+            cursor: 'pointer', fontSize: 10,
             whiteSpace: 'nowrap',
             transition: 'border-color 100ms',
           }}
-          onMouseOver={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
-          onMouseOut={(e) => (e.currentTarget.style.borderColor = '#334155')}
+          onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
+          onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--hotbar-slot-border)')}
         >
-          <span style={{ fontSize: 9, color: '#64748b', fontWeight: 700 }}>{i + 1}</span>
+          <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700 }}>{i + 1}</span>
           {item.label}
         </button>
       ))}

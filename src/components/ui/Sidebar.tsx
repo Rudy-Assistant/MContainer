@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Sidebar.tsx — Unified "Super-Sidebar" (384px, left side)
+ * Sidebar.tsx — Unified "Super-Sidebar" (440px, left side)
  *
  * State A (no selection): Library — drag-and-drop container cards + furniture.
  * State B (selection active): Inspector — IsoEditor + MatrixEditor.
@@ -10,7 +10,7 @@
  * returning to State A seamlessly.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import {
   type Container,
@@ -37,6 +37,8 @@ import {
   Palette, Scan, Grid3x3,
 } from "lucide-react";
 import UserLibrary from "@/components/ui/UserLibrary";
+import { useTabletDrawer } from "@/hooks/useTabletDrawer";
+import { WIZARD_PRESETS } from "@/config/wizardPresets";
 // Theme/Ground imports removed — selectors moved to TopToolbar Appearance popover
 
 // ── Constants ────────────────────────────────────────────────
@@ -89,6 +91,17 @@ const FURNITURE_ICONS: Record<FurnitureType, React.ComponentType<{ size?: number
   [FurnitureType.Plant]:        TreePine,
   [FurnitureType.FloorLamp]:    Lamp,
   [FurnitureType.Rug]:          Palette,
+  [FurnitureType.DiningChair]:  Armchair,
+  [FurnitureType.BarStool]:     Armchair,
+  [FurnitureType.Sectional]:    Sofa,
+  [FurnitureType.Loveseat]:     Sofa,
+  [FurnitureType.Ottoman]:      Armchair,
+  [FurnitureType.SideTable]:    Coffee,
+  [FurnitureType.ConsoleTable]: Coffee,
+  [FurnitureType.BedKing]:      Bed,
+  [FurnitureType.Wardrobe]:     Shirt,
+  [FurnitureType.Vanity]:       Archive,
+  [FurnitureType.KitchenIsland]: CookingPot,
 };
 
 function LibraryCard({
@@ -97,15 +110,18 @@ function LibraryCard({
   Icon,
   accentColor,
   onMouseDown,
+  testId,
 }: {
   label: string;
   subtitle: string;
   Icon: React.ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>;
   accentColor: string;
   onMouseDown: (e: React.MouseEvent) => void;
+  testId?: string;
 }) {
   return (
     <button
+      data-testid={testId}
       onMouseDown={onMouseDown}
       style={{
         display: "flex", alignItems: "center", gap: "12px",
@@ -113,7 +129,7 @@ function LibraryCard({
         border: `1px solid ${BORDER}`,
         background: CARD,
         cursor: "grab", width: "100%", textAlign: "left",
-        transition: "all 120ms ease",
+        transition: "all 150ms ease-out",
         boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
       }}
       onMouseEnter={(e) => {
@@ -196,7 +212,7 @@ function Library() {
               border: `1px solid ${activeTab === tab ? ACCENT : BORDER}`,
               background: activeTab === tab ? `${ACCENT}10` : "transparent",
               color: activeTab === tab ? ACCENT : TEXT_DIM,
-              transition: "all 120ms ease",
+              transition: "all 150ms ease-out",
             }}
           >
             {tab === "structure" ? "Structure" : tab === "interior" ? "Interior" : "Saved"}
@@ -206,17 +222,33 @@ function Library() {
 
       {/* Content */}
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-        {activeTab === "structure" &&
-          STRUCTURE_ITEMS.map((item) => (
+        {activeTab === "structure" && (
+          <>
+            {STRUCTURE_ITEMS.map((item) => (
+              <LibraryCard
+                key={item.size}
+                label={item.label}
+                subtitle={item.dims}
+                Icon={item.Icon}
+                accentColor="#3b82f6"
+                onMouseDown={(e) => handleContainerDrag(item.size, e)}
+              />
+            ))}
+            {/* Pool Container — subterranean 40' HC. Click to place; the action
+                creates the container at Y = -height (top flush with ground). */}
             <LibraryCard
-              key={item.size}
-              label={item.label}
-              subtitle={item.dims}
-              Icon={item.Icon}
-              accentColor="#3b82f6"
-              onMouseDown={(e) => handleContainerDrag(item.size, e)}
+              label="Pool Container"
+              subtitle="Subterranean 40' HC — concrete basin"
+              Icon={Droplets}
+              accentColor="#2563eb"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                useStore.getState().addPoolContainer();
+              }}
+              testId="library-pool-container"
             />
-          ))}
+          </>
+        )}
 
         {activeTab === "interior" && (
           <>
@@ -419,10 +451,10 @@ function Inspector({
                 }}
                 title="Stack container above"
                 style={{
-                  background: "none", border: "1px solid #e2e8f0", borderRadius: "4px",
-                  cursor: "pointer", padding: "3px 4px",
-                  color: "#3b82f6", display: "flex", alignItems: "center",
-                  fontSize: 11, fontWeight: 700,
+                  background: "var(--btn-bg, #fff)", border: "1px solid #e2e8f0", borderRadius: "6px",
+                  cursor: "pointer", padding: "6px 8px", minWidth: 32, height: 28,
+                  color: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, fontWeight: 700, transition: "all 150ms ease-out",
                 }}
               >
                 ⬆
@@ -433,10 +465,10 @@ function Inspector({
                 onClick={() => { unstackContainer(containerId); removeContainer(containerId); }}
                 title="Unstack and remove"
                 style={{
-                  background: "none", border: "1px solid #fca5a5", borderRadius: "4px",
-                  cursor: "pointer", padding: "3px 4px",
-                  color: "#dc2626", display: "flex", alignItems: "center",
-                  fontSize: 11, fontWeight: 700,
+                  background: "var(--btn-bg, #fff)", border: "1px solid #fca5a5", borderRadius: "6px",
+                  cursor: "pointer", padding: "6px 8px", minWidth: 32, height: 28,
+                  color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, fontWeight: 700, transition: "all 150ms ease-out",
                 }}
               >
                 ✕
@@ -469,14 +501,37 @@ function Inspector({
         ) : (target.type === "voxel" || target.type === "bay" || target.type === "face" || target.type === "bay-face") ? (
           <FinishesPanel />
         ) : (
-          <div style={{ padding: "8px 12px" }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8 }}>
+          <div style={{ padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
               Container Properties
             </div>
 
+            {/* Applied Wizard Preset (read-only) — surfaces appliedPreset so users
+                can see which Quick Setup preset shaped this container. */}
+            {container.appliedPreset && (() => {
+              const preset = WIZARD_PRESETS.find((p) => p.id === container.appliedPreset);
+              const label = preset?.label ?? container.appliedPreset;
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, width: 92, flexShrink: 0 }}>Preset</span>
+                  <span
+                    data-testid="inspector-applied-preset"
+                    title={preset?.description ?? ''}
+                    style={{
+                      flex: 1, fontSize: 12, padding: "6px 8px", borderRadius: 6,
+                      border: `1px solid ${BORDER}`, background: `${ACCENT}10`, color: ACCENT,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {label}
+                  </span>
+                </div>
+              );
+            })()}
+
             {/* Interior Finish */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_DIM }}>Finish:</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, width: 92, flexShrink: 0 }}>Finish</span>
               <select
                 value={container.interiorFinish ?? "raw"}
                 onChange={(e) => {
@@ -486,7 +541,7 @@ function Inspector({
                   );
                 }}
                 style={{
-                  flex: 1, fontSize: 10, padding: "3px 6px", borderRadius: 4,
+                  flex: 1, fontSize: 12, padding: "6px 8px", borderRadius: 6,
                   border: `1px solid ${BORDER}`, background: CARD, color: TEXT,
                   cursor: "pointer",
                 }}
@@ -499,8 +554,8 @@ function Inspector({
             </div>
 
             {/* Rooftop Deck toggle */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_DIM }}>Rooftop Deck:</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, width: 92, flexShrink: 0 }}>Rooftop Deck</span>
               <button
                 data-testid="btn-toggle-deck"
                 onClick={() => {
@@ -516,9 +571,9 @@ function Inspector({
                   }
                 }}
                 style={{
-                  flex: 1, fontSize: 10, padding: "4px 8px", borderRadius: 4,
+                  flex: 1, fontSize: 12, padding: "7px 10px", borderRadius: 6,
                   border: `1px solid ${BORDER}`, background: CARD, color: TEXT,
-                  cursor: "pointer", fontWeight: 600, transition: "all 100ms ease",
+                  cursor: "pointer", fontWeight: 600, transition: "all 150ms ease-out",
                 }}
               >
                 {container.voxelGrid?.[1 * 8 + 1]?.faces?.top === "Deck_Wood" ? "✓ Remove Deck" : "+ Add Deck"}
@@ -558,7 +613,7 @@ function DesignModePanel() {
             border: `1px solid ${ACCENT}`,
             background: `${ACCENT}10`, color: ACCENT,
             fontSize: 13, fontWeight: 700, cursor: "pointer",
-            transition: "all 120ms ease",
+            transition: "all 150ms ease-out",
           }}
         >
           + Add Container
@@ -576,15 +631,15 @@ function DesignModePanel() {
                 data-testid={`add-container-${item.size}`}
                 onClick={() => handleAdd(item.size)}
                 style={{
-                  display: "block", width: "100%", padding: "8px 14px", textAlign: "left",
+                  display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
                   border: "none", borderBottom: `1px solid ${BORDER}`,
-                  background: "none", cursor: "pointer", fontSize: 12,
+                  background: "none", cursor: "pointer", fontSize: 13, transition: "background 150ms ease-out",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
               >
                 <div style={{ fontWeight: 600, color: TEXT }}>{item.label}</div>
-                <div style={{ fontSize: 10, color: TEXT_DIM, marginTop: 2 }}>{item.dims}</div>
+                <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 3, lineHeight: 1.4 }}>{item.dims}</div>
               </button>
             ))}
             {/* Pool container — subterranean HighCube40 */}
@@ -595,15 +650,15 @@ function DesignModePanel() {
                 setSizeMenuOpen(false);
               }}
               style={{
-                display: "block", width: "100%", padding: "8px 14px", textAlign: "left",
+                display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
                 border: "none", borderTop: `1px solid #e2e8f0`,
-                background: "none", cursor: "pointer", fontSize: 12,
+                background: "none", cursor: "pointer", fontSize: 13, transition: "background 150ms ease-out",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = `${ACCENT}08`; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
             >
               <div style={{ fontWeight: 600, color: "#2563eb" }}>Pool Container</div>
-              <div style={{ fontSize: 10, color: TEXT_DIM, marginTop: 2 }}>Subterranean 40&apos; HC — concrete basin</div>
+              <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 3, lineHeight: 1.4 }}>Subterranean 40&apos; HC — concrete basin</div>
             </button>
           </div>
         )}
@@ -624,6 +679,19 @@ export default function Sidebar() {
   const viewMode      = useStore((s) => s.viewMode);
   const collapsed     = useStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
+  // Below 1024px the sidebar becomes a slide-in drawer that overlays the canvas.
+  const isDrawer = useTabletDrawer();
+
+  // When the viewport first crosses into drawer mode (tablet-width), collapse
+  // the sidebar so the canvas isn't immediately covered by an open drawer.
+  const autoCollapsedRef = useRef(false);
+  useEffect(() => {
+    if (isDrawer && !autoCollapsedRef.current && !collapsed) {
+      autoCollapsedRef.current = true;
+      toggleSidebar();
+    }
+    if (!isDrawer) autoCollapsedRef.current = false;
+  }, [isDrawer, collapsed, toggleSidebar]);
 
   const selectedElements = useStore((s) => s.selectedElements);
 
@@ -655,6 +723,14 @@ export default function Sidebar() {
           boxShadow: "4px 0 24px rgba(0,0,0,0.08), 1px 0 2px rgba(0,0,0,0.04)",
           paddingTop: "10px",
           gap: "8px",
+          // In drawer mode the collapsed strip also floats over the canvas so it doesn't
+          // reserve layout width on tablets — the canvas gets the full viewport.
+          ...(isDrawer && {
+            position: "absolute" as const,
+            top: 0,
+            left: 0,
+            zIndex: 39,
+          }),
         }}
       >
         <button
@@ -665,7 +741,7 @@ export default function Sidebar() {
             width: 32, height: 32, borderRadius: 6,
             background: "none", border: `1px solid ${BORDER}`,
             cursor: "pointer", color: TEXT_DIM,
-            transition: "all 120ms ease",
+            transition: "all 150ms ease-out",
           }}
           className="hover-accent-icon"
         >
@@ -708,10 +784,27 @@ export default function Sidebar() {
 
   // ── Expanded state ──
   return (
-    <div
+    <>
+      {/* Backdrop for drawer mode — clicking it collapses the sidebar back. */}
+      {isDrawer && (
+        <div
+          aria-hidden
+          onClick={toggleSidebar}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(15,23,42,0.32)",
+            zIndex: 40,
+            animation: "drawer-fade 150ms ease-out",
+          }}
+        />
+      )}
+      <style>{`@keyframes drawer-fade { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes drawer-slide-in { from { transform: translateX(-100%) } to { transform: translateX(0) } }`}</style>
+      <div
       data-testid="sidebar-expanded"
       style={{
-        width: "384px",
+        width: isDrawer ? "min(380px, 90vw)" : "440px",
         height: "100%",
         background: "var(--panel-bg, rgba(248,250,252,0.82))",
         backdropFilter: "blur(16px) saturate(1.4)",
@@ -723,6 +816,14 @@ export default function Sidebar() {
         overflow: "hidden",
         boxShadow: "var(--panel-shadow, 4px 0 24px rgba(0,0,0,0.08))",
         color: "var(--text-main, #374151)",
+        ...(isDrawer && {
+          position: "absolute" as const,
+          top: 0,
+          left: 0,
+          bottom: 0,
+          zIndex: 41,
+          animation: "drawer-slide-in 220ms ease-out",
+        }),
       }}
     >
       {/* ── Header ──────────────────────────────────────── */}
@@ -805,7 +906,7 @@ export default function Sidebar() {
             width: 24, height: 24, borderRadius: 4, marginLeft: 6,
             background: "none", border: `1px solid ${BORDER}`,
             cursor: "pointer", color: TEXT_DIM, flexShrink: 0,
-            transition: "all 120ms ease",
+            transition: "all 150ms ease-out",
           }}
           className="hover-accent-icon"
         >
@@ -825,10 +926,13 @@ export default function Sidebar() {
             container={container}
             containerId={selectedId!}
           />
-        ) : viewMode === ViewMode.Realistic3D ? (
-          <DesignModePanel />
         ) : (
           <>
+            {viewMode === ViewMode.Realistic3D && (
+              <div style={{ marginBottom: 12 }}>
+                <DesignModePanel />
+              </div>
+            )}
             <Library />
           </>
         )}
@@ -836,5 +940,6 @@ export default function Sidebar() {
 
       {/* BOM Footer removed — cost total moved to TopToolbar */}
     </div>
+    </>
   );
 }
