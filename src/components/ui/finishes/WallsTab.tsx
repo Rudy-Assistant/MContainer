@@ -15,6 +15,7 @@ import SwatchRow from './SwatchRow';
 import CategoryRow from './CategoryRow';
 import VariantGrid from './VariantGrid';
 import TemplatePicker from './TemplatePicker';
+import { PresetCard } from './PresetCard';
 import { useApplyFinish } from './useApplyFinish';
 
 interface Props {
@@ -133,7 +134,13 @@ export default function WallsTab({ containerId, voxelIndex, indices, face }: Pro
         <PickerSection mode="window" containerId={containerId} voxelIndex={voxelIndex} face={face} />
       )}
       {(surface === 'Half_Fold' || surface === 'Gull_Wing') && (
-        <HingedToggle containerId={containerId} voxelIndex={voxelIndex} indices={indices} face={face} />
+        <HingedToggle
+          containerId={containerId}
+          voxelIndex={voxelIndex}
+          indices={indices}
+          face={face}
+          surface={surface as 'Half_Fold' | 'Gull_Wing'}
+        />
       )}
       {selectedWallCategory === 'shelf' && (
         <PickerSection mode="shelf" containerId={containerId} voxelIndex={voxelIndex} face={face} />
@@ -197,18 +204,89 @@ function PickerSection({
   );
 }
 
-/** Open/closed toggle for Half_Fold + Gull_Wing surfaces. Writes to the
- *  voxel's hingedConfig — the renderer animates the panel rotations from
- *  closed (0) to open (1). When multiple voxels are selected (e.g. a bay
- *  range), the toggle applies to every voxel in `indices` so a row of fold
- *  walls opens together. */
+/** Tiny SVG diagram of a hinged-wall surface in either Closed (vertical
+ *  panels) or Open (panels folded outward) state. Used as the thumbnail in
+ *  the HingedToggle picker so the user previews the rendered effect.
+ *
+ *  - Half_Fold: top half steel + bottom half wood (closed) → top stays,
+ *    bottom rotates 90° outward into a horizontal deck plank.
+ *  - Gull_Wing: top + bottom steel (closed) → top rotates up into an
+ *    awning, bottom rotates down into a deck.
+ *
+ *  The SVG is purely indicative — colors and proportions match the 3D
+ *  surface but the pose is a side elevation, not the isometric used in
+ *  Block / Container thumbnails. */
+function HingedPreviewSVG({
+  surface, state,
+}: {
+  surface: 'Half_Fold' | 'Gull_Wing';
+  state: 'closed' | 'open';
+}) {
+  const STEEL = '#64748b';
+  const WOOD = '#8B6914';
+  const HINGE = '#1f2937';
+  const open = state === 'open';
+
+  if (surface === 'Half_Fold') {
+    // Side view: x=horizontal, y=vertical. Wall plane at x=24 (centerline);
+    // panels fold outward toward x>24. Hinge at center y.
+    return (
+      <svg viewBox="0 0 48 48" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+        {/* Floor */}
+        <line x1="6" y1="42" x2="42" y2="42" stroke="#94a3b8" strokeWidth={0.6} strokeDasharray="2 2" />
+        {/* Top half steel — always vertical */}
+        <rect x="22" y="10" width="4" height="14" fill={STEEL} stroke="#475569" strokeWidth={0.4} />
+        {/* Bottom half wood — vertical (closed) or horizontal extending right (open) */}
+        {open ? (
+          <rect x="24" y="22" width="14" height="4" fill={WOOD} stroke="#5a4209" strokeWidth={0.4} />
+        ) : (
+          <rect x="22" y="24" width="4" height="14" fill={WOOD} stroke="#5a4209" strokeWidth={0.4} />
+        )}
+        {/* Hinge line at mid-height */}
+        <line x1="22" y1="24" x2="26" y2="24" stroke={HINGE} strokeWidth={1.2} />
+      </svg>
+    );
+  }
+  // Gull_Wing
+  return (
+    <svg viewBox="0 0 48 48" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+      <line x1="6" y1="42" x2="42" y2="42" stroke="#94a3b8" strokeWidth={0.6} strokeDasharray="2 2" />
+      {/* Top panel — vertical (closed) or horizontal up-right (open awning) */}
+      {open ? (
+        <rect x="24" y="20" width="14" height="4" fill={STEEL} stroke="#475569" strokeWidth={0.4} />
+      ) : (
+        <rect x="22" y="10" width="4" height="14" fill={STEEL} stroke="#475569" strokeWidth={0.4} />
+      )}
+      {/* Bottom panel — vertical (closed) or horizontal down-right (open deck) */}
+      {open ? (
+        <rect x="24" y="24" width="14" height="4" fill={STEEL} stroke="#475569" strokeWidth={0.4} />
+      ) : (
+        <rect x="22" y="24" width="4" height="14" fill={STEEL} stroke="#475569" strokeWidth={0.4} />
+      )}
+      {/* Hinge line + awning support hint */}
+      <line x1="22" y1="24" x2="26" y2="24" stroke={HINGE} strokeWidth={1.2} />
+      {open && <line x1="26" y1="22" x2="34" y2="22" stroke={HINGE} strokeWidth={0.4} strokeDasharray="1 1" />}
+    </svg>
+  );
+}
+
+/** Open/closed picker for Half_Fold + Gull_Wing surfaces. Two PresetCards
+ *  side-by-side (Closed | Open) with thumbnail SVGs of the panel pose.
+ *  Clicking a card writes openAmount 0 or 1 to the voxel's hingedConfig —
+ *  the renderer lerps the panel rotations smoothly. When multiple voxels
+ *  are selected (e.g. a bay range), the click applies to every voxel in
+ *  `indices` so a row of fold walls opens together.
+ *
+ *  Mirrors the picker style used by DoorFace + WindowFace template grids
+ *  so the affordance is visually consistent across the WallsTab. */
 function HingedToggle({
-  containerId, voxelIndex, indices, face,
+  containerId, voxelIndex, indices, face, surface,
 }: {
   containerId: string;
   voxelIndex: number;
   indices: number[];
   face: FaceKey;
+  surface: 'Half_Fold' | 'Gull_Wing';
 }) {
   const setHingedConfig = useStore((s) => s.setHingedConfig);
   const openAmount = useStore(
@@ -217,41 +295,45 @@ function HingedToggle({
   const isOpen = openAmount > 0.5;
   const targets = indices.length > 0 ? indices : [voxelIndex];
 
-  const toggle = () => {
-    const next = isOpen ? 0 : 1;
+  const setState = (next: 0 | 1) => {
+    if ((next === 1) === isOpen) return; // already in target state
     for (const idx of targets) {
       setHingedConfig(containerId, idx, face as 'n' | 's' | 'e' | 'w', { openAmount: next });
     }
   };
 
+  const friendlySurface = surface === 'Half_Fold' ? 'fold-down' : 'gull-wing';
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 0', borderTop: '1px solid var(--border)', marginTop: 8 }}>
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)', letterSpacing: '0.02em' }}>
+    <div style={{ padding: '10px 0', borderTop: '1px solid var(--border)', marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Hinged panel
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, lineHeight: 1.4 }}>
-          {isOpen
-            ? 'Folded outward — drops down as a deck or rises as an awning.'
-            : 'Closed — sealed wall panel.'}
+        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+          {friendlySurface}
         </div>
       </div>
-      <button
+      <div
         data-testid="hinged-toggle"
-        onClick={toggle}
         aria-pressed={isOpen}
-        style={{
-          fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-          color: isOpen ? '#fff' : 'var(--accent)',
-          background: isOpen ? 'var(--accent)' : 'transparent',
-          border: '1.5px solid var(--accent)',
-          borderRadius: 6, padding: '5px 12px',
-          cursor: 'pointer', letterSpacing: '0.02em',
-          transition: 'all 120ms ease-out', whiteSpace: 'nowrap',
-        }}
+        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}
       >
-        {isOpen ? 'Open ●' : 'Closed ○'}
-      </button>
+        <PresetCard
+          content={<HingedPreviewSVG surface={surface} state="closed" />}
+          label="Closed"
+          title="Sealed wall panel"
+          active={!isOpen}
+          onClick={() => setState(0)}
+        />
+        <PresetCard
+          content={<HingedPreviewSVG surface={surface} state="open" />}
+          label="Open"
+          title={surface === 'Half_Fold' ? 'Bottom half folds down as a deck' : 'Top awns up, bottom decks down'}
+          active={isOpen}
+          onClick={() => setState(1)}
+        />
+      </div>
     </div>
   );
 }
