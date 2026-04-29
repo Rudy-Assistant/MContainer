@@ -2765,7 +2765,10 @@ export default function ContainerMesh({ container }: { container: Container }) {
           Legacy panels (SolidBay, GlassBay, HingedWall) rendered at identical positions
           as ContainerSkin voxel faces, causing severe Z-fighting artifacts.
           The voxel skin system replaces all wall rendering.
-          TODO Phase 4: Rebuild hinged wall animations within the voxel system. */}
+          ★ PHASE 4 (2bcf7f0): hinged-wall animations rebuilt inside the voxel skin —
+          HalfFoldFace + GullWingFace each host pivot <group>s driven by useFrame
+          lerping toward voxel.hingedConfig[face].openAmount. No legacy WallAssembly
+          remains; this comment is kept as historical context only. */}
 
       {/* Furniture */}
       {(container.furniture ?? []).map((item) => (
