@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-04-29 — v0.2.0: Phase 4 hinged walls + sprint bugfix close-out
+
+### Phase 4 — Hinged walls back inside the voxel skin
+- New `HingedConfig` ({ openAmount: 0..1 }) per voxel face, stored under `voxel.hingedConfig`.
+- New store action `setHingedConfig(containerId, voxelIndex, face, partial | null)` — clamps input, merges partial updates, removes entry on null.
+- `HalfFoldFace` and `GullWingFace` panels now sit inside pivot `<group>`s driven by `useFrame` lerping toward the target angle; each panel folds OUT (away from container interior) regardless of which wall (n/s/e/w) it sits on.
+- `hingedBottomSign` helper documents the s=-1, n=+1, e=+1, w=-1 convention; gull-wing top panel uses the opposite sign so it swings up while the bottom swings down.
+- Closes the long-standing TODO at `ContainerMesh.tsx:2768` ("Rebuild hinged wall animations within the voxel system"). The legacy WallAssembly was disabled in Phase 1 to eliminate Z-fighting; this brings the animation back inside the voxel skin where it belongs.
+
+### Hinged-wall surface picker
+- `WallsTab` renders a `HingedToggle` when the selected face's surface is `Half_Fold` or `Gull_Wing`. Multi-voxel selections apply the toggle to every voxel in `indices` so a row of fold-walls opens together.
+- Toggle replaced with two side-by-side `PresetCard`s, each showing a tiny SVG diagram of the panel pose:
+  - **Closed**: vertical wall (steel + wood for Half_Fold; both steel for Gull_Wing).
+  - **Open**: bottom panel folded out horizontally (Half_Fold) or top awns up + bottom decks down (Gull_Wing).
+- Cards reuse shared `PresetCard` so they get hover scale, active selection ring, animated check badge, and label-outside-image styling — matching the door / window / decor pickers in the same tab.
+- Click on either card calls `setHingedConfig` with target openAmount only when target differs from current state (no thrash on already-active clicks).
+
+### Sprint bugfix backlog closed (DISC-1, DISC-2, S3, #5/#6/#7) + design pass #3/#4/#7
+- **#3 PresetCard standardization**: `TemplatePicker.tsx` 6 bespoke skin/swatch grids (door / shelf / cabinet / counter top / decor palette / window) migrated to a new `SkinSwatchCard` helper that wraps shared `PresetCard`. Honors the "highlight on image only, label outside" card convention.
+- **#4 Hotbar polish**: new `--hotbar-slot-bg` / `--hotbar-slot-border` / `--hotbar-slot-label` theme tokens in `globals.css` for both light and dark modes. `RecentItemsBar` and `SmartHotbar` (Rooms / Materials / Furniture / Light cards plus tab pills) migrated from hardcoded slate colors to theme tokens; both verified readable in light + dark via `preview_inspect`.
+- **#7 Multi-select element-type constraint**: regression test pinning type-switching discards old selection, type-stable append/remove, last-item-clears-to-null, and `selectableRectangle` exclusion of inactive + locked cells.
+
+### Working tree cleanup
+- Drained 182-entry working tree across multiple sessions: shelf/cabinet/decor/fixture template + skin systems, counter-top materials, door + window template catalogs, roof shape overlay, smart-rule validators, AI designer, building-performance modal, embed page, service-worker registrar, mobile gate, face filter widget.
+- `.gitignore` additions: `.dev-server.log` (transient runtime output) and `gate-baselines/*` except `baseline-*.png` (only committed visual baselines are versioned; webm tour recordings, qa-deep timestamped runs, vframes/tour-debug debug captures are one-shot outputs).
+
+### Tests
+- 123 test files, 1043 tests pass (was 113/969 at last release). `+10` files / `+74` tests this cycle:
+  - `hinged-wall-config.test.ts` (9 tests) pinning store contract — clamping, partial merge, null-clears, face isolation, no-op on missing container, persistence across other face mutations.
+  - Multi-select element-type constraint regression test.
+  - Sprint-bugfix verification suites.
+- DISC-1 sidebar test timeout bumped to 10 s (1.9 s in isolation but flaky under parallel load at the default 5 s).
+- `tsc --noEmit` clean.
+
+### Browser verification
+- Half_Fold + Gull_Wing surfaces show the HingedToggle in WallsTab; clicking flips store openAmount and aria-pressed; no console errors during animation.
+- Active card gets the indigo ring + ✓ badge; inactive card stays neutral; same for both Half_Fold and Gull_Wing variants with correct hint titles.
+- All 7 sprint bugfix items verified at 1440x900 in light + dark modes.
+
 ## 2026-04-25 — Wall feature overlays (doors, windows, shelves, cabinets, fixtures, decor, lighting)
 
 ### Doors
