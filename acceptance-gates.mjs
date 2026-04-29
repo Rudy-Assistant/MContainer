@@ -15,7 +15,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { PNG } from 'pngjs';
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.MODUHOME_BASE_URL || 'http://localhost:3000';
 const DIR = 'gate-screenshots';
 const BASELINES_DIR = 'gate-baselines';
 mkdirSync(DIR, { recursive: true });
@@ -52,13 +52,24 @@ async function openOverflowMenu(page) {
     // Menu button might already be expanded or layout is different — continue gracefully
     return;
   }
-  await btn.click({ force: true });
-  // Wait for menu content to appear (any button inside the overflow panel)
+  // The overflow dropdown uses useExitTransition which mounts via two RAFs after
+  // state flips. Under headless SwiftShader, RAFs can stall behind WebGL frames,
+  // so be generous with the wait. If the dropdown is already open from a prior
+  // call, the locator resolves immediately.
+  const alreadyOpen = await page.locator('[data-testid="btn-reset"]').isVisible().catch(() => false);
+  if (!alreadyOpen) {
+    // Use dispatchEvent('click') instead of page.click — Playwright's click
+    // synthesizes mouse events that can race with the document-level
+    // mousedown outside-click handler in SettingsMenuControl. Direct dispatch
+    // hits onClick directly, no race.
+    await btn.dispatchEvent('click');
+  }
+  // Wait for menu content to appear (any button inside the overflow panel).
   await page.locator('[data-testid="btn-reset"], [data-testid="btn-export"]')
     .first()
-    .waitFor({ state: 'visible', timeout: 2000 })
+    .waitFor({ state: 'visible', timeout: 8000 })
     .catch(() => {}); // Fall back to fixed delay if locators not found
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(200);
 }
 
 /** Open the active toolbar Time of Day popover so its range input is mounted. */
