@@ -33,8 +33,13 @@ import {
   ContainerSize,
   type SurfaceType,
   type FaceFinish,
+  type VoxelFaces,
 } from '@/types/container';
 import { getVoxelLayout } from '@/components/objects/ContainerSkin';
+import {
+  CONTAINER_ARRANGEMENT_SPECS,
+  evaluateContainerArrangementCell,
+} from '@/config/containerArrangements';
 
 const PREVIEW_COLOR = new THREE.Color('#3b82f6');
 const PREVIEW_OPACITY = 0.25;
@@ -147,8 +152,10 @@ const GLASS_SURFACES: ReadonlySet<SurfaceType> = new Set([
 ]);
 const _activeGhostMats: THREE.Material[] = [];
 
-// Reusable pool: avoid creating/destroying meshes every frame
-const GHOST_POOL_SIZE = 48; // max 8 voxels × 6 faces
+// Reusable pool: avoid creating/destroying meshes every frame.
+// Bumped to 200 so container-scoped arrangement previews have headroom
+// (a 64-voxel grid with perimeter walls + top/bottom can hit ~120 faces).
+const GHOST_POOL_SIZE = 200;
 let _ghostPool: THREE.Mesh[] | null = null;
 function getGhostPool(): THREE.Mesh[] {
   if (!_ghostPool) {
@@ -197,7 +204,7 @@ function PresetGhost() {
     _activeGhostMats.length = 0;
 
     const state = useStore.getState();
-    const { ghostPreset, containers } = state;
+    const { ghostPreset, containers, selection } = state;
     const selectedVoxel = getSelectedVoxel();
     const selectedVoxels = getSelectedVoxels();
 
@@ -207,11 +214,25 @@ function PresetGhost() {
       return;
     }
 
-    // Determine target container + indices
+    // Determine target container + indices.
     let containerId: string | null = null;
     let indices: number[] = [];
 
-    if (selectedVoxel && !selectedVoxel.isExtension) {
+    if (ghostPreset.targetScope === 'container') {
+      // Container-scoped previews (arrangement cards): pick the selected
+      // container directly. Falls back to the voxel-selected container if
+      // there's no top-level container selection — same UX as click-apply.
+      containerId = selection?.[0]
+        ?? selectedVoxel?.containerId
+        ?? selectedVoxels?.containerId
+        ?? null;
+      if (containerId && containers[containerId]?.voxelGrid) {
+        // Cover every voxel position so per-cell arrangement evaluation
+        // can decide which ones get the perimeter wall, the void, etc.
+        const totalVoxels = VOXEL_COLS * VOXEL_ROWS * VOXEL_LEVELS;
+        for (let i = 0; i < totalVoxels; i++) indices.push(i);
+      }
+    } else if (selectedVoxel && !selectedVoxel.isExtension) {
       containerId = selectedVoxel.containerId;
       if (ghostPreset.targetScope === 'bay' && selectedVoxels?.containerId === selectedVoxel.containerId) {
         indices = selectedVoxels.indices;
@@ -229,6 +250,12 @@ function PresetGhost() {
       return;
     }
 
+    // Resolve arrangement spec once per render — used inside the loop to
+    // get per-voxel face configs when previewing an arrangement card.
+    const arrangementSpec = ghostPreset.arrangementId
+      ? CONTAINER_ARRANGEMENT_SPECS.find((s) => s.id === ghostPreset.arrangementId) ?? null
+      : null;
+
     const container = containers[containerId];
     if (!container) {
       group.visible = false;
@@ -239,7 +266,7 @@ function PresetGhost() {
     const dims = CONTAINER_DIMENSIONS[container.size as ContainerSize];
     const vHeight = dims.height / VOXEL_LEVELS;
     const halfH = vHeight / 2;
-    const { faces } = ghostPreset;
+    const presetFaces = ghostPreset.faces;
 
     // Pre-compute container transform (avoid recomputing cos/sin per face)
     const cp = container.position;
@@ -253,6 +280,17 @@ function PresetGhost() {
       const col = idx % VOXEL_COLS;
       const row = Math.floor(idx / VOXEL_COLS) % VOXEL_ROWS;
       const level = Math.floor(idx / (VOXEL_COLS * VOXEL_ROWS));
+
+      // Per-voxel face config: arrangement evaluator wins (correct shell vs.
+      // void cells), then fall back to the single-faces preset config.
+      let faces: VoxelFaces;
+      if (arrangementSpec) {
+        const result = evaluateContainerArrangementCell(arrangementSpec, { level, row, col });
+        if (!result || !result.active) continue; // cell deactivated by spec — skip
+        faces = result.faces;
+      } else {
+        faces = presetFaces;
+      }
 
       const { voxW, voxD, px, pz } = getVoxelLayout(col, row, dims);
       const cy = level * vHeight + halfH;

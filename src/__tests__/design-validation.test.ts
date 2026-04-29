@@ -33,8 +33,14 @@ describe('Validation: checkUnprotectedEdges', () => {
   it('VAL-2: Elevated container with open top + open wall triggers warning', () => {
     const id = useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 2.9, z: 0 });
     const voxelIndex = 9; // level 0, row 1, col 1
-    useStore.getState().paintFace(id, voxelIndex, 'top', 'Open');
-    useStore.getState().paintFace(id, voxelIndex, 'n', 'Open');
+
+    // Mutate state directly — using paintFace() would mark these as user-painted,
+    // which SR-04 (correctly) exempts from automatic enforcement.
+    const before = useStore.getState().containers[id];
+    const grid = before.voxelGrid!.map((v, i) =>
+      i === voxelIndex ? { ...v, faces: { ...v.faces, top: 'Open' as const, n: 'Open' as const } } : v
+    );
+    useStore.setState({ containers: { ...useStore.getState().containers, [id]: { ...before, voxelGrid: grid } } });
 
     const containers = useStore.getState().containers;
     expect(containers[id].position.y).toBeGreaterThan(0.1);

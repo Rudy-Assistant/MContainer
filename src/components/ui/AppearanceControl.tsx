@@ -15,8 +15,18 @@ interface AppearanceControlProps {
   buttonStyle: React.CSSProperties;
 }
 
+// Per-theme accent color used in the picker chips. Picked from each theme's
+// signature material so the chip telegraphs the look at a glance.
 const THEME_COLORS: Record<ThemeId, string> = {
-  industrial: "#607d8b", japanese: "#5d4037", desert: "#d4a373",
+  industrial:   "#607d8b",   // weathered steel grey-blue
+  japanese:     "#5d4037",   // charred yakisugi brown
+  desert:       "#d4a373",   // sand stucco tan
+  scandinavian: "#e8e0cf",   // whitewashed pine cream
+  brutalist:    "#3a3a3a",   // raw board-formed concrete
+  coastal:      "#86b3a8",   // sea-glass turquoise
+  ryokan:       "#c9b070",   // tatami straw gold
+  loft:         "#8a4a3a",   // exposed red brick
+  midcentury:   "#b8743c",   // redwood siding
 };
 
 const GROUND_COLORS: Record<GroundPresetId, string> = {
@@ -79,25 +89,46 @@ export default function AppearanceControl({
           <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted, #6b7280)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
             Theme
           </div>
-          <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
+          {/* 2-column grid of theme chips. Each chip shows a colour swatch
+              (left) + label (right). Wraps cleanly when the theme library
+              grows past 6 entries. */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "12px" }}>
             {THEME_IDS.map((tid) => {
               const active = currentTheme === tid;
+              const accent = THEME_COLORS[tid];
               return (
                 <button
                   key={tid}
                   data-testid={`theme-${tid}`}
                   onClick={() => { setTheme(tid); setActivePalette(tid); }}
                   style={{
-                    flex: 1, height: "32px", borderRadius: "6px", border: "1px solid",
-                    borderColor: active ? THEME_COLORS[tid] : "#e5e7eb",
-                    cursor: "pointer", fontSize: "10px", fontWeight: active ? 700 : 500,
-                    color: active ? "#fff" : "#6b7280",
-                    background: active ? THEME_COLORS[tid] : "#f9fafb",
-                    transition: "all 150ms ease",
+                    display: "flex", alignItems: "center", gap: "8px",
+                    height: "36px", padding: "0 10px",
+                    borderRadius: "8px",
+                    border: `1.5px solid ${active ? accent : "var(--btn-border, #e5e7eb)"}`,
+                    cursor: "pointer", fontSize: "11px",
+                    fontWeight: active ? 700 : 500,
+                    color: active ? "var(--text-main, #111827)" : "var(--text-muted, #6b7280)",
+                    background: active ? `${accent}1a` : "var(--btn-bg, #fff)",
+                    transition: "all 150ms ease-out",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
                   }}
                   title={THEMES[tid].label}
                 >
-                  {THEMES[tid].label}
+                  <span
+                    aria-hidden
+                    style={{
+                      flexShrink: 0,
+                      width: "18px", height: "18px",
+                      borderRadius: "4px",
+                      background: accent,
+                      boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.08)",
+                    }}
+                  />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {THEMES[tid].label}
+                  </span>
                 </button>
               );
             })}

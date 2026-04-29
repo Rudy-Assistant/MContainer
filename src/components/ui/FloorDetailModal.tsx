@@ -161,11 +161,11 @@ export default function FloorDetailModal() {
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-[560px] overflow-hidden">
+      <div className="modal-content relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-[680px] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 tracking-tight">
               <Layers size={18} className="text-gray-400" />
               Floor Detail
             </h2>
@@ -267,7 +267,7 @@ export default function FloorDetailModal() {
           {/* Edge picker popover (when an edge is active) */}
           {activeEdge && (
             <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              <p className="text-sm font-bold text-gray-600 uppercase tracking-wider mb-3">
                 {WALL_LABELS[activeEdge]} &mdash; Edge Treatment
               </p>
               {deployedCount(activeEdge) === 0 ? (
@@ -283,7 +283,7 @@ export default function FloorDetailModal() {
                         key={opt.id}
                         onClick={() => applyEdgeType(activeEdge, opt.id)}
                         className={`
-                          flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                          flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
                           ${isCurrent
                             ? "bg-blue-50 text-blue-700 border-2 border-blue-400"
                             : "bg-white text-gray-700 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50"
@@ -306,13 +306,13 @@ export default function FloorDetailModal() {
           {/* Corner picker popover (when a corner is active) */}
           {activeCorner && container && (
             <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              <p className="text-sm font-bold text-gray-600 uppercase tracking-wider mb-3">
                 {activeCorner.replace('_', ' ')} corner
               </p>
 
               {/* Post Type */}
               <div className="mb-3">
-                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">Post Type</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Post Type</p>
                 <div className="flex items-center gap-2">
                   {([
                     { id: 'solid' as const, label: 'Solid', color: '#546e7a' },
@@ -325,7 +325,7 @@ export default function FloorDetailModal() {
                       <button
                         key={opt.id}
                         onClick={() => setCornerConfig(target!, activeCorner, { postType: opt.id })}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
                           ${isCurrent
                             ? "bg-blue-50 text-blue-700 border-2 border-blue-400"
                             : "bg-white text-gray-700 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50"
@@ -342,7 +342,7 @@ export default function FloorDetailModal() {
               {/* Edge A & B */}
               {(['edgeA', 'edgeB'] as const).map((edgeKey, ei) => (
                 <div key={edgeKey} className={ei === 0 ? "mb-3" : ""}>
-                  <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                     Edge {ei === 0 ? 'A' : 'B'} Treatment
                   </p>
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -353,7 +353,7 @@ export default function FloorDetailModal() {
                         <button
                           key={opt.id}
                           onClick={() => setCornerConfig(target!, activeCorner, { [edgeKey]: opt.id })}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all
                             ${isCurrent
                               ? "bg-blue-50 text-blue-700 border-2 border-blue-400"
                               : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50"
@@ -394,7 +394,7 @@ export default function FloorDetailModal() {
                       className="w-8 h-8 rounded-md border border-gray-200"
                       style={{ background: mat.swatch }}
                     />
-                    <span className="text-[10px] font-medium text-gray-600 leading-tight text-center">
+                    <span className="text-xs font-semibold text-gray-700 leading-tight text-center">
                       {mat.label}
                     </span>
                   </button>

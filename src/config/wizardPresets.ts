@@ -14,11 +14,22 @@ export interface WizardStep {
   doorFace?: 'n' | 's' | 'e' | 'w';
 }
 
+/** Names of lucide-react icons used to render preset cards.
+ *  We restrict the union here so the WizardModal can switch on the value
+ *  without importing all of lucide just to type-check. */
+export type WizardPresetIcon =
+  | 'box' | 'box-glass' | 'home' | 'open-plan' | 'atrium' | 'atrium-glass'
+  | 'terrace' | 'terrace-glass' | 'rooftop' | 'tower-stack' | 'fortress';
+
 export interface WizardPreset {
   id: string;
   label: string;
   description: string;
+  /** Emoji fallback — kept for legacy callers (sidebar tooltips, etc). */
   icon: string;
+  /** Stylized lucide-based icon used by WizardModal. New presets should set
+   *  this; old presets will still render via the emoji fallback. */
+  iconStyle?: WizardPresetIcon;
   steps: WizardStep[];
   designIntent?: DesignIntentSpec;
 }
@@ -29,6 +40,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Glass Box',
     description: 'Floor-to-ceiling glass walls on all sides. Maximum light and views.',
     icon: '🔲',
+    iconStyle: 'box-glass',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'largest_glass',
@@ -43,6 +55,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Rooftop Deck',
     description: 'Outdoor deck on top with cable railings. Great for entertaining.',
     icon: '🏗️',
+    iconStyle: 'rooftop',
     steps: [
       { action: 'rooftop_deck' },
     ],
@@ -52,6 +65,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Open Plan',
     description: 'Full floor space with steel walls. No interior divisions.',
     icon: '📐',
+    iconStyle: 'open-plan',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'max_closed',
@@ -66,6 +80,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Atrium Home',
     description: 'Double-height central atrium with guarded upper opening and enclosed shell.',
     icon: '🕳️',
+    iconStyle: 'atrium',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'central_atrium',
@@ -80,6 +95,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Glass Atrium',
     description: 'Glass perimeter with a double-height central light well and guarded upper opening.',
     icon: '🪟',
+    iconStyle: 'atrium-glass',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'glass_atrium',
@@ -94,6 +110,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Roof Terrace',
     description: 'Enclosed lower shell with an upper terrace ring for outdoor circulation.',
     icon: '🌤️',
+    iconStyle: 'terrace',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'roof_terrace',
@@ -108,6 +125,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Glass Terrace',
     description: 'Glass pavilion below with an upper terrace ring and guarded outdoor edges.',
     icon: '🌇',
+    iconStyle: 'terrace-glass',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'glass_terrace',
@@ -122,6 +140,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Studio + Loft',
     description: 'Glass box with internal staircase to upper level.',
     icon: '🏠',
+    iconStyle: 'tower-stack',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'largest_glass',
@@ -138,6 +157,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Glass Home',
     description: 'Full extensions with glass walls, wood floors, open interior — maximum space.',
     icon: '🏡',
+    iconStyle: 'home',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'largest_glass',
@@ -157,6 +177,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Home + Roof Deck',
     description: 'Glass ground floor with stacked rooftop deck, stairs, and railings.',
     icon: '🌇',
+    iconStyle: 'tower-stack',
     designIntent: {
       kind: 'single_container',
       arrangementId: 'largest_glass',
@@ -180,6 +201,7 @@ export const WIZARD_PRESETS: WizardPreset[] = [
     label: 'Steel Fortress',
     description: 'Full steel enclosure with no extensions. Industrial bunker style.',
     icon: '🏭',
+    iconStyle: 'fortress',
     steps: [
       { action: 'paint_outer_walls', wallMaterial: 'Solid_Steel' },
       { action: 'open_interior_walls' },

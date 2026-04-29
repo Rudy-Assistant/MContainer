@@ -49,9 +49,10 @@ export default function TimeOfDayControl({ open, setOpen, onOpen }: TimeOfDayCon
         style={{
           display: "flex", alignItems: "center", gap: "4px",
           background: "none", border: "none", cursor: "pointer", padding: "6px 8px",
-          fontSize: "13px", fontWeight: 600, fontFamily: "monospace",
-          color: open ? "#3b82f6" : "var(--text-muted)",
-          transition: "color 120ms",
+          fontSize: "12px", fontWeight: 500, fontFamily: "var(--font-mono, ui-monospace, Menlo, Consolas, monospace)",
+          fontVariantNumeric: "tabular-nums",
+          color: open ? "#3b82f6" : "var(--text-dim, #9ca3af)",
+          transition: "color 150ms ease-out",
         }}
         title="Time of Day"
       >

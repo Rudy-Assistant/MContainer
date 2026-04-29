@@ -224,10 +224,12 @@ describe('generateRooftopDeck', () => {
     const id = addTestContainer();
     useStore.getState().generateRooftopDeck(id);
     const grid = useStore.getState().containers[id].voxelGrid!;
-    // Body voxel at row 1, col 1 (index 9) should have Deck_Wood top
-    expect(grid[9].faces.top).toBe('Deck_Wood');
-    // Perimeter body voxel at row 1, col 1 should have Railing_Cable on north face
-    expect(grid[9].faces.n).toBe('Railing_Cable');
+    // Rooftop deck lives on the TOP internal level (idx 41 = level 1 row 1 col 1),
+    // so the container's roof becomes the deck surface — not its floor.
+    expect(grid[41].faces.top).toBe('Deck_Wood');
+    expect(grid[41].faces.n).toBe('Railing_Cable');
+    // Floor-level voxel (idx 9) must be left untouched so enclosed rooms below remain intact
+    expect(grid[9].faces.top).not.toBe('Deck_Wood');
   });
 });
 

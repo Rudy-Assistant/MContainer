@@ -74,17 +74,27 @@ describe('container arrangements', () => {
     expect(grid[idx(2, 4, 1)].faces.w).toBe('Open');
   });
 
-  it('glass_atrium keeps the atrium void while glazing the perimeter shell', () => {
+  it('glass_atrium produces a single-volume pavilion with a glazed perimeter, glass skylight, and operable sliding-door pair', () => {
     const id = addTestContainer();
     useStore.getState().applyContainerArrangement(id, 'glass_atrium');
     const grid = useStore.getState().containers[id].voxelGrid!;
 
+    // Perimeter is glazed.
     expect(grid[idx(0, 1)].faces.n).toBe('Glass_Pane');
     expect(grid[idx(3, 6)].faces.s).toBe('Glass_Pane');
-    expect(grid[idx(1, 3)].faces.top).toBe('Open');
-    expect(grid[idx(1, 3, 1)].faces.bottom).toBe('Open');
-    expect(grid[idx(1, 3, 1)].faces.n).toBe('Railing_Cable');
-    expect(grid[idx(1, 3, 1)].faces.e).toBe('Open');
+    // Atrium void cells now render as glass skylight rather than a literal
+    // hole (was 'Open' before 2026-04-25 — that produced an open-ceiling
+    // pavilion that wasn't habitable; the user wanted a glass roof).
+    expect(grid[idx(1, 3)].faces.top).toBe('Glass_Pane');
+    // Two adjacent south-wall cells (cols 3 + 4) are sliding-glass doors —
+    // operable as a pair. Surrounding cells stay regular Glass_Pane.
+    expect(grid[idx(3, 3)].faces.s).toBe('Glass_Shoji');
+    expect(grid[idx(3, 4)].faces.s).toBe('Glass_Shoji');
+    // Upper level is fully removed: voxels are inactive, faces collapse to Open.
+    // Previously these were Solid_Steel shell cells with Railing_Cable around the
+    // void, which produced a confusing "two-shell" look on stacked containers.
+    expect(grid[idx(1, 3, 1)].active).toBe(false);
+    expect(grid[idx(1, 1, 1)].active).toBe(false);
   });
 
   it('roof_terrace creates an enclosed lower shell and upper extension terrace ring', () => {

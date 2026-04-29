@@ -21,10 +21,12 @@ type Set = SliceSet<EnvironmentRuntimeState>;
 
 export interface EnvironmentSlice {
   // Environment (persisted in `environment` object)
-  environment: { timeOfDay: number; northOffset: number; groundPreset: string };
+  environment: { timeOfDay: number; northOffset: number; groundPreset: string; siteContextEnabled: boolean; showMEP: boolean };
   setTimeOfDay: (time: number) => void;
   setNorthOffset: (degrees: number) => void;
   setGroundPreset: (preset: string) => void;
+  setSiteContextEnabled: (enabled: boolean) => void;
+  setShowMEP: (show: boolean) => void;
 
   // View mode (persisted)
   viewMode: ViewMode;
@@ -58,7 +60,7 @@ export interface EnvironmentSlice {
 
 export const createEnvironmentSlice = (set: Set): EnvironmentSlice => ({
   // ── Initial State ──────────────────────────────────────
-  environment: { timeOfDay: 15, northOffset: 0, groundPreset: 'grass' },
+  environment: { timeOfDay: 15, northOffset: 0, groundPreset: 'grass', siteContextEnabled: false, showMEP: false },
   viewMode: ViewMode.Realistic3D,
   currentTheme: 'industrial' as ThemeId,
   activeStyle: 'industrial' as StyleId,
@@ -84,7 +86,23 @@ export const createEnvironmentSlice = (set: Set): EnvironmentSlice => ({
       environment: { ...s.environment, groundPreset: preset },
     })),
 
+  setSiteContextEnabled: (enabled) =>
+    set((s) => ({
+      environment: { ...s.environment, siteContextEnabled: enabled },
+    })),
+
+  setShowMEP: (show) =>
+    set((s) => ({ environment: { ...s.environment, showMEP: show } })),
+
   setViewMode: (mode) => {
+    // Veil the camera/scene-graph swap with the soft scene-fade — without
+    // it, switching 3D ↔ Blueprint ↔ Walkthrough reads as a jump-cut as
+    // mounts/unmounts and camera teleports happen in one frame.
+    const setStore = set as unknown as (partial: Record<string, unknown>) => void;
+    setStore({ sceneFadeActive: true });
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => setStore({ sceneFadeActive: false }), 360);
+    }
     if (mode === 'walkthrough') {
       set({
         viewMode: mode,
@@ -99,6 +117,10 @@ export const createEnvironmentSlice = (set: Set): EnvironmentSlice => ({
 
   setTheme: (theme) => {
     const themeConfig = THEMES[theme];
+    if (!themeConfig) {
+      console.warn(`[setTheme] Unknown theme "${theme}" — ignored. Valid: ${Object.keys(THEMES).join(', ')}`);
+      return;
+    }
     set((s) => ({
       currentTheme: theme,
       activeStyle: THEME_TO_STYLE_MAP[theme] ?? 'industrial',

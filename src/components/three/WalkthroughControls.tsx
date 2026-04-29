@@ -461,14 +461,52 @@ export default function WalkthroughControls() {
               }
               if (isMeltedCross) continue; // face shared with adjacent container — skip collision
 
-              // Open faces are passable — no collision
+              // Open faces are passable — no collision (UNLESS an overlay
+              // sits on this face; cabinets/fixtures/tall shelves block
+              // movement even on Open walls).
               const surface = voxel.faces[f.dir];
-              if (surface === 'Open') continue;
-              // Door faces are passable when toggled open
+              const cabinetOnFace = voxel.cabinetConfig?.[f.dir];
+              const fixtureOnFace = voxel.fixtureConfig?.[f.dir];
+              const shelfOnFace = voxel.shelfConfig?.[f.dir];
+              if (surface === 'Open' && !cabinetOnFace && !fixtureOnFace && !shelfOnFace) continue;
+              // Door faces are passable when toggled open (overlays don't
+              // sit on Door faces — surface-gated picker prevents that).
               if (surface === 'Door' && voxel.openFaces?.[f.dir]) continue;
               // Railing types: collision only up to railing height
               const fH = (surface === 'Railing_Cable' || surface === 'Railing_Glass') ? 1.0 : h;
-              boxes.push(localBoxToWorld(f.cx, f.cz, f.hw, f.hd, fH));
+              if (surface !== 'Open') {
+                boxes.push(localBoxToWorld(f.cx, f.cz, f.hw, f.hd, fH));
+              }
+
+              // ── Overlay collision: cabinet, fixture, tall shelves ──
+              // Each overlay extends ~0.45m into the room from the face.
+              // Place a collision box centered on the inward-projected
+              // overlay extent. Picture decor is flat against the wall and
+              // not added (passable).
+              const inwardSign = (f.dir === 'n' || f.dir === 'w') ? +1 : -1;
+              const inwardAxis = (f.dir === 'n' || f.dir === 's') ? 'z' : 'x';
+              const pushOverlayBox = (overlayDepth: number, overlayHW: number, overlayHD: number) => {
+                const offset = inwardSign * (WALL_T / 2 + overlayDepth / 2);
+                const ocx = inwardAxis === 'x' ? f.cx + offset : f.cx;
+                const ocz = inwardAxis === 'z' ? f.cz + offset : f.cz;
+                // Half-extents along the wall plane vs into the room
+                const localHW = inwardAxis === 'x' ? overlayDepth / 2 : overlayHW;
+                const localHD = inwardAxis === 'z' ? overlayDepth / 2 : overlayHD;
+                boxes.push(localBoxToWorld(ocx, ocz, localHW, localHD, h));
+              };
+
+              if (cabinetOnFace || fixtureOnFace) {
+                // Both reach ~0.45m into the room. Use 0.5m to leave a
+                // small clearance for the player capsule.
+                pushOverlayBox(0.5, f.hw * 0.85, f.hd * 0.85);
+              } else if (shelfOnFace) {
+                // Shelves stick out ~0.25m. Only collide for mid-anchor
+                // shelves (top-anchor shelves are above head height).
+                const anchor = shelfOnFace.verticalAnchor ?? 'mid';
+                if (anchor !== 'top') {
+                  pushOverlayBox(0.28, f.hw * 0.7, f.hd * 0.7);
+                }
+              }
             }
           }
         }
@@ -764,6 +802,23 @@ export default function WalkthroughControls() {
       // E = toggle target (was context menu, now direct toggle)
       if (e.code === "KeyE") {
         toggleTarget();
+      }
+      // O = open/close the door under the crosshair. Dedicated binding so
+      // users have a predictable key for "operate the thing I'm looking at"
+      // — Space is overloaded with cycle/face-toggle behaviour.
+      if (e.code === "KeyO") {
+        e.preventDefault();
+        const store = useStore.getState();
+        const edge = store.hoveredVoxelEdge;
+        if (edge) {
+          const c = store.containers[edge.containerId];
+          const voxel = c?.voxelGrid?.[edge.voxelIndex];
+          const face = edge.face as 'n' | 's' | 'e' | 'w';
+          // Only toggle on actual doors / shoji panels — silently no-op on walls.
+          if (voxel?.faces[face] === 'Door' || voxel?.faces[face] === 'Glass_Shoji') {
+            store.toggleOpenFace(edge.containerId, edge.voxelIndex, face);
+          }
+        }
       }
       // T = toggle auto-tour (cycles: off → interior → exterior → off)
       if (e.code === "KeyT") {

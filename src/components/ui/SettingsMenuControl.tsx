@@ -1,22 +1,47 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useExitTransition } from "@/hooks/useExitTransition";
 import {
+  Activity,
   Bug,
+  Camera,
   Download,
+  FileText,
+  Glasses,
+  Code2,
+  Mail,
+  Sparkles,
+  Video,
   Grid2x2,
   Grid3x3,
+  LayoutGrid,
   Moon,
+  Printer,
   RotateCcw,
   RotateCw,
   Share2,
   SlidersHorizontal,
   Sun,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { ContainerSize, ViewMode } from "@/types/container";
-import { buildShareUrl } from "@/utils/shareUrl";
+import { buildShareUrl, buildEmbedSnippet } from "@/utils/shareUrl";
+import { downloadBlob } from "@/utils/downloadBlob";
+import QuoteRequestModal from "./QuoteRequestModal";
+import AIDesignModal from "./AIDesignModal";
+import BuildingPerformanceModal from "./BuildingPerformanceModal";
+
+// Heavy utilities are lazy-imported on first click — keeps them out of the
+// initial bundle for users who never open the settings menu (most sessions).
+const lazyDownloadBomCSV = () => import("@/utils/constructionDocs").then((m) => m.downloadBomCSV());
+const lazyOpenPrintableReport = () => import("@/utils/constructionDocs").then((m) => m.openPrintableReport());
+const lazyDownloadPhotorealPNG = () => import("@/utils/photorealCapture").then((m) => m.downloadPhotorealPNG());
+const lazyRecordTourClip = (durationMs: number) => import("@/utils/tourVideoRecorder").then((m) => m.recordTourClip(durationMs));
+const lazyRecordAutoTourClip = (durationMs: number) => import("@/utils/tourVideoRecorder").then((m) => m.recordAutoTourClip(durationMs));
+const lazyEnterVR = () => import("@/utils/webXR").then((m) => m.enterVR());
 
 interface SettingsMenuControlProps {
   open: boolean;
@@ -32,6 +57,13 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
   const clearSelection = useStore((s) => s.clearSelection);
   const viewMode = useStore((s) => s.viewMode);
   const exportState = useStore((s) => s.exportState);
+  const importState = useStore((s) => s.importState);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [perfOpen, setPerfOpen] = useState(false);
+  // Keep the settings dropdown mounted briefly after `open` flips false so
+  // the dropdown-out CSS animation can play before unmount.
+  const dropdown = useExitTransition(open, 140);
   const updateContainerRotation = useStore((s) => s.updateContainerRotation);
   const addContainer = useStore((s) => s.addContainer);
   const debugMode = useStore((s) => s.debugMode);
@@ -48,6 +80,8 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
   const toggleHideSkin = useStore((s) => s.toggleHideSkin);
   const showHotbar = useStore((s) => s.showHotbar);
   const toggleHotbar = useStore((s) => s.toggleHotbar);
+  const showFloorGrid = useStore((s) => s.showFloorGrid);
+  const toggleFloorGrid = useStore((s) => s.toggleFloorGrid);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,13 +105,27 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
 
   const handleExport = () => {
     const json = exportState();
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "moduhome-project.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(
+      new Blob([json], { type: "application/json" }),
+      `moduhome-design-${new Date().toISOString().slice(0, 10)}.json`,
+    );
+  };
+
+  const handleImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        importState(text);
+      } catch (e) {
+        alert(`Could not import: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+    input.click();
   };
 
   return (
@@ -93,8 +141,8 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
       >
         <SlidersHorizontal size={14} />
       </button>
-      {open && (
-        <div style={{
+      {dropdown.mounted && (
+        <div data-state={dropdown.state} className="dropdown-menu" style={{
           position: "absolute", top: "100%", right: 0, marginTop: "4px",
           background: "var(--modal-bg, #fff)", borderRadius: "10px",
           boxShadow: "var(--panel-shadow, 0 8px 24px rgba(0,0,0,0.15))",
@@ -175,6 +223,19 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
             <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{showHotbar ? "ON" : "OFF"}</span>
           </button>
 
+          <button onClick={toggleFloorGrid} style={{
+            display: "flex", alignItems: "center", gap: 8, width: "100%",
+            padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+            fontSize: 12, fontWeight: 600, marginBottom: 4,
+            color: showFloorGrid ? "var(--accent)" : "var(--text-main)",
+            background: showFloorGrid ? "rgba(37,99,235,0.10)" : "transparent",
+            transition: "all 100ms",
+          }}>
+            <LayoutGrid size={13} />
+            Floor Grid
+            <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{showFloorGrid ? "ON" : "OFF"}</span>
+          </button>
+
           <button onClick={() => setDesignComplexity(designComplexity === "simple" ? "detailed" : "simple")} style={{
             display: "flex", alignItems: "center", gap: 8, width: "100%",
             padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
@@ -190,10 +251,21 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
 
           <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 10px 2px" }}>Actions</div>
           {[
+            { label: "AI Design…", action: () => { setAiOpen(true); setOpen(false); }, enabled: !isWalkthrough, Icon: Sparkles, testId: "btn-ai-design" },
             { label: "Delete Selected", action: handleDelete, enabled: hasSelection && !isWalkthrough, Icon: Trash2 },
             { label: "Rotate 90°", action: () => selection.forEach((id) => { const c = containers[id]; if (c) updateContainerRotation(id, (c.rotation ?? 0) + Math.PI / 2); }), enabled: hasSelection && !isWalkthrough, Icon: RotateCw },
             { label: "Share URL", action: () => { const url = buildShareUrl(containers); navigator.clipboard.writeText(url).then(() => alert("Copied!")); }, enabled: Object.keys(containers).length > 0, Icon: Share2 },
+            { label: "Copy Embed Code", action: () => { const html = buildEmbedSnippet(containers); navigator.clipboard.writeText(html).then(() => alert("Embed iframe copied to clipboard!")); }, enabled: Object.keys(containers).length > 0, Icon: Code2, testId: "btn-embed-code" },
             { label: "Export JSON", action: () => { handleExport(); setOpen(false); }, enabled: true, Icon: Download, testId: "btn-export" },
+            { label: "Import JSON", action: () => { handleImport(); setOpen(false); }, enabled: true, Icon: Upload, testId: "btn-import" },
+            { label: "BOM (CSV)", action: () => { void lazyDownloadBomCSV(); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: FileText, testId: "btn-bom-csv" },
+            { label: "Construction Docs (PDF)", action: () => { void lazyOpenPrintableReport(); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: Printer, testId: "btn-print-docs" },
+            { label: "Performance (Energy/Solar/Code)", action: () => { setPerfOpen(true); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: Activity, testId: "btn-performance" },
+            { label: "Request Quote…", action: () => { setQuoteOpen(true); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: Mail, testId: "btn-request-quote" },
+            { label: "Photoreal Snapshot", action: () => { void lazyDownloadPhotorealPNG(); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: Camera, testId: "btn-photoreal" },
+            { label: "Record 10s Tour Video", action: () => { void lazyRecordTourClip(10000); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: Video, testId: "btn-record-tour" },
+            { label: "Record Auto-Tour (20s)", action: () => { void lazyRecordAutoTourClip(20000); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: Video, testId: "btn-record-auto-tour" },
+            { label: "Enter VR (WebXR)", action: () => { void lazyEnterVR(); setOpen(false); }, enabled: Object.keys(containers).length > 0, Icon: Glasses, testId: "btn-enter-vr" },
           ].map(({ label, action, enabled, Icon, testId }) => (
             <button key={label} data-testid={testId} onClick={() => { if (enabled) action(); }} disabled={!enabled} style={{
               display: "flex", alignItems: "center", gap: 8, width: "100%",
@@ -211,9 +283,15 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
 
           <button data-testid="btn-reset" onClick={() => {
             if (confirm("Reset to empty canvas?")) {
-              Object.keys(containers).forEach((id) => removeContainer(id));
-              clearSelection();
-              addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+              // Trigger the scene-fade veil first so the swap happens behind
+              // a soft wash instead of as a jarring jump-cut. The actual
+              // state change happens at ~150ms (mid-fade).
+              useStore.getState().triggerSceneFade();
+              setTimeout(() => {
+                Object.keys(useStore.getState().containers).forEach((id) => removeContainer(id));
+                clearSelection();
+                addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+              }, 150);
               setOpen(false);
             }
           }} disabled={Object.keys(containers).length === 0} style={{
@@ -227,6 +305,9 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
           </button>
         </div>
       )}
+      <QuoteRequestModal open={quoteOpen} onClose={() => setQuoteOpen(false)} />
+      <AIDesignModal open={aiOpen} onClose={() => setAiOpen(false)} />
+      <BuildingPerformanceModal open={perfOpen} onClose={() => setPerfOpen(false)} />
     </div>
   );
 }

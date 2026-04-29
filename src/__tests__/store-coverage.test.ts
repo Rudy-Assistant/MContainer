@@ -257,11 +257,15 @@ describe('Pool Conversion', () => {
 describe('Great Room Demo', () => {
   beforeEach(resetStore);
 
+  // createGreatRoomDemo applies arrangements + extensions across multiple
+  // containers and now invokes the Smart-rule normalize pass on each step,
+  // which pushes the test north of the default 5s timeout under CPU contention.
+  // Bumped to 15s — generous; isolated runs still finish in ~3s.
   it('DEMO-1: createGreatRoomDemo creates multiple containers', () => {
     useStore.getState().createGreatRoomDemo();
     const count = Object.keys(useStore.getState().containers).length;
     expect(count).toBeGreaterThanOrEqual(2);
-  });
+  }, 15000);
 
   it('DEMO-2: createGreatRoomDemo creates multi-level structure', () => {
     useStore.getState().createGreatRoomDemo();
@@ -269,7 +273,7 @@ describe('Great Room Demo', () => {
     // Should have multiple levels (L0 + L1 + L2)
     const levels = new Set(containers.map((c) => c.level));
     expect(levels.size).toBeGreaterThanOrEqual(2);
-  });
+  }, 15000);
 });
 
 // ─────────────────────────────────────────────────────────

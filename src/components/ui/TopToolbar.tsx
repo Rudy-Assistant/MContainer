@@ -18,7 +18,9 @@ import {
   Undo2,
   Redo2,
   Wand2,
+  Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 import WarningBadge from './WarningBadge';
 import { useNarrowToolbar } from '@/hooks/useNarrowToolbar';
 import TimeOfDayControl from "./TimeOfDayControl";
@@ -74,9 +76,12 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
     cursor: enabled ? "pointer" : "not-allowed",
     fontSize: "13px",
     fontWeight: 500,
-    color: enabled ? "var(--text-main, #374151)" : "var(--text-dim, #9ca3af)",
-    background: enabled ? "var(--btn-bg, #fff)" : "var(--surface-alt, #f9fafb)",
-    transition: "all 150ms ease",
+    // Disabled-button state is recognisable as a button — keep the border + bg,
+    // drop only the icon/text opacity so users can tell the target still exists.
+    color: "var(--text-main, #374151)",
+    background: "var(--btn-bg, #fff)",
+    opacity: enabled ? 1 : 0.4,
+    transition: "all 150ms ease-out",
     whiteSpace: "nowrap",
     flexShrink: 0,
   });
@@ -101,10 +106,14 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
         zIndex: 50,
       }}
     >
-      {/* ═══ ZONE A: Logo ═══ */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-        <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-main, #111827)" }}>ModuHome</span>
-        <span style={{ fontSize: "9px", fontWeight: 600, padding: "2px 6px", borderRadius: "9999px", background: "var(--accent, #2563eb)", color: "#fff" }}>
+      {/* ═══ ZONE A: Logo (quieter so the canvas + cost can win attention) ═══ */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+        {narrow ? (
+          <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-muted, #6b7280)", letterSpacing: "-0.01em" }} aria-label="ModuHome">MH</span>
+        ) : (
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-muted, #4b5563)", letterSpacing: "-0.01em" }}>ModuHome</span>
+        )}
+        <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "9999px", background: "var(--surface-alt, #f3f4f6)", color: "var(--text-muted, #6b7280)", letterSpacing: "0.06em" }}>
           PRO
         </span>
       </div>
@@ -121,6 +130,36 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
 
         <button onClick={openWizard} style={btn(true)} title="Quick Setup">
           <Wand2 size={15} />
+        </button>
+
+        {/* Smart Rules "Clean up design" — runs normalizeDesign in repair mode.
+            Fixes: missing railings, rooftop on non-topmost, stair-to-nowhere, etc.
+            Idempotent — pressing twice is a no-op on a clean design. */}
+        <button
+          onClick={() => {
+            const result = useStore.getState().cleanupDesign();
+            const repairs = result.notes.length;
+            const remaining = result.violations.length;
+            if (repairs === 0 && remaining === 0) {
+              toast.success("Design is already compliant with Smart Rules.");
+              return;
+            }
+            if (repairs > 0 && remaining === 0) {
+              toast.success(
+                `Cleaned up — ${repairs} rule${repairs === 1 ? '' : 's'} repaired.`,
+                { description: result.notes.join(", ") },
+              );
+              return;
+            }
+            toast.warning(
+              `Cleanup applied ${repairs} repair${repairs === 1 ? '' : 's'}; ${remaining} warning${remaining === 1 ? '' : 's'} remain.`,
+              { description: "Residual issues may need manual attention." },
+            );
+          }}
+          style={btn(true)}
+          title="Clean up design — applies Smart Rules (railings, rooftop, stair voids)"
+        >
+          <Sparkles size={15} />
         </button>
 
         <div style={{ width: "1px", height: "20px", background: "var(--border, #e5e7eb)", flexShrink: 0 }} />
@@ -162,26 +201,26 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
       {/* ═══ ZONE C: Right — Floor/Roof + Wall Vis + Overflow ═══ */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
 
-        {/* ── Smart/Manual pill ── */}
+        {/* ── Smart/Manual pill — restricts auto-fixes; high-frequency toggle, so reads as a clear pair. ── */}
         <div style={{
-          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 6, overflow: "hidden",
-          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 11, fontWeight: 600,
+          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 8, overflow: "hidden",
+          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 12, fontWeight: 600,
         }}>
           {(['smart', 'manual'] as const).map((m) => (
             <button key={m} onClick={() => useStore.getState().setDesignMode(m)} style={{
-              padding: "5px 10px", border: "none", cursor: "pointer",
+              padding: "6px 14px", border: "none", cursor: "pointer",
               background: designMode === m ? "var(--accent, #2563eb)" : "transparent",
               color: designMode === m ? "#fff" : "var(--text-muted, #6b7280)",
-              transition: "all 100ms",
+              transition: "all 150ms ease-out",
+              letterSpacing: "0.01em",
             }}>
               {narrow ? (m === 'smart' ? 'S' : 'M') : (m === 'smart' ? 'Smart' : 'Manual')}
             </button>
           ))}
         </div>
 
-        {/* Floor/Ceiling/Frame view toggle moved to MatrixEditor header (Phase 2 declutter) */}
-
-        {/* Wall Visibility, Roof, Skin moved to Settings dropdown (Phase 1 declutter) */}
+        {/* Separator: groups the ephemeral status chips, lets Cost read as the primary indicator. */}
+        <div style={{ width: "1px", height: "20px", background: "var(--border, #e5e7eb)", flexShrink: 0, margin: "0 2px" }} />
 
         <CostControl
           open={costOpen}
@@ -193,23 +232,29 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           onOpenBudget={onOpenBudget}
         />
 
-        <TimeOfDayControl
-          open={todOpen}
-          setOpen={setTodOpen}
-          onOpen={() => {
-            setCostOpen(false);
-            setCompassOpen(false);
-          }}
-        />
+        {/* Time of day + compass are lower-priority status — collapse into the Settings
+            overflow on narrow (<1024px) viewports so the toolbar doesn't clip. */}
+        {!narrow && (
+          <>
+            <TimeOfDayControl
+              open={todOpen}
+              setOpen={setTodOpen}
+              onOpen={() => {
+                setCostOpen(false);
+                setCompassOpen(false);
+              }}
+            />
 
-        <CompassControl
-          open={compassOpen}
-          setOpen={setCompassOpen}
-          onOpen={() => {
-            setTodOpen(false);
-            setCostOpen(false);
-          }}
-        />
+            <CompassControl
+              open={compassOpen}
+              setOpen={setCompassOpen}
+              onOpen={() => {
+                setTodOpen(false);
+                setCostOpen(false);
+              }}
+            />
+          </>
+        )}
 
         {/* Warning badge */}
         <WarningBadge />

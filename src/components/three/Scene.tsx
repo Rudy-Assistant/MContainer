@@ -49,6 +49,10 @@ import { PlacementGhost } from '@/components/objects/PlacementGhost';
 import { HoverPreviewGhost } from '@/components/objects/HoverPreviewGhost';
 // pbrTextures.ts removed — texture loading consolidated into materialCache.ts via textureLoader.ts
 import GroundManager from "./GroundManager";
+import SiteFeatures from "./SiteFeatures";
+import MEPOverlay from "./MEPOverlay";
+import XRLocomotion from "./XRLocomotion";
+import FloorGrid from "./FloorGrid";
 import DebugOverlay from "./DebugOverlay";
 import StaircaseGhost from "./StaircaseGhost";
 // FaceContextWidget removed — replaced by Materials hotbar
@@ -171,6 +175,13 @@ function SunLight() {
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.00008}
         shadow-normalBias={0.0001}
+        // Softer shadow edges — the previous default produced harsh
+        // grid-aligned dark rectangles on the ground that read as artifacts
+        // ("afterburn") next to thin posts/railings. Larger radius + the
+        // PCFSoftShadowMap algorithm (set on the renderer) makes the edges
+        // diffuse so the shadow reads as one continuous shape.
+        shadow-radius={6}
+        shadow-blurSamples={20}
         shadow-camera-left={-72}
         shadow-camera-right={72}
         shadow-camera-top={72}
@@ -1423,6 +1434,9 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
       <DappleGobo />
       <FollowLight />
       <GroundManager />
+      <SiteFeatures />
+      <MEPOverlay />
+      <FloorGrid />
       {/* PBRTextureLoader removed — textures now loaded by materialCache at module init */}
       <FrameModeInvalidator />
       <SceneChangeInvalidator />
@@ -1433,6 +1447,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
 
       {/* Distance fog — softens horizon edge */}
       <SceneFog />
+      <XRLocomotion />
 
       <GroundContactShadows />
 
@@ -2096,6 +2111,8 @@ function WalkthroughScene() {
       <SunLight />
       <DappleGobo />
       <GroundManager />
+      <SiteFeatures />
+      <MEPOverlay />
 
       {/* Phase 8: HDRI environment for PBR reflections */}
       <TimeOfDayEnvironment intensity={0.2} />

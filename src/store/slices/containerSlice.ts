@@ -54,6 +54,13 @@ import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
 import { evaluateContainerArrangementCell, getContainerArrangementSpec } from "@/config/containerArrangements";
 import { recomputeSmartHoleGuards, recomputeSmartRailings } from "./voxelSlice";
+import { getShelfTemplate } from "@/config/shelfTemplates";
+import { getCabinetTemplate } from "@/config/cabinetTemplates";
+import { getCabinetrySkin } from "@/config/cabinetrySkins";
+import { getCounterTopMaterial } from "@/config/counterTopMaterials";
+import { getFixtureTemplate } from "@/config/fixtureTemplates";
+import { getDecorTemplate } from "@/config/decorTemplates";
+import { normalizeDesign } from "@/utils/normalizeDesign";
 import {
   compileMultiContainerDesignIntent,
   compileSingleContainerDesignIntent,
@@ -191,6 +198,10 @@ export interface ContainerSlice {
   renameContainer: (id: string, name: string) => void;
   resizeContainer: (id: string, newSize: ContainerSize) => void;
   toggleRoof: (id: string) => void;
+  /** Set the container's roof shape (flat / parapet / gable / shed /
+   *  butterfly / green). Cosmetic geometry only — does not affect rooms
+   *  or walkthrough collision. */
+  setRoofType: (id: string, roofType: import('@/config/roofTypes').RoofTypeId) => void;
   toggleFloor: (id: string) => void;
   _applyExtensionDoors: (containerId: string, config: ExtensionConfig) => void;
   _restoreExtensionDoors: (containerId: string) => void;
@@ -287,6 +298,21 @@ export interface ContainerSlice {
 
   // ── Shared Design Import ────────────────────────────────
   importSharedDesign: (design: SharedDesignPayload) => void;
+
+  /**
+   * Run Smart Rules over the current design and apply autofix repairs.
+   *
+   * Invoked automatically at the end of `applyDesignIntent`,
+   * `applyMultiContainerDesignIntent`, and `importSharedDesign` so designs
+   * arriving from the AI pipeline or a share URL pass through the same
+   * correctness gate an interactive editor gets.
+   *
+   * Also available as a user-facing "Clean up design" action.
+   *
+   * Returns the normalize result so UI callers can show a toast with the
+   * number of repairs applied or residual violations.
+   */
+  cleanupDesign: () => import('@/utils/normalizeDesign').NormalizeResult;
 
   // ── Frame Configuration ────────────────────────────────────
   setFrameDefaults: (containerId: string, defaults: Partial<NonNullable<Container['frameDefaults']>>) => void;
@@ -1001,6 +1027,15 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     }));
   },
 
+  setRoofType: (id, roofType) => {
+    set((s) => ({
+      containers: {
+        ...s.containers,
+        [id]: { ...s.containers[id], roofType },
+      },
+    }));
+  },
+
   toggleFloor: (id) => {
 
     set((s) => ({
@@ -1371,7 +1406,39 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       if (form) sceneObjectsCost += form.costEstimate;
     }
 
-    const total = containersCost + modulesCost + cutsCost + sceneObjectsCost;
+    // ── Wall-feature overlay costs (shelves, cabinets, fixtures, decor) ──
+    // Walks every voxel face in every container summing the per-template
+    // costUSD. Counter tops are billed per voxel-face slab (linear-foot
+    // approximation). Mirrored cabinet skins add a 30% upcharge on the
+    // cabinet body cost.
+    let overlaysCost = 0;
+    for (const c of Object.values(containers) as Container[]) {
+      if (!c.voxelGrid) continue;
+      for (const voxel of c.voxelGrid) {
+        if (!voxel?.active) continue;
+        for (const face of ['n', 's', 'e', 'w'] as const) {
+          const sh = voxel.shelfConfig?.[face];
+          if (sh) overlaysCost += getShelfTemplate(sh.template).costUSD;
+          const cab = voxel.cabinetConfig?.[face];
+          if (cab) {
+            const base = getCabinetTemplate(cab.template).costUSD;
+            const mirror = getCabinetrySkin(cab.skin).mirrorDoors ? 1.3 : 1.0;
+            overlaysCost += base * mirror;
+            if (cab.counterTop) overlaysCost += getCounterTopMaterial(cab.counterTop).costPerSlabUSD;
+            if (cab.underCabinetLight) overlaysCost += 60;
+          }
+          const fx = voxel.fixtureConfig?.[face];
+          if (fx) overlaysCost += getFixtureTemplate(fx.template).costUSD;
+          const dec = voxel.decorConfig?.[face];
+          if (dec) {
+            overlaysCost += getDecorTemplate(dec.template).costUSD;
+            if (dec.pictureLight) overlaysCost += 80;
+          }
+        }
+      }
+    }
+
+    const total = containersCost + modulesCost + cutsCost + sceneObjectsCost + overlaysCost;
     return {
       low: Math.round(total * 0.85),
       high: Math.round(total * 1.15),
@@ -1380,6 +1447,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         modules: modulesCost,
         cuts: cutsCost,
         sceneObjects: sceneObjectsCost,
+        overlays: Math.round(overlaysCost),
         total,
       },
     };
@@ -1449,6 +1517,9 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     if (process.env.NODE_ENV === 'development') {
       console.log(`Stacked: "${top.name}" (L${newLevel}) on "${bottom.name}" (L${bottom.level}) at Y=${newY.toFixed(2)}m`);
     }
+    // Bottom container was just topmost and may be carrying a rooftop-deck signature.
+    // Strip it so SR-07 (rooftop-only-on-topmost) stays true through multi-level stacks.
+    get().removeRooftopDeck(bottomId);
     // Auto-generate rooftop deck on the newly stacked top container FIRST
     get().generateRooftopDeck(topId);
 
@@ -1757,6 +1828,10 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     );
     if (!isTopmost) return;
 
+    // Rooftop deck lives on the TOP level (the roof of the container), not level 0.
+    // For VOXEL_LEVELS=2 this is level 1 (idx 32-63); falls back to level 0 for single-level.
+    const topLevelBase = (VOXEL_LEVELS - 1) * VOXEL_ROWS * VOXEL_COLS;
+
     // Set body voxel top faces to Deck_Wood, perimeter walls to Railing_Cable
     set((state) => {
       const container = state.containers[containerId];
@@ -1765,7 +1840,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
       for (let row = 0; row < VOXEL_ROWS; row++) {
         for (let col = 0; col < VOXEL_COLS; col++) {
-          const idx = row * VOXEL_COLS + col;
+          const idx = topLevelBase + row * VOXEL_COLS + col;
           const isBody = row >= 1 && row <= 2 && col >= 1 && col <= 6;
           if (!isBody) continue;
 
@@ -1789,13 +1864,24 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       };
     });
 
-    // Expand extensions as deck
-    get().setAllExtensions(containerId, DEFAULT_EXTENSION_CONFIG, true);
+    // Expand extensions as deck — but ONLY when no deliberate arrangement
+    // has already shaped the container's envelope. Without this guard, the
+    // auto-rooftop logic silently clobbers Window_Standard / Glass_Pane
+    // perimeters installed by arrangements like framed_glass_box (caught
+    // while wiring the Glass Atrium Showcase preset). The arrangement
+    // already chose its own extension treatment via extensionDoorProfile +
+    // perimeterFaces; reapplying DEFAULT_EXTENSION_CONFIG would undo it.
+    const refreshed = get().containers[containerId];
+    if (!refreshed?.appliedPreset) {
+      get().setAllExtensions(containerId, DEFAULT_EXTENSION_CONFIG, true);
+    }
   },
 
   removeRooftopDeck: (containerId) => {
     const c = get().containers[containerId] as Container | undefined;
     if (!c?.voxelGrid) return;
+
+    const topLevelBase = (VOXEL_LEVELS - 1) * VOXEL_ROWS * VOXEL_COLS;
 
     // Restore body voxel top faces and perimeter railings
     set((state) => {
@@ -1805,7 +1891,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
       for (let row = 0; row < VOXEL_ROWS; row++) {
         for (let col = 0; col < VOXEL_COLS; col++) {
-          const idx = row * VOXEL_COLS + col;
+          const idx = topLevelBase + row * VOXEL_COLS + col;
           const isBody = row >= 1 && row <= 2 && col >= 1 && col <= 6;
           if (!isBody) continue;
 
@@ -1872,6 +1958,11 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         }
       }
     }
+
+    // Smart Rule gate — a shared-URL design may predate rules or originate from
+    // a Manual-mode editor. Normalize before surfacing to the user so the
+    // rendered scene is always Smart-compliant.
+    get().cleanupDesign();
 
     scheduleAdjacency(get);
   },
@@ -2201,19 +2292,11 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     const preset = WIZARD_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
 
-    if (preset.designIntent) {
-      get().applyDesignIntent(containerId, preset.designIntent);
-      set((s) => ({
-        containers: {
-          ...s.containers,
-          [containerId]: { ...s.containers[containerId], appliedPreset: presetId },
-        },
-      }));
-      return;
-    }
-
-    // Force a tracked set() to snapshot current state as the undo baseline,
-    // then pause so all wizard changes are invisible to undo history.
+    // Snapshot the pre-wizard state as the single undo baseline. Without this
+    // first tracked set(), applyDesignIntent's many inner set() calls each
+    // become their own undo entry — one Ctrl+Z then only reverts the last
+    // mutation, leaving the bulk of the wizard's changes (glass walls,
+    // doors, stairs) stuck in place.
     set((s) => ({
       containers: {
         ...s.containers,
@@ -2221,6 +2304,25 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       },
     }));
     temporalPause();
+
+    if (preset.designIntent) {
+      try {
+        get().applyDesignIntent(containerId, preset.designIntent);
+        // applyContainerArrangement (called inside applyDesignIntent) overwrites
+        // appliedPreset back to the arrangement ID — restore the wizard ID so
+        // the UI shows the wizard name the user picked.
+        set((s) => ({
+          containers: {
+            ...s.containers,
+            [containerId]: { ...s.containers[containerId], appliedPreset: presetId },
+          },
+        }));
+      } finally {
+        temporalResume();
+      }
+      return;
+    }
+
 
     for (const step of preset.steps) {
       // Re-read state each iteration (prior steps mutate it)
@@ -2372,6 +2474,9 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           break;
       }
     }
+
+    // Smart Rule gate — same rationale as applyMultiContainerDesignIntent below.
+    get().cleanupDesign();
   },
 
   applyMultiContainerDesignIntent: (intent) => {
@@ -2411,9 +2516,34 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       }
     }
 
-    return intent.containers
+    const placedIds = intent.containers
       .map((node) => nodeMap.get(node.id))
       .filter((id): id is string => !!id);
+
+    // Smart Rule correctness gate: an LLM-generated multi-container intent may
+    // satisfy the TS types but still produce a design that violates a Smart
+    // Rule (missing railing, rooftop on a non-topmost container, etc). Normalize
+    // before returning so the caller sees only compliant state.
+    get().cleanupDesign();
+    return placedIds;
+  },
+
+  cleanupDesign: () => {
+    const snapshot = get().containers;
+    const result = normalizeDesign(snapshot, { mode: 'repair', rejectOnResidualPhysics: false });
+    if (result.repaired) {
+      // Wrap the commit in temporal pause so the repair is NOT captured as its
+      // own undo step. If we recorded it, a user pressing Ctrl+Z after an
+      // AI-generated design loads would undo the safety fixes and end up in
+      // a policy-violating state (missing railings, stair-to-nowhere, etc).
+      temporalPause();
+      try {
+        set({ containers: result.containers });
+      } finally {
+        temporalResume();
+      }
+    }
+    return result;
   },
 
   // applyModule — moved to voxelSlice

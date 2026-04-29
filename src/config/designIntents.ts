@@ -1,10 +1,15 @@
+import { z } from 'zod';
 import type {
   ContainerArrangementId,
   ContainerPosition,
   ContainerSize,
   FloorMaterialType,
 } from '@/types/container';
-import { CONTAINER_DIMENSIONS, ContainerSize as DefaultContainerSize } from '@/types/container';
+import {
+  CONTAINER_ARRANGEMENT_IDS,
+  CONTAINER_DIMENSIONS,
+  ContainerSize as DefaultContainerSize,
+} from '@/types/container';
 import {
   getContainerArrangementSpec,
   type ContainerArrangementOutcome,
@@ -143,6 +148,143 @@ export type PromptDesignIntentSchema =
       circulation?: DesignConceptCirculation;
       outdoor?: DesignConceptOutdoor;
     };
+
+// ───────────────────────────────────────────────────────────
+// Zod schema — the LLM boundary.
+//
+// An AI emits unstructured JSON that *claims* to match PromptDesignIntentSchema.
+// This Zod schema is the clean rejection point: malformed output fails here
+// with a precise error message instead of crashing deep in `parsePromptDesignIntentSchema`
+// or silently producing a rendered scene that violates Smart Rules.
+//
+// `.strict()` rejects unknown keys — LLMs love to hallucinate fields, and an
+// unknown key is almost always a sign the model hallucinated something real
+// (like `color`) onto a schema that doesn't accept it.
+// ───────────────────────────────────────────────────────────
+
+// Derived from the TS union's source tuple so the two stay in lockstep.
+const ArrangementIdZod = z.enum(CONTAINER_ARRANGEMENT_IDS);
+
+const ArrangementOutcomeZod = z.enum([
+  'enclosed',
+  'atrium',
+  'terrace',
+  'wraparound',
+]);
+
+const ContainerSizeZod = z.enum([
+  '20ft_standard',
+  '40ft_standard',
+  '40ft_high_cube',
+]);
+
+const FloorMaterialZod = z.enum([
+  'wood',
+  'concrete',
+  'tile',
+  'carpet',
+  'vinyl',
+  'tatami',
+]);
+
+const FaceDirectionZod = z.enum(['n', 's', 'e', 'w']);
+
+const DoorZod = z.object({
+  voxelIndex: z.number().int().min(0).max(63),
+  face: FaceDirectionZod,
+}).strict();
+
+const StairsZod = z.object({
+  voxelIndex: z.number().int().min(0).max(63),
+  facing: FaceDirectionZod,
+}).strict();
+
+const SingleContainerZod = z.object({
+  kind: z.literal('single_container'),
+  arrangementId: ArrangementIdZod.optional(),
+  expectedOutcome: ArrangementOutcomeZod.optional(),
+  rooftopDeck: z.boolean().optional(),
+  floorMaterial: FloorMaterialZod.optional(),
+  ceilingMaterial: FloorMaterialZod.optional(),
+  door: DoorZod.optional(),
+  stairs: StairsZod.optional(),
+}).strict();
+
+const MultiContainerPlacementZod = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('origin'),
+    position: z
+      .object({ x: z.number(), y: z.number(), z: z.number() })
+      .partial()
+      .optional(),
+  }).strict(),
+  z.object({
+    type: z.literal('adjacent'),
+    target: z.string(),
+    side: z.enum(['north', 'south', 'east', 'west']),
+    gap: z.number().optional(),
+  }).strict(),
+  z.object({
+    type: z.literal('stack_on'),
+    target: z.string(),
+  }).strict(),
+]);
+
+const MultiContainerNodeZod = z.object({
+  key: z.string().min(1),
+  size: ContainerSizeZod.optional(),
+  name: z.string().optional(),
+  placement: MultiContainerPlacementZod.optional(),
+  arrangementId: ArrangementIdZod.optional(),
+  expectedOutcome: ArrangementOutcomeZod.optional(),
+  rooftopDeck: z.boolean().optional(),
+  floorMaterial: FloorMaterialZod.optional(),
+  ceilingMaterial: FloorMaterialZod.optional(),
+  door: DoorZod.optional(),
+  stairs: StairsZod.optional(),
+}).strict();
+
+const MultiContainerZod = z.object({
+  kind: z.literal('multi_container'),
+  containers: z.array(MultiContainerNodeZod).min(1).max(16),
+}).strict();
+
+const ConceptZod = z.object({
+  kind: z.literal('concept'),
+  composition: z.enum(['single_pavilion', 'gallery_wings', 'courtyard_compound', 'stacked_tower']),
+  envelope: z.enum(['steel', 'glass']).optional(),
+  circulation: z.enum(['flat', 'atrium', 'vertical']).optional(),
+  outdoor: z.enum(['none', 'terrace']).optional(),
+}).strict();
+
+export const PromptDesignIntentZodSchema = z.discriminatedUnion('kind', [
+  SingleContainerZod,
+  MultiContainerZod,
+  ConceptZod,
+]);
+
+export type ValidatedPromptDesignIntent = z.infer<typeof PromptDesignIntentZodSchema>;
+
+/** Safe parse — returns a success/failure discriminated union rather than
+ *  throwing. The caller can surface the error string to the UI and
+ *  optionally ask the LLM to retry. */
+export function safeParsePromptDesignIntent(
+  raw: unknown,
+): { success: true; data: ValidatedPromptDesignIntent } | { success: false; error: string } {
+  const result = PromptDesignIntentZodSchema.safeParse(raw);
+  if (result.success) return { success: true, data: result.data };
+  const issues = result.error.issues
+    .map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
+    .join('; ');
+  return { success: false, error: issues };
+}
+
+/** Strict parse — throws a `ZodError` on malformed input.
+ *  Use this when you want validation errors to surface as exceptions (e.g. in a
+ *  try/catch AI-retry loop). Otherwise prefer `safeParsePromptDesignIntent`. */
+export function parsePromptDesignIntent(raw: unknown): ValidatedPromptDesignIntent {
+  return PromptDesignIntentZodSchema.parse(raw);
+}
 
 function conceptArrangementId(
   envelope: DesignConceptEnvelope,

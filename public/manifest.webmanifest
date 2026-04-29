@@ -1,0 +1,14 @@
+{
+  "name": "ModuHome — Container Home Designer",
+  "short_name": "ModuHome",
+  "description": "Browser-based 3D shipping container home designer with materials, room presets, and BOM/PDF export.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f8",
+  "theme_color": "#2563eb",
+  "categories": ["productivity", "design", "architecture"],
+  "icons": [
+    { "src": "/file.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

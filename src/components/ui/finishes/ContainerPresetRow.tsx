@@ -35,7 +35,12 @@ export function ContainerPresetRow({ containerId, onApply }: Props) {
                 title={p.title}
                 active={appliedPreset === p.id}
                 onClick={() => onApply(p.id)}
-                onMouseEnter={() => setGhostPreset({ source: 'container', faces: p.faces, targetScope: 'container' })}
+                onMouseEnter={() => setGhostPreset({
+                  source: 'container',
+                  faces: p.faces,
+                  targetScope: 'container',
+                  arrangementId: p.id,
+                })}
                 onMouseLeave={() => clearGhostPreset()}
               />
             ))}

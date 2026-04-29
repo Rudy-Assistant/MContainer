@@ -21,15 +21,30 @@ export function ContainerTab({ containerId }: Props) {
     }))
   );
 
-  const { applyContainerArrangement } = useStore(
+  const { applyContainerArrangement, setGhostPreset, clearGhostPreset } = useStore(
     useShallow((s: StoreState) => ({
       applyContainerArrangement: s.applyContainerArrangement,
+      setGhostPreset: s.setGhostPreset,
+      clearGhostPreset: s.clearGhostPreset,
     }))
   );
 
   function handleApplyPreset(presetId: ContainerArrangementId) {
     applyContainerArrangement(containerId, presetId);
   }
+
+  // Hover handlers for the inline Openings buttons — produce the same
+  // translucent arrangement preview as the main ContainerPresetRow cards.
+  const handleHoverPreset = (presetId: ContainerArrangementId) => {
+    const preset = CONTAINER_LEVEL_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setGhostPreset({
+      source: 'container',
+      faces: preset.faces,
+      targetScope: 'container',
+      arrangementId: preset.id,
+    });
+  };
 
   const appliedPreset = useStore((s) => s.containers[containerId]?.appliedPreset);
   const activePreset = CONTAINER_LEVEL_PRESETS.find((preset) => preset.id === appliedPreset);
@@ -91,6 +106,8 @@ export function ContainerTab({ containerId }: Props) {
             type="button"
             title="Create a guarded central atrium opening"
             onClick={() => handleApplyPreset('central_atrium')}
+            onMouseEnter={() => handleHoverPreset('central_atrium')}
+            onMouseLeave={() => clearGhostPreset()}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -114,6 +131,8 @@ export function ContainerTab({ containerId }: Props) {
             type="button"
             title="Create a guarded central atrium opening with glass perimeter walls"
             onClick={() => handleApplyPreset('glass_atrium')}
+            onMouseEnter={() => handleHoverPreset('glass_atrium')}
+            onMouseLeave={() => clearGhostPreset()}
             style={{
               display: 'flex',
               alignItems: 'center',

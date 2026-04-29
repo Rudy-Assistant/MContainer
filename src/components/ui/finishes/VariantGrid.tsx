@@ -4,6 +4,7 @@ import { useStore } from '@/store/useStore';
 import type { SurfaceCategory, CategoryVariant } from '@/config/surfaceCategories';
 import { EMPTY_FACES, type SurfaceType, type VoxelFaces, type MaterialDef } from '@/types/container';
 import { sectionHeaderStyle } from './sectionHeaderStyle';
+import { getCategoryIcon } from './categoryIcons';
 
 interface VariantGridProps {
   category: SurfaceCategory;
@@ -99,17 +100,20 @@ export default function VariantGrid({
     <div style={{ marginBottom: 14 }}>
       <div style={sectionHeaderStyle()}>{category.label}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-        {category.variants.map(variant => (
-          <PresetCard
-            key={variant.id}
-            icon={variant.icon}
-            label={variant.label}
-            active={isVariantActive(variant)}
-            onClick={() => handleSelect(variant)}
-            onMouseEnter={() => handleHover(variant)}
-            onMouseLeave={handleLeave}
-          />
-        ))}
+        {category.variants.map(variant => {
+          const svgIcon = getCategoryIcon(variant.id);
+          return (
+            <PresetCard
+              key={variant.id}
+              icon={svgIcon ?? variant.icon}
+              label={variant.label}
+              active={isVariantActive(variant)}
+              onClick={() => handleSelect(variant)}
+              onMouseEnter={() => handleHover(variant)}
+              onMouseLeave={handleLeave}
+            />
+          );
+        })}
       </div>
     </div>
   );

@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { WALL_CATEGORIES, FLOOR_CATEGORIES, CEILING_CATEGORIES, getCategoryForSurface } from '@/config/surfaceCategories';
 
 describe('surfaceCategories', () => {
-  it('WALL_CATEGORIES has 7 categories', () => {
-    expect(WALL_CATEGORIES).toHaveLength(7);
-    expect(WALL_CATEGORIES.map(c => c.id)).toEqual(['wall', 'door', 'window', 'railing', 'stairs', 'shelf', 'open']);
+  it('WALL_CATEGORIES has 10 categories', () => {
+    expect(WALL_CATEGORIES).toHaveLength(10);
+    expect(WALL_CATEGORIES.map(c => c.id)).toEqual([
+      'wall', 'door', 'window', 'railing', 'stairs',
+      'shelf', 'cabinet', 'fixture', 'decor', 'open',
+    ]);
   });
 
   it('Door category has 8 variants', () => {
@@ -37,10 +40,16 @@ describe('surfaceCategories', () => {
     expect(getCategoryForSurface('Deck_Wood', 'floor')).toBe('solid');
   });
 
-  it('Shelf category is placeholder with no variants', () => {
+  it('Shelf and Cabinet categories are overlay categories with no SurfaceType variants', () => {
+    // Shelves and cabinets render as overlay configs (voxel.shelfConfig /
+    // voxel.cabinetConfig) on top of any wall surface — they are not
+    // SurfaceType-replacing categories, so they have no variants array.
     const shelf = WALL_CATEGORIES.find(c => c.id === 'shelf')!;
+    const cabinet = WALL_CATEGORIES.find(c => c.id === 'cabinet')!;
     expect(shelf.variants).toHaveLength(0);
-    expect(shelf.placeholder).toBe(true);
+    expect(shelf.volumetric).toBe(true);
+    expect(cabinet.variants).toHaveLength(0);
+    expect(cabinet.volumetric).toBe(true);
   });
 
   it('Stairs category is volumetric', () => {

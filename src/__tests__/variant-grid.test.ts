@@ -2,10 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { WALL_CATEGORIES } from '@/config/surfaceCategories';
 
 describe('VariantGrid active state', () => {
-  it('placeholder category has no variants', () => {
+  it('overlay categories (shelf, cabinet) have no SurfaceType variants', () => {
+    // Shelves and cabinets render as overlay configs, not SurfaceType
+    // replacements, so their variants array is empty.
     const shelf = WALL_CATEGORIES.find(c => c.id === 'shelf')!;
-    expect(shelf.placeholder).toBe(true);
+    const cabinet = WALL_CATEGORIES.find(c => c.id === 'cabinet')!;
     expect(shelf.variants).toHaveLength(0);
+    expect(cabinet.variants).toHaveLength(0);
   });
 
   it('volumetric category marked correctly', () => {

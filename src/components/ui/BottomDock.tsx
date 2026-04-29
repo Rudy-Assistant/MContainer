@@ -90,9 +90,11 @@ export function TimeOfDaySlider() {
         pointerEvents: 'none',
       }} />
 
-      {/* Sun/Moon icon */}
+      {/* Sun/Moon icon — overlaid pair with opacity crossfade so the symbol
+          actually melts between day/night instead of jump-cutting. */}
       <span style={{
         fontSize: '14px', lineHeight: 1, position: 'relative', zIndex: 1,
+        width: 14, height: 14, display: 'inline-block',
         filter: isDaytime ? 'drop-shadow(0 0 4px rgba(255,200,0,0.5))' : 'drop-shadow(0 0 4px rgba(150,180,255,0.4))',
         transition: 'filter 500ms ease',
       }}>

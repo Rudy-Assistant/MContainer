@@ -122,7 +122,7 @@ function PreviewPictureFrameHitbox({
 
 const PANEL_THICK = 0.06; // must match ContainerSkin's PANEL_THICK
 
-function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface, onCycle, onContextMenu, xray = false }: {
+function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface, onCycle, onContextMenu, xray = false, doorConfig, windowConfig, shelfConfig, cabinetConfig, fixtureConfig, decorConfig }: {
   face: keyof VoxelFaces;
   position: [number, number, number];
   nW: number; nH: number; nD: number;
@@ -131,6 +131,12 @@ function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface,
   onCycle: () => void;
   onContextMenu: (e: ThreeEvent<MouseEvent>) => void;
   xray?: boolean;
+  doorConfig?: import('@/types/container').DoorConfig;
+  windowConfig?: import('@/types/container').WindowConfig;
+  shelfConfig?: import('@/types/container').ShelfConfig;
+  cabinetConfig?: import('@/types/container').CabinetConfig;
+  fixtureConfig?: import('@/types/container').FixtureConfig;
+  decorConfig?: import('@/types/container').DecorConfig;
 }) {
   const [hovered, setHovered] = useState(false);
   const setHoveredPreviewFace = useStore((s) => s.setHoveredPreviewFace);
@@ -187,7 +193,7 @@ function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface,
       )}
 
       {/* ★ TRUE 1:1 visual — ContainerSkin's FaceVisual, not a Mini clone */}
-      {surface === "Open"
+      {surface === "Open" && !shelfConfig && !cabinetConfig && !fixtureConfig && !decorConfig
         ? <mesh geometry={hitGeo} material={mOpen} />
         : <FaceVisual
             surface={surface}
@@ -197,6 +203,13 @@ function PreviewFace({ face, position, nW, nH, nD, isNS, isEW, isHoriz, surface,
             isNS={isNS}
             isEW={isEW}
             isHoriz={isHoriz}
+            dir={face as 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'}
+            doorConfig={doorConfig}
+            windowConfig={windowConfig}
+            shelfConfig={shelfConfig}
+            cabinetConfig={cabinetConfig}
+            fixtureConfig={fixtureConfig}
+            decorConfig={decorConfig}
           />
       }
 
@@ -392,6 +405,12 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
             isEW={config.isEW}
             isHoriz={config.isHoriz}
             surface={faces[config.face]}
+            doorConfig={voxel?.doorConfig?.[config.face]}
+            windowConfig={voxel?.windowConfig?.[config.face]}
+            shelfConfig={voxel?.shelfConfig?.[config.face]}
+            cabinetConfig={voxel?.cabinetConfig?.[config.face]}
+            fixtureConfig={voxel?.fixtureConfig?.[config.face]}
+            decorConfig={voxel?.decorConfig?.[config.face]}
             xray={config.face === 'n' || config.face === 'w'}
             onCycle={() => {
               // Always select the face

@@ -43,9 +43,21 @@ type LibraryRuntimeState = LibrarySlice & {
   applyContainerArrangement: (containerId: string, arrangementId: import('@/types/container').ContainerArrangementId) => void;
   setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
   stackContainer: (topId: string, bottomId: string) => boolean;
-  applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w') => void;
+  applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w' | 'top') => void;
   generateRooftopDeck: (containerId: string) => void;
   refreshAdjacency: () => void;
+  setVoxelFace: (
+    containerId: string,
+    voxelIndex: number,
+    face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom',
+    surface: import('@/types/container').SurfaceType,
+  ) => void;
+  addFurniture: (
+    containerId: string,
+    type: import('@/types/container').FurnitureType,
+    position?: { x: number; y: number; z: number },
+    rotation?: number,
+  ) => string | null;
 };
 type Set = SliceSet<LibraryRuntimeState>;
 type Get = SliceGet<LibraryRuntimeState>;
@@ -389,6 +401,29 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         get().applyContainerArrangement(id, mc.arrangementId);
         t?.pause();
       }
+
+      // Install an entry door if the preset requested one. Walkthrough-ready
+      // presets use this so the spawn pose lands the user at a working door.
+      if (mc.entryDoor) {
+        get().setVoxelFace(id, mc.entryDoor.voxelIndex, mc.entryDoor.face, 'Door');
+        t?.pause();
+      }
+
+      // Drop preset furniture into the placed container. Positions are local
+      // to the container origin; addFurniture re-anchors to world space.
+      if (mc.furniture?.length) {
+        const c = get().containers[id];
+        const baseY = c?.position.y ?? 0;
+        for (const f of mc.furniture) {
+          const worldPos = {
+            x: c!.position.x + f.position.x,
+            y: baseY + f.position.y,
+            z: c!.position.z + f.position.z,
+          };
+          get().addFurniture(id, f.type, worldPos, f.rotation ?? 0);
+          t?.pause();
+        }
+      }
     }
 
     // Process connections
@@ -401,9 +436,20 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         get().stackContainer(topId, bottomId);
         t?.pause();
         if (conn.stairsVoxelIndex !== undefined) {
-          get().applyStairsFromFace(bottomId, conn.stairsVoxelIndex, 'n');
+          get().applyStairsFromFace(bottomId, conn.stairsVoxelIndex, conn.stairsFace ?? 'n');
           t?.pause();
         }
+      }
+    }
+
+    // Process extra stairs (not tied to a stacking event) — used for
+    // rooftop-deck access stairs that ascend off the topmost container.
+    if (model.extraStairs) {
+      for (const s of model.extraStairs) {
+        const targetId = containerIds[s.containerIndex];
+        if (!targetId) continue;
+        get().applyStairsFromFace(targetId, s.voxelIndex, s.face);
+        t?.pause();
       }
     }
 

@@ -2,8 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { QUALITY_PRESETS, type QualityPresetId } from '@/config/qualityPresets';
 
 describe('Quality Presets', () => {
-  it('exports all three presets', () => {
-    expect(Object.keys(QUALITY_PRESETS)).toEqual(['low', 'medium', 'high']);
+  it('exports all four presets (incl. photoreal)', () => {
+    expect(Object.keys(QUALITY_PRESETS)).toEqual(['low', 'medium', 'high', 'photoreal']);
+  });
+
+  it('photoreal maxes texture quality + cubeCamera env', () => {
+    expect(QUALITY_PRESETS.photoreal.textureQuality).toBe('2k');
+    expect(QUALITY_PRESETS.photoreal.envMap).toBe('cubeCamera');
+    expect(QUALITY_PRESETS.photoreal.lightShadows).toBe(true);
   });
 
   it('low disables post-processing', () => {

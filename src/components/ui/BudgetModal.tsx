@@ -6,6 +6,7 @@ import { ContainerSize, ModuleType, type PricingConfig } from "@/types/container
 import defaultPricing from "@/config/pricing_config.json";
 import { X, RotateCcw, ChevronDown } from "lucide-react";
 import { formatUSD as fmt } from "@/utils/formatters";
+import { useExitTransition } from "@/hooks/useExitTransition";
 
 const CONTAINER_SIZE_LABELS: Record<string, string> = {
   [ContainerSize.Standard20]: "20ft Standard",
@@ -54,7 +55,8 @@ export default function BudgetModal({ open, onClose }: BudgetModalProps) {
     [open, containers, pricing],
   );
 
-  if (!open) return null;
+  const { mounted, state } = useExitTransition(open, 200);
+  if (!mounted) return null;
   const bd = estimate?.breakdown;
 
   const handleContainerBase = (size: ContainerSize, value: string) => {
@@ -73,13 +75,13 @@ export default function BudgetModal({ open, onClose }: BudgetModalProps) {
   const handleReset = () => { setDraft(defaultPricing as unknown as PricingConfig); };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ padding: 24 }}>
+    <div data-state={state} className="fixed inset-0 z-50 flex items-center justify-center" style={{ padding: 24 }}>
       {/* Backdrop */}
       <div className="modal-backdrop" onClick={onClose} />
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col"
+        className="modal-content relative w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col"
         style={{
           background: 'var(--modal-bg, #ffffff)',
           borderRadius: 16,
@@ -124,18 +126,21 @@ export default function BudgetModal({ open, onClose }: BudgetModalProps) {
               <span style={{ fontSize: 13, color: 'var(--text-dim, #94a3b8)', fontWeight: 500 }}>estimated total</span>
             </div>
 
-            {/* Category breakdown cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            {/* Category breakdown cards — auto-fit grid so 4-5 categories
+                wrap responsively on narrow screens. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
               {[
                 { label: 'Structure', value: bd.containers, color: 'var(--text-muted, #475569)', bg: 'var(--border-subtle, #f1f5f9)', border: 'var(--border, #e2e8f0)' },
                 { label: 'Modules', value: bd.modules, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
                 { label: 'Cuts & Fees', value: bd.cuts, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+                ...(bd.sceneObjects ? [{ label: 'Scene Objects', value: bd.sceneObjects, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' }] : []),
+                ...(bd.overlays ? [{ label: 'Cabinets / Fixtures / Decor', value: bd.overlays, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' }] : []),
               ].map(({ label, value, color, bg, border }) => (
                 <div key={label} style={{
                   padding: '14px 16px', borderRadius: 10, background: bg,
                   border: `1px solid ${border}`,
                 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
                     {label}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'system-ui' }}>
@@ -166,7 +171,7 @@ export default function BudgetModal({ open, onClose }: BudgetModalProps) {
             <div style={{ paddingBottom: 20 }}>
               {/* Container Base Costs */}
               <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
                   Container Base Cost
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -189,7 +194,7 @@ export default function BudgetModal({ open, onClose }: BudgetModalProps) {
 
               {/* Module Costs */}
               <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
                   Module Costs
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -210,7 +215,7 @@ export default function BudgetModal({ open, onClose }: BudgetModalProps) {
 
               {/* Additional Fees */}
               <div>
-                <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
                   Additional Fees
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

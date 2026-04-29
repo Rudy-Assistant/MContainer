@@ -97,7 +97,7 @@ export default function FinishesPanel() {
           padding: '10px 12px 6px',
         }}>
           <span style={{
-            fontSize: 13, fontWeight: 700, color: 'var(--text-main)',
+            fontSize: 15, fontWeight: 700, color: 'var(--text-main)',
             letterSpacing: '-0.01em',
           }}>
             Interior Finishes
@@ -106,10 +106,11 @@ export default function FinishesPanel() {
             onClick={() => { clearSelection(); clearGhostPreset(); clearStampPreview(); }}
             title="Close"
             style={{
-              width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
+              width: 28, height: 28, borderRadius: 6, cursor: 'pointer',
               border: '1px solid var(--border)', background: 'var(--btn-bg)',
-              color: 'var(--text-muted)', fontSize: 13, lineHeight: 1,
+              color: 'var(--text-muted)', fontSize: 16, lineHeight: 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 150ms ease-out',
             }}
           >
             ×
@@ -139,7 +140,7 @@ export default function FinishesPanel() {
             <BlockTab containerId={containerId} voxelIndex={voxelIndex} indices={indices} />
           ) : !hasFace ? (
             <div style={{ padding: '24px 12px', textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
                 Click a face in the preview to edit finishes
               </div>
             </div>

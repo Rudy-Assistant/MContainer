@@ -27,7 +27,7 @@ import {
 import { useStore } from "@/store/useStore";
 import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
-import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER } from "@/config/highlightColors";
+import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_HEX_HOVER_FILTERED } from "@/config/highlightColors";
 
 import { nullRaycast } from '@/utils/nullRaycast';
 
@@ -1879,7 +1879,7 @@ function FrameBeams({ container, dims }: Omit<FrameProps, "setHoveredElement">) 
   );
 }
 
-/** Roof surface — togglable via container.roofRemoved */
+/** Roof surface — togglable via container.roofRemoved. */
 function ContainerRoof({ container, dims }: { container: Container; dims: { length: number; width: number; height: number } }) {
   if (container.roofRemoved) return null;
   // Voxel skin is active — it provides the visual roof surface (Level 1, top face).
@@ -1899,6 +1899,124 @@ function ContainerRoof({ container, dims }: { container: Container; dims: { leng
   );
 }
 
+/** Module-scope roof material cache — 5 fixed palettes, one
+ *  MeshStandardMaterial each, lazily built on first use. Replaces the
+ *  per-render allocation that would leak materials on every container
+ *  re-render. */
+const _roofMatCache = new Map<string, THREE.MeshStandardMaterial>();
+function _buildRoofMat(paletteHint: string): THREE.MeshStandardMaterial {
+  if (paletteHint === 'green_living') return new THREE.MeshStandardMaterial({ color: '#5e8a3a', metalness: 0, roughness: 0.85 });
+  if (paletteHint === 'membrane_white') return new THREE.MeshStandardMaterial({ color: '#f0f0ec', metalness: 0.1, roughness: 0.6 });
+  if (paletteHint === 'asphalt_shingle') return new THREE.MeshStandardMaterial({ color: '#3a3a3c', metalness: 0.1, roughness: 0.8 });
+  if (paletteHint === 'standing_seam') return new THREE.MeshStandardMaterial({ color: '#5a6470', metalness: 0.7, roughness: 0.35 });
+  return new THREE.MeshStandardMaterial({ color: '#7c7c7e', metalness: 0.4, roughness: 0.5 });
+}
+function getRoofMat(paletteHint: string): THREE.MeshStandardMaterial {
+  let mat = _roofMatCache.get(paletteHint);
+  if (mat) return mat;
+  mat = _buildRoofMat(paletteHint);
+  _roofMatCache.set(paletteHint, mat);
+  return mat;
+}
+
+/** Decorative roof-shape overlay — gable, shed, butterfly, parapet, green.
+ *  Sits on top of the container's flat roof. Cosmetic only; doesn't affect
+ *  rooms or walkthrough collision (the existing flat roof remains the
+ *  walkable ceiling). */
+function RoofShapeOverlay({ container, dims }: { container: Container; dims: { length: number; width: number; height: number } }) {
+  const roofType = container.roofType ?? 'flat';
+  if (roofType === 'flat' || container.roofRemoved) return null;
+  const baseY = dims.height + 0.05; // sit just above the flat roof slab
+  const L = dims.length;
+  const W = dims.width;
+  const matFor = getRoofMat;
+
+  if (roofType === 'parapet') {
+    // 4 raised perimeter bars + flat membrane between
+    const wallH = 0.4;
+    const wallT = 0.12;
+    const m = matFor('membrane_white');
+    return (
+      <group position={[0, baseY, 0]}>
+        <mesh position={[0, 0.005, 0]} material={m}><boxGeometry args={[L, 0.01, W]} /></mesh>
+        <mesh position={[0, wallH / 2, -W / 2 + wallT / 2]} material={m} castShadow><boxGeometry args={[L, wallH, wallT]} /></mesh>
+        <mesh position={[0, wallH / 2, +W / 2 - wallT / 2]} material={m} castShadow><boxGeometry args={[L, wallH, wallT]} /></mesh>
+        <mesh position={[-L / 2 + wallT / 2, wallH / 2, 0]} material={m} castShadow><boxGeometry args={[wallT, wallH, W]} /></mesh>
+        <mesh position={[+L / 2 - wallT / 2, wallH / 2, 0]} material={m} castShadow><boxGeometry args={[wallT, wallH, W]} /></mesh>
+      </group>
+    );
+  }
+
+  if (roofType === 'gable') {
+    // Two slopes meeting at a center ridge along the long axis
+    const peak = 1.2;
+    const slopeAngle = Math.atan2(peak, W / 2);
+    const slopeLen = Math.sqrt(peak * peak + (W / 2) * (W / 2));
+    const m = matFor('asphalt_shingle');
+    return (
+      <group position={[0, baseY, 0]}>
+        {/* North slope */}
+        <mesh position={[0, peak / 2, -W / 4]} rotation={[-slopeAngle, 0, 0]} material={m} castShadow>
+          <boxGeometry args={[L, 0.04, slopeLen]} />
+        </mesh>
+        {/* South slope */}
+        <mesh position={[0, peak / 2, +W / 4]} rotation={[+slopeAngle, 0, 0]} material={m} castShadow>
+          <boxGeometry args={[L, 0.04, slopeLen]} />
+        </mesh>
+        {/* Gable end-walls (triangle approximation as thin tall boxes) */}
+        <mesh position={[-L / 2 + 0.025, peak / 2, 0]} material={m}><boxGeometry args={[0.05, peak * 0.95, W * 0.95]} /></mesh>
+        <mesh position={[+L / 2 - 0.025, peak / 2, 0]} material={m}><boxGeometry args={[0.05, peak * 0.95, W * 0.95]} /></mesh>
+      </group>
+    );
+  }
+
+  if (roofType === 'shed') {
+    // Single mono-pitch slope from low edge (south) to high edge (north)
+    const peak = 0.9;
+    const slopeAngle = Math.atan2(peak, W);
+    const slopeLen = Math.sqrt(peak * peak + W * W);
+    const m = matFor('standing_seam');
+    return (
+      <group position={[0, baseY, 0]}>
+        <mesh position={[0, peak / 2, 0]} rotation={[-slopeAngle, 0, 0]} material={m} castShadow>
+          <boxGeometry args={[L, 0.04, slopeLen]} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (roofType === 'butterfly') {
+    // Two slopes meeting at a central VALLEY along the long axis (inverted gable).
+    // Outer edges raised; valley sits at the flat-roof baseline.
+    const peakRise = 1.0;
+    const slopeAngle = Math.atan2(peakRise, W / 2);
+    const slopeLen = Math.sqrt(peakRise * peakRise + (W / 2) * (W / 2));
+    const m = matFor('standing_seam');
+    return (
+      <group position={[0, baseY, 0]}>
+        <mesh position={[0, peakRise / 2, -W / 4]} rotation={[+slopeAngle, 0, 0]} material={m} castShadow>
+          <boxGeometry args={[L, 0.04, slopeLen]} />
+        </mesh>
+        <mesh position={[0, peakRise / 2, +W / 4]} rotation={[-slopeAngle, 0, 0]} material={m} castShadow>
+          <boxGeometry args={[L, 0.04, slopeLen]} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (roofType === 'green') {
+    // Living roof: thin sedum layer with subtle bumps approximated as a
+    // single slightly-thicker mesh in green.
+    const m = matFor('green_living');
+    return (
+      <mesh position={[0, baseY + 0.09, 0]} material={m} castShadow receiveShadow>
+        <boxGeometry args={[L * 0.96, 0.18, W * 0.96]} />
+      </mesh>
+    );
+  }
+  return null;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // STANDALONE VOXEL HOVER/SELECTION HIGHLIGHT
 // ═══════════════════════════════════════════════════════════════
@@ -1916,7 +2034,17 @@ function getHlEdges(w: number, h: number, d: number): THREE.BufferGeometry {
   return _hlEdgeCache.get(k)!;
 }
 
-const hlHoverMat = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.5, depthTest: false });
+// `depthWrite: false` is critical for transparent overlays — without it the
+// wireframe writes to the depth buffer, which can cause the highlight to
+// "burn in" visually when paired with persistent renderers (afterimage bug
+// reported 2026-04-25). Same fix applied to hlBayGroupMat below.
+// `toneMapped: false` keeps hover overlays out of the bloom contribution —
+// without it, the saturated highlight color seeds the bloom history buffer
+// and leaves a fading after-image on the ground plane (reproduced 2026-04-25
+// when floor-grid was on; preserved here so the artifact can't return if a
+// future change re-enables grid + bloom together).
+const hlHoverMat = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.5, depthTest: false, depthWrite: false, toneMapped: false });
+const hlHoverFilteredMat = new THREE.LineBasicMaterial({ color: HIGHLIGHT_HEX_HOVER_FILTERED, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false, toneMapped: false });
 
 // Cached box geometries for hover highlights (avoids dispose+recreate per render)
 const _hlBoxCache = new Map<string, THREE.BoxGeometry>();
@@ -1940,7 +2068,13 @@ function getFloorQuadrant(face: string | null, cx: number, cz: number, w: number
 // §7.1 Hover wall face overlay (amber)
 const hlWallMat = new THREE.MeshBasicMaterial({
   color: HIGHLIGHT_HEX_HOVER, transparent: true, opacity: 0.25,
-  depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+  depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide,
+});
+// Filtered-mode face overlay — light blue, slightly stronger opacity so it reads
+// as deliberately distinct from the default amber.
+const hlWallFilteredMat = new THREE.MeshBasicMaterial({
+  color: HIGHLIGHT_HEX_HOVER_FILTERED, transparent: true, opacity: 0.32,
+  depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide,
 });
 // §7.2 Selection wall/floor face overlay (blue — matches select wireframe)
 const hlWallSelectMat = new THREE.MeshBasicMaterial({
@@ -1951,11 +2085,13 @@ const hlWallSelectMat = new THREE.MeshBasicMaterial({
 const hlSelectEdgeMat = new THREE.LineBasicMaterial({
   color: 0x3b82f6, transparent: true, opacity: 0.8,
   depthTest: false,
+  depthWrite: false,
 });
 // Bay group select: blue wireframe (matches individual voxel select)
 const hlBayGroupMat = new THREE.LineBasicMaterial({
   color: 0x3b82f6, transparent: true, opacity: 0.9,
   depthTest: false,
+  depthWrite: false,
 });
 // Floor select highlight: blue floor portion for voxel/bay selection (no face)
 const hlFloorSelectMat = new THREE.MeshBasicMaterial({
@@ -1995,6 +2131,14 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
   const selectedVoxels = useSelectedVoxels();
   const selectedFace = useStore((s) => s.selectedFace);
   const hoveredObjectId = useStore((s) => s.hoveredObjectId);
+  // FaceFilterWidget gates pointer events; when active, swap to the
+  // light-blue highlight palette so the user sees the visual confirmation
+  // that they're in filtered-pick mode + suppress the full-voxel wireframe
+  // so only the relevant face surface gets highlighted.
+  const faceFilter = useStore((s) => s.faceFilter);
+  const isFiltered = faceFilter !== 'all';
+  const hoverWireframeMat = isFiltered ? hlHoverFilteredMat : hlHoverMat;
+  const hoverFaceMat = isFiltered ? hlWallFilteredMat : hlWallMat;
   const dims = CONTAINER_DIMENSIONS[container.size];
   const vHeight = dims.height;
   const vOffset = vHeight / 2;
@@ -2116,13 +2260,18 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         let wallPos: [number, number, number] | null = null;
         let wallSize: [number, number] | null = null;
         let wallRotY = 0;
+        // Push horizontal-face highlights slightly outside the container shell
+        // so the roof / floor mesh can't occlude them at glancing camera
+        // angles. 0.06m offset is well below user-perceivable thickness
+        // but reliable across all roof types.
+        const TOP_BOTTOM_LIFT = 0.06;
         switch (selectedFace) {
           case 'n': wallPos = [mBox.cx, vOffset + mYLift, mBox.cz - halfD]; wallSize = [mBox.w, vHeight]; break;
           case 's': wallPos = [mBox.cx, vOffset + mYLift, mBox.cz + halfD]; wallSize = [mBox.w, vHeight]; break;
           case 'e': wallPos = [mBox.cx + halfW, vOffset + mYLift, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
           case 'w': wallPos = [mBox.cx - halfW, vOffset + mYLift, mBox.cz]; wallSize = [mBox.d, vHeight]; wallRotY = Math.PI / 2; break;
-          case 'top': wallPos = [mBox.cx, vHeight + mYLift, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
-          case 'bottom': wallPos = [mBox.cx, mYLift, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
+          case 'top': wallPos = [mBox.cx, vHeight + mYLift + TOP_BOTTOM_LIFT, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
+          case 'bottom': wallPos = [mBox.cx, mYLift - TOP_BOTTOM_LIFT, mBox.cz]; wallSize = [mBox.w, mBox.d]; wallRotY = 0; break;
         }
         if (!wallPos || !wallSize) return null;
         const isHoriz = selectedFace === 'top' || selectedFace === 'bottom';
@@ -2132,11 +2281,21 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
             <mesh
               position={wallPos}
               rotation={isHoriz ? [-Math.PI / 2, 0, 0] : [0, wallRotY, 0]}
-              geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
+              geometry={getHlBox(wallSize[0] * 0.98, wallSize[1] * 0.98, 0.04)}
               material={hlWallSelectMat}
-              renderOrder={10}
+              renderOrder={22}
               raycast={nullRaycast}
               frustumCulled={false}
+            />
+            {/* Crisp wireframe border so the selection edge is unmistakable
+                even when the fill is faint against a similarly-toned roof. */}
+            <lineSegments
+              position={wallPos}
+              rotation={isHoriz ? [-Math.PI / 2, 0, 0] : [0, wallRotY, 0]}
+              geometry={getHlEdges(wallSize[0] * 0.98, wallSize[1] * 0.98, 0.04)}
+              material={hlSelectEdgeMat}
+              renderOrder={23}
+              raycast={nullRaycast}
             />
             {/* Floor quadrant strip for bay group wall selection */}
             {isWallFace && (() => {
@@ -2156,12 +2315,14 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
           </>
         );
       })()}
-      {/* Merged bay group hover wireframe */}
-      {mergedHoverBox && (
+      {/* Merged bay group hover wireframe — suppressed when face-filter is active
+          so only the active face overlay shows (avoids the noisy "whole voxel
+          volume in yellow" effect when the user is targeting a specific side). */}
+      {mergedHoverBox && !isFiltered && (
         <lineSegments
           position={[mergedHoverBox.cx, vOffset + (hoveredBayGroup ? levelYOffset(hoveredBayGroup.indices[0]) : 0), mergedHoverBox.cz]}
           geometry={getHlEdges(mergedHoverBox.w, vHeight, mergedHoverBox.d)}
-          material={hlHoverMat}
+          material={hoverWireframeMat}
           renderOrder={21}
           raycast={nullRaycast}
         />
@@ -2238,13 +2399,27 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
               />
               </>
             )}
-            {isHover && (
+            {isHover && !isFiltered && (
               <lineSegments
                 position={[layout.px, vOffset + yLift, layout.pz]}
                 geometry={getHlEdges(layout.voxW, vHeight, layout.voxD)}
-                material={hlHoverMat}
+                material={hoverWireframeMat}
                 renderOrder={21}
                 raycast={nullRaycast}
+              />
+            )}
+            {/* Top/bottom face overlay on hover — needed when face-filter is
+                active so a horizontal face has a visible target (the wall
+                overlay above only handles n/s/e/w). */}
+            {isHover && idx === hoveredFaceIdx && (hoveredFace === 'top' || hoveredFace === 'bottom') && (
+              <mesh
+                position={[layout.px, hoveredFace === 'top' ? vHeight + yLift - 0.02 : yLift + 0.02, layout.pz]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                geometry={getHlBox(layout.voxW * 0.95, layout.voxD * 0.95, 0.04)}
+                material={hoverFaceMat}
+                renderOrder={11}
+                raycast={nullRaycast}
+                frustumCulled={false}
               />
             )}
             {/* §7.1 Amber wall face overlay on hover + floor quadrant strip */}
@@ -2256,7 +2431,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                   position={hoverWallPos}
                   rotation={[0, hoverWallRotY, 0]}
                   geometry={getHlBox(hoverWallSize[0] * 0.95, hoverWallSize[1] * 0.95, 0.04)}
-                  material={hlWallMat}
+                  material={hoverFaceMat}
                   renderOrder={11}
                   raycast={nullRaycast}
                   frustumCulled={false}
@@ -2266,7 +2441,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                   position={[fp.qx, yLift + 0.01, fp.qz]}
                   rotation={[-Math.PI / 2, 0, 0]}
                   geometry={getHlBox(fp.qw, fp.qd, 0.02)}
-                  material={hlWallMat}
+                  material={hoverFaceMat}
                   renderOrder={11}
                   raycast={nullRaycast}
                   frustumCulled={false}
@@ -2329,7 +2504,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
               position={wallPos}
               rotation={[0, wallRotY, 0]}
               geometry={getHlBox(wallSize[0] * 0.95, wallSize[1] * 0.95, 0.04)}
-              material={hlWallMat}
+              material={hoverFaceMat}
               renderOrder={11}
               raycast={nullRaycast}
               frustumCulled={false}
@@ -2342,7 +2517,7 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
                   position={[bq.qx, mYLift + 0.01, bq.qz]}
                   rotation={[-Math.PI / 2, 0, 0]}
                   geometry={getHlBox(bq.qw, bq.qd, 0.02)}
-                  material={hlWallMat}
+                  material={hoverFaceMat}
                   renderOrder={11}
                   raycast={nullRaycast}
                   frustumCulled={false}
@@ -2353,6 +2528,37 @@ function VoxelHoverHighlight({ container }: { container: Container }) {
         );
       })()}
     </>
+  );
+}
+
+// ── Arrangement hover frame outline ──────────────────────────
+// Subtle light-blue wireframe around the full container shell, shown only
+// while the user is hovering a container-scoped arrangement preset card
+// (ghostPreset.source === 'container'). Tells them at a glance which
+// container the upcoming change applies to.
+const arrangementFrameMat = new THREE.LineBasicMaterial({
+  color: HIGHLIGHT_HEX_HOVER_FILTERED,
+  transparent: true,
+  opacity: 0.85,
+  depthWrite: false,
+  depthTest: false,
+  toneMapped: false,
+});
+
+function ArrangementHoverFrame({ container, isSelected }: { container: Container; isSelected: boolean }) {
+  const ghostPreset = useStore((s) => s.ghostPreset);
+  // Only mark the SELECTED container — fallback rules in PresetGhost match,
+  // so the frame and the translucent fill both refer to the same shell.
+  if (!ghostPreset || ghostPreset.source !== 'container' || !isSelected) return null;
+  const dims = CONTAINER_DIMENSIONS[container.size];
+  return (
+    <lineSegments
+      position={[0, dims.height / 2, 0]}
+      geometry={getHlEdges(dims.length + 0.05, dims.height + 0.05, dims.width + 0.05)}
+      material={arrangementFrameMat}
+      renderOrder={24}
+      raycast={nullRaycast}
+    />
   );
 }
 
@@ -2491,6 +2697,28 @@ export default function ContainerMesh({ container }: { container: Container }) {
     }
   }, [isBeingDragged]);
 
+  // ── Mount-time entrance animation ──
+  // Containers added to the scene (manual placement, wizard apply, AI design,
+  // share-URL import, reset) "settle in" with a brief scale-up rather than
+  // appearing instantly — small but perceptible polish that makes the canvas
+  // feel responsive instead of teleport-y. ~280ms ease-out cubic.
+  const mountTimeRef = useRef<number | null>(null);
+  useEffect(() => { mountTimeRef.current = performance.now(); }, []);
+  useFrame(() => {
+    const group = groupRef.current;
+    if (!group || mountTimeRef.current === null) return;
+    const elapsed = performance.now() - mountTimeRef.current;
+    const duration = 280;
+    if (elapsed < duration) {
+      const t = elapsed / duration;
+      const eased = 1 - Math.pow(1 - t, 3);
+      group.scale.setScalar(0.92 + eased * 0.08);
+    } else if (group.scale.x !== 1) {
+      group.scale.setScalar(1);
+      mountTimeRef.current = null; // stop checking once settled
+    }
+  });
+
   return (
     <group
       ref={groupRef}
@@ -2527,6 +2755,7 @@ export default function ContainerMesh({ container }: { container: Container }) {
 
       {/* Roof — extracted sub-component */}
       <ContainerRoof container={container} dims={dims} />
+      <RoofShapeOverlay container={container} dims={dims} />
 
       {/* Structural frame — individually interactive posts and beams */}
       <FramePosts container={container} dims={dims} setHoveredElement={setHoveredElement} />
@@ -2553,6 +2782,12 @@ export default function ContainerMesh({ container }: { container: Container }) {
 
       {/* Standalone hover/selection highlight — re-renders independently from ContainerSkin */}
       <VoxelHoverHighlight container={container} />
+
+      {/* Arrangement-hover frame outline: when the user hovers a container
+          arrangement card and this is the selected container, draw a soft
+          light-blue wireframe around the whole shell so the user can see
+          which container the preview applies to. */}
+      <ArrangementHoverFrame container={container} isSelected={isSelected} />
 
       {/* Container label — subtle pill; suppressed for grouped containers (WU-3) */}
       {(isSelected || hovered) && container.groupId === null && (

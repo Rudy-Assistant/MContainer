@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
 import { MODEL_HOMES, getModelHome } from '@/config/modelHomes';
+import { VOXEL_COLS, VOXEL_LEVELS, VOXEL_ROWS } from '@/types/container';
 
 function resetStore() {
   const initial = useStore.getInitialState();
@@ -156,5 +157,29 @@ describe('Model Home System', () => {
     expect(containers[ids[0]].appliedPreset).toBe('roof_terrace');
     expect(containers[ids[2]].appliedPreset).toBe('glass_terrace');
     expect(containers[ids[3]].appliedPreset).toBe('roof_terrace');
+  });
+
+  it('MH-14: two_story rooftop deck lands on the bedroom roof, not the bedroom floor', () => {
+    // Regression: generateRooftopDeck used to write the deck to level-0 voxels, so the
+    // upper (bedroom) container had its FLOOR turned into deck and its ceiling untouched —
+    // meaning the staircase led into an open void where the bedroom should be.
+    const ids = useStore.getState().placeModelHome('two_story');
+    expect(ids).toHaveLength(2);
+    const containers = useStore.getState().containers;
+    const upper = Object.values(containers).find((c) => c.stackedOn) ?? null;
+    expect(upper).not.toBeNull();
+    const grid = upper!.voxelGrid!;
+
+    const topLevelBase = (VOXEL_LEVELS - 1) * VOXEL_ROWS * VOXEL_COLS;
+    const floorBodyIdx = 1 * VOXEL_COLS + 1;                  // bedroom floor body voxel
+    const roofBodyIdx = topLevelBase + 1 * VOXEL_COLS + 1;    // bedroom roof body voxel
+
+    // Rooftop deck material is on the ROOF (top-level top face), with railings on the perimeter
+    expect(grid[roofBodyIdx].faces.top).toBe('Deck_Wood');
+    expect(grid[roofBodyIdx].faces.n).toBe('Railing_Cable');
+
+    // Floor-level ceiling is NOT Deck_Wood — i.e. the bedroom below is enclosed,
+    // not a roof deck masquerading as a floor.
+    expect(grid[floorBodyIdx].faces.top).not.toBe('Deck_Wood');
   });
 });

@@ -46,10 +46,14 @@ export default function CostControl({ open, setOpen, onOpen, onOpenBudget }: Cos
         }}
         style={{
           display: "flex", alignItems: "center", gap: "3px",
-          background: "none", border: "none", cursor: "pointer", padding: "6px 8px",
-          fontSize: "13px", fontWeight: 700, fontFamily: "monospace",
-          color: open ? "#16a34a" : "var(--text-muted)",
-          transition: "color 120ms",
+          background: open ? "rgba(22,163,74,0.10)" : "var(--surface-alt, #f3f4f6)",
+          border: "none", cursor: "pointer", padding: "6px 10px", borderRadius: "8px",
+          // Cost is the primary dynamic indicator in the toolbar. Stronger weight +
+          // tabular-nums keeps digits from jittering on every edit.
+          fontSize: "14px", fontWeight: 700, fontFamily: "var(--font-mono, ui-monospace, Menlo, Consolas, monospace)",
+          fontVariantNumeric: "tabular-nums",
+          color: open ? "#16a34a" : "var(--text-main, #111827)",
+          transition: "background 150ms ease-out, color 150ms ease-out",
         }}
         title="Cost breakdown"
       >

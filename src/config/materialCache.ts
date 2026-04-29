@@ -186,9 +186,15 @@ export function applyQualityTextures(quality: TextureQuality, invalidate?: () =>
 let _currentQuality: TextureQuality = '1k';
 
 export const _themeMats: Record<ThemeId, ThemeMaterialSet> = {
-  industrial: buildThemeMaterials(THEMES.industrial.materials),
-  japanese:   buildThemeMaterials(THEMES.japanese.materials),
-  desert:     buildThemeMaterials(THEMES.desert.materials),
+  industrial:   buildThemeMaterials(THEMES.industrial.materials),
+  japanese:     buildThemeMaterials(THEMES.japanese.materials),
+  desert:       buildThemeMaterials(THEMES.desert.materials),
+  scandinavian: buildThemeMaterials(THEMES.scandinavian.materials),
+  brutalist:    buildThemeMaterials(THEMES.brutalist.materials),
+  coastal:      buildThemeMaterials(THEMES.coastal.materials),
+  ryokan:       buildThemeMaterials(THEMES.ryokan.materials),
+  loft:         buildThemeMaterials(THEMES.loft.materials),
+  midcentury:   buildThemeMaterials(THEMES.midcentury.materials),
 };
 
 /**

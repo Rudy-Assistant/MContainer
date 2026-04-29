@@ -8,7 +8,12 @@ export type ContainerArrangementOutcome =
 
 export type ContainerArrangementKind = 'retract' | 'structured';
 export type ContainerArrangementScope = 'full_footprint' | 'extensions_only';
-export type ContainerArrangementUpperLevelMode = 'full_shell' | 'clear_extensions' | 'extensions_only';
+export type ContainerArrangementUpperLevelMode =
+  | 'full_shell'        // upper level is an enclosed shell with floor + roof + (open) walls
+  | 'clear_extensions'  // upper-level extensions deactivate; body keeps prior state
+  | 'extensions_only'   // upper level is a wraparound terrace (extensions only)
+  | 'deactivate';       // upper level fully removed — single-volume pavilion (atrium voids
+                        //   in `voidRows/voidCols` become roof skylights in the L0 ceiling)
 export type ExtensionDoorProfile = 'all_interior' | 'all_glass_interior';
 
 export interface ContainerArrangementSpec {
@@ -29,6 +34,11 @@ export interface ContainerArrangementSpec {
   extensionDoorProfile?: ExtensionDoorProfile;
   voidRows?: number[];
   voidCols?: number[];
+  /** South-wall cols that should render as `Glass_Shoji` instead of the
+   *  default perimeter wall — produces an operable sliding-glass entry on
+   *  the front of the unit. Two adjacent values create the side-by-side
+   *  pair of sliding doors a user expects on a glass pavilion. */
+  doorCols?: number[];
   tags?: string[];
 }
 
@@ -61,12 +71,17 @@ function perimeterFaces(
   wall: SurfaceType,
   top: SurfaceType,
   bottom: SurfaceType,
+  doorCols?: number[],
 ): VoxelFaces {
+  // South-wall door cells render as Glass_Shoji (operable sliding glass).
+  const southSurface = row === 3
+    ? (doorCols?.includes(col) ? 'Glass_Shoji' : wall)
+    : 'Open';
   return {
     top,
     bottom,
     n: row === 0 ? wall : 'Open',
-    s: row === 3 ? wall : 'Open',
+    s: southSurface,
     e: col === 7 ? wall : 'Open',
     w: col === 0 ? wall : 'Open',
   };
@@ -139,14 +154,43 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     tags: ['Void', 'Guarded'],
   },
   {
-    id: 'glass_atrium',
-    label: 'Glass Atrium',
-    title: 'Glass atrium pavilion',
-    hint: 'Glazed perimeter shell around a guarded central light well.',
+    // Framed glass box — full perimeter walls of `Window_Standard` (per-voxel
+    // sill + glass + transom) so each voxel reads as its own framed pane and
+    // the steel mullions visually connect to the corner posts as continuous
+    // structural support. Two adjacent south-wall voxels render as Glass_Shoji
+    // sliding doors for entry. Used as the L1 base for the Glass Atrium
+    // Showcase — gives the "expensive curtain wall" look without resorting to
+    // a single frameless pane.
+    id: 'framed_glass_box',
+    label: 'Framed Glass Box',
+    title: 'Framed glass box with sliding entry',
+    hint: 'Per-voxel framed glass walls and a pair of sliding glass entry doors on the south.',
     outcome: 'enclosed',
     kind: 'structured',
     level0Scope: 'full_footprint',
-    perimeterWall: 'Glass_Pane',
+    perimeterWall: 'Window_Standard',
+    roof: 'Solid_Steel',
+    floor: 'Deck_Wood',
+    upperLevelMode: 'deactivate',
+    extensionDoorProfile: 'all_glass_interior',
+    doorCols: [3, 4],
+    tags: ['Glass', 'Framed', 'Entry'],
+  },
+  {
+    // Framed-glass variant of central_atrium — same 2×2 floor void with
+    // Railing_Cable, but the perimeter is Window_Standard instead of solid
+    // steel. Used on the L2 deck of the Glass Atrium Showcase so each upper
+    // container looks down through its own atrium opening while still showing
+    // a per-voxel framed-glass envelope. Roof stays solid so the SR-07 smart
+    // rule can promote the topmost containers to a walkable rooftop deck.
+    id: 'framed_glass_atrium',
+    label: 'Framed Glass Atrium',
+    title: 'Framed glass walls with central floor void',
+    hint: 'Per-voxel framed glass perimeter and a guarded central void looking down to the floor below.',
+    outcome: 'enclosed',
+    kind: 'structured',
+    level0Scope: 'full_footprint',
+    perimeterWall: 'Window_Standard',
     roof: 'Solid_Steel',
     floor: 'Deck_Wood',
     upperLevelMode: 'full_shell',
@@ -155,7 +199,31 @@ export const CONTAINER_ARRANGEMENT_SPECS: ContainerArrangementSpec[] = [
     extensionDoorProfile: 'all_glass_interior',
     voidRows: [1, 2],
     voidCols: [3, 4],
-    tags: ['Glass', 'Void', 'Guarded'],
+    tags: ['Glass', 'Framed', 'Void', 'Guarded'],
+  },
+  {
+    id: 'glass_atrium',
+    label: 'Glass Atrium',
+    title: 'Glass atrium pavilion',
+    hint: 'Single-volume glass pavilion with a central skylight in the roof.',
+    outcome: 'enclosed',
+    kind: 'structured',
+    level0Scope: 'full_footprint',
+    perimeterWall: 'Glass_Pane',
+    roof: 'Solid_Steel',
+    floor: 'Deck_Wood',
+    // 'deactivate' makes this a SINGLE-VOLUME pavilion — the void cells punch
+    // a skylight in the L0 ceiling rather than creating a redundant L1 shell.
+    // Previously used 'full_shell' which produced a confusing two-layered look
+    // when applied to a stacked container (visible bug 2026-04-25).
+    upperLevelMode: 'deactivate',
+    extensionDoorProfile: 'all_glass_interior',
+    voidRows: [1, 2],
+    voidCols: [3, 4],
+    // Two adjacent south-wall cells render as Glass_Shoji — visually a pair
+    // of side-by-side sliding panels, operable as a single entry.
+    doorCols: [3, 4],
+    tags: ['Glass', 'Void', 'Skylight'],
   },
   {
     id: 'roof_terrace',
@@ -259,14 +327,18 @@ export function evaluateContainerArrangementCell(
 
   if (level === 0) {
     if (spec.level0Scope === 'extensions_only' && !extension) return null;
+    // Skylight-tagged voids render as glass instead of a literal hole — the
+    // pavilion remains habitable (rain-sealed) while still admitting light.
+    const voidTopSurface: SurfaceType = spec.tags?.includes('Skylight') ? 'Glass_Pane' : 'Open';
     return {
       active: true,
       faces: perimeterFaces(
         row,
         col,
         spec.perimeterWall!,
-        isVoidCell(spec, row, col) ? 'Open' : spec.roof!,
+        isVoidCell(spec, row, col) ? voidTopSurface : spec.roof!,
         spec.floor!,
+        spec.doorCols,
       ),
     };
   }
@@ -280,6 +352,13 @@ export function evaluateContainerArrangementCell(
         bottom: isVoidCell(spec, row, col) ? 'Open' : (spec.upperLevelFloor ?? 'Solid_Steel'),
       },
     };
+  }
+
+  // Single-volume pavilion: deactivate L1 entirely. Atrium void cells already
+  // punched the L0 ceiling (top face = 'Open' via the level-0 branch above), so
+  // the void becomes a roof skylight without an extra "shell" stacked on top.
+  if (spec.upperLevelMode === 'deactivate') {
+    return { active: false, faces: openFaces() };
   }
 
   if (spec.upperLevelMode === 'clear_extensions' && extension) {

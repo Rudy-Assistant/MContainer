@@ -13,11 +13,15 @@
     "gates:arrangements": "node scripts/arrangement-visual-gates.mjs",
     "gates:lighting": "node scripts/lighting-visual-matrix.mjs",
     "baselines": "node scripts/capture-baselines.mjs",
+    "visual-regression": "node scripts/visual-regression.mjs",
+    "visual-regression:update": "node scripts/visual-regression.mjs --update",
     "quality": "node generate-quality-assessment.mjs",
     "convert-textures": "node scripts/convert-textures.mjs",
+    "fetch-polyhaven": "node scripts/fetch-polyhaven-furniture.mjs",
     "postinstall": "node scripts/copy-basis-transcoder.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",

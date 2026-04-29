@@ -47,3 +47,13 @@ next-env.d.ts
 public/assets/materials-ktx2/
 .gstack/
 gate-screenshots/
+
+# dev-server log — transient runtime output
+.dev-server.log
+
+# Transient gate/QA artifacts — only the committed baseline-*.png files
+# in gate-baselines/ are versioned; everything else (recorded webm tours,
+# qa-deep timestamped runs, vframes/tour-debug debug captures) is a
+# one-shot output and stays out of git.
+gate-baselines/*
+!gate-baselines/baseline-*.png

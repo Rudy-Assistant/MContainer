@@ -8,6 +8,7 @@
 import type { Container, VoxelFaces } from '@/types/container';
 import { ContainerSize, VOXEL_COLS, VOXEL_ROWS, VOXEL_LEVELS } from '@/types/container';
 import type { DesignWarning, ValidationRule } from '@/types/validation';
+import { validateSmartRules, type SmartRuleViolation } from '@/utils/smartRuleValidator';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -37,60 +38,31 @@ function neighborIndex(idx: number, face: keyof VoxelFaces): number {
   }
 }
 
-// ── Rule: Unprotected Edges ──────────────────────────────────
+// ── Rule: Unprotected Edges (SR-04 alias) ─────────────────────
 
 /**
- * checkUnprotectedEdges — Find elevated voxels with open top AND an open wall
- * face that has no active neighbor (i.e., a fall hazard).
+ * checkUnprotectedEdges — Backward-compatible alias for SR-04.
  *
- * Only triggers for containers where position.y > 0.1 (elevated).
- * Category: 'safety', severity: 'warning'.
+ * The original scanner body migrated into `smartRuleValidator.checkOpenEdgeRailing`
+ * to deduplicate two rules that flagged the same defect. This export remains as
+ * an alias so existing imports keep compiling; internally it just filters the
+ * SR-04 output produced by `checkSmartRules`.
+ *
+ * Category stays `'safety'` / severity stays `'warning'` for wire-format stability
+ * (previously persisted warnings and any downstream consumer dashboards keep
+ * working). The newer `checkSmartRules` output uses `'structural'` / `'error'` —
+ * that's the modern form; this alias is for legacy parity only.
  */
 export const checkUnprotectedEdges: ValidationRule = (containers: Record<string, Container>) => {
-  const warnings: DesignWarning[] = [];
-
-  for (const c of Object.values(containers)) {
-    // Only check elevated containers
-    if (c.position.y <= 0.1) continue;
-    if (!c.voxelGrid) continue;
-
-    for (let i = 0; i < c.voxelGrid.length; i++) {
-      const voxel = c.voxelGrid[i];
-      if (!voxel.active) continue;
-      if (voxel.faces.top !== 'Open') continue;
-
-      // Check each wall face for open + no active neighbor
-      const openWallFaces: string[] = [];
-      for (const face of WALL_FACES) {
-        if (voxel.faces[face] !== 'Open') continue;
-        const ni = neighborIndex(i, face);
-        // Open wall at grid boundary = unprotected
-        if (ni === -1) {
-          openWallFaces.push(face);
-          continue;
-        }
-        // Open wall with inactive/missing neighbor = unprotected
-        const neighbor = c.voxelGrid[ni];
-        if (!neighbor || !neighbor.active) {
-          openWallFaces.push(face);
-        }
-      }
-
-      if (openWallFaces.length > 0) {
-        warnings.push({
-          id: `safety-unprotected-${c.id}-${i}`,
-          category: 'safety',
-          severity: 'warning',
-          message: `Elevated voxel ${i} has open top and unprotected edge(s): ${openWallFaces.join(', ')}`,
-          containerId: c.id,
-          voxelIndices: [i],
-          faces: openWallFaces,
-        });
-      }
-    }
-  }
-
-  return warnings;
+  return checkSmartRules(containers, undefined)
+    .filter((w) => w.id.includes('SR-04-open-edge-railing'))
+    .map((w) => ({
+      ...w,
+      id: w.id.replace('smart-SR-04-open-edge-railing-', 'safety-unprotected-'),
+      category: 'safety',
+      severity: 'warning',
+      message: w.message.replace(/^\[SR-04-open-edge-railing\]\s*/, ''),
+    }));
 };
 
 // ── Rule: Stair to Nowhere ───────────────────────────────────
@@ -291,14 +263,38 @@ export const checkBudget: ValidationRule = (containers: Record<string, Container
 
 // ── Rules Registry ───────────────────────────────────────────
 
+/** Smart-rule violations flow through the same warning pipeline so users see
+ *  them in the toolbar's Warning Badge. Violations with severity 'high' map to
+ *  'error', 'medium' to 'warning', anything else to 'info'. */
+export const checkSmartRules: ValidationRule = (containers: Record<string, Container>) => {
+  const out: DesignWarning[] = [];
+  const violations = validateSmartRules(containers);
+  for (const v of violations) {
+    out.push({
+      id: `smart-${v.ruleId}-${v.containerId}-${v.voxelIndex ?? 'x'}`,
+      category: 'structural',
+      severity: v.severity === 'high' ? 'error' : v.severity === 'medium' ? 'warning' : 'info',
+      message: `[${v.ruleId}] ${v.message}`,
+      containerId: v.containerId,
+      voxelIndices: v.voxelIndex !== undefined ? [v.voxelIndex] : [],
+    });
+  }
+  return out;
+};
+
+// `checkUnprotectedEdges` is intentionally NOT in this list — it's exported
+// above as a backward-compat alias that re-derives SR-04 warnings, but the
+// canonical path is `checkSmartRules`, which emits the same defects in the
+// modern format. Keeping both in RULES would cause every elevated-edge
+// defect to surface twice (different IDs, different categories).
 const RULES: ValidationRule[] = [
-  checkUnprotectedEdges,
   checkStairToNowhere,
   checkNoExit,
   checkNoEnvelope,
   checkGravity,
   checkUnsupportedCantilever,
   checkBudget,
+  checkSmartRules,
 ];
 
 // ── Main Entry Point ─────────────────────────────────────────

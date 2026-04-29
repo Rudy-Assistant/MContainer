@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Component, type ReactNode, useMemo } from 'react';
+import React, { Component, type ReactNode, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import {
   EffectComposer,
@@ -12,26 +12,94 @@ import {
   BrightnessContrast,
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
+import { useThree } from '@react-three/fiber';
 import { useStore } from '@/store/useStore';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
 import { getStyle } from '@/config/styleRegistry';
 import type { StyleEffect } from '@/types/sceneObject';
 
 // ── ErrorBoundary ────────────────────────────────────────────
-// If EffectComposer causes GL context loss, disable gracefully
-// rather than crashing the entire scene tree.
-interface EBState { failed: boolean }
+// If EffectComposer causes GL context loss, retry on the next render
+// rather than disabling permanently. Context loss is recoverable in
+// modern browsers — the GPU process restarts, the canvas raises
+// `webglcontextrestored`, and a retry-on-mount gives us a clean composer.
+interface EBState { failed: boolean; attempt: number }
 
 class PostProcessingBoundary extends Component<{ children: ReactNode }, EBState> {
-  state: EBState = { failed: false };
-  static getDerivedStateFromError(): EBState { return { failed: true }; }
+  state: EBState = { failed: false, attempt: 0 };
+  static getDerivedStateFromError(): Partial<EBState> { return { failed: true }; }
   componentDidCatch(error: Error) {
-    console.warn('[PostProcessingStack] EffectComposer failed, disabling post-processing:', error.message);
+    console.warn(
+      `[PostProcessingStack] EffectComposer failed (attempt ${this.state.attempt + 1}):`,
+      error.message,
+    );
+    // Retry once after a frame — handles transient context-attribute races
+    // where the renderer is mid-initialization the first time we mount.
+    if (this.state.attempt < 1) {
+      requestAnimationFrame(() => {
+        this.setState({ failed: false, attempt: this.state.attempt + 1 });
+      });
+    }
   }
   render() {
     if (this.state.failed) return null;
     return this.props.children;
   }
+}
+
+/**
+ * RendererReadyGate — defers child mount until the WebGL context is fully
+ * initialized AND not lost. Without this, EffectComposer can read
+ * `renderer.getContext().getContextAttributes()` while the underlying
+ * context is still null, throwing "Cannot read properties of null
+ * (reading 'alpha')" — verified bug in postprocessing v6.x against
+ * @react-three/postprocessing v3.0.4.
+ */
+function RendererReadyGate({ children }: { children: ReactNode }) {
+  const gl = useThree((s) => s.gl);
+  const [ready, setReady] = useState(() => {
+    // Best-effort sync check on first render
+    try {
+      const ctx = gl.getContext();
+      const attrs = ctx?.getContextAttributes?.();
+      return !!attrs && !ctx.isContextLost();
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (ready) return;
+    let cancelled = false;
+    const tryReady = () => {
+      if (cancelled) return;
+      try {
+        const ctx = gl.getContext();
+        const attrs = ctx?.getContextAttributes?.();
+        if (attrs && !ctx.isContextLost()) {
+          setReady(true);
+          return;
+        }
+      } catch { /* keep polling */ }
+      requestAnimationFrame(tryReady);
+    };
+    requestAnimationFrame(tryReady);
+
+    // Also recover from context loss/restored at runtime
+    const canvas = gl.domElement;
+    const onLost = (e: Event) => { e.preventDefault(); setReady(false); };
+    const onRestored = () => setReady(true);
+    canvas.addEventListener('webglcontextlost', onLost);
+    canvas.addEventListener('webglcontextrestored', onRestored);
+    return () => {
+      cancelled = true;
+      canvas.removeEventListener('webglcontextlost', onLost);
+      canvas.removeEventListener('webglcontextrestored', onRestored);
+    };
+  }, [ready, gl]);
+
+  if (!ready) return null;
+  return <>{children}</>;
 }
 
 // ── N8AO config ──────────────────────────────────────────────
@@ -160,7 +228,9 @@ function PostProcessingEffects() {
 export default function PostProcessingStack() {
   return (
     <PostProcessingBoundary>
-      <PostProcessingEffects />
+      <RendererReadyGate>
+        <PostProcessingEffects />
+      </RendererReadyGate>
     </PostProcessingBoundary>
   );
 }

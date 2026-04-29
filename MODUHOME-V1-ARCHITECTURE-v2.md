@@ -216,8 +216,36 @@ interface Voxel {
   stairAscending?: 'n' | 's' | 'e' | 'w';
   stairPart?: 'lower' | 'upper' | 'single';
   doorState?: 'closed' | 'open_swing' | 'open_slide';
+
+  // Per-face configs — selected via the Walls tab template picker.
+  doorConfig?:    Partial<Record<keyof VoxelFaces, DoorConfig>>;     // template + skin + state
+  windowConfig?:  Partial<Record<keyof VoxelFaces, WindowConfig>>;   // template + skin + openAmount
+
+  // Per-face OVERLAYS — render ON TOP of the SurfaceType (wall stays intact).
+  shelfConfig?:   Partial<Record<keyof VoxelFaces, ShelfConfig>>;    // bookshelves, floating shelves
+  cabinetConfig?: Partial<Record<keyof VoxelFaces, CabinetConfig>>;  // kitchen / bath cabinets, dressers
+  fixtureConfig?: Partial<Record<keyof VoxelFaces, FixtureConfig>>;  // appliances + bathroom fixtures
+  decorConfig?:   Partial<Record<keyof VoxelFaces, DecorConfig>>;    // pictures, mirrors, TVs, clocks
 }
 ```
+
+### Three Wall-Feature Patterns
+
+The renderer dispatches a face's appearance through three distinct mechanisms:
+
+| Pattern | Where | Examples | How rendered |
+|---------|-------|----------|--------------|
+| **SurfaceType replacement** | `voxel.faces[face]` | `Door`, `Window_Standard`, `Glass_Pane`, `Solid_Steel` | The face becomes that surface; the wall behind is gone. |
+| **Per-face config (surface-gated)** | `voxel.doorConfig?.[face]`, `voxel.windowConfig?.[face]` | Door template + skin, Window template + skin + openAmount | Augments a SurfaceType-replacing surface (`Door` or `Window_*`) with template/skin/animation. |
+| **Per-face overlay (category-gated)** | `voxel.shelfConfig`, `cabinetConfig`, `fixtureConfig`, `decorConfig` | Bookshelves, kitchen cabinets, fridges, picture frames, TVs | Renders ON TOP of whatever SurfaceType the face has. Wall stays intact behind. Counter tops, under-cabinet LEDs, picture lights are sub-options on these configs. |
+
+**Picker dispatch** (in `WallsTab.tsx`):
+- Door + Window pickers are **surface-gated** (appear when the face's SurfaceType matches).
+- Shelf/Cabinet/Fixture/Decor pickers are **category-gated** (appear when the user clicks the corresponding category chip in `CategoryRow`).
+
+**Renderer entry point** (in `ContainerSkin.tsx`):
+- `FaceVisual` builds an `overlay` JSX node from any present overlay configs and composites it after the SurfaceType-driven mesh: `<>{surfaceNode}{overlay}</>`.
+- Each overlay component (`ShelfFace`, `CabinetFace`, `FixtureFace`, `DecorFace`) lives in `ContainerSkin.tsx` and uses the shared `OverlayMount` wrapper to position itself in front of the wall along the face normal.
 
 ### Coordinate System
 

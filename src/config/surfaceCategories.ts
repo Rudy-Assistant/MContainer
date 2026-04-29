@@ -83,7 +83,35 @@ export const WALL_CATEGORIES: SurfaceCategory[] = [
     id: 'shelf',
     icon: '📚',
     label: 'Shelf',
-    placeholder: true,
+    volumetric: true,
+    // No SurfaceType variants — shelves are an OVERLAY config layer
+    // (`voxel.shelfConfig`), not a face SurfaceType. Picker is mounted by
+    // category in WallsTab; selecting the category does not change the
+    // underlying surface.
+    variants: [],
+  },
+  {
+    id: 'cabinet',
+    icon: '🗄️',
+    label: 'Cabinet',
+    volumetric: true,
+    // Same overlay pattern as Shelf — see comment above.
+    variants: [],
+  },
+  {
+    id: 'fixture',
+    icon: '🛁',
+    label: 'Fixture',
+    volumetric: true,
+    // Overlay category — appliances + bathroom fixtures.
+    variants: [],
+  },
+  {
+    id: 'decor',
+    icon: '🖼️',
+    label: 'Decor',
+    volumetric: true,
+    // Overlay category — pictures, mirrors, TVs, clocks, tapestries.
     variants: [],
   },
   {

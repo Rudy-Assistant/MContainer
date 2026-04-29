@@ -673,10 +673,10 @@ function SimpleBayGrid({
   const brushPreviewColor = activeBrush ? (SURFACE_COLORS[activeBrush] ?? "#78909c") : null;
 
   const dirLabelStyle: React.CSSProperties = {
-    fontSize: 9,
-    fontWeight: 600,
-    letterSpacing: '0.08em',
-    color: 'var(--text-dim)',
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    color: 'var(--text-muted, #64748b)',
     textAlign: 'center',
     textTransform: 'uppercase',
   };
@@ -1099,7 +1099,7 @@ export default function MatrixEditor({
                 marginTop: 4, padding: '8px 10px', background: 'rgba(0,0,0,0.04)',
                 borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6,
               }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                   Door Configuration
                 </span>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -1111,9 +1111,9 @@ export default function MatrixEditor({
                       tooltip: (opt: string) => opt === 'swing' && !constraints.canSwing ? (constraints.swingBlockReason ?? '') : opt === 'slide' && !constraints.canSlide ? (constraints.slideBlockReason ?? '') : '',
                     },
                   ] as const).map(({ label, options, value, key, disabled, tooltip }) => (
-                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 9, color: '#9ca3af' }}>{label}</span>
-                      <div style={{ display: 'flex', gap: 1 }}>
+                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>{label}</span>
+                      <div style={{ display: 'flex', gap: 2 }}>
                         {options.map(opt => {
                           const isDisabled = disabled(opt);
                           const tip = tooltip(opt);
@@ -1132,11 +1132,11 @@ export default function MatrixEditor({
                               }}
                               title={tip || undefined}
                               style={{
-                                padding: '2px 6px', fontSize: 10, borderRadius: 4,
+                                padding: '4px 9px', fontSize: 12, borderRadius: 5,
                                 background: value === opt ? '#3b82f6' : isDisabled ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.06)',
-                                color: value === opt ? 'white' : isDisabled ? '#d1d5db' : '#374151',
-                                border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', fontWeight: 500,
-                                opacity: isDisabled ? 0.5 : 1,
+                                color: value === opt ? 'white' : isDisabled ? '#cbd5e1' : '#334155',
+                                border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', fontWeight: 600,
+                                opacity: isDisabled ? 0.5 : 1, transition: 'all 150ms ease-out',
                               }}
                             >
                               {opt}
@@ -1148,7 +1148,7 @@ export default function MatrixEditor({
                   ))}
                 </div>
                 {(!constraints.canSwing || !constraints.canSlide) && (
-                  <span style={{ fontSize: 9, color: '#f59e0b', fontStyle: 'italic' }}>
+                  <span style={{ fontSize: 11, color: '#d97706', fontStyle: 'italic', lineHeight: 1.4 }}>
                     {constraints.swingBlockReason || constraints.slideBlockReason}
                   </span>
                 )}

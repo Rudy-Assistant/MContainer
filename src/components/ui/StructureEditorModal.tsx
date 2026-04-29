@@ -152,36 +152,38 @@ export default function StructureEditorModal() {
         onClick={closeStructureEditor}
       />
 
-      {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-[600px] overflow-hidden">
+      {/* Modal — wider and roomier so the structure schematic and direction
+          labels (BACK/FRONT/LEFT/RIGHT) read clearly without squinting. */}
+      <div className="modal-content relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-[720px] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-7 py-5 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">
               Frame Structure
             </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {container.name} &mdash; {dims.length.toFixed(1)}m &times; {dims.width.toFixed(1)}m &times; {dims.height.toFixed(1)}m
+            <p className="text-sm text-gray-500 mt-1">
+              Toggle any beam or post to hide it. {container.name} &mdash; {dims.length.toFixed(1)}m &times; {dims.width.toFixed(1)}m &times; {dims.height.toFixed(1)}m
             </p>
           </div>
           <button
             onClick={closeStructureEditor}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+            aria-label="Close"
+            className="w-9 h-9 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors flex items-center justify-center"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Body — SVG Schematic */}
-        <div className="px-6 py-5 flex flex-col items-center">
+        <div className="px-7 py-6 flex flex-col items-center">
           {/* Legend */}
-          <div className="flex items-center gap-6 mb-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-1 rounded-full" style={{ background: ACTIVE_COLOR }} />
+          <div className="flex items-center gap-7 mb-5 text-sm text-gray-600">
+            <span className="flex items-center gap-2">
+              <span className="w-5 h-1.5 rounded-full" style={{ background: ACTIVE_COLOR }} />
               Visible
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-1 rounded-full border border-dashed" style={{ borderColor: HIDDEN_COLOR }} />
+            <span className="flex items-center gap-2">
+              <span className="w-5 h-1.5 rounded-full border border-dashed" style={{ borderColor: HIDDEN_COLOR }} />
               Hidden
             </span>
             <span className="text-gray-400">
@@ -198,16 +200,16 @@ export default function StructureEditorModal() {
             <rect x={0} y={0} width={SVG_W} height={SVG_H} fill="#fafafa" rx={12} />
 
             {/* Direction labels */}
-            <text x={SVG_W / 2} y={PAD - 10} textAnchor="middle" fontSize={11} fill="#9e9e9e" fontWeight={500}>
+            <text x={SVG_W / 2} y={PAD - 10} textAnchor="middle" fontSize={13} fill="#475569" fontWeight={600}>
               BACK
             </text>
-            <text x={SVG_W / 2} y={SVG_H - PAD + 25} textAnchor="middle" fontSize={11} fill="#9e9e9e" fontWeight={500}>
+            <text x={SVG_W / 2} y={SVG_H - PAD + 25} textAnchor="middle" fontSize={13} fill="#475569" fontWeight={600}>
               FRONT
             </text>
-            <text x={PAD - 15} y={SVG_H / 2} textAnchor="middle" fontSize={11} fill="#9e9e9e" fontWeight={500} transform={`rotate(-90, ${PAD - 15}, ${SVG_H / 2})`}>
+            <text x={PAD - 15} y={SVG_H / 2} textAnchor="middle" fontSize={13} fill="#475569" fontWeight={600} transform={`rotate(-90, ${PAD - 15}, ${SVG_H / 2})`}>
               LEFT
             </text>
-            <text x={SVG_W - PAD + 15} y={SVG_H / 2} textAnchor="middle" fontSize={11} fill="#9e9e9e" fontWeight={500} transform={`rotate(90, ${SVG_W - PAD + 15}, ${SVG_H / 2})`}>
+            <text x={SVG_W - PAD + 15} y={SVG_H / 2} textAnchor="middle" fontSize={13} fill="#475569" fontWeight={600} transform={`rotate(90, ${SVG_W - PAD + 15}, ${SVG_H / 2})`}>
               RIGHT
             </text>
 
@@ -274,19 +276,19 @@ export default function StructureEditorModal() {
               onClick={handleResetAll}
               disabled={hiddenCount === 0}
               className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors
                 ${hiddenCount > 0
                   ? "text-gray-700 hover:bg-gray-100 border border-gray-200"
-                  : "text-gray-400 cursor-not-allowed"
+                  : "text-gray-400 cursor-not-allowed border border-gray-200"
                 }
               `}
             >
-              <RotateCcw size={14} />
+              <RotateCcw size={15} />
               Reset All
             </button>
             <button
               onClick={closeStructureEditor}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+              className="flex items-center gap-2 px-7 py-2.5 rounded-lg text-sm font-bold bg-gray-900 text-white hover:bg-gray-800 transition-colors shadow-sm"
             >
               Done
             </button>

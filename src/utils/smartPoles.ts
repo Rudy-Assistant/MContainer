@@ -1,11 +1,15 @@
 /**
  * smartPoles.ts — Smart Corner Pole Placement Algorithm
  *
- * Computes pole positions at every 90° corner of a roof boundary.
- * A "roofed" voxel has top !== 'Open' and is active.
- * Out-of-bounds cells count as "unroofed".
- * A pole is placed at a vertex when exactly 1 or 3 of the 4 surrounding voxels are roofed.
- * This captures both convex (1 roofed) and concave (3 roofed) corners.
+ * Computes pole positions at every 90° corner of a structural voxel boundary.
+ * A voxel is "structural" (needs corner support) if it is active and has EITHER
+ * a roof (top !== 'Open') OR a floor (bottom !== 'Open'). Out-of-bounds cells
+ * and fully-open voxels are non-structural.
+ *
+ * A pole is placed at a vertex when exactly 1 or 3 of the 4 surrounding voxels
+ * are structural. This captures both convex (1 structural) and concave (3) corners
+ * and ensures deck-extension floor corners get support — a hard rule in ModuHome's
+ * "smart" building system: no unsupported perimeter floor corners.
  *
  * Pure function — no React/store dependencies. Testable in isolation.
  */
@@ -29,11 +33,14 @@ export interface PolePosition {
 /** Callback to compute world-space vertex position from grid vertex coordinates */
 export type VertexPositionResolver = (vr: number, vc: number) => { px: number; pz: number };
 
-/** Check if a voxel at (row, col) is "roofed" — active with a ceiling (top !== 'Open') */
-function isRoofed(grid: Voxel[], row: number, col: number): boolean {
+/** Check if a voxel at (row, col) is "structural" — active with either a roof OR a floor.
+ *  A deck-extension voxel (open sky above, wooden deck below) counts as structural
+ *  so the smart pole pass places a support post under the perimeter floor corner. */
+function isStructural(grid: Voxel[], row: number, col: number): boolean {
   if (row < 0 || row >= VOXEL_ROWS || col < 0 || col >= VOXEL_COLS) return false;
   const v = grid[row * VOXEL_COLS + col];
-  return v?.active === true && v.faces.top !== 'Open';
+  if (!v?.active) return false;
+  return v.faces.top !== 'Open' || v.faces.bottom !== 'Open';
 }
 
 /**
@@ -85,15 +92,15 @@ export function computePolePositions(
   // The 4 surrounding voxels are at (vr-1, vc-1), (vr-1, vc), (vr, vc-1), (vr, vc).
   for (let vr = 0; vr <= VOXEL_ROWS; vr++) {
     for (let vc = 0; vc <= VOXEL_COLS; vc++) {
-      // Count how many of the 4 surrounding voxels are roofed
-      const tl = isRoofed(grid, vr - 1, vc - 1); // top-left
-      const tr = isRoofed(grid, vr - 1, vc);     // top-right
-      const bl = isRoofed(grid, vr, vc - 1);     // bottom-left
-      const br = isRoofed(grid, vr, vc);          // bottom-right
+      // Count how many of the 4 surrounding voxels are structural (have a roof or floor)
+      const tl = isStructural(grid, vr - 1, vc - 1); // top-left
+      const tr = isStructural(grid, vr - 1, vc);     // top-right
+      const bl = isStructural(grid, vr, vc - 1);     // bottom-left
+      const br = isStructural(grid, vr, vc);          // bottom-right
 
       const count = (tl ? 1 : 0) + (tr ? 1 : 0) + (bl ? 1 : 0) + (br ? 1 : 0);
 
-      // Pole at 90° corners: exactly 1 roofed (convex) or exactly 3 roofed (concave)
+      // Pole at 90° corners: exactly 1 structural (convex) or exactly 3 structural (concave)
       if (count !== 1 && count !== 3) continue;
 
       // World position of this vertex
@@ -104,22 +111,22 @@ export function computePolePositions(
       posSet.add(key);
 
       // Determine which voxel "owns" this corner for the key.
-      // Use the roofed voxel closest to the vertex for naming.
-      // For convex (count=1): the single roofed voxel
-      // For concave (count=3): the single UNroofed voxel's position marks the concave elbow
+      // Use the structural voxel closest to the vertex for naming.
+      // For convex (count=1): the single structural voxel
+      // For concave (count=3): the single non-structural voxel's position marks the concave elbow
       let anchorRow: number;
       let anchorCol: number;
       let corner: 'ne' | 'nw' | 'se' | 'sw';
 
       if (count === 1) {
-        // Convex: the one roofed voxel
+        // Convex: the one structural voxel
         if (tl) { anchorRow = vr - 1; anchorCol = vc - 1; corner = 'se'; }
         else if (tr) { anchorRow = vr - 1; anchorCol = vc; corner = 'sw'; }
         else if (bl) { anchorRow = vr; anchorCol = vc - 1; corner = 'ne'; }
         else { anchorRow = vr; anchorCol = vc; corner = 'nw'; }
       } else {
-        // Concave (count=3): the one UNroofed voxel marks the concave corner
-        // The pole is at the corner of the 3 roofed voxels facing the gap
+        // Concave (count=3): the one non-structural voxel marks the concave corner
+        // The pole is at the corner of the 3 structural voxels facing the gap
         if (!tl) { anchorRow = vr - 1; anchorCol = vc; corner = 'sw'; }
         else if (!tr) { anchorRow = vr - 1; anchorCol = vc - 1; corner = 'se'; }
         else if (!bl) { anchorRow = vr; anchorCol = vc; corner = 'nw'; }

@@ -72,6 +72,7 @@ export function PresetCard({
   content, icon, iconSize = 28, label, title, active, onClick, onMouseEnter, onMouseLeave,
 }: PresetCardProps) {
   const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const prevActiveRef = useRef(active);
   const [animating, setAnimating] = useState(false);
 
@@ -109,6 +110,10 @@ export function PresetCard({
     background: 'var(--surface)',
     overflow: 'hidden',
     transition: 'transform 150ms ease-out, box-shadow 150ms ease-out',
+    // While pressed, scale down by 4% — gives a tactile "I felt that"
+    // response that's missing from a pure :hover state. The hover scale-up
+    // is in getCardImageStyle so this composes cleanly.
+    ...(pressed ? { transform: 'scale(0.96)', transition: 'transform 80ms ease-out, box-shadow 150ms ease-out' } : {}),
     ...(animating
       ? { animation: 'selectPop 200ms ease-out' }
       : {}),
@@ -136,8 +141,11 @@ export function PresetCard({
       }}
       onMouseLeave={() => {
         setHovered(false);
+        setPressed(false);
         onMouseLeave?.();
       }}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
       style={{
         display: 'flex',
         flexDirection: 'column',

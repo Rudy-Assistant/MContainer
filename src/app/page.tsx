@@ -7,10 +7,12 @@ import { ContainerSize, ViewMode } from "@/types/container";
 import Sidebar from "@/components/ui/Sidebar";
 import BudgetModal from "@/components/ui/BudgetModal";
 import WizardModal from "@/components/ui/WizardModal";
+import MobileGate from "@/components/ui/MobileGate";
 import StructureEditorModal from "@/components/ui/StructureEditorModal";
 import FloorDetailModal from "@/components/ui/FloorDetailModal";
 import ContainerContextMenu from "@/components/ui/ContainerContextMenu";
 import LevelSlicer from "@/components/ui/LevelSlicer";
+import FaceFilterWidget from "@/components/ui/FaceFilterWidget";
 import TopToolbar from "@/components/ui/TopToolbar";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
@@ -52,10 +54,14 @@ function useHydrationSeed() {
         }
       });
     } else {
-      // Fresh state with no containers → seed a default container
+      // Fresh state with no containers → open the model-home wizard so the user's
+      // first impression is a curated starting-layout picker, not an anonymous
+      // empty container they didn't ask for. The wizard falls back to a default
+      // container if the user dismisses it.
       const store = useStore.getState();
       if (Object.keys(store.containers).length === 0) {
         store.addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+        if (!store.wizardOpen) store.openWizard();
       }
     }
   }, [hasHydrated]);
@@ -89,6 +95,7 @@ export default function Home() {
   const hasHydrated = useStore((s) => s._hasHydrated);
   const activeHotbarSlot = useStore((s) => s.activeHotbarSlot);
   const showHotbar = useStore((s) => s.showHotbar);
+  const sceneFadeActive = useStore((s) => s.sceneFadeActive);
   useHydrationSeed();
 
   if (!hasHydrated) {
@@ -112,6 +119,8 @@ export default function Home() {
         {/* Canvas Area — onContextMenu absolutely prevented */}
         <div className="flex-1 relative" style={{ backgroundColor: "var(--background, #f4f6f8)", cursor: activeHotbarSlot !== null && !isWalkthrough ? 'crosshair' : 'default' }} onContextMenu={(e) => e.preventDefault()}>
           <SceneCanvas />
+          {/* Scene fade — soft veil during disruptive transitions (Reset, AI replace, view switch) */}
+          <div className={`scene-fade-overlay${sceneFadeActive ? ' scene-fade-active' : ''}`} aria-hidden />
 
           {/* Grab mode overlay */}
           <GrabModeOverlay />
@@ -121,6 +130,9 @@ export default function Home() {
 
           {/* Level Selector — hidden in FPV where level navigation is irrelevant */}
           {!isWalkthrough && <LevelSlicer />}
+
+          {/* Face filter widget — restrict pointer events to roof / walls / floor */}
+          {!isWalkthrough && !isPreviewMode && <FaceFilterWidget />}
 
           {/* Hotbars — visible when showHotbar enabled (not walkthrough, not preview) */}
           {showHotbar && !isWalkthrough && !isPreviewMode && <CustomHotbar />}
@@ -153,7 +165,7 @@ export default function Home() {
                 }}
               >
                 <span className="text-[11px] text-white/80">
-                  WASD move · Arrows look · Mouse look · Shift sprint · Q/Z fly up/down · Click/Space cycle panel · E preset · Right-click menu · T tour · ESC exit
+                  WASD move · Arrows look · Mouse look · Shift sprint · Q/Z fly up/down · Click/Space cycle panel · E preset · O open/close door · Right-click menu · T tour · ESC exit
                 </span>
               </div>
             </>
@@ -174,6 +186,9 @@ export default function Home() {
       <FloorDetailModal />
       <ContainerContextMenu />
       <WizardModal />
+
+      {/* Mobile gate: desktop-first editor doesn't fit sub-tablet layouts. */}
+      <MobileGate />
     </div>
   );
 }

@@ -55,6 +55,14 @@ export interface UiSlice {
 
   showHotbar: boolean;
   toggleHotbar: () => void;
+  /** Show the subtle reference grid on the ground plane. Default true. */
+  showFloorGrid: boolean;
+  toggleFloorGrid: () => void;
+  /** Hover/click face filter — when set, the 3D viewport only registers
+   *  pointer events on faces of this category. Lets the user pick out
+   *  ceilings or floors that are hard to hit when unfiltered. */
+  faceFilter: 'all' | 'top' | 'bottom' | 'walls';
+  setFaceFilter: (filter: 'all' | 'top' | 'bottom' | 'walls') => void;
   selectedWallCategory: string | null;
   selectedFloorCategory: string | null;
   selectedCeilingCategory: string | null;
@@ -188,14 +196,19 @@ export interface UiSlice {
   hoveredFormId: string | null;
   setHoveredFormId: (id: string | null) => void;
 
-  // Preset card hover → ghost preview of faces in 3D scene
+  // Preset card hover → ghost preview of faces in 3D scene.
+  // `arrangementId` (optional) — when present, the renderer evaluates the
+  // arrangement spec per-voxel (perimeter walls only on perimeter cells,
+  // void cells punched, etc.) instead of stamping the same `faces` config
+  // on every voxel. Used for "Glass Atrium" / "Atrium" / etc. cards.
   ghostPreset: {
     source: 'block' | 'container' | 'walls' | 'flooring' | 'ceiling';
     faces: VoxelFaces;
     targetScope: 'voxel' | 'bay' | 'container';
     materialMap?: Partial<Record<keyof VoxelFaces, MaterialDef>>;
+    arrangementId?: import('@/types/container').ContainerArrangementId;
   } | null;
-  setGhostPreset: (g: { source: 'block' | 'container' | 'walls' | 'flooring' | 'ceiling'; faces: VoxelFaces; targetScope: 'voxel' | 'bay' | 'container'; materialMap?: Partial<Record<keyof VoxelFaces, MaterialDef>> } | null) => void;
+  setGhostPreset: (g: { source: 'block' | 'container' | 'walls' | 'flooring' | 'ceiling'; faces: VoxelFaces; targetScope: 'voxel' | 'bay' | 'container'; materialMap?: Partial<Record<keyof VoxelFaces, MaterialDef>>; arrangementId?: import('@/types/container').ContainerArrangementId } | null) => void;
   clearGhostPreset: () => void;
 
   // Ghost pop animation lifecycle
@@ -203,6 +216,12 @@ export interface UiSlice {
   ghostPopStartTime: number;
   triggerGhostPop: () => void;
   clearGhostPop: () => void;
+
+  // Scene-level fade overlay — set true briefly during disruptive scene
+  // mutations (Reset Canvas, AI design replace, view-mode switch) so the
+  // change happens behind a soft veil instead of as a visible jump cut.
+  sceneFadeActive: boolean;
+  triggerSceneFade: () => void;
 
   // Stamp mode ghost preview — green tint overlay on hovered face
   stampPreview: {
@@ -239,6 +258,10 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   showHotbar: false,
   toggleHotbar: () => set((s) => ({ showHotbar: !s.showHotbar })),
+  showFloorGrid: false,
+  toggleFloorGrid: () => set((s) => ({ showFloorGrid: !s.showFloorGrid })),
+  faceFilter: 'all',
+  setFaceFilter: (filter) => set({ faceFilter: filter }),
   selectedWallCategory: null,
   selectedFloorCategory: null,
   selectedCeilingCategory: null,
@@ -388,6 +411,17 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
     ghostPopStartTime: performance.now(),
   }),
   clearGhostPop: () => set({ ghostPopActive: false }),
+
+  // Scene fade — momentarily veils the canvas (~360ms total) so abrupt
+  // mutations (Reset Canvas, full-design replace, view-mode switch) land
+  // behind a soft white wash instead of jump-cutting.
+  sceneFadeActive: false,
+  triggerSceneFade: () => {
+    set({ sceneFadeActive: true });
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => set({ sceneFadeActive: false }), 360);
+    }
+  },
 
   // Stamp mode ghost preview
   stampPreview: null,

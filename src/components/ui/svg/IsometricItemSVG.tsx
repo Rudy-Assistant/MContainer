@@ -133,21 +133,23 @@ function renderItem(itemId: string): React.ReactNode {
         </g>
       );
 
-    default:
+    case 'none':
+      // "No fixture" — slashed circle. Used for any category's "none" option
+      // (lights, switches, etc). Replaces the prior "?" fallback that read
+      // as broken/unimplemented.
       return (
         <g>
-          <circle cx="30" cy="30" r="20" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5" />
-          <text
-            x="30"
-            y="35"
-            textAnchor="middle"
-            fontSize="18"
-            fill="#64748b"
-            fontFamily="sans-serif"
-            fontWeight="bold"
-          >
-            ?
-          </text>
+          <circle cx="30" cy="30" r="16" fill="none" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="18" y1="42" x2="42" y2="18" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+        </g>
+      );
+
+    default:
+      // Generic placeholder — neutral square outline so unmapped item ids
+      // don't display as a "?" mark (which read as a bug to users).
+      return (
+        <g>
+          <rect x="14" y="14" width="32" height="32" rx="4" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3 3" />
         </g>
       );
   }

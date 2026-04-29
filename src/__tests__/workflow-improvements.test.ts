@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
 import { useStore } from '@/store/useStore';
-import { ContainerSize, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
+import { ContainerSize, VOXEL_COLS, VOXEL_LEVELS, VOXEL_ROWS } from '@/types/container';
 
 function resetStore() {
   const initial = useStore.getInitialState();
@@ -34,9 +34,10 @@ describe('Rooftop Deck toggle', () => {
     const s = useStore.getState();
     s.generateRooftopDeck(id);
 
-    // Verify deck was applied
+    // Verify deck was applied — rooftop lives on the TOP internal level, not level 0
     const afterGen = useStore.getState().containers[id];
-    const bodyIdx = 1 * VOXEL_COLS + 1; // row=1, col=1 (body voxel)
+    const topLevelBase = (VOXEL_LEVELS - 1) * VOXEL_ROWS * VOXEL_COLS;
+    const bodyIdx = topLevelBase + 1 * VOXEL_COLS + 1; // top level row=1, col=1
     expect(afterGen.voxelGrid[bodyIdx].faces.top).toBe('Deck_Wood');
 
     // Remove the deck
@@ -51,8 +52,8 @@ describe('Rooftop Deck toggle', () => {
     const id = addC();
     useStore.getState().generateRooftopDeck(id);
 
-    // row=1 should have Railing_Cable on north face
-    const bodyIdx = 1 * VOXEL_COLS + 3; // row=1, col=3
+    const topLevelBase = (VOXEL_LEVELS - 1) * VOXEL_ROWS * VOXEL_COLS;
+    const bodyIdx = topLevelBase + 1 * VOXEL_COLS + 3; // top level row=1, col=3
     expect(useStore.getState().containers[id].voxelGrid[bodyIdx].faces.n).toBe('Railing_Cable');
 
     useStore.getState().removeRooftopDeck(id);

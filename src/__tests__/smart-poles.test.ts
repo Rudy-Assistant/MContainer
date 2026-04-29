@@ -2,9 +2,13 @@
  * Smart Corner Poles Tests
  *
  * Phase 2 of Smart Architecture, Work Item 3: Poles appear at every
- * 90° corner of a roof boundary. A "roofed" voxel has top !== 'Open'.
- * Out-of-bounds cells count as "unroofed". A pole is placed when
- * exactly 1 or 3 of the 4 surrounding voxels are roofed.
+ * 90° corner of a STRUCTURAL voxel boundary. A voxel is structural if it
+ * is active and has EITHER a roof (top !== 'Open') or a floor (bottom !== 'Open').
+ * Out-of-bounds cells are non-structural. A pole is placed when exactly 1 or 3
+ * of the 4 surrounding voxels are structural.
+ *
+ * Deck extension floors count as structural — the ModuHome smart-building rule
+ * bans unsupported perimeter floor corners.
  *
  * TDD: RED-GREEN-REFACTOR cycle. Pure function, real assertions.
  */
@@ -17,7 +21,7 @@ import { type Voxel, type VoxelFaces } from '@/types/container';
 import { VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
 
 /** Create a minimal voxel grid for testing. All voxels inactive by default. */
-function makeGrid(overrides: Record<number, { active: boolean; topOpen?: boolean }>): Voxel[] {
+function makeGrid(overrides: Record<number, { active: boolean; topOpen?: boolean; bottomOpen?: boolean }>): Voxel[] {
   const defaultFaces: VoxelFaces = {
     top: 'Solid_Steel', bottom: 'Solid_Steel',
     n: 'Solid_Steel', s: 'Solid_Steel',
@@ -29,6 +33,7 @@ function makeGrid(overrides: Record<number, { active: boolean; topOpen?: boolean
     if (override) {
       const faces = { ...defaultFaces };
       if (override.topOpen) faces.top = 'Open';
+      if (override.bottomOpen) faces.bottom = 'Open';
       grid.push({ active: override.active, faces } as Voxel);
     } else {
       grid.push({ active: false, faces: { ...defaultFaces } } as Voxel);
@@ -104,23 +109,30 @@ describe('Smart Corner Poles: Placement Algorithm', () => {
     expect(poles).toHaveLength(4);
   });
 
-  it('POLE-5: Deck voxels (top=Open) do NOT get poles — only roofed voxels', () => {
-    // Voxel 10 active but top=Open (deck/open-air)
+  it('POLE-5: Deck voxel (top=Open, floor present) DOES get corner poles — smart floor-support rule', () => {
+    // Voxel 10 active, top=Open (open sky), bottom=Solid_Steel (has a floor) → structural
+    // The perimeter floor corners need support, so we get 4 poles.
     const grid = makeGrid({ 10: { active: true, topOpen: true } });
+    const poles = computePolePositions(grid);
+    expect(poles).toHaveLength(4);
+  });
+
+  it('POLE-5b: Fully-open voxel (no roof, no floor) does NOT get poles', () => {
+    // A voxel with both top and bottom open is a pure void — no structure to support.
+    const grid = makeGrid({ 10: { active: true, topOpen: true, bottomOpen: true } });
     const poles = computePolePositions(grid);
     expect(poles).toHaveLength(0);
   });
 
-  it('POLE-6: Mixed roof and deck — poles only at roofed voxel corners', () => {
-    // Voxel 9 = roofed, voxel 10 = deck (open top)
+  it('POLE-6: Mixed roof and deck — both generate corner poles on their perimeter', () => {
+    // Voxel 9 = enclosed room, voxel 10 = deck (open top). Both are structural, so
+    // the combined footprint (a 1×2 rectangle) yields 4 corner poles; the shared
+    // edge is internal and generates no pole.
     const grid = makeGrid({
       9: { active: true },
       10: { active: true, topOpen: true },
     });
     const poles = computePolePositions(grid);
-    // Voxel 9 has 4 corners. The two corners shared with voxel 10:
-    // At those vertices, 10 is "unroofed" (top=Open), so it counts as unroofed.
-    // Voxel 9 gets all 4 poles (all corners are convex since 10 is not roofed).
     expect(poles).toHaveLength(4);
   });
 

@@ -1,4 +1,4 @@
-export type QualityPresetId = 'low' | 'medium' | 'high';
+export type QualityPresetId = 'low' | 'medium' | 'high' | 'photoreal';
 
 export interface QualityConfig {
   postProcessing: boolean;
@@ -62,7 +62,26 @@ export const QUALITY_PRESETS: Record<QualityPresetId, QualityConfig> = {
     groundTextured: true,
     groundAO: true,
   },
+  /** Photoreal — for the "Render Hi-Res" capture flow only. Maxes every
+   *  knob: 4096 shadows, 2k textures, full env map, all lights cast shadows.
+   *  Not a daily-use preset; intended to be applied transiently while the
+   *  user renders a still image, then reverted. */
+  photoreal: {
+    postProcessing: true,
+    aoHalfRes: false,
+    bloomEnabled: true,
+    shadowMapSize: 4096,
+    textureQuality: '2k',
+    useKTX2: false,
+    usePBRTextures: true,
+    glassClearcoat: true,
+    envMap: 'cubeCamera',
+    maxLights: 16,
+    lightShadows: true,
+    groundTextured: true,
+    groundAO: true,
+  },
 };
 
-export const QUALITY_PRESET_IDS: QualityPresetId[] = ['low', 'medium', 'high'];
+export const QUALITY_PRESET_IDS: QualityPresetId[] = ['low', 'medium', 'high', 'photoreal'];
 export const DEFAULT_QUALITY_PRESET: QualityPresetId = 'medium';
