@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-24T06:35:37.912Z",
+  "timestamp": "2026-04-30T19:31:35.052Z",
   "sprint": 13,
   "gates": [
     {
@@ -20,7 +20,7 @@
     {
       "gate": "G3b-webglAlive",
       "status": "PASS",
-      "msg": "WebGL alive, scene has 407 meshes (pixel variance low in headless — SwiftShader limitation)"
+      "msg": "WebGL alive, scene has 307 meshes (pixel variance low in headless — SwiftShader limitation)"
     },
     {
       "gate": "G4-resetButton",
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.814, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.400, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -95,7 +95,7 @@
     {
       "gate": "G11-exportDropdown",
       "status": "PASS",
-      "msg": "export verified: 1 containers, 24681 bytes JSON"
+      "msg": "export verified: 1 containers, 24736 bytes JSON"
     },
     {
       "gate": "G12-modelHomeLoad",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=49.03, targetY=1.45, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=1.83, targetY=1.29, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=a1f37031-a33d-4f41-bc94-0078eb18ec22"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=9a6c58ab-ccd0-41d6-86a5-81eaf1c13972"
     },
     {
       "gate": "G21-leftDragMove",
@@ -160,7 +160,7 @@
     {
       "gate": "G23-twoLevelHome",
       "status": "PASS",
-      "msg": "Full workflow: Y=2.90, void=OK, walk=true, moved=true, exit=true, tod=true"
+      "msg": "Full workflow: Y=2.90, void=OK, walk=true, moved=false, exit=true, tod=true"
     },
     {
       "gate": "G24-furniture",

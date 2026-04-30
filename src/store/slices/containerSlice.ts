@@ -47,12 +47,13 @@ import {
 import { findAdjacentPairs, computeGlobalCulling, wallSideToBoundary, checkOverlap, getFootprintAt, getFullFootprint, findEdgeSnap, voxelExtentsOverlap } from "@/store/spatialEngine";
 import defaultPricing from "@/config/pricing_config.json";
 import { getContainerRole } from "@/config/containerRoles";
+import { getModulePreset, resolveModuleFaces } from "@/config/moduleCatalog";
 import { DEFAULT_EXTENSION_CONFIG, type ExtensionConfig } from "@/types/container";
 import { BLOCK_PRESETS, autoStairAscending } from "../useStore";
 import { isPoleKey } from "@/config/frameMaterials";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 import { formRegistry } from "@/config/formRegistry";
-import { evaluateContainerArrangementCell, getContainerArrangementSpec } from "@/config/containerArrangements";
+import { CONTAINER_ARRANGEMENT_SPECS, evaluateContainerArrangementCell, getContainerArrangementSpec } from "@/config/containerArrangements";
 import { recomputeSmartHoleGuards, recomputeSmartRailings } from "./voxelSlice";
 import { getShelfTemplate } from "@/config/shelfTemplates";
 import { getCabinetTemplate } from "@/config/cabinetTemplates";
@@ -190,7 +191,7 @@ export interface ContainerSlice {
   addContainer: (size?: ContainerSize, position?: ContainerPosition, level?: number, skipSmartPlacement?: boolean) => string;
   addPoolContainer: () => string;
   applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
-  setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
+  setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean, animate?: boolean) => void;
   applyContainerArrangement: (containerId: string, arrangementId: ContainerArrangementId) => void;
   removeContainer: (id: string) => void;
   updateContainerPosition: (id: string, position: ContainerPosition) => void;
@@ -617,7 +618,7 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     });
   },
 
-  setAllExtensions: (containerId, config, skipOverlapCheck) => {
+  setAllExtensions: (containerId, config, skipOverlapCheck, animate = true) => {
     const c = get().containers[containerId] as Container | undefined;
     if (!c?.voxelGrid) return;
 
@@ -716,33 +717,42 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         };
       });
     } else if (config === 'all_deck' || config === 'north_deck' || config === 'south_deck' || config === 'east_deck' || config === 'west_deck') {
-      // Apply deck_open module to affected extension voxels
-      for (let level = 0; level < VOXEL_LEVELS; level++) {
-        for (let row = 0; row < VOXEL_ROWS; row++) {
-          for (let col = 0; col < VOXEL_COLS; col++) {
-            if (!shouldAffect(row, col)) continue;
-            const idx = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col;
-            // Activate the voxel first
-            set((s) => {
-              const container = s.containers[containerId];
-              if (!container?.voxelGrid) return {};
-              const grid = [...container.voxelGrid];
-              grid[idx] = { ...grid[idx], active: true };
-              return { containers: { ...s.containers, [containerId]: { ...container, voxelGrid: grid } } };
-            });
-            get().applyModule(containerId, idx, 'deck_open', 'n');
-            // Set unpack animation phase for cinematic extension deployment
-            set((s) => {
-              const container = s.containers[containerId];
-              if (!container?.voxelGrid) return {};
-              const grid = [...container.voxelGrid];
-              if (grid[idx]) {
-                grid[idx] = { ...grid[idx], unpackPhase: 'wall_to_floor' as const };
+      // Apply the deck_open module to affected extension voxels.
+      //
+      // Resolve the deck_open faces once from the module catalog (single source
+      // of truth — keeps Railing_Cable/Deck_Wood/Open in lockstep with module
+      // edits) and apply ALL voxel mutations inside a single set() call. This
+      // replaces the old 3-set-per-voxel pattern (activate → applyModule →
+      // unpackPhase) which fired up to ~96 store mutations on a single stack.
+      const deckPreset = getModulePreset('deck_open');
+      const deckFaces: VoxelFaces | null = deckPreset
+        ? resolveModuleFaces(deckPreset, 'n')
+        : null;
+      if (deckFaces) {
+        set((s) => {
+          const container = s.containers[containerId];
+          if (!container?.voxelGrid) return {};
+          const grid = [...container.voxelGrid];
+          for (let level = 0; level < VOXEL_LEVELS; level++) {
+            for (let row = 0; row < VOXEL_ROWS; row++) {
+              for (let col = 0; col < VOXEL_COLS; col++) {
+                if (!shouldAffect(row, col)) continue;
+                const idx = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col;
+                const voxel = grid[idx];
+                if (!voxel) continue;
+                grid[idx] = {
+                  ...voxel,
+                  active: true,
+                  faces: { ...deckFaces },
+                  moduleId: 'deck_open',
+                  moduleOrientation: 'n',
+                  unpackPhase: animate ? ('wall_to_floor' as const) : undefined,
+                };
               }
-              return { containers: { ...s.containers, [containerId]: { ...container, voxelGrid: grid } } };
-            });
+            }
           }
-        }
+          return { containers: { ...s.containers, [containerId]: { ...container, voxelGrid: grid } } };
+        });
       }
     } else if (config === 'all_interior' || config === 'all_glass_interior') {
       // Expand floor area: activate extensions with interior-matching faces
@@ -765,7 +775,14 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
                 e: col === 7 ? outerWall : 'Open',
                 w: col === 0 ? outerWall : 'Open',
               };
-              grid[idx] = { ...grid[idx], active: true, faces, moduleId: undefined, moduleOrientation: undefined, unpackPhase: 'wall_to_ceiling' as const };
+              grid[idx] = {
+                ...grid[idx],
+                active: true,
+                faces,
+                moduleId: undefined,
+                moduleOrientation: undefined,
+                unpackPhase: animate ? ('wall_to_ceiling' as const) : undefined,
+              };
             }
           }
         }
@@ -1520,8 +1537,47 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     // Bottom container was just topmost and may be carrying a rooftop-deck signature.
     // Strip it so SR-07 (rooftop-only-on-topmost) stays true through multi-level stacks.
     get().removeRooftopDeck(bottomId);
-    // Auto-generate rooftop deck on the newly stacked top container FIRST
-    get().generateRooftopDeck(topId);
+
+    // Decide what to do with the new top container:
+    //
+    // 1. If the top already carries its own applied arrangement (model homes
+    //    place + arrange BEFORE stacking — e.g. stacked_atrium_tower stacks a
+    //    `glass_atrium` top onto a `central_atrium` bottom), respect that
+    //    choice and do nothing further. Overwriting it would silently swap
+    //    the user's (or model home's) intended envelope.
+    //
+    // 2. Else, if the bottom carries an applied arrangement (Glass Box, Max
+    //    Box, etc.), extend it upward to the new top container so the
+    //    envelope reads as a continuous shell instead of a fresh container
+    //    with default Solid_Steel walls visible behind the bottom's
+    //    perimeter (Bug 1 / 2026-04-30). applyContainerArrangement also sets
+    //    top.appliedPreset, which short-circuits the rooftop-deck side-effect
+    //    path so no `wall_to_floor` cascade fires on stack.
+    //
+    // 3. Else (both default), fall back to the rooftop deck so the top of a
+    //    plain 40HC reads as a usable terrace, exactly as before. The deck
+    //    side-effect path uses animate=false to suppress the 40-voxel
+    //    `wall_to_floor` cascade (Bug 2 / 2026-04-30).
+    //
+    // Note on the lookup at line ★: `Container.appliedPreset` is typed as
+    // plain `string` because it doubles as a wizard-preset bucket
+    // (`'studio_apartment'`, `'cottage'`, …) AND as an arrangement ID. Only
+    // arrangement IDs are valid inputs to `applyContainerArrangement` — the
+    // wizard IDs would throw `Unknown container arrangement: …`. Filter by
+    // membership in `CONTAINER_ARRANGEMENT_SPECS` so a wizard-preset bottom
+    // simply falls through to the default rooftop-deck path.
+    const topPreset = get().containers[topId]?.appliedPreset;
+    const bottomPreset = get().containers[bottomId]?.appliedPreset;
+    if (!topPreset) {
+      const bottomArrangementId = CONTAINER_ARRANGEMENT_SPECS.find(
+        (spec) => spec.id === bottomPreset,
+      )?.id;
+      if (bottomArrangementId) {
+        get().applyContainerArrangement(topId, bottomArrangementId);
+      } else {
+        get().generateRooftopDeck(topId);
+      }
+    }
 
     // THEN apply roof → floor inheritance: copy L1's roof config to L2's floor
     const updatedState = get();
@@ -1871,9 +1927,15 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     // while wiring the Glass Atrium Showcase preset). The arrangement
     // already chose its own extension treatment via extensionDoorProfile +
     // perimeterFaces; reapplying DEFAULT_EXTENSION_CONFIG would undo it.
+    //
+    // animate=false: this is a SIDE EFFECT of stack/auto-deploy, not a user
+    // gesture. Forty simultaneous wall_to_floor animations on stack were
+    // confirmed to produce a visible camera/scene jitter (Bug 2 / 2026-04-30).
+    // The cinematic unpack phase is reserved for explicit user-initiated
+    // extension deploys via the Container tab.
     const refreshed = get().containers[containerId];
     if (!refreshed?.appliedPreset) {
-      get().setAllExtensions(containerId, DEFAULT_EXTENSION_CONFIG, true);
+      get().setAllExtensions(containerId, DEFAULT_EXTENSION_CONFIG, true, false);
     }
   },
 
