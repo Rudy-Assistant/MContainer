@@ -57,3 +57,9 @@ gate-screenshots/
 # one-shot output and stays out of git.
 gate-baselines/*
 !gate-baselines/baseline-*.png
+
+# Output of scripts/verify-stack-bug-fix.mjs — regenerable visual evidence,
+# not source. Run the script to recreate.
+verify-stack-bug-fix/
+verify-stack-bug-fix-BEFORE/
+verify-stack-bug-fix-AFTER/
