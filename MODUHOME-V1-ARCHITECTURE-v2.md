@@ -346,7 +346,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 
 ## §6 Feature Status
 
-27/27 features at PRODUCTION quality. 43/43 Playwright gates PASS (verified 2026-05-02 against v0.2.0 + post-release fixes; Extension Unpack Animations promoted PROTOTYPE→PRODUCTION via new G31-animations gate). See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
+28/28 features at PRODUCTION quality. 44/44 Playwright gates PASS (verified 2026-05-02 against v0.2.0 + post-release fixes; Animation Lifecycle promoted PROTOTYPE→PRODUCTION via G31-animations; AI Designer wired end-to-end and gated via G32-aiDesigner with mocked fetch). See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
 
 | Feature | Rating |
 |---------|--------|

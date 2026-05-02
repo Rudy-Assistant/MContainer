@@ -1234,6 +1234,72 @@ async function run() {
       : fail('G31-animations', JSON.stringify(r));
   } catch (e) { fail('G31-animations', e.message); }
 
+  // ═══ G32: AI Designer — mocked Claude response → applyDesignPlan → store ═══
+  // Mocks /api/design with a deterministic plan so this gate doesn't burn
+  // Claude tokens or require ANTHROPIC_API_KEY in CI. Verifies the full UI
+  // path: open Settings menu → click "AI Design…" → enter prompt → Generate
+  // → fetchDesignPlan parses response → applyDesignPlan mutates the store.
+  try {
+    // Reset to clean state first (prior gates leave state behind)
+    await page.evaluate(() => {
+      const s = window.__store.getState();
+      for (const id of Object.keys(s.containers)) s.removeContainer(id);
+    });
+    await page.waitForTimeout(300);
+
+    // Intercept the AI Designer fetch with a stub response
+    await page.route('**/api/design', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          plan: {
+            rationale: 'Gate G32 stub: single 40ft High Cube with butterfly roof for the test.',
+            actions: [
+              { type: 'set_site_context', enabled: true },
+              { type: 'add_container', size: '40ft_high_cube', position: { x: 0, y: 0, z: 0 }, level: 0, roofType: 'butterfly' },
+              { type: 'apply_room_preset', containerIndex: 0, anchorBodyCol: 0, anchorBodyRow: 0, presetId: 'kitchen_galley' },
+            ],
+          },
+        }),
+      })
+    );
+
+    await openOverflowMenu(page);
+    await page.click('[data-testid="btn-ai-design"]', { force: true });
+    await page.waitForTimeout(500);
+    await page.locator('textarea').first().fill('Gate test: studio with butterfly roof');
+    await page.waitForTimeout(200);
+    await page.locator('button', { hasText: 'Generate Design' }).click({ force: true });
+    // Generate triggers a 150ms scene fade + container reset, then applies
+    await page.waitForTimeout(1500);
+
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      const containers = Object.values(s.containers);
+      return {
+        count: containers.length,
+        hasButterflyRoof: containers.some((c) => c.roofType === 'butterfly'),
+        siteContext: s.environment?.siteContextEnabled === true,
+      };
+    });
+
+    const ok = r.count >= 1 && r.hasButterflyRoof && r.siteContext;
+    ok
+      ? pass('G32-aiDesigner', `mocked fetch applied: containers=${r.count}, butterflyRoof=${r.hasButterflyRoof}, siteContext=${r.siteContext}`)
+      : fail('G32-aiDesigner', JSON.stringify(r));
+
+    // Close modal via Escape (the modal's footer "Close" button locator races
+    // with the X icon-only close button which also has accessible text).
+    // Pressing Escape triggers onClose via the modal's keyboard handler.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    // Belt-and-braces: click outside the modal as well, in case Escape didn't fire
+    await page.mouse.click(10, 10).catch(() => {});
+    await page.waitForTimeout(300);
+    await page.unroute('**/api/design').catch(() => {});
+  } catch (e) { fail('G32-aiDesigner', e.message); }
+
   // ═══ G19: Default visual — restore defaults + visual comparison ═══
   try {
     // Reset to clean state

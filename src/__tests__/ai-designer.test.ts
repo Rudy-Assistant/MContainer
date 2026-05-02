@@ -3,9 +3,9 @@
  * scans. Asserts that a plan ends in the expected mutations.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@/store/useStore';
-import { applyDesignPlan, type DesignPlan } from '@/utils/aiDesigner';
+import { applyDesignPlan, fetchDesignPlan, type DesignPlan } from '@/utils/aiDesigner';
 import { ContainerSize } from '@/types/container';
 
 describe('applyDesignPlan', () => {
@@ -108,5 +108,111 @@ describe('applyDesignPlan', () => {
     const result = applyDesignPlan(plan, useStore.getState());
     expect(result.addedIds).toHaveLength(2); // both containers created
     expect(result.warnings.length).toBeGreaterThan(0); // overflow warning
+  });
+});
+
+describe('fetchDesignPlan', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  function mockFetch(response: { ok: boolean; status: number; body: unknown }) {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: response.ok,
+      status: response.status,
+      json: () => Promise.resolve(response.body),
+    } as Response);
+  }
+
+  it('returns ok:true with parsed plan when server responds 200 with valid plan', async () => {
+    const plan: DesignPlan = {
+      rationale: 'A simple home.',
+      actions: [
+        { type: 'add_container', size: ContainerSize.HighCube40, position: { x: 0, y: 0, z: 0 } },
+      ],
+    };
+    mockFetch({ ok: true, status: 200, body: { plan } });
+    const result = await fetchDesignPlan('two-bedroom modern home');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.plan.rationale).toBe('A simple home.');
+      expect(result.plan.actions).toHaveLength(1);
+    }
+  });
+
+  it('returns ok:false when server returns 503 missing-API-key error', async () => {
+    mockFetch({
+      ok: false,
+      status: 503,
+      body: { error: 'ANTHROPIC_API_KEY is not set on the server.' },
+    });
+    const result = await fetchDesignPlan('any prompt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('ANTHROPIC_API_KEY');
+    }
+  });
+
+  it('returns ok:false when server returns 400 with no error string', async () => {
+    mockFetch({ ok: false, status: 400, body: {} });
+    const result = await fetchDesignPlan('any prompt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('400');
+    }
+  });
+
+  it('returns ok:false when server returns malformed plan (missing actions)', async () => {
+    mockFetch({
+      ok: true,
+      status: 200,
+      body: { plan: { rationale: 'No actions array.' } },
+    });
+    const result = await fetchDesignPlan('any prompt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('actions array');
+    }
+  });
+
+  it('returns ok:false when server returns plan without rationale', async () => {
+    mockFetch({
+      ok: true,
+      status: 200,
+      body: { plan: { actions: [] } },
+    });
+    const result = await fetchDesignPlan('any prompt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('rationale');
+    }
+  });
+
+  it('returns ok:false when fetch itself throws (network error)', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('connection refused'));
+    const result = await fetchDesignPlan('any prompt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('connection refused');
+    }
+  });
+
+  it('returns ok:false when response is not valid JSON', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.reject(new Error('Unexpected token <')),
+    } as Response);
+    const result = await fetchDesignPlan('any prompt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('non-JSON');
+    }
   });
 });

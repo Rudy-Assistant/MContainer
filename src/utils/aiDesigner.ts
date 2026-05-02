@@ -101,6 +101,51 @@ export function applyDesignPlan(plan: DesignPlan, store: StoreState): ApplyResul
   return { addedIds, warnings };
 }
 
+// ── Fetch wrapper ────────────────────────────────────────────────────────
+
+/**
+ * POST the user's prompt to /api/design and validate the response shape.
+ *
+ * Validation guards against silently passing malformed bodies into
+ * applyDesignPlan, which would otherwise dispatch on missing fields.
+ * Server errors (503 missing API key, 502 model failure, 400 bad
+ * request) surface as ok:false with the server's error message.
+ */
+export type FetchDesignPlanResult =
+  | { ok: true; plan: DesignPlan }
+  | { ok: false; error: string };
+
+export async function fetchDesignPlan(prompt: string): Promise<FetchDesignPlanResult> {
+  let res: Response;
+  try {
+    res = await fetch('/api/design', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt.trim() }),
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error.' };
+  }
+  let data: { plan?: unknown; error?: unknown };
+  try {
+    data = (await res.json()) as { plan?: unknown; error?: unknown };
+  } catch {
+    return { ok: false, error: `Server returned ${res.status} with non-JSON body.` };
+  }
+  if (!res.ok) {
+    const error = typeof data.error === 'string' ? data.error : `Server returned ${res.status}.`;
+    return { ok: false, error };
+  }
+  const plan = data.plan;
+  if (!plan || typeof plan !== 'object' || !Array.isArray((plan as { actions?: unknown }).actions)) {
+    return { ok: false, error: 'Server returned a malformed plan (missing actions array).' };
+  }
+  if (typeof (plan as { rationale?: unknown }).rationale !== 'string') {
+    return { ok: false, error: 'Server returned a malformed plan (missing rationale string).' };
+  }
+  return { ok: true, plan: plan as DesignPlan };
+}
+
 // ── Catalogs (re-exported for the API route's system prompt) ─────────────
 
 export const VALID_CONTAINER_SIZES: ContainerSize[] = [

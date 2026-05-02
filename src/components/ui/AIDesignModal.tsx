@@ -15,7 +15,7 @@
 import { useState } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { useStore } from '@/store/useStore';
-import { applyDesignPlan, type DesignPlan } from '@/utils/aiDesigner';
+import { applyDesignPlan, fetchDesignPlan, type DesignPlan } from '@/utils/aiDesigner';
 import { useExitTransition } from '@/hooks/useExitTransition';
 
 interface AIDesignModalProps {
@@ -44,17 +44,12 @@ export default function AIDesignModal({ open, onClose }: AIDesignModalProps) {
     setError(null);
     setLastPlan(null);
     try {
-      const res = await fetch('/api/design', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? 'Something went wrong.');
+      const fetched = await fetchDesignPlan(prompt);
+      if (!fetched.ok) {
+        setError(fetched.error);
         return;
       }
-      const plan = data.plan as DesignPlan;
+      const plan = fetched.plan;
       // Reset canvas before applying so the new design lands on a clean slate.
       // Veil the swap with the scene-fade so containers don't pop in and out
       // visibly — the new design appears as if it materialised through the wash.
@@ -68,8 +63,6 @@ export default function AIDesignModal({ open, onClose }: AIDesignModalProps) {
       if (result.warnings.length > 0) {
         setError(`Applied with ${result.warnings.length} warning(s):\n${result.warnings.join('\n')}`);
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Network error.');
     } finally {
       setLoading(false);
     }
