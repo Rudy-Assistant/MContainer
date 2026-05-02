@@ -346,7 +346,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 
 ## §6 Feature Status
 
-26/26 features at PRODUCTION quality. 42/42 Playwright gates PASS (verified 2026-05-02 against v0.2.0 + post-release fixes). See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
+27/27 features at PRODUCTION quality. 43/43 Playwright gates PASS (verified 2026-05-02 against v0.2.0 + post-release fixes; Extension Unpack Animations promoted PROTOTYPE→PRODUCTION via new G31-animations gate). See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
 
 | Feature | Rating |
 |---------|--------|
@@ -368,7 +368,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 | Staircase System | PRODUCTION |
 | Hotbar + Controls | PRODUCTION |
 | Ground + Atmosphere | PRODUCTION |
-| Extension Unpack Animations | PROTOTYPE |
+| Animation Lifecycle (Extension Unpack + Stair Telescope) | PRODUCTION |
 
 ---
 

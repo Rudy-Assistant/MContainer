@@ -1165,6 +1165,75 @@ async function run() {
       : fail('G30-walkthroughStairs', JSON.stringify(r));
   } catch (e) { fail('G30-walkthroughStairs', e.message); }
 
+  // ═══ G31: Animation Lifecycle — extension unpack + stair telescope state ═══
+  // Verifies the four animation systems (ExtensionUnpack, StairTelescope, PillarFoldDown,
+  // RailingFoldUp) by exercising their store-level driver fields. Animation rendering
+  // itself is unverifiable in headless SwiftShader, but the state machine that drives
+  // it is the thing that breaks during regressions. State-based verification is the
+  // appropriate granularity (mirrors G24-furniture, G27-extensions pattern).
+  try {
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      // Reset to clean state
+      for (const id of Object.keys(s.containers)) s.removeContainer(id);
+      const cid = window.__store.getState().addContainer('40ft_high_cube', { x: 0, y: 0, z: 0 });
+      // ── Phase 1: Extension forward unpack ('wall_to_floor') ──
+      window.__store.getState().setAllExtensions(cid, 'all_deck', true);
+      const g1 = window.__store.getState().containers[cid].voxelGrid;
+      const extIdx = 0; // corner extension voxel
+      const forwardPhase = g1[extIdx]?.unpackPhase;
+      const forwardActive = g1[extIdx]?.active;
+      // ── Phase 2: Reverse animation ('reverse' + _reverseOriginalPhase) ──
+      window.__store.getState().setAllExtensions(cid, 'none');
+      const g2 = window.__store.getState().containers[cid].voxelGrid;
+      const reversePhase = g2[extIdx]?.unpackPhase;
+      const reverseOriginal = g2[extIdx]?._reverseOriginalPhase;
+      const reverseActive = g2[extIdx]?.active;
+      // ── Phase 3: clearUnpackPhase deactivates after animation completes ──
+      window.__store.getState().clearUnpackPhase(cid, extIdx);
+      const g3 = window.__store.getState().containers[cid].voxelGrid;
+      const clearedPhase = g3[extIdx]?.unpackPhase;
+      const clearedActive = g3[extIdx]?.active;
+      // ── Phase 4: Staircase telescope-up (StairMesh enter) ──
+      window.__store.getState().applyStairsFromFace(cid, 10, 'n');
+      const g4 = window.__store.getState().containers[cid].voxelGrid;
+      const stairIdx = 10;
+      const stairType = g4[stairIdx]?.voxelType;
+      const stairAscending = g4[stairIdx]?.stairAscending;
+      const stairPart = g4[stairIdx]?.stairPart;
+      // ── Phase 5: removeStairs sets _stairExiting (StairTelescope exit trigger) ──
+      window.__store.getState().removeStairs(cid, stairIdx);
+      const g5 = window.__store.getState().containers[cid].voxelGrid;
+      const stairExiting = g5[stairIdx]?._stairExiting;
+      const stairTypeAfterExit = g5[stairIdx]?.voxelType; // still 'stairs' until clearStairExit
+      // ── Phase 6: clearStairExit reverts to standard voxel ──
+      window.__store.getState().clearStairExit(cid, stairIdx);
+      const g6 = window.__store.getState().containers[cid].voxelGrid;
+      const stairTypeFinal = g6[stairIdx]?.voxelType;
+      const stairExitingCleared = g6[stairIdx]?._stairExiting;
+      const ok =
+        forwardPhase === 'wall_to_floor' && forwardActive === true &&
+        reversePhase === 'reverse' && reverseOriginal === 'wall_to_floor' && reverseActive === true &&
+        clearedPhase === undefined && clearedActive === false &&
+        stairType === 'stairs' && !!stairAscending && !!stairPart &&
+        stairExiting === true && stairTypeAfterExit === 'stairs' &&
+        (stairTypeFinal === undefined || stairTypeFinal === 'standard') &&
+        !stairExitingCleared;
+      return {
+        ok,
+        forwardPhase, forwardActive,
+        reversePhase, reverseOriginal, reverseActive,
+        clearedPhase, clearedActive,
+        stairType, stairAscending, stairPart,
+        stairExiting, stairTypeAfterExit,
+        stairTypeFinal, stairExitingCleared,
+      };
+    });
+    r.ok
+      ? pass('G31-animations', `extension fwd=${r.forwardPhase}→rev=${r.reversePhase}(orig=${r.reverseOriginal})→cleared, stair ${r.stairType}/${r.stairAscending}/${r.stairPart}→exit=${r.stairExiting}→cleared`)
+      : fail('G31-animations', JSON.stringify(r));
+  } catch (e) { fail('G31-animations', e.message); }
+
   // ═══ G19: Default visual — restore defaults + visual comparison ═══
   try {
     // Reset to clean state

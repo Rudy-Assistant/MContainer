@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-02T19:19:53.634Z",
+  "timestamp": "2026-05-02T19:34:33.964Z",
   "sprint": 13,
   "gates": [
     {
@@ -35,7 +35,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "visual match (13.13% diff)"
+      "msg": "screenshot captured (no buffer for comparison)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.448, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.600, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.86, targetY=1.30, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=1.98, targetY=1.29, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=fc5653ab-4d21-436f-86d5-96f559c97580"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=3f92c3f2-8b4f-46f8-83d7-218f93c1b869"
     },
     {
       "gate": "G21-leftDragMove",
@@ -203,6 +203,11 @@
       "msg": "stairs=true, ascending=true, part=true, bom=$15700"
     },
     {
+      "gate": "G31-animations",
+      "status": "PASS",
+      "msg": "extension fwd=wall_to_floor→rev=reverse(orig=wall_to_floor)→cleared, stair stairs/s/lower→exit=true→cleared"
+    },
+    {
       "gate": "G19-defaultVisual",
       "status": "PASS",
       "msg": "default state restored via UI"
@@ -213,7 +218,7 @@
       "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 42,
-  "passed": 42,
+  "total": 43,
+  "passed": 43,
   "failed": 0
 }

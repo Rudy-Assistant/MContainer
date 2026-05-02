@@ -33,6 +33,7 @@ const FEATURE_GATES = {
   'Adjacency':           ['G28-adjacencyMerge'],
   'Blueprint':           ['G5-blueprintMode', 'G29-blueprintInteraction'],
   'Walkthrough':         ['G8-walkthrough', 'G8-fpWalking', 'G30-walkthroughStairs'],
+  'Animation Lifecycle': ['G31-animations'],
 };
 
 // Previously ungated features — now gated as of Sprint 13.
