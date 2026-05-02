@@ -63,3 +63,6 @@ gate-baselines/*
 verify-stack-bug-fix/
 verify-stack-bug-fix-BEFORE/
 verify-stack-bug-fix-AFTER/
+
+# Local QA scratch — visual-qa screenshots taken during development
+.qa/

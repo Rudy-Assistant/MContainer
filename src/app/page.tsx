@@ -19,6 +19,7 @@ import RecentItemsBar from "@/components/ui/RecentItemsBar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
 import FaceContextMenu from "@/components/ui/FaceContextMenu";
 import MaterialPaletteModal from "@/components/ui/MaterialPaletteModal";
+import AIDesignModal from "@/components/ui/AIDesignModal";
 // FormCatalog and SkinEditor replaced by unified BottomPanel (Sims-style drawer)
 import BottomPanel from "@/components/ui/BottomPanel";
 // Legacy GameHUD, Hotbar, StyleSelector removed in Phase 7
@@ -89,6 +90,7 @@ function GrabModeOverlay() {
 export default function Home() {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [aiDesignOpen, setAiDesignOpen] = useState(false);
   const viewMode = useStore((s) => s.viewMode);
   const isWalkthrough = viewMode === ViewMode.Walkthrough;
   const isPreviewMode = useStore((s) => s.isPreviewMode);
@@ -109,7 +111,11 @@ export default function Home() {
   return (
     <div className="flex flex-col w-screen h-screen bg-white">
       {/* Top Header Toolbar - Production Light Theme */}
-      <TopToolbar onOpenBudget={() => setBudgetOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
+      <TopToolbar
+        onOpenBudget={() => setBudgetOpen(true)}
+        onOpenPalette={() => setPaletteOpen(true)}
+        onOpenAiDesign={() => setAiDesignOpen(true)}
+      />
 
       {/* Workspace: Sidebar + (Canvas + BottomPanel) */}
       <div className="flex flex-1 min-h-0">
@@ -180,6 +186,9 @@ export default function Home() {
 
       {/* Material Palette Modal */}
       <MaterialPaletteModal open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+
+      {/* AI Design Modal — opened from primary toolbar button or Settings overflow */}
+      <AIDesignModal open={aiDesignOpen} onClose={() => setAiDesignOpen(false)} />
 
       {/* Detail Editor Modals */}
       <StructureEditorModal />

@@ -19,6 +19,7 @@ import {
   Redo2,
   Wand2,
   Sparkles,
+  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import WarningBadge from './WarningBadge';
@@ -32,9 +33,10 @@ import SettingsMenuControl from "./SettingsMenuControl";
 interface TopToolbarProps {
   onOpenBudget: () => void;
   onOpenPalette: () => void;
+  onOpenAiDesign: () => void;
 }
 
-export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarProps) {
+export default function TopToolbar({ onOpenBudget, onOpenPalette, onOpenAiDesign }: TopToolbarProps) {
   const viewMode = useStore((s) => s.viewMode);
   const setViewMode = useStore((s) => s.setViewMode);
   const designMode = useStore((s) => s.designMode);
@@ -130,6 +132,18 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
 
         <button onClick={openWizard} style={btn(true)} title="Quick Setup">
           <Wand2 size={15} />
+        </button>
+
+        {/* AI Designer — natural-language design brief → DesignPlan via Claude.
+            Promoted from the Settings overflow to a primary toolbar button so the
+            most-recently-shipped generative feature is one click deep instead of four. */}
+        <button
+          data-testid="btn-ai-design-toolbar"
+          onClick={onOpenAiDesign}
+          style={btn(true)}
+          title="AI Designer — describe a home, Claude lays it out"
+        >
+          <Bot size={15} />
         </button>
 
         {/* Smart Rules "Clean up design" — runs normalizeDesign in repair mode.
@@ -272,6 +286,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette }: TopToolbarPr
           setOpen={setDevToolsOpen}
           onOpen={() => setAppearanceOpen(false)}
           buttonStyle={btn(true)}
+          onOpenAiDesign={onOpenAiDesign}
         />
 
         {/* Old View Pill removed — now prominent tabs in ZONE B center */}

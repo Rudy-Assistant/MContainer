@@ -31,7 +31,6 @@ import { ContainerSize, ViewMode } from "@/types/container";
 import { buildShareUrl, buildEmbedSnippet } from "@/utils/shareUrl";
 import { downloadBlob } from "@/utils/downloadBlob";
 import QuoteRequestModal from "./QuoteRequestModal";
-import AIDesignModal from "./AIDesignModal";
 import BuildingPerformanceModal from "./BuildingPerformanceModal";
 
 // Heavy utilities are lazy-imported on first click — keeps them out of the
@@ -48,9 +47,12 @@ interface SettingsMenuControlProps {
   setOpen: (open: boolean) => void;
   onOpen: () => void;
   buttonStyle: CSSProperties;
+  /** Opens the AI Designer modal — owned by page.tsx so the primary toolbar
+   *  button and the Settings overflow entry share a single mount. */
+  onOpenAiDesign: () => void;
 }
 
-export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle }: SettingsMenuControlProps) {
+export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle, onOpenAiDesign }: SettingsMenuControlProps) {
   const selection = useStore((s) => s.selection);
   const containers = useStore((s) => s.containers);
   const removeContainer = useStore((s) => s.removeContainer);
@@ -59,7 +61,6 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
   const exportState = useStore((s) => s.exportState);
   const importState = useStore((s) => s.importState);
   const [quoteOpen, setQuoteOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
   const [perfOpen, setPerfOpen] = useState(false);
   // Keep the settings dropdown mounted briefly after `open` flips false so
   // the dropdown-out CSS animation can play before unmount.
@@ -251,7 +252,7 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
 
           <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 10px 2px" }}>Actions</div>
           {[
-            { label: "AI Design…", action: () => { setAiOpen(true); setOpen(false); }, enabled: !isWalkthrough, Icon: Sparkles, testId: "btn-ai-design" },
+            { label: "AI Design…", action: () => { onOpenAiDesign(); setOpen(false); }, enabled: !isWalkthrough, Icon: Sparkles, testId: "btn-ai-design" },
             { label: "Delete Selected", action: handleDelete, enabled: hasSelection && !isWalkthrough, Icon: Trash2 },
             { label: "Rotate 90°", action: () => selection.forEach((id) => { const c = containers[id]; if (c) updateContainerRotation(id, (c.rotation ?? 0) + Math.PI / 2); }), enabled: hasSelection && !isWalkthrough, Icon: RotateCw },
             { label: "Share URL", action: () => { const url = buildShareUrl(containers); navigator.clipboard.writeText(url).then(() => alert("Copied!")); }, enabled: Object.keys(containers).length > 0, Icon: Share2 },
@@ -306,7 +307,6 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
         </div>
       )}
       <QuoteRequestModal open={quoteOpen} onClose={() => setQuoteOpen(false)} />
-      <AIDesignModal open={aiOpen} onClose={() => setAiOpen(false)} />
       <BuildingPerformanceModal open={perfOpen} onClose={() => setPerfOpen(false)} />
     </div>
   );
