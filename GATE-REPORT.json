@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-30T19:31:35.052Z",
+  "timestamp": "2026-05-02T19:19:53.634Z",
   "sprint": 13,
   "gates": [
     {
@@ -35,7 +35,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (13.13% diff)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.400, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.448, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.83, targetY=1.29, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=1.86, targetY=1.30, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=9a6c58ab-ccd0-41d6-86a5-81eaf1c13972"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=fc5653ab-4d21-436f-86d5-96f559c97580"
     },
     {
       "gate": "G21-leftDragMove",

@@ -1,6 +1,7 @@
 # ModuHome V1 — Architecture Reference
 
-> Updated 2026-03-14. Rebuilt from code audit + Playwright regression (23/23 PASS).
+> Updated 2026-05-02. Rebuilt from code audit + Playwright regression (23/23 PASS).
+> Refreshed for v0.2.0 (hinged-wall animations + four-overlay pattern).
 > Previous versions preserved as historical record.
 
 ---
@@ -158,17 +159,25 @@ Centralized phase classification for all time-dependent systems:
 - `getHdriFile(t)` — selects bundled HDRI by time bracket
 - `getLightIntensity(t)` — interior light intensity curve
 
-### ContainerSkin.tsx (~2500 lines)
+### ContainerSkin.tsx (~5300 lines)
 
 Per-voxel renderer. For each active voxel, renders up to 6 face planes (N/S/E/W/Top/Bottom) + hitbox meshes. Materials come from `_themeMats` via module-level aliases (`mSteel`, `mGlass`, etc.) synced per render via `syncThemeMats(theme)`.
 
-Special renderers: `StairMesh` (6/3 treads + risers + railings), `DoorFace` (animated swing/slide).
+Special renderers:
+- `StairMesh` (6/3 treads + risers + railings)
+- `DoorFace` (animated swing/slide; 12 templates × 11 skins)
+- `WindowFace` (12 templates × 7 skins; per-template animation: casement swing, awning/hopper/tilt-turn tilt, sliding pane translate, double-hung sash, jalousie louvres)
+- `HalfFoldFace` + `GullWingFace` (Half_Fold + Gull_Wing surfaces, panels inside pivot `<group>`s driven by `useFrame` lerping toward `hingedConfig.openAmount`; `hingedBottomSign` helper encodes the s=−1 / n=+1 / e=+1 / w=−1 fold-direction convention)
+- Animation lifecycle components: `ExtensionUnpack` (phase chain wall→floor/ceiling, floor_slide, walls_deploy + reverse), `StairTelescope` (Y-scale 0→1 from ceiling anchor + isExiting), `PillarFoldDown` (rotate Z ±90°→0), `RailingFoldUp` (rotate from floor edge upward)
+- Overlay components (composited after the SurfaceType node via `<>{surfaceNode}{overlay}</>`): `ShelfFace` (8 templates), `CabinetFace` (10 templates × 13 skins, animated doors swing 95°, drawers translate 85% body depth, single useFrame loop with settle guard), `FixtureFace` (16 templates: 8 appliances + 8 bathroom; fixtures with `hasOpeningDoor` animate via `fixtureConfig.openAmount`), `DecorFace` (11 templates × 7 frame palettes)
+- Shared `OverlayMount` wrapper handles inward-face-normal positioning + vertical anchor (top/mid/bottom)
+- Cosmetic emissive lighting (no real point lights): under-cabinet LED, glass-display interior glow, decor picture light. Mirror skins (`mirror_silver`, `bronze_mirror`) use high-metalness/low-roughness IBL reflection.
 
-### ContainerMesh.tsx (~2500 lines)
+### ContainerMesh.tsx (~2800 lines)
 
-Orchestrates per-container rendering: bay walls (legacy), furniture GLBs via `useGLTF`, hover highlights, interior glow (activates at dawn/dusk when glass faces present).
+Orchestrates per-container rendering: bay walls (legacy, disabled in Phase 1 to eliminate Z-fighting; replaced by `ContainerSkin` voxel skin), furniture GLBs via `useGLTF`, hover highlights, interior glow (activates at dawn/dusk when glass faces present). The Phase 4 hinged-wall TODO (formerly at line ~2768) is now closed — fold animations live inside `ContainerSkin` via `hingedConfig`.
 
-### Scene.tsx (~1700 lines)
+### Scene.tsx (~2300 lines)
 
 Scene graph for all three view modes:
 - **RealisticScene**: Sky (Preetham atmospheric), TimeOfDayEnvironment (bundled HDRIs or CubeCamera on High), SunLight (PCFSoftShadow, quality-dependent shadow map), GroundManager, SceneFog (adaptive near/far), InteriorLights, PostProcessingStack (N8AO + Bloom + ToneMapping ACESFilmic)
@@ -179,9 +188,9 @@ Scene graph for all three view modes:
 
 Ground presets with per-preset texture filename overrides. Grass uses ambientCG 1K set (Color, NormalGL, Roughness, Displacement, AO). Other presets (concrete/gravel/dirt) use generic `color.jpg`/`normal.jpg`/`roughness.jpg`. All presets have ErrorBoundary fallback to solid color + procedural displacement. Random UV rotation per session breaks visible tiling.
 
-### WalkthroughControls.tsx (1182 lines)
+### WalkthroughControls.tsx (~1250 lines)
 
-Built on drei `<PointerLockControls>`. Adds: voxel-granular wall collision, floor detection with stair support, auto-tour (interior + exterior waypoints), smart spawn, door toggling, camera save/restore, fly mode. **Not a candidate for replacement.**
+Built on drei `<PointerLockControls>`. Adds: voxel-granular wall collision, floor detection with stair support, auto-tour (interior + exterior waypoints), smart spawn, door toggling, camera save/restore, fly mode. Respects all four wall-feature overlays — cabinets and fixtures block movement (~0.5m collision box extending into the room), mid- and bottom-anchor shelves block (top-anchor shelves above head height pass through), decor (flat against wall) is passable. **Not a candidate for replacement.**
 
 ### Camera System (Scene.tsx)
 
@@ -212,20 +221,40 @@ interface Voxel {
   type: 'core' | 'deck' | 'roof';
   faces: VoxelFaces;              // { top, bottom, n, s, e, w } — each a SurfaceType
   voxelType?: 'standard' | 'stairs';
-  stairDir?: 'ns' | 'ew';
-  stairAscending?: 'n' | 's' | 'e' | 'w';
+  stairAscending?: 'n' | 's' | 'e' | 'w';   // canonical; stairDir is DEPRECATED
   stairPart?: 'lower' | 'upper' | 'single';
-  doorState?: 'closed' | 'open_swing' | 'open_slide';
+  openFaces?:  Partial<Record<keyof VoxelFaces, boolean>>;
+  doorStates?: Partial<Record<keyof VoxelFaces, DoorState>>;          // closed / open_swing / open_slide
 
-  // Per-face configs — selected via the Walls tab template picker.
-  doorConfig?:    Partial<Record<keyof VoxelFaces, DoorConfig>>;     // template + skin + state
-  windowConfig?:  Partial<Record<keyof VoxelFaces, WindowConfig>>;   // template + skin + openAmount
+  // Per-face configs — selected via the Walls tab template picker (surface-gated).
+  doorConfig?:    Partial<Record<keyof VoxelFaces, DoorConfig>>;      // 12 templates × 11 skins + state
+  windowConfig?:  Partial<Record<keyof VoxelFaces, WindowConfig>>;    // 12 templates × 7 skins + openAmount
+  hingedConfig?:  Partial<Record<keyof VoxelFaces, HingedConfig>>;    // Half_Fold + Gull_Wing { openAmount: 0..1 }
 
-  // Per-face OVERLAYS — render ON TOP of the SurfaceType (wall stays intact).
-  shelfConfig?:   Partial<Record<keyof VoxelFaces, ShelfConfig>>;    // bookshelves, floating shelves
-  cabinetConfig?: Partial<Record<keyof VoxelFaces, CabinetConfig>>;  // kitchen / bath cabinets, dressers
-  fixtureConfig?: Partial<Record<keyof VoxelFaces, FixtureConfig>>;  // appliances + bathroom fixtures
-  decorConfig?:   Partial<Record<keyof VoxelFaces, DecorConfig>>;    // pictures, mirrors, TVs, clocks
+  // Per-face OVERLAYS — render ON TOP of the SurfaceType (wall stays intact, category-gated).
+  shelfConfig?:   Partial<Record<keyof VoxelFaces, ShelfConfig>>;     // 8 templates (static)
+  cabinetConfig?: Partial<Record<keyof VoxelFaces, CabinetConfig>>;   // 10 templates × 13 skins, animated doors+drawers, +counter top, +under-cabinet LED
+  fixtureConfig?: Partial<Record<keyof VoxelFaces, FixtureConfig>>;   // 16 templates (8 appliances + 8 bathroom)
+  decorConfig?:   Partial<Record<keyof VoxelFaces, DecorConfig>>;     // 11 templates × 7 frame palettes, +picture light
+
+  // Voxel-level overlays — keyed by face for symmetry, but only one face is meaningful.
+  floorOverlay?:   Partial<Record<keyof VoxelFaces, FloorOverlayConfig>>;    // rugs, runners (uses 'bottom')
+  ceilingOverlay?: Partial<Record<keyof VoxelFaces, CeilingOverlayConfig>>;  // fans, pendants, recessed grids, beams (uses 'top')
+
+  // Smart-stair tracking + user-painted preservation
+  userPaintedFaces?: Partial<Record<keyof VoxelFaces, boolean>>;
+  _smartStairChanges?: SmartStairChanges;
+
+  // Ephemeral animation state — stripped in partialize, never persisted to IDB.
+  unpackPhase?: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy' | 'reverse';
+  _reverseOriginalPhase?: 'wall_to_floor' | 'wall_to_ceiling' | 'floor_slide' | 'walls_deploy';
+  _stairExiting?: boolean;
+
+  // Theme-override + room metadata
+  faceFinishes?: FaceFinishes;
+  roomTag?: string;
+  moduleId?: string;
+  moduleOrientation?: ModuleOrientation;
 }
 ```
 
@@ -235,12 +264,14 @@ The renderer dispatches a face's appearance through three distinct mechanisms:
 
 | Pattern | Where | Examples | How rendered |
 |---------|-------|----------|--------------|
-| **SurfaceType replacement** | `voxel.faces[face]` | `Door`, `Window_Standard`, `Glass_Pane`, `Solid_Steel` | The face becomes that surface; the wall behind is gone. |
-| **Per-face config (surface-gated)** | `voxel.doorConfig?.[face]`, `voxel.windowConfig?.[face]` | Door template + skin, Window template + skin + openAmount | Augments a SurfaceType-replacing surface (`Door` or `Window_*`) with template/skin/animation. |
+| **SurfaceType replacement** | `voxel.faces[face]` | `Door`, `Window_Standard`, `Glass_Pane`, `Solid_Steel`, `Half_Fold`, `Gull_Wing` | The face becomes that surface; the wall behind is gone. |
+| **Per-face config (surface-gated)** | `voxel.doorConfig?.[face]`, `voxel.windowConfig?.[face]`, `voxel.hingedConfig?.[face]` | Door template + skin + state, Window template + skin + openAmount, Hinged-wall openAmount | Augments a SurfaceType-replacing surface (`Door`, `Window_*`, `Half_Fold`, `Gull_Wing`) with template/skin/animation. `setHingedConfig` clamps openAmount to [0,1], merges partial updates, removes entry on null. |
 | **Per-face overlay (category-gated)** | `voxel.shelfConfig`, `cabinetConfig`, `fixtureConfig`, `decorConfig` | Bookshelves, kitchen cabinets, fridges, picture frames, TVs | Renders ON TOP of whatever SurfaceType the face has. Wall stays intact behind. Counter tops, under-cabinet LEDs, picture lights are sub-options on these configs. |
+| **Voxel-level overlay** | `voxel.floorOverlay`, `voxel.ceilingOverlay` | Rugs/runners (floor), fans/pendants/recessed grids/beams (ceiling) | Keyed by face for symmetry, but only `'bottom'` is meaningful for floor and `'top'` for ceiling. |
 
 **Picker dispatch** (in `WallsTab.tsx`):
 - Door + Window pickers are **surface-gated** (appear when the face's SurfaceType matches).
+- Hinged-wall picker (`HingedToggle` → two `PresetCard`s: Closed / Open) is surface-gated — appears when the selected face's surface is `Half_Fold` or `Gull_Wing`. Multi-voxel selections apply the toggle to every voxel in `indices` so a row of fold-walls opens together. Click on either card calls `setHingedConfig` with target openAmount only when target differs from current state (no thrash on already-active clicks).
 - Shelf/Cabinet/Fixture/Decor pickers are **category-gated** (appear when the user clicks the corresponding category chip in `CategoryRow`).
 
 **Renderer entry point** (in `ContainerSkin.tsx`):
@@ -315,7 +346,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 
 ## §6 Feature Status
 
-26/26 features at PRODUCTION quality (Sprint 13). 39/39 Playwright gates PASS. See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
+26/26 features at PRODUCTION quality. 42/42 Playwright gates PASS (verified 2026-05-02 against v0.2.0 + post-release fixes). See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
 
 | Feature | Rating |
 |---------|--------|
