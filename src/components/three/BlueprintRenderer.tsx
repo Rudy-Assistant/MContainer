@@ -183,8 +183,30 @@ function VoxelBlueprintGrid({
   const setSelectedElements = useStore((s) => s.setSelectedElements);
   const select           = useStore((s) => s.select);
   const setHoveredVoxel  = useStore((s) => s.setHoveredVoxel);
+  const setVoxelFace     = useStore((s) => s.setVoxelFace);
+  const setActiveBrush   = useStore((s) => s.setActiveBrush);
   const selectedVoxel    = useSelectedVoxel();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  // BP face paint: clicking an edge paints n/s/e/w; clicking the center paints
+  // bottom (the floor surface visible in top-down view). Alt+click acts as
+  // eyedropper, mirroring ContainerSkin.onClickEdge in 3D mode.
+  const paintFaceFromActiveBrush = useCallback(
+    (idx: number, face: keyof import('@/types/container').VoxelFaces, e: ThreeEvent<MouseEvent>) => {
+      if (e.nativeEvent.altKey) {
+        const v = useStore.getState().containers[container.id]?.voxelGrid?.[idx];
+        if (v) setActiveBrush(v.faces[face]);
+        return true;
+      }
+      const activeBrush = useStore.getState().activeBrush as SurfaceType | null;
+      if (!activeBrush) return false;
+      select(container.id);
+      setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
+      setVoxelFace(container.id, idx, face, activeBrush);
+      return true;
+    },
+    [container.id, select, setActiveBrush, setSelectedElements, setVoxelFace]
+  );
 
   const grid: Voxel[] = container.voxelGrid ?? [];
 
@@ -249,13 +271,42 @@ function VoxelBlueprintGrid({
               />
             )}
 
-            {/* Hit mesh — above floor click target so voxel wins */}
+            {/* Edge hit meshes — n/s/e/w wall faces. Painted when activeBrush
+                is set; otherwise fall through to the center hit mesh below. */}
+            {(['n', 's', 'e', 'w'] as const).map((dir) => {
+              const isNS     = dir === 'n' || dir === 's';
+              const edgeSign = (dir === 's' || dir === 'e') ? 1 : -1;
+              const edgeX    = isNS ? px : px + edgeSign * (voxW / 2 - BPV_EDGE / 2);
+              const edgeZ    = isNS ? pz + edgeSign * (voxD / 2 - BPV_EDGE / 2) : pz;
+              const hitW     = isNS ? voxW : BPV_EDGE * 3;
+              const hitH     = isNS ? BPV_EDGE * 3 : voxD;
+              return (
+                <mesh
+                  key={`hit-${dir}`}
+                  position={[edgeX, Y + 0.005, edgeZ]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  renderOrder={1003}
+                  onClick={(e: ThreeEvent<MouseEvent>) => {
+                    if (paintFaceFromActiveBrush(idx, dir, e)) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  <planeGeometry args={[hitW, hitH]} />
+                  <meshBasicMaterial transparent opacity={0.001} depthWrite={false} depthTest={false} />
+                </mesh>
+              );
+            })}
+
+            {/* Center hit mesh — selection by default; paints .bottom (floor)
+                when activeBrush is set, mirroring 3D top-face paint behavior. */}
             <mesh
               position={[px, Y + 0.004, pz]}
               rotation={[-Math.PI / 2, 0, 0]}
               renderOrder={1001}
               onClick={(e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
+                if (paintFaceFromActiveBrush(idx, 'bottom', e)) return;
                 select(container.id, e.nativeEvent.shiftKey);
                 setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
               }}
