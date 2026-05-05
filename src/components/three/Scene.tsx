@@ -55,6 +55,7 @@ import XRLocomotion from "./XRLocomotion";
 import FloorGrid from "./FloorGrid";
 import DebugOverlay from "./DebugOverlay";
 import StaircaseGhost from "./StaircaseGhost";
+import { RendererReadyGate } from '@/components/system/RendererReadyGate';
 // FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats, rebuildThemeMaterials } from "@/config/materialCache";
 import { initKTX2Loader } from '../../config/textureLoader';
@@ -108,7 +109,7 @@ function hasOrbitTarget(value: unknown): value is { target: THREE.Vector3 } {
 // ── Sun Position Calculator ─────────────────────────────────
 
 function useSunPosition() {
-  const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const timeOfDay = Number(useStore((s) => s.environment.timeOfDay));
   const northOffset = useStore((s) => s.environment.northOffset);
 
   return useMemo(() => {
@@ -127,7 +128,7 @@ function useSunPosition() {
 
 function SunLight() {
   const sunPos = useSunPosition();
-  const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const timeOfDay = Number(useStore((s) => s.environment.timeOfDay));
   const qualityPreset = useStore((s) => s.qualityPreset);
   const shadowMapSize = QUALITY_PRESETS[qualityPreset].shadowMapSize;
 
@@ -431,7 +432,9 @@ function TimeOfDayEnvironmentInner({ intensity = 0.4 }: { intensity?: number }) 
 function TimeOfDayEnvironment({ intensity = 0.4 }: { intensity?: number }) {
   return (
     <Suspense fallback={null}>
-      <TimeOfDayEnvironmentInner intensity={intensity} />
+      <RendererReadyGate>
+        <TimeOfDayEnvironmentInner intensity={intensity} />
+      </RendererReadyGate>
     </Suspense>
   );
 }
@@ -530,6 +533,7 @@ function getFogParams(t: number) {
 export function getSkyParams(timeOfDay: number) {
   const goldenHour = isGoldenHourTime(timeOfDay);
   const deepTwilight = isDeepTwilightTime(timeOfDay);
+
   return {
     rayleigh: deepTwilight ? 3.0 : goldenHour ? 2.4 : 2.8,
     turbidity: deepTwilight ? 5.0 : goldenHour ? 2.5 : 1.1,
@@ -552,7 +556,7 @@ export function getSkyParams(timeOfDay: number) {
 
 function SkyDome() {
   const sunPos = useSunPosition();
-  const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const timeOfDay = Number(useStore((s) => s.environment.timeOfDay));
   const scene = useThree((s) => s.scene);
 
   // Compute background color for current time of day
@@ -604,7 +608,7 @@ function SkyDome() {
 // ── Scene Fog (time-adaptive) ───────────────────────────────
 
 function SceneFog() {
-  const timeOfDay = useStore((s) => s.environment.timeOfDay);
+  const timeOfDay = Number(useStore((s) => s.environment.timeOfDay));
   const fogRef = useRef<THREE.Fog>(null);
   const fog = getFogParams(timeOfDay);
 

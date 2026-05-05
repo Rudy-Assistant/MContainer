@@ -47,60 +47,7 @@ class PostProcessingBoundary extends Component<{ children: ReactNode }, EBState>
   }
 }
 
-/**
- * RendererReadyGate — defers child mount until the WebGL context is fully
- * initialized AND not lost. Without this, EffectComposer can read
- * `renderer.getContext().getContextAttributes()` while the underlying
- * context is still null, throwing "Cannot read properties of null
- * (reading 'alpha')" — verified bug in postprocessing v6.x against
- * @react-three/postprocessing v3.0.4.
- */
-function RendererReadyGate({ children }: { children: ReactNode }) {
-  const gl = useThree((s) => s.gl);
-  const [ready, setReady] = useState(() => {
-    // Best-effort sync check on first render
-    try {
-      const ctx = gl.getContext();
-      const attrs = ctx?.getContextAttributes?.();
-      return !!attrs && !ctx.isContextLost();
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    if (ready) return;
-    let cancelled = false;
-    const tryReady = () => {
-      if (cancelled) return;
-      try {
-        const ctx = gl.getContext();
-        const attrs = ctx?.getContextAttributes?.();
-        if (attrs && !ctx.isContextLost()) {
-          setReady(true);
-          return;
-        }
-      } catch { /* keep polling */ }
-      requestAnimationFrame(tryReady);
-    };
-    requestAnimationFrame(tryReady);
-
-    // Also recover from context loss/restored at runtime
-    const canvas = gl.domElement;
-    const onLost = (e: Event) => { e.preventDefault(); setReady(false); };
-    const onRestored = () => setReady(true);
-    canvas.addEventListener('webglcontextlost', onLost);
-    canvas.addEventListener('webglcontextrestored', onRestored);
-    return () => {
-      cancelled = true;
-      canvas.removeEventListener('webglcontextlost', onLost);
-      canvas.removeEventListener('webglcontextrestored', onRestored);
-    };
-  }, [ready, gl]);
-
-  if (!ready) return null;
-  return <>{children}</>;
-}
+import { RendererReadyGate } from '@/components/system/RendererReadyGate';
 
 // ── N8AO config ──────────────────────────────────────────────
 const N8AO_CONFIG = {

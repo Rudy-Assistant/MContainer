@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 
+import { useStore } from '@/store/useStore';
+import { ViewMode } from '@/types/container';
+
 // 5 axes: +Y, +X, -X, +Z, -Z (no -Y — looking up from underground is useless).
 // Labels: +Y is UP, horizontal axes carry compass letters so the gizmo
 // functions as both a camera snapper AND a cardinal-direction reference.
@@ -34,12 +37,14 @@ export default function OrientationGizmo({ cameraQuaternionRef, onSnapToAxis }: 
   const [hoveredAxis, setHoveredAxis] = useState<string | null>(null);
   const [projections, setProjections] = useState<{ id: string; label: string; x: number; y: number; positive: boolean; dir: readonly [number, number, number] }[]>([]);
 
-  // Project axis directions using inverse camera quaternion each frame
+  // Project axis directions using inverse camera orientation each frame
   useEffect(() => {
     let raf: number;
     const tmpV = new THREE.Vector3();
     const tmpQ = new THREE.Quaternion();
     const lastQ = new THREE.Quaternion();
+    const camDir = new THREE.Vector3();
+    const dummyCam = new THREE.PerspectiveCamera();
 
     const update = () => {
       const q = cameraQuaternionRef.current;
@@ -49,7 +54,18 @@ export default function OrientationGizmo({ cameraQuaternionRef, onSnapToAxis }: 
       if (lastQ.equals(q)) { raf = requestAnimationFrame(update); return; }
       lastQ.copy(q);
 
-      tmpQ.copy(q).invert();
+      const viewMode = useStore.getState().viewMode;
+      
+      if (viewMode === ViewMode.Walkthrough) {
+        // In FPV, project world axes based on camera's look direction
+        dummyCam.quaternion.copy(q);
+        dummyCam.updateMatrixWorld();
+        tmpQ.copy(dummyCam.quaternion).invert();
+      } else {
+        // In Orbit mode, use the existing quaternion logic
+        tmpQ.copy(q).invert();
+      }
+
       const pts = AXES.map(axis => {
         tmpV.set(axis.dir[0], axis.dir[1], axis.dir[2]).applyQuaternion(tmpQ);
         return {

@@ -167,19 +167,38 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Instructions */}
+              {/* Polished Instructions */}
               <div
-                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 rounded-lg px-4 py-2 pointer-events-none"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-6 px-6 py-3 pointer-events-none"
                 style={{
-                  background: "rgba(0, 0, 0, 0.5)",
-                  backdropFilter: "blur(8px)",
+                  background: "rgba(15, 23, 42, 0.4)",
+                  backdropFilter: "blur(12px)",
+                  borderRadius: "100px",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
                 }}
               >
-                <span className="text-[11px] text-white/80">
-                  WASD move · Arrows look · Mouse look · Shift sprint · Q/Z fly up/down · Click/Space cycle panel · E preset · O open/close door · Right-click menu · T tour · ESC exit
-                </span>
-              </div>
-            </>
+                <div className="flex items-center gap-3">
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-bold text-white/90">WASD</span>
+                  <span className="text-[11px] font-medium text-white/70">Move</span>
+                </div>
+                <div className="flex items-center gap-3 border-l border-white/10 pl-6">
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-bold text-white/90">MOUSE</span>
+                  <span className="text-[11px] font-medium text-white/70">Look</span>
+                </div>
+                <div className="flex items-center gap-3 border-l border-white/10 pl-6">
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-bold text-white/90">SPACE</span>
+                  <span className="text-[11px] font-medium text-white/70">Interact</span>
+                </div>
+                <div className="flex items-center gap-3 border-l border-white/10 pl-6">
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-bold text-white/90">T</span>
+                  <span className="text-[11px] font-medium text-white/70">Auto-Tour</span>
+                </div>
+                <div className="flex items-center gap-3 border-l border-white/10 pl-6">
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-bold text-white/90">ESC</span>
+                  <span className="text-[11px] font-medium text-white/70">Exit</span>
+                </div>
+              </div>            </>
           )}
         </div>
       </div>

@@ -525,31 +525,32 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       if (!container?.voxelGrid) return {};
       const grid = [...container.voxelGrid];
       const saved: Record<string, SurfaceType> = {};
-      const isDeck = config !== 'all_interior';
-      const doorFace: SurfaceType = isDeck ? 'Door' : 'Open';
+      const isInterior = config === 'all_interior' || config === 'all_glass_interior';
+      const isDeck = !isInterior;
+      const doorFace: SurfaceType = isInterior ? 'Open' : 'Door';
 
       // Map: extension zone → body row/col + face direction
       const boundaries: Array<{ row: number; col: number; face: keyof VoxelFaces; extRow: number; extCol: number }> = [];
 
-      if (config === 'all_deck' || config === 'all_interior' || config === 'north_deck') {
+      if (config === 'all_deck' || isInterior || config === 'north_deck') {
         // Row 0 ext → Row 1 body, north face
         for (let col = 1; col <= 6; col++) {
           boundaries.push({ row: 1, col, face: 'n', extRow: 0, extCol: col });
         }
       }
-      if (config === 'all_deck' || config === 'all_interior' || config === 'south_deck') {
+      if (config === 'all_deck' || isInterior || config === 'south_deck') {
         // Row 3 ext → Row 2 body, south face
         for (let col = 1; col <= 6; col++) {
           boundaries.push({ row: 2, col, face: 's', extRow: 3, extCol: col });
         }
       }
-      if (config === 'all_deck' || config === 'all_interior' || config === 'west_deck') {
+      if (config === 'all_deck' || isInterior || config === 'west_deck') {
         // Col 0 ext → Col 1 body, west face
         for (let row = 1; row <= 2; row++) {
           boundaries.push({ row, col: 1, face: 'w', extRow: row, extCol: 0 });
         }
       }
-      if (config === 'all_deck' || config === 'all_interior' || config === 'east_deck') {
+      if (config === 'all_deck' || isInterior || config === 'east_deck') {
         // Col 7 ext → Col 6 body, east face
         for (let row = 1; row <= 2; row++) {
           boundaries.push({ row, col: 6, face: 'e', extRow: row, extCol: 7 });
