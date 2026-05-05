@@ -18,11 +18,12 @@ import {
   type ExtensionConfig,
   type Zone,
   ViewMode,
+  CONTAINER_DIMENSIONS,
+  DEFAULT_EXTENSION_CONFIG,
 } from '@/types/container';
-import { createDefaultVoxelGrid } from '@/types/factories';
+import { createDefaultVoxelGrid, createPoolVoxelGrid } from '@/types/factories';
 import defaultPricing from '@/config/pricing_config.json';
 import { getModelHome } from '@/config/modelHomes';
-import { DEFAULT_EXTENSION_CONFIG } from '@/types/container';
 import { scheduleAdjacency } from '@/store/slices/containerSlice';
 import type { HotbarSlot } from '../useStore';
 import type { SliceGet, SliceSet } from './types';
@@ -383,6 +384,29 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         y: origin[1] + mc.relativePosition[1],
         z: origin[2] + mc.relativePosition[2],
       };
+
+      // Pool slots are placed differently: subterranean basin with concrete
+      // walls + open top water surface. Mirrors addPoolContainer() exactly,
+      // but at the slot's relativePosition rather than [0,0,0].
+      if (mc.pool) {
+        const dims = CONTAINER_DIMENSIONS[mc.size];
+        const poolPos: ContainerPosition = { x: pos.x, y: -dims.height, z: pos.z };
+        const id = get().addContainer(mc.size, poolPos, 0, true);
+        t?.pause();
+        set((s) => {
+          const c = s.containers[id];
+          if (!c) return {};
+          return {
+            containers: {
+              ...s.containers,
+              [id]: { ...c, subterranean: true, voxelGrid: createPoolVoxelGrid(), name: 'Pool' },
+            },
+          };
+        });
+        containerIds.push(id);
+        continue; // skip role/extension/arrangement/door/furniture for pool slots
+      }
+
       const id = get().addContainer(mc.size, pos, Math.round(pos.y / 2.9), true);
       t?.pause();
       containerIds.push(id);

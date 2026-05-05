@@ -35,6 +35,7 @@ const FEATURE_GATES = {
   'Walkthrough':         ['G8-walkthrough', 'G8-fpWalking', 'G30-walkthroughStairs'],
   'Animation Lifecycle': ['G31-animations'],
   'AI Designer':         ['G32-aiDesigner'],
+  'Blueprint Authoring': ['G33-resortHouse'],
 };
 
 // Previously ungated features — now gated as of Sprint 13.

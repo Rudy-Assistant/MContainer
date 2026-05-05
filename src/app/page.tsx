@@ -12,6 +12,7 @@ import StructureEditorModal from "@/components/ui/StructureEditorModal";
 import FloorDetailModal from "@/components/ui/FloorDetailModal";
 import ContainerContextMenu from "@/components/ui/ContainerContextMenu";
 import LevelSlicer from "@/components/ui/LevelSlicer";
+import BlueprintLevelChips from "@/components/ui/BlueprintLevelChips";
 import FaceFilterWidget from "@/components/ui/FaceFilterWidget";
 import TopToolbar from "@/components/ui/TopToolbar";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
@@ -136,6 +137,10 @@ export default function Home() {
 
           {/* Level Selector — hidden in FPV where level navigation is irrelevant */}
           {!isWalkthrough && <LevelSlicer />}
+
+          {/* Blueprint level chip strip — always-visible top-center bar, only
+              in Blueprint mode where stacked containers occlude in plan view. */}
+          {viewMode === ViewMode.Blueprint && <BlueprintLevelChips />}
 
           {/* Face filter widget — restrict pointer events to roof / walls / floor */}
           {!isWalkthrough && !isPreviewMode && <FaceFilterWidget />}

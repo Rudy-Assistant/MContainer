@@ -729,6 +729,10 @@ function MarqueeSelect({ containers }: { containers: Container[] }) {
 }
 
 // ── Main Blueprint Scene ────────────────────────────────────
+// Blueprint Level Chips strip lives in src/components/ui/BlueprintLevelChips
+// and is mounted from page.tsx as a sibling of SceneCanvas — it can't live
+// inside the Canvas tree because R3F's reconciler interprets intrinsic JSX
+// (`<span>`, etc.) as THREE primitives.
 export default function BlueprintRenderer() {
   const containers = useStore((s) => s.containers);
   const zones      = useStore((s) => s.zones);

@@ -32,6 +32,14 @@ export interface ModelHomeContainer {
    *  Each item is added via `addFurniture` so it appears in the BOM and renders
    *  in 3D. Positions are LOCAL to the container origin. */
   furniture?: ModelHomePresetFurniture[];
+  /** When true, this slot is a Pool Container — placed below ground (Y is
+   *  forced to -dims.height regardless of relativePosition[1]) with
+   *  `subterranean: true` and a concrete-walled basin voxel grid (open top
+   *  for the water surface). Role / arrangement / extension / entryDoor /
+   *  furniture fields are IGNORED for pool slots; pool semantics override
+   *  them. Used by the Resort House preset to embed an indoor pool below
+   *  the ground-floor atrium. */
+  pool?: boolean;
 }
 
 export interface ModelHomeConnection {
@@ -873,6 +881,106 @@ export const MODEL_HOMES: ModelHome[] = [
       { containerIndex: 4, voxelIndex: 9, face: 'top' },
     ],
     tags: ['showcase', '2x2', 'glass', 'atrium', 'rooftop', 'walkthrough', 'smart-rule:rooftop-topmost'],
+  },
+
+  // ── 13. Resort House ─────────────────────────────────────
+  // Three-level resort home with an indoor pool basin below ground, double-
+  // height central atrium aligned over the pool, framed-glass upper floor,
+  // and a rooftop deck. Forces every multi-level primitive to cooperate:
+  // subterranean pool, central_atrium void on L1 + framed_glass_atrium void
+  // on L2 (visually continuous shaft of light from roof to pool), L1→L2
+  // stair on the NW corner, L2→roof stair on the NW corner with face='top'.
+  {
+    id: 'resort_house',
+    label: 'Resort House',
+    description: 'Three-level resort home with an indoor pool basin under a double-height central atrium, framed-glass upper floor, and rooftop deck. Pool sits below the L1 floor; the atrium void aligns vertically through L1 and L2 so light spills from the rooftop down to the water.',
+    icon: '🏝️',
+    containers: [
+      // [0] Pool basin — subterranean, centered under the 2×2 footprint of L1
+      // (relativePosition Y is ignored for pool slots; placement forces
+      //  Y = -dims.height so the basin's top edge sits at world Y=0).
+      {
+        role: 'open_plan',
+        size: ContainerSize.HighCube40,
+        relativePosition: [LENGTH_40 / 2, 0, WIDTH / 2],
+        pool: true,
+      },
+      // [1-4] L1 — four ground-floor units in 2×2 with central_atrium
+      // (steel perimeter + central floor void over the pool).
+      {
+        role: 'open_plan',
+        size: ContainerSize.HighCube40,
+        relativePosition: [0, 0, 0],
+        extensionConfig: 'all_deck',
+        arrangementId: 'central_atrium',
+      },
+      {
+        role: 'open_plan',
+        size: ContainerSize.HighCube40,
+        relativePosition: [LENGTH_40, 0, 0],
+        extensionConfig: 'all_deck',
+        arrangementId: 'central_atrium',
+      },
+      {
+        role: 'open_plan',
+        size: ContainerSize.HighCube40,
+        relativePosition: [0, 0, WIDTH],
+        extensionConfig: 'all_deck',
+        arrangementId: 'central_atrium',
+      },
+      {
+        role: 'open_plan',
+        size: ContainerSize.HighCube40,
+        relativePosition: [LENGTH_40, 0, WIDTH],
+        extensionConfig: 'all_deck',
+        arrangementId: 'central_atrium',
+      },
+      // [5-8] L2 — four upper bedrooms stacked above L1, framed_glass_atrium
+      // continues the void so the atrium feels triple-height.
+      {
+        role: 'bedroom',
+        size: ContainerSize.HighCube40,
+        relativePosition: [0, HEIGHT_HC, 0],
+        extensionConfig: 'all_deck',
+        arrangementId: 'framed_glass_atrium',
+      },
+      {
+        role: 'bedroom',
+        size: ContainerSize.HighCube40,
+        relativePosition: [LENGTH_40, HEIGHT_HC, 0],
+        extensionConfig: 'all_deck',
+        arrangementId: 'framed_glass_atrium',
+      },
+      {
+        role: 'bedroom',
+        size: ContainerSize.HighCube40,
+        relativePosition: [0, HEIGHT_HC, WIDTH],
+        extensionConfig: 'all_deck',
+        arrangementId: 'framed_glass_atrium',
+      },
+      {
+        role: 'bedroom',
+        size: ContainerSize.HighCube40,
+        relativePosition: [LENGTH_40, HEIGHT_HC, WIDTH],
+        extensionConfig: 'all_deck',
+        arrangementId: 'framed_glass_atrium',
+      },
+    ],
+    connections: [
+      // L1[1] → L2[5] (NW pair) carries the L1→L2 stair on voxel 9 so the
+      // user emerges on the upper walkway facing the atrium edge.
+      { fromIndex: 1, toIndex: 5, type: 'stacked', stairsVoxelIndex: 9 },
+      { fromIndex: 2, toIndex: 6, type: 'stacked' },
+      { fromIndex: 3, toIndex: 7, type: 'stacked' },
+      { fromIndex: 4, toIndex: 8, type: 'stacked' },
+    ],
+    extraStairs: [
+      // L2 NW (index 5) → rooftop deck. Voxel 9 + face='top' produces a stair
+      // ascending out of the L2 floor onto the rooftop deck (auto-generated
+      // by SR-07 since L2 is topmost).
+      { containerIndex: 5, voxelIndex: 9, face: 'top' },
+    ],
+    tags: ['resort', 'pool', 'atrium', '2x2', 'glass', 'rooftop', 'three-level', 'subterranean'],
   },
 ];
 

@@ -1300,6 +1300,95 @@ async function run() {
     await page.unroute('**/api/design').catch(() => {});
   } catch (e) { fail('G32-aiDesigner', e.message); }
 
+  // ═══ G33: Resort House preset + Blueprint level chip strip ═══
+  // Places the Resort House preset (3-level: subterranean pool + L1 + L2 + roof
+  // stairs, exercises subterranean pool placement, atrium void arrangements
+  // on both upper levels, and the L2→roof stair). Then verifies the new
+  // Blueprint level chip strip renders at top-center with All/L2/L1/Pool
+  // chips and that clicking the L1 chip filters viewLevel to 0.
+  try {
+    // Reset state first — prior gates leave containers behind
+    await page.evaluate(() => {
+      const s = window.__store.getState();
+      for (const id of Object.keys(s.containers)) s.removeContainer(id);
+    });
+    await page.waitForTimeout(300);
+
+    // Place Resort House via store action (no UI gallery for it yet)
+    const placement = await page.evaluate(() => {
+      const s = window.__store.getState();
+      s.placeModelHome('resort_house');
+      const after = window.__store.getState();
+      const containers = Object.values(after.containers);
+      let stairCount = 0;
+      let atriumCount = 0;
+      let glassAtriumCount = 0;
+      for (const c of containers) {
+        const arr = c.voxelGrid ? Array.from(c.voxelGrid) : [];
+        if (c.appliedPreset === 'central_atrium') atriumCount++;
+        if (c.appliedPreset === 'framed_glass_atrium') glassAtriumCount++;
+        for (const v of arr) {
+          if (v?.voxelType === 'stairs' && v?.stairPart === 'lower') stairCount++;
+        }
+      }
+      return {
+        total: containers.length,
+        pool: containers.find(c => c.subterranean) ? { name: containers.find(c => c.subterranean).name, y: containers.find(c => c.subterranean).position.y } : null,
+        atriumCount, glassAtriumCount, stairCount,
+      };
+    });
+
+    // Switch to Blueprint mode + verify chip strip
+    await page.evaluate(() => window.__store.getState().setViewMode('blueprint'));
+    await page.waitForTimeout(500);
+
+    const stripState = await page.evaluate(() => {
+      const strip = document.querySelector('[data-testid="bp-level-chips"]');
+      if (!strip) return { found: false };
+      const r = strip.getBoundingClientRect();
+      const chips = Array.from(strip.querySelectorAll('button')).map(b => ({
+        testid: b.getAttribute('data-testid'),
+        text: b.textContent.trim(),
+        disabled: b.disabled,
+      }));
+      return {
+        found: true,
+        atTopCenter: r.y < 120 && Math.abs((r.x + r.width/2) - window.innerWidth/2) < 100,
+        chipCount: chips.length,
+        chips,
+      };
+    });
+
+    // Click the L1 chip (ground floor — viewLevel = 0)
+    await page.click('[data-testid="bp-level-chip-L0"]', { force: true });
+    await page.waitForTimeout(300);
+    const afterClick = await page.evaluate(() => window.__store.getState().viewLevel);
+
+    // Reset to "All" so we don't poison subsequent gates
+    await page.click('[data-testid="bp-level-chip-all"]', { force: true });
+    await page.waitForTimeout(200);
+
+    const ok =
+      placement.total === 9 &&
+      placement.pool?.name === 'Pool' &&
+      placement.pool?.y === -2.9 &&
+      placement.atriumCount === 4 &&
+      placement.glassAtriumCount === 4 &&
+      placement.stairCount === 2 && // L1→L2 + L2→roof
+      stripState.found &&
+      stripState.atTopCenter &&
+      stripState.chipCount === 4 &&
+      afterClick === 0;
+
+    ok
+      ? pass('G33-resortHouse', `placed: ${placement.total} containers, pool@y=${placement.pool?.y}, ${placement.atriumCount} central_atrium + ${placement.glassAtriumCount} framed_glass_atrium, ${placement.stairCount} stair pairs; chip strip atTopCenter=${stripState.atTopCenter}, ${stripState.chipCount} chips, L1 click→viewLevel=${afterClick}`)
+      : fail('G33-resortHouse', JSON.stringify({ placement, stripState, afterClick }));
+
+    // Tear down: switch back to 3D so subsequent gates aren't in BP
+    await page.evaluate(() => window.__store.getState().setViewMode('3d'));
+    await page.waitForTimeout(300);
+  } catch (e) { fail('G33-resortHouse', e.message); }
+
   // ═══ G19: Default visual — restore defaults + visual comparison ═══
   try {
     // Reset to clean state

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-02T21:04:10.926Z",
+  "timestamp": "2026-05-05T22:26:12.607Z",
   "sprint": 13,
   "gates": [
     {
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.499, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.800, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.90, targetY=1.29, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=2.16, targetY=1.29, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=6652fc9d-99d6-479d-abf0-413c2edae4fb"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=1f3d8744-eb87-4969-9713-e39d5c816f3f"
     },
     {
       "gate": "G21-leftDragMove",
@@ -213,6 +213,11 @@
       "msg": "mocked fetch applied: containers=1, butterflyRoof=true, siteContext=true"
     },
     {
+      "gate": "G33-resortHouse",
+      "status": "PASS",
+      "msg": "placed: 9 containers, pool@y=-2.9, 4 central_atrium + 4 framed_glass_atrium, 2 stair pairs; chip strip atTopCenter=true, 4 chips, L1 click→viewLevel=0"
+    },
+    {
       "gate": "G19-defaultVisual",
       "status": "PASS",
       "msg": "default state restored via UI"
@@ -223,7 +228,7 @@
       "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 44,
-  "passed": 44,
+  "total": 45,
+  "passed": 45,
   "failed": 0
 }
