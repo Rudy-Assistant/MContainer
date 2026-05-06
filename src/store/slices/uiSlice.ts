@@ -5,7 +5,7 @@
  * not undo-tracked. Consumer selectors unchanged.
  */
 
-import type { MaterialDef, SurfaceType, VoxelFaces } from '@/types/container';
+import type { ContainerSize, MaterialDef, SurfaceType, VoxelFaces } from '@/types/container';
 import type { DesignWarning } from '@/types/validation';
 import type { VoxelPayload } from '../useStore';
 import type { SliceGet, SliceSet } from './types';
@@ -58,6 +58,12 @@ export interface UiSlice {
   /** Show the subtle reference grid on the ground plane. Default true. */
   showFloorGrid: boolean;
   toggleFloorGrid: () => void;
+  /** Active container size for Blueprint click-to-place. When non-null, a click
+   *  on an empty BP grid cell will call addContainer(bpvActiveContainerSize, ...).
+   *  Cleared when the user clicks an existing container or presses Escape.
+   *  Library tile click is the primary setter. Phase 4 BP refinement. */
+  bpvActiveContainerSize: ContainerSize | null;
+  setBpvActiveContainerSize: (size: ContainerSize | null) => void;
   /** Hover/click face filter — when set, the 3D viewport only registers
    *  pointer events on faces of this category. Lets the user pick out
    *  ceilings or floors that are hard to hit when unfiltered. */
@@ -260,6 +266,8 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   toggleHotbar: () => set((s) => ({ showHotbar: !s.showHotbar })),
   showFloorGrid: false,
   toggleFloorGrid: () => set((s) => ({ showFloorGrid: !s.showFloorGrid })),
+  bpvActiveContainerSize: null,
+  setBpvActiveContainerSize: (size) => set({ bpvActiveContainerSize: size }),
   faceFilter: 'all',
   setFaceFilter: (filter) => set({ faceFilter: filter }),
   selectedWallCategory: null,
