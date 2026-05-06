@@ -911,6 +911,21 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         }
       }
 
+      // Arrangements REDEFINE the entire voxel grid, voiding cells (e.g.
+      // central_atrium punches a 2×2 floor void). Furniture placed by a
+      // prior `applyContainerRole` call (which stamps modules with
+      // `furnitureType` like `living_room` → Sofa) would otherwise be left
+      // orphaned floating in voided voxels — visible to the user as
+      // "sofa-spam on an exposed/voided ground floor". Clear furniture and
+      // the global furniture index so the arrangement always wins.
+      // Bruce 2026-05-06 — Resort House round 4: this was the source of the
+      // "your whole Ground floor is exposed on every side... yet,
+      // inexplicably, absolutely filled with sofas" complaint.
+      const indexEntries = Object.entries(s.furnitureIndex).filter(
+        ([, f]) => f.containerId !== containerId,
+      );
+      const cleanedIndex = Object.fromEntries(indexEntries);
+
       return {
         containers: {
           ...s.containers,
@@ -918,8 +933,10 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
             ...container,
             voxelGrid: grid,
             appliedPreset: arrangementId,
+            furniture: [],
           },
         },
+        furnitureIndex: cleanedIndex,
       };
     });
 
