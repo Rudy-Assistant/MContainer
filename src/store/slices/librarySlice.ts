@@ -477,6 +477,20 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       }
     }
 
+    // Force a rooftop deck onto specific containers — needed when the
+    // topmost row carries an arrangement (framed_glass_atrium etc.) that
+    // makes `stackContainer`'s auto-rooftop path skip itself. See
+    // `ModelHome.extraRooftopDecks` for the rationale. `generateRooftopDeck`
+    // is idempotent and re-checks the topmost invariant per call.
+    if (model.extraRooftopDecks) {
+      for (const idx of model.extraRooftopDecks) {
+        const targetId = containerIds[idx];
+        if (!targetId) continue;
+        get().generateRooftopDeck(targetId);
+        t?.pause();
+      }
+    }
+
     // Auto-expand extensions only when the model home leaves extension behavior unspecified.
     for (const [i, mc] of model.containers.entries()) {
       if (!mc.extensionConfig && !mc.arrangementId) {
