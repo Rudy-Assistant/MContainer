@@ -37,6 +37,7 @@ const FEATURE_GATES = {
   'AI Designer':         ['G32-aiDesigner'],
   'Blueprint Authoring': ['G33-resortHouse'],
   'Blueprint Add/Delete': ['G34-bpAddContainer'],
+  'Blueprint Dogfood (level-aware placement + edge-click face select)': ['G35-bpDogfood'],
 };
 
 // Previously ungated features — now gated as of Sprint 13.

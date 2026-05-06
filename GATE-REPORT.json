@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-06T04:09:42.332Z",
+  "timestamp": "2026-05-06T11:18:32.731Z",
   "sprint": 13,
   "gates": [
     {
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.434, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.400, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.85, targetY=1.29, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=1.92, targetY=1.50, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=96b0cbfb-9cd4-4ca2-aa18-3e26573e9f1e"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=9c63f8e8-f7e7-4c50-aad3-8918c73493c7"
     },
     {
       "gate": "G21-leftDragMove",
@@ -223,6 +223,11 @@
       "msg": "armed→place(5,5)→clear=null, re-arm(20ft_standard)→escape=null, delete 1→0"
     },
     {
+      "gate": "G35-bpDogfood",
+      "status": "PASS",
+      "msg": "place: count=2 levels=[0,1] placeLevel=1; face-select: face=n voxel=11"
+    },
+    {
       "gate": "G19-defaultVisual",
       "status": "PASS",
       "msg": "default state restored via UI"
@@ -233,7 +238,7 @@
       "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 46,
-  "passed": 46,
+  "total": 47,
+  "passed": 47,
   "failed": 0
 }
