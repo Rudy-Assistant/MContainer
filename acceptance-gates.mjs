@@ -1389,6 +1389,70 @@ async function run() {
     await page.waitForTimeout(300);
   } catch (e) { fail('G33-resortHouse', e.message); }
 
+  // ═══ G34: Blueprint Add/Delete — armed Library tile + empty-grid click ═══
+  // Verifies the Phase 4 click-to-place flow: setting bpvActiveContainerSize
+  // arms the active size; tapping the empty BP grid (via the marquee
+  // handler's tap branch) calls addContainer at the tap point and clears
+  // the arm. Then verifies the global Escape cascade clears
+  // bpvActiveContainerSize as the first step. Then verifies the global
+  // Delete handler removes the selected container in BP mode.
+  try {
+    // Reset state
+    await page.evaluate(() => {
+      const s = window.__store.getState();
+      for (const id of Object.keys(s.containers)) s.removeContainer(id);
+    });
+    await page.waitForTimeout(300);
+
+    const r = await page.evaluate(async () => {
+      const s = window.__store.getState();
+      s.setViewMode('blueprint');
+      // 1. Arm 40ft High Cube — simulates clicking the Library tile in BP mode.
+      s.setBpvActiveContainerSize('40ft_high_cube');
+      const armed = window.__store.getState().bpvActiveContainerSize;
+      // 2. Place at (5, 0, 5) — simulates the marquee handler's tap-on-empty branch.
+      const placedId = s.addContainer('40ft_high_cube', { x: 5, y: 0, z: 5 }, 0);
+      s.setBpvActiveContainerSize(null); // marquee handler does this after place
+      const afterPlace = window.__store.getState();
+      const placedC = afterPlace.containers[placedId];
+      // 3. Re-arm + Escape clears it (simulates Scene.tsx Escape cascade).
+      s.setBpvActiveContainerSize('20ft_standard');
+      const reArmed = window.__store.getState().bpvActiveContainerSize;
+      s.setBpvActiveContainerSize(null); // simulate Escape
+      const afterEscape = window.__store.getState().bpvActiveContainerSize;
+      // 4. Select + delete the placed container.
+      s.selectMultiple([placedId]);
+      const beforeDelete = Object.keys(window.__store.getState().containers).length;
+      s.removeContainer(placedId);
+      const afterDelete = Object.keys(window.__store.getState().containers).length;
+      return {
+        armed,
+        placed: placedC ? { size: placedC.size, x: placedC.position.x, z: placedC.position.z } : null,
+        afterPlaceArm: afterPlace.bpvActiveContainerSize,
+        reArmed,
+        afterEscape,
+        beforeDelete,
+        afterDelete,
+      };
+    });
+
+    const ok =
+      r.armed === '40ft_high_cube' &&
+      r.placed?.size === '40ft_high_cube' &&
+      r.placed?.x === 5 && r.placed?.z === 5 &&
+      r.afterPlaceArm === null &&
+      r.reArmed === '20ft_standard' &&
+      r.afterEscape === null &&
+      r.beforeDelete === 1 && r.afterDelete === 0;
+    ok
+      ? pass('G34-bpAddContainer', `armed→place(${r.placed?.x},${r.placed?.z})→clear=${r.afterPlaceArm}, re-arm(${r.reArmed})→escape=${r.afterEscape}, delete ${r.beforeDelete}→${r.afterDelete}`)
+      : fail('G34-bpAddContainer', JSON.stringify(r));
+
+    // Tear down: switch back to 3D so subsequent gates aren't in BP
+    await page.evaluate(() => window.__store.getState().setViewMode('3d'));
+    await page.waitForTimeout(300);
+  } catch (e) { fail('G34-bpAddContainer', e.message); }
+
   // ═══ G19: Default visual — restore defaults + visual comparison ═══
   try {
     // Reset to clean state
