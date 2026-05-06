@@ -1,18 +1,23 @@
 "use client";
 
 /**
- * BlueprintLevelChips — always-visible level navigator for Blueprint Mode.
+ * BlueprintLevelChips — always-visible level navigator pill strip.
  *
- * Multi-level designs (Resort House, Glass Atrium Showcase) need a one-click
- * level switcher in plan view because top-down rendering causes stacked
- * containers to occlude each other. The pre-existing LevelSlicer pill is a
- * click-to-expand dropdown — fine for casual use but adds friction when
- * navigating four or more levels back-to-back.
+ * Originally rendered as a fixed top-center overlay only in Blueprint mode,
+ * alongside the older right-side LevelSlicer dropdown. The two selectors
+ * occupied different positions and confused users; per Bruce 2026-05-06
+ * round-3 audit ("the Level is selectable twice (once on top, once on the
+ * side)") the chip strip was consolidated into a single topbar element and
+ * the right-side LevelSlicer was removed.
  *
- * Mounted outside the R3F Canvas in page.tsx so React's normal DOM
- * reconciler handles it (R3F's reconciler interprets `<span>` and
- * other intrinsics as THREE primitives — see BlueprintRenderer.tsx history
- * for the failed inline-portal attempt).
+ * Rendered inline inside TopToolbar.tsx (ZONE B) so it sits in the topbar
+ * row along with Undo/Redo and the view-mode tabs. No fixed positioning.
+ *
+ * The strip auto-hides when there are no containers and only one level
+ * (typical fresh project) so the empty "All (0)" pill doesn't add noise.
+ *
+ * Atomic Zustand selectors only — useShallow on the parallel level/sub
+ * arrays keeps the component out of the render loop on paint/drag changes.
  */
 
 import { useMemo } from "react";
@@ -49,7 +54,7 @@ export default function BlueprintLevelChips() {
     return { minLevel: lo, maxLevel: Math.max(hi, 0), perLevel: counts, hasPool: pool, totalCount: total };
   }, [containerLevels, containerSubFlags]);
 
-  // Build chip list: All → topmost level → ground → subterranean → Pool
+  // Build chip list: All -> topmost level -> ground -> subterranean -> Pool
   type Chip = { key: string; label: string; value: number | null; count: number; tone: "default" | "pool" | "all" };
   const chips: Chip[] = [
     { key: "all", label: "All", value: null, count: totalCount, tone: "all" },
@@ -61,24 +66,25 @@ export default function BlueprintLevelChips() {
     chips.push({ key: "pool", label: "Pool", value: null, count: 1, tone: "pool" });
   }
 
+  // Hide when there's nothing to navigate: empty project, or a single
+  // level with no pool. Reappears as soon as a basement/L2/Pool exists.
+  // Keeps the topbar uncluttered for the typical fresh / single-level
+  // workflow without sacrificing the consolidated single-selector role.
+  const hasMultipleSlices = maxLevel > minLevel || hasPool;
+  if (totalCount === 0 || !hasMultipleSlices) return null;
+
   return (
     <div
       data-testid="bp-level-chips"
       style={{
-        position: "fixed",
-        top: 68,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 50,
-        pointerEvents: "auto",
         display: "flex",
-        gap: 6,
-        padding: "4px 6px",
-        background: "rgba(255,255,255,0.92)",
-        backdropFilter: "blur(8px)",
-        border: "1px solid #cfd8dc",
+        gap: 4,
+        padding: "3px 4px",
+        background: "var(--input-bg, #f3f4f6)",
+        border: "1px solid var(--btn-border, #e5e7eb)",
         borderRadius: 8,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        flexShrink: 0,
+        alignItems: "center",
       }}
     >
       {chips.map((chip) => {
@@ -91,23 +97,33 @@ export default function BlueprintLevelChips() {
             data-testid={`bp-level-chip-${chip.key}`}
             onClick={() => { if (!isPool) setViewLevel(chip.value); }}
             disabled={isPool || isEmpty}
-            title={isPool ? "Pool basin (subterranean)" : `${chip.label} — ${chip.count} container${chip.count === 1 ? "" : "s"}`}
+            title={isPool ? "Pool basin (subterranean)" : `${chip.label} - ${chip.count} container${chip.count === 1 ? "" : "s"}`}
             style={{
-              padding: "4px 10px",
+              padding: "4px 9px",
               fontSize: 11,
-              fontWeight: 700,
+              fontWeight: 600,
               fontFamily: "system-ui",
               borderRadius: 6,
-              border: "1.5px solid",
-              borderColor: isActive ? "#1565c0" : isPool ? "#0288d1" : "#cfd8dc",
-              background: isActive ? "#1565c0" : isPool ? "rgba(2,136,209,0.08)" : "#ffffff",
-              color: isActive ? "#ffffff" : isEmpty ? "#b0bec5" : isPool ? "#0277bd" : "#37474f",
+              border: "none",
+              background: isActive
+                ? "var(--accent, #2563eb)"
+                : isPool
+                  ? "rgba(2,136,209,0.10)"
+                  : "transparent",
+              color: isActive
+                ? "#ffffff"
+                : isEmpty
+                  ? "var(--text-muted, #94a3b8)"
+                  : isPool
+                    ? "#0277bd"
+                    : "var(--text-muted, #6b7280)",
               cursor: isPool || isEmpty ? "default" : "pointer",
               opacity: isEmpty ? 0.5 : 1,
-              transition: "all 0.15s",
+              transition: "all 150ms ease",
               display: "flex",
               alignItems: "baseline",
               gap: 4,
+              boxShadow: isActive ? "0 1px 3px rgba(37,99,235,0.3)" : "none",
             }}
           >
             <span>{chip.label}</span>

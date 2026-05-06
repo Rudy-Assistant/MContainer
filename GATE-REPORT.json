@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-06T11:18:32.731Z",
+  "timestamp": "2026-05-06T18:16:09.069Z",
   "sprint": 13,
   "gates": [
     {
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.400, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.839, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=1.92, targetY=1.50, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=2.19, targetY=1.29, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=9c63f8e8-f7e7-4c50-aad3-8918c73493c7"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=6c0ae68e-6cfd-4bb1-a19c-d6c7e7372cb9"
     },
     {
       "gate": "G21-leftDragMove",
@@ -215,7 +215,7 @@
     {
       "gate": "G33-resortHouse",
       "status": "PASS",
-      "msg": "placed: 9 containers, pool@y=-2.9, 4 central_atrium + 4 framed_glass_atrium, 2 stair pairs; chip strip atTopCenter=true, 4 chips, L1 click→viewLevel=0"
+      "msg": "placed: 9 containers, pool@y=-2.9, 4 central_atrium + 4 framed_glass_atrium, 2 stair pairs; chip strip inTopbar=true, 4 chips, L1 click→viewLevel=0"
     },
     {
       "gate": "G34-bpAddContainer",

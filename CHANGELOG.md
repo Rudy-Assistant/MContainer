@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-06 — Level selector consolidation (Bruce round-3 audit)
+
+- Bruce: "The Level is selectable twice (once on top, once on the side) ... previously just a selector placed in the topbar — please correct."
+- `BlueprintLevelChips` is now rendered inline in `TopToolbar.tsx` (ZONE B, after the view-mode tabs) as the single level selector. Visible in 3D and Blueprint modes; hidden in walkthrough; auto-hides when the project has zero containers.
+- `LevelSlicer.tsx` removed — its right-side floating pill was a duplicate. PgUp/PgDn keyboard shortcuts are unchanged (handled in `Scene.tsx`).
+- `data-testid="bp-level-chips"` and per-chip `bp-level-chip-*` testids preserved. Gate G33 updated: now asserts the strip lives in the topbar (`r.y < 60`) instead of canvas top-center.
+
 ## 2026-05-06 — Blueprint Mode refinement (Phase 4 closeout)
 
 User-flagged feedback: Blueprint Mode felt "very disconnected from 3D Mode." This release closes the gap with one cohesive arc — every BP-canvas affordance now mirrors a 3D-mode affordance, and a forcing-function model home (Resort House) exercises every multi-level primitive at once.

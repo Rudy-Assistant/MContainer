@@ -1303,13 +1303,19 @@ async function run() {
   // ═══ G33: Resort House preset + Blueprint level chip strip ═══
   // Places the Resort House preset (3-level: subterranean pool + L1 + L2 + roof
   // stairs, exercises subterranean pool placement, atrium void arrangements
-  // on both upper levels, and the L2→roof stair). Then verifies the new
-  // Blueprint level chip strip renders at top-center with All/L2/L1/Pool
+  // on both upper levels, and the L2→roof stair). Then verifies the
+  // BlueprintLevelChips strip renders inside the topbar with All/L2/L1/Pool
   // chips and that clicking the L1 chip filters viewLevel to 0.
   try {
-    // Reset state first — prior gates leave containers behind
+    // Reset state first — prior gates leave containers behind. Also close
+    // any modals (Quick Setup wizard from page hydration, AI Designer) so
+    // their backdrops don't intercept the chip-strip click. Earlier gates
+    // sometimes leave the wizard open if they didn't go through a modal flow.
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(150);
     await page.evaluate(() => {
       const s = window.__store.getState();
+      if (s.wizardOpen) s.closeWizard();
       for (const id of Object.keys(s.containers)) s.removeContainer(id);
     });
     await page.waitForTimeout(300);
@@ -1351,21 +1357,28 @@ async function run() {
         text: b.textContent.trim(),
         disabled: b.disabled,
       }));
+      // Chips now live inside the 56px topbar (consolidated single
+      // selector — Bruce 2026-05-06 round-3 audit). Just verify the
+      // strip is rendered in the topbar region; horizontal centering
+      // depends on toolbar layout and is not asserted.
       return {
         found: true,
-        atTopCenter: r.y < 120 && Math.abs((r.x + r.width/2) - window.innerWidth/2) < 100,
+        inTopbar: r.y >= 0 && r.y < 60,
         chipCount: chips.length,
         chips,
       };
     });
 
-    // Click the L1 chip (ground floor — viewLevel = 0)
-    await page.click('[data-testid="bp-level-chip-L0"]', { force: true });
+    // Click the L1 chip (ground floor — viewLevel = 0). Chips moved into
+    // the topbar (Bruce 2026-05-06 round-3 audit) — use noWaitAfter so
+    // page.click doesn't stall waiting for unrelated navigation events
+    // triggered by topbar re-renders.
+    await page.click('[data-testid="bp-level-chip-L0"]', { force: true, noWaitAfter: true });
     await page.waitForTimeout(300);
     const afterClick = await page.evaluate(() => window.__store.getState().viewLevel);
 
     // Reset to "All" so we don't poison subsequent gates
-    await page.click('[data-testid="bp-level-chip-all"]', { force: true });
+    await page.click('[data-testid="bp-level-chip-all"]', { force: true, noWaitAfter: true });
     await page.waitForTimeout(200);
 
     const ok =
@@ -1376,12 +1389,12 @@ async function run() {
       placement.glassAtriumCount === 4 &&
       placement.stairCount === 2 && // L1→L2 + L2→roof
       stripState.found &&
-      stripState.atTopCenter &&
+      stripState.inTopbar &&
       stripState.chipCount === 4 &&
       afterClick === 0;
 
     ok
-      ? pass('G33-resortHouse', `placed: ${placement.total} containers, pool@y=${placement.pool?.y}, ${placement.atriumCount} central_atrium + ${placement.glassAtriumCount} framed_glass_atrium, ${placement.stairCount} stair pairs; chip strip atTopCenter=${stripState.atTopCenter}, ${stripState.chipCount} chips, L1 click→viewLevel=${afterClick}`)
+      ? pass('G33-resortHouse', `placed: ${placement.total} containers, pool@y=${placement.pool?.y}, ${placement.atriumCount} central_atrium + ${placement.glassAtriumCount} framed_glass_atrium, ${placement.stairCount} stair pairs; chip strip inTopbar=${stripState.inTopbar}, ${stripState.chipCount} chips, L1 click→viewLevel=${afterClick}`)
       : fail('G33-resortHouse', JSON.stringify({ placement, stripState, afterClick }));
 
     // Tear down: switch back to 3D so subsequent gates aren't in BP

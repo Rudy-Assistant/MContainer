@@ -157,6 +157,13 @@ export interface UiSlice {
   darkMode: boolean;
   toggleDarkMode: () => void;
 
+  // Units (Imperial by default per Bruce 2026-05-06 round-3 feedback;
+  // switchable via Settings > Appearance). Affects dimension labels in
+  // BlueprintRenderer, Sidebar Library tiles, and VoxelPreview3D. Pure
+  // formatting concern — internal state stays SI (meters).
+  units: 'imperial' | 'metric';
+  setUnits: (u: 'imperial' | 'metric') => void;
+
   // Quick Setup Wizard
   wizardOpen: boolean;
   wizardPresetId: string | null;
@@ -337,6 +344,11 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
 
   isPaintDragging: false,
   setIsPaintDragging: (v) => set({ isPaintDragging: v }),
+
+  // Imperial by default (US construction market). Users can switch to
+  // metric in Settings > Appearance.
+  units: 'imperial',
+  setUnits: (u) => set({ units: u }),
 
   darkMode: false,
   toggleDarkMode: () => {

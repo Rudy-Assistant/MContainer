@@ -29,6 +29,7 @@ import CompassControl from "./CompassControl";
 import CostControl from "./CostControl";
 import AppearanceControl from "./AppearanceControl";
 import SettingsMenuControl from "./SettingsMenuControl";
+import BlueprintLevelChips from "./BlueprintLevelChips";
 
 interface TopToolbarProps {
   onOpenBudget: () => void;
@@ -210,6 +211,13 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette, onOpenAiDesign
             );
           })}
         </div>
+
+        {/* ── Level Chip Strip — single source-of-truth level selector.
+            Replaces the right-side LevelSlicer dropdown + duplicated BP-only
+            top-center strip (Bruce 2026-05-06 round-3 audit). Hidden in
+            walkthrough where level navigation is irrelevant. The component
+            self-hides when there are zero containers. ── */}
+        {viewMode !== ViewMode.Walkthrough && <BlueprintLevelChips />}
       </div>
 
       {/* ═══ ZONE C: Right — Floor/Roof + Wall Vis + Overflow ═══ */}

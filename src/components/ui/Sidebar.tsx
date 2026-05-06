@@ -18,7 +18,9 @@ import {
   ViewMode,
   FurnitureType,
   FURNITURE_CATALOG,
+  CONTAINER_DIMENSIONS,
 } from "@/types/container";
+import { formatLengthShort } from "@/utils/unitFormat";
 import IsoEditor from "@/components/ui/IsoEditor";
 import MatrixEditor from "@/components/ui/MatrixEditor";
 import { FrameInspector } from "@/components/ui/FrameInspector";
@@ -55,10 +57,20 @@ const TEXT_DIM  = "var(--text-muted, #64748b)";
 // ═══════════════════════════════════════════════════════════
 
 const STRUCTURE_ITEMS = [
-  { size: ContainerSize.Standard20, label: "20' Standard",   dims: "6.06 × 2.44 × 2.59 m", Icon: Package },
-  { size: ContainerSize.Standard40, label: "40' Standard",   dims: "12.19 × 2.44 × 2.59 m", Icon: Box },
-  { size: ContainerSize.HighCube40, label: "40' High Cube",  dims: "12.19 × 2.44 × 2.90 m", Icon: Warehouse },
+  { size: ContainerSize.Standard20, label: "20' Standard",   Icon: Package },
+  { size: ContainerSize.Standard40, label: "40' Standard",   Icon: Box },
+  { size: ContainerSize.HighCube40, label: "40' High Cube",  Icon: Warehouse },
 ];
+
+/**
+ * Build the dimension subtitle (length × width × height) for a Library tile.
+ * Uses the active units setting so labels match the rest of the UI
+ * (BlueprintRenderer dimensions, voxel preview, etc.).
+ */
+function formatContainerDims(size: ContainerSize, units: 'imperial' | 'metric'): string {
+  const d = CONTAINER_DIMENSIONS[size];
+  return `${formatLengthShort(d.length, units)} × ${formatLengthShort(d.width, units)} × ${formatLengthShort(d.height, units)}`;
+}
 
 const FURNITURE_ICONS: Record<FurnitureType, React.ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>> = {
   [FurnitureType.Stairs]:       Footprints,
@@ -168,6 +180,7 @@ function Library() {
   const viewMode         = useStore((s) => s.viewMode);
   const setBpvActiveContainerSize = useStore((s) => s.setBpvActiveContainerSize);
   const bpvActiveContainerSize    = useStore((s) => s.bpvActiveContainerSize);
+  const units = useStore((s) => s.units);
   const [activeTab, setActiveTab] = useState<"structure" | "interior" | "saved">("structure");
   const [dragging, setDragging]   = useState<string | null>(null);
   const [dragPos, setDragPos]     = useState({ x: 0, y: 0 });
@@ -240,7 +253,7 @@ function Library() {
               <LibraryCard
                 key={item.size}
                 label={item.label}
-                subtitle={item.dims}
+                subtitle={formatContainerDims(item.size, units)}
                 Icon={item.Icon}
                 accentColor="#3b82f6"
                 onMouseDown={(e) => handleContainerDrag(item.size, e)}
@@ -276,7 +289,7 @@ function Library() {
                 <LibraryCard
                   key={entry.type}
                   label={entry.label}
-                  subtitle={`${d.length} × ${d.width} × ${d.height} m`}
+                  subtitle={`${formatLengthShort(d.length, units)} × ${formatLengthShort(d.width, units)} × ${formatLengthShort(d.height, units)}`}
                   Icon={Icon}
                   accentColor="#22c55e"
                   onMouseDown={(e) => {
@@ -357,6 +370,7 @@ function Inspector({
   const gridCollapsed = useStore((s) => s.gridCollapsed);
   const setGridCollapsed = useStore((s) => s.setGridCollapsed);
   const addContainer = useStore((s) => s.addContainer);
+  const units = useStore((s) => s.units);
   const stackContainer = useStore((s) => s.stackContainer);
   const unstackContainer = useStore((s) => s.unstackContainer);
   const removeContainer = useStore((s) => s.removeContainer);
@@ -604,6 +618,7 @@ function Inspector({
 
 function DesignModePanel() {
   const setDragContainer = useStore((s) => s.setDragContainer);
+  const units = useStore((s) => s.units);
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
 
   // Click-to-equip: clicking a size starts ghost placement (Sims pattern)
@@ -651,7 +666,7 @@ function DesignModePanel() {
                 onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
               >
                 <div style={{ fontWeight: 600, color: TEXT }}>{item.label}</div>
-                <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 3, lineHeight: 1.4 }}>{item.dims}</div>
+                <div style={{ fontSize: 12, color: TEXT_DIM, marginTop: 3, lineHeight: 1.4 }}>{formatContainerDims(item.size, units)}</div>
               </button>
             ))}
             {/* Pool container — subterranean HighCube40 */}

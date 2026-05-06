@@ -20,6 +20,9 @@ import {
 } from "@/types/container";
 import { useStore } from "@/store/useStore";
 import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
+import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
+import { computeBayGroups, type BayGroup } from "@/config/bayGroups";
+import { formatLengthShort } from "@/utils/unitFormat";
 
 const Y = 0.5;
 
@@ -178,12 +181,17 @@ function StairArrow({ px, pz, voxW, voxD, ascending }: {
 
 // ── Voxel Blueprint Grid ────────────────────────────────────
 // Renders all active voxels at the given level as floor fills + wall edge lines.
+// When `simpleMode` is true, per-voxel hit meshes (center + edges) are suppressed
+// inside body voxels; a sibling BlockBlueprintGrid emits per-bay block hit meshes
+// that select all 4 voxels of a body bay at once. Halo voxels remain non-selectable
+// in either mode (Bruce 2026-05-06: external voxels must be non-selectable in BP).
 function VoxelBlueprintGrid({
-  container, dims, level,
+  container, dims, level, simpleMode,
 }: {
   container: Container;
   dims: ContainerDimensions;
   level: number;
+  simpleMode: boolean;
 }) {
   const setSelectedElements = useStore((s) => s.setSelectedElements);
   const select           = useStore((s) => s.select);
@@ -192,6 +200,7 @@ function VoxelBlueprintGrid({
   const setActiveBrush   = useStore((s) => s.setActiveBrush);
   const applyStairsFromFace = useStore((s) => s.applyStairsFromFace);
   const selectedVoxel    = useSelectedVoxel();
+  const selectedVoxels   = useSelectedVoxels();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // BP face paint: clicking an edge paints n/s/e/w; clicking the center paints
@@ -246,8 +255,20 @@ function VoxelBlueprintGrid({
 
         const { voxW, voxD, px, pz } = getVoxelLayout(col, row, dims);
         const isHov = hoveredIdx === idx;
-        const isSel = selectedVoxel?.containerId === container.id &&
+        // In Simple Mode the legacy per-voxel selection collapses into a
+        // bay-level selection; reflect "this voxel belongs to the selected
+        // block" so all 4 voxels of a Bay light up together.
+        const isVoxelSel = selectedVoxel?.containerId === container.id &&
           'index' in (selectedVoxel ?? {}) && (selectedVoxel as { index: number }).index === idx;
+        const isBaySel = !!(selectedVoxels &&
+          selectedVoxels.containerId === container.id &&
+          selectedVoxels.indices.includes(idx));
+        const isSel = isVoxelSel || isBaySel;
+        // Body voxels are rows 1-2, cols 1-6. Halo voxels (col 0/7 extension halos
+        // and row 0/3 deck halos) render their visual fill but expose NO hit meshes
+        // so clicks pass through. Bruce 2026-05-06 round-3: external voxels must be
+        // non-selectable in BP.
+        const isBody = col >= 1 && col <= 6 && row >= 1 && row <= 2;
 
         const floorMat = bpvFloorMats[voxel.faces.bottom] ?? matFloor;
 
@@ -297,8 +318,11 @@ function VoxelBlueprintGrid({
             )}
 
             {/* Edge hit meshes — n/s/e/w wall faces. Painted when activeBrush
-                is set; otherwise fall through to the center hit mesh below. */}
-            {(['n', 's', 'e', 'w'] as const).map((dir) => {
+                is set; otherwise fall through to the center hit mesh below.
+                Body voxels only — halo voxels expose no clickable surface.
+                In Simple Mode, per-voxel edge hit meshes are suppressed in
+                favor of block-level meshes from BlockBlueprintGrid. */}
+            {isBody && !simpleMode && (['n', 's', 'e', 'w'] as const).map((dir) => {
               const isNS     = dir === 'n' || dir === 's';
               const edgeSign = (dir === 's' || dir === 'e') ? 1 : -1;
               const edgeX    = isNS ? px : px + edgeSign * (voxW / 2 - BPV_EDGE / 2);
@@ -345,33 +369,157 @@ function VoxelBlueprintGrid({
                 ceiling face when activeBrush is set. inspectorView ('floor'
                 or 'ceiling') decides which face: 'floor' -> 'bottom' face,
                 'ceiling' -> 'top' face. Previously hardcoded to 'bottom'
-                (Bruce 2026-05-06 audit: ceiling painting in BP was absent). */}
-            <mesh
-              position={[px, Y + 0.004, pz]}
-              rotation={[-Math.PI / 2, 0, 0]}
-              renderOrder={1001}
-              onClick={(e: ThreeEvent<MouseEvent>) => {
-                e.stopPropagation();
-                const targetFace: keyof import('@/types/container').VoxelFaces =
-                  useStore.getState().inspectorView === 'ceiling' ? 'top' : 'bottom';
-                if (paintFaceFromActiveBrush(idx, targetFace, e)) return;
-                select(container.id, e.nativeEvent.shiftKey);
-                setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
-              }}
-              onPointerOver={(e: ThreeEvent<PointerEvent>) => {
-                e.stopPropagation();
-                setHoveredIdx(idx);
-                setHoveredVoxel({ containerId: container.id, index: idx });
-              }}
-              onPointerOut={() => {
-                setHoveredIdx(null);
-                setHoveredVoxel(null);
-              }}
-            >
-              <planeGeometry args={[voxW - 0.02, voxD - 0.02]} />
-              <meshBasicMaterial transparent opacity={0.001} depthWrite={false} depthTest={false} />
-            </mesh>
+                (Bruce 2026-05-06 audit: ceiling painting in BP was absent).
+                Body voxels only — halo voxels are non-selectable in BP.
+                In Simple Mode, per-voxel center hit meshes are suppressed in
+                favor of block-level meshes from BlockBlueprintGrid. */}
+            {isBody && !simpleMode && (
+              <mesh
+                position={[px, Y + 0.004, pz]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                renderOrder={1001}
+                onClick={(e: ThreeEvent<MouseEvent>) => {
+                  e.stopPropagation();
+                  const targetFace: keyof import('@/types/container').VoxelFaces =
+                    useStore.getState().inspectorView === 'ceiling' ? 'top' : 'bottom';
+                  if (paintFaceFromActiveBrush(idx, targetFace, e)) return;
+                  select(container.id, e.nativeEvent.shiftKey);
+                  setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
+                }}
+                onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+                  e.stopPropagation();
+                  setHoveredIdx(idx);
+                  setHoveredVoxel({ containerId: container.id, index: idx });
+                }}
+                onPointerOut={() => {
+                  setHoveredIdx(null);
+                  setHoveredVoxel(null);
+                }}
+              >
+                <planeGeometry args={[voxW - 0.02, voxD - 0.02]} />
+                <meshBasicMaterial transparent opacity={0.001} depthWrite={false} depthTest={false} />
+              </mesh>
+            )}
           </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// ── Block Blueprint Grid ────────────────────────────────────
+// Simple Mode: each body bay (Bay 1 / Bay 2 / Bay 3) gets a single hit mesh
+// covering all four constituent voxels. Clicking selects all voxels of the
+// bay as a `bay`-typed multi-selection, mirroring MatrixEditor's SimpleBayGrid.
+// Halo bays (decks, end caps, corners) are intentionally non-clickable in BP
+// to preserve the existing "external voxels are non-selectable in BP" rule.
+const BAY_GROUPS_BP: BayGroup[] = computeBayGroups();
+
+function BlockBlueprintGrid({
+  container, dims, level,
+}: {
+  container: Container;
+  dims: ContainerDimensions;
+  level: number;
+}) {
+  const setSelectedElements = useStore((s) => s.setSelectedElements);
+  const select              = useStore((s) => s.select);
+  const setHoveredVoxel     = useStore((s) => s.setHoveredVoxel);
+  const setHoveredBayGroup  = useStore((s) => s.setHoveredBayGroup);
+  const setVoxelFace        = useStore((s) => s.setVoxelFace);
+  const setActiveBrush      = useStore((s) => s.setActiveBrush);
+
+  const grid: Voxel[] = container.voxelGrid ?? [];
+  const levelOffset   = level * ROWS * COLS;
+
+  // Compute the block bounding box from its constituent voxel layouts.
+  const blockBounds = useCallback((g: BayGroup) => {
+    let minX =  Infinity, maxX = -Infinity;
+    let minZ =  Infinity, maxZ = -Infinity;
+    for (const baseIdx of g.voxelIndices) {
+      const row = Math.floor(baseIdx / COLS);
+      const col = baseIdx % COLS;
+      const { voxW, voxD, px, pz } = getVoxelLayout(col, row, dims);
+      minX = Math.min(minX, px - voxW / 2);
+      maxX = Math.max(maxX, px + voxW / 2);
+      minZ = Math.min(minZ, pz - voxD / 2);
+      maxZ = Math.max(maxZ, pz + voxD / 2);
+    }
+    return {
+      cx: (minX + maxX) / 2,
+      cz: (minZ + maxZ) / 2,
+      w:  maxX - minX,
+      h:  maxZ - minZ,
+    };
+  }, [dims]);
+
+  // Block-level brush paint. Mirrors SimpleBayGrid: when a brush is armed,
+  // paint the chosen face on every voxel in the block. Alt+click acts as
+  // eyedropper (samples the first body voxel's face).
+  const paintBlockFace = useCallback(
+    (indices: number[], face: keyof import('@/types/container').VoxelFaces, e: ThreeEvent<MouseEvent>) => {
+      if (e.nativeEvent.altKey) {
+        const first = indices[0];
+        const v = useStore.getState().containers[container.id]?.voxelGrid?.[first];
+        if (v) setActiveBrush(v.faces[face]);
+        return true;
+      }
+      const activeBrush = useStore.getState().activeBrush as SurfaceType | null;
+      if (!activeBrush) return false;
+      select(container.id);
+      setSelectedElements({
+        type: 'bay',
+        items: indices.map((i) => ({ containerId: container.id, id: String(i) })),
+      });
+      for (const idx of indices) setVoxelFace(container.id, idx, face, activeBrush);
+      return true;
+    },
+    [container.id, select, setActiveBrush, setSelectedElements, setVoxelFace]
+  );
+
+  return (
+    <group>
+      {BAY_GROUPS_BP.filter((g) => g.role === 'body').map((g) => {
+        // Skip blocks whose voxels are all inactive — keeps clicks from
+        // landing on emptied bays.
+        const indices = g.voxelIndices.map((i) => levelOffset + i);
+        const anyActive = indices.some((idx) => grid[idx]?.active);
+        if (!anyActive) return null;
+
+        const { cx, cz, w, h } = blockBounds(g);
+
+        return (
+          <mesh
+            key={`block-${g.id}`}
+            position={[cx, Y + 0.004, cz]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            renderOrder={1001}
+            onClick={(e: ThreeEvent<MouseEvent>) => {
+              e.stopPropagation();
+              const targetFace: keyof import('@/types/container').VoxelFaces =
+                useStore.getState().inspectorView === 'ceiling' ? 'top' : 'bottom';
+              if (paintBlockFace(indices, targetFace, e)) return;
+              select(container.id, e.nativeEvent.shiftKey);
+              setSelectedElements({
+                type: 'bay',
+                items: indices.map((idx) => ({ containerId: container.id, id: String(idx) })),
+              });
+            }}
+            onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+              e.stopPropagation();
+              setHoveredBayGroup({ containerId: container.id, indices });
+              // Also ping hoveredVoxel for the 3D bridge that highlights
+              // a representative voxel — first index of the block.
+              setHoveredVoxel({ containerId: container.id, index: indices[0] });
+            }}
+            onPointerOut={() => {
+              setHoveredBayGroup(null);
+              setHoveredVoxel(null);
+            }}
+          >
+            <planeGeometry args={[Math.max(w - 0.02, 0.01), Math.max(h - 0.02, 0.01)]} />
+            <meshBasicMaterial transparent opacity={0.001} depthWrite={false} depthTest={false} />
+          </mesh>
         );
       })}
     </group>
@@ -388,6 +536,11 @@ function BlueprintContainer({ container }: { container: Container }) {
   const startContainerDrag      = useStore((s) => s.startContainerDrag);
   const renameContainer         = useStore((s) => s.renameContainer);
   const openContainerContextMenu = useStore((s) => s.openContainerContextMenu);
+  const units                    = useStore((s) => s.units);
+  // Simple Mode (Bruce 2026-05-06 round-3): voxels become selectable as
+  // blocks. We swap per-voxel hit meshes for per-bay block hit meshes,
+  // mirroring MatrixEditor's SimpleBayGrid aggregation rules.
+  const simpleMode               = useStore((s) => s.designComplexity === 'simple');
 
   const isSelected     = selection.includes(container.id);
 
@@ -491,8 +644,16 @@ function BlueprintContainer({ container }: { container: Container }) {
         </>
       )}
 
-      {/* Voxel blueprint grid (floor fills + wall edge lines) */}
-      <VoxelBlueprintGrid container={container} dims={dims} level={bpvLevel} />
+      {/* Voxel blueprint grid (floor fills + wall edge lines).
+          Wall edges always render at voxel resolution because they encode
+          per-face material data; only the hit-mesh geometry coarsens in
+          Simple Mode. */}
+      <VoxelBlueprintGrid container={container} dims={dims} level={bpvLevel} simpleMode={simpleMode} />
+
+      {/* Simple Mode: block-level hit meshes for body bays. */}
+      {simpleMode && (
+        <BlockBlueprintGrid container={container} dims={dims} level={bpvLevel} />
+      )}
 
       {/* Floor click target — below voxel hit meshes (Y+0.001 vs Y+0.004) */}
       <mesh
@@ -558,7 +719,7 @@ function BlueprintContainer({ container }: { container: Container }) {
                 color: isSelected ? "#90a4ae" : "#78909c",
                 fontSize: "9px", fontWeight: 500, marginTop: "1px",
               }}>
-                {sizeLabel} — {dims.length.toFixed(1)} × {dims.width.toFixed(1)} m
+                {sizeLabel} — {formatLengthShort(dims.length, units)} × {formatLengthShort(dims.width, units)}
               </div>
             </div>
           )}
@@ -854,10 +1015,10 @@ function MarqueeSelect({ containers }: { containers: Container[] }) {
 }
 
 // ── Main Blueprint Scene ────────────────────────────────────
-// Blueprint Level Chips strip lives in src/components/ui/BlueprintLevelChips
-// and is mounted from page.tsx as a sibling of SceneCanvas — it can't live
-// inside the Canvas tree because R3F's reconciler interprets intrinsic JSX
-// (`<span>`, etc.) as THREE primitives.
+// Level selector chips live in src/components/ui/BlueprintLevelChips and
+// are mounted inside TopToolbar.tsx — they sit in the topbar row alongside
+// the view-mode tabs (Bruce 2026-05-06 round-3 audit consolidated the
+// previous canvas-overlay strip + side LevelSlicer into one topbar element).
 export default function BlueprintRenderer() {
   const containers = useStore((s) => s.containers);
   const zones      = useStore((s) => s.zones);

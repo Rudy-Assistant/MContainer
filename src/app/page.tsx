@@ -11,8 +11,6 @@ import MobileGate from "@/components/ui/MobileGate";
 import StructureEditorModal from "@/components/ui/StructureEditorModal";
 import FloorDetailModal from "@/components/ui/FloorDetailModal";
 import ContainerContextMenu from "@/components/ui/ContainerContextMenu";
-import LevelSlicer from "@/components/ui/LevelSlicer";
-import BlueprintLevelChips from "@/components/ui/BlueprintLevelChips";
 import FaceFilterWidget from "@/components/ui/FaceFilterWidget";
 import TopToolbar from "@/components/ui/TopToolbar";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
@@ -136,12 +134,9 @@ export default function Home() {
           {/* Face context menu — surface-aware right-click actions */}
           {!isPreviewMode && <FaceContextMenu />}
 
-          {/* Level Selector — hidden in FPV where level navigation is irrelevant */}
-          {!isWalkthrough && <LevelSlicer />}
-
-          {/* Blueprint level chip strip — always-visible top-center bar, only
-              in Blueprint mode where stacked containers occlude in plan view. */}
-          {viewMode === ViewMode.Blueprint && <BlueprintLevelChips />}
+          {/* Level selector lives in TopToolbar (BlueprintLevelChips). The
+              old right-side LevelSlicer + canvas-overlaid chip strip were
+              consolidated per Bruce 2026-05-06 round-3 audit. */}
 
           {/* Face filter widget — restrict pointer events to roof / walls / floor */}
           {/* FaceFilterWidget gates 3D pointer events by face-category. In

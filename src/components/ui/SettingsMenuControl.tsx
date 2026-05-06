@@ -11,6 +11,7 @@ import {
   Glasses,
   Code2,
   Mail,
+  Ruler,
   Sparkles,
   Video,
   Grid2x2,
@@ -83,6 +84,8 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
   const toggleHotbar = useStore((s) => s.toggleHotbar);
   const showFloorGrid = useStore((s) => s.showFloorGrid);
   const toggleFloorGrid = useStore((s) => s.toggleFloorGrid);
+  const units = useStore((s) => s.units);
+  const setUnits = useStore((s) => s.setUnits);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -196,6 +199,28 @@ export default function SettingsMenuControl({ open, setOpen, onOpen, buttonStyle
             {darkMode ? <Moon size={13} /> : <Sun size={13} />}
             {darkMode ? "Dark Mode" : "Light Mode"}
             <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700 }}>{darkMode ? "ON" : "OFF"}</span>
+          </button>
+
+          {/* Units — Imperial by default (US construction); switchable to Metric.
+              Affects dimension labels in BP, Library tiles, and voxel previews. */}
+          <button
+            data-testid="btn-units-toggle"
+            onClick={() => setUnits(units === "imperial" ? "metric" : "imperial")}
+            style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              padding: "8px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, marginBottom: 4,
+              color: "var(--text-main)",
+              background: "transparent",
+              transition: "all 100ms",
+            }}
+            title={units === "imperial" ? "Switch to Metric" : "Switch to Imperial"}
+          >
+            <Ruler size={13} />
+            Units
+            <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700, letterSpacing: "0.06em" }}>
+              {units === "imperial" ? "FT/IN" : "M"}
+            </span>
           </button>
 
           <button onClick={toggleDebugMode} style={{

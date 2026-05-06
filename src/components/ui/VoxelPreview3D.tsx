@@ -17,6 +17,7 @@ import { useStore } from "@/store/useStore";
 import type { SurfaceType, VoxelFaces } from "@/types/container";
 import { VOXEL_COLS, VOXEL_ROWS, CONTAINER_DIMENSIONS } from "@/types/container";
 import { FaceVisual, StairMesh } from "@/components/objects/ContainerSkin";
+import { formatLengthShort } from "@/utils/unitFormat";
 
 // ── Surface cycle ──────────────────────────────────────────────
 
@@ -264,6 +265,7 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
   const setVoxelFace = useStore((s) => s.setVoxelFace);
   const activeBrush = useStore((s) => s.activeBrush);
   const setSelectedFace = useStore((s) => s.setSelectedFace);
+  const units = useStore((s) => s.units);
 
   // Dynamic voxel proportions — varies by position (body vs extension)
   const dims = containerSize ? CONTAINER_DIMENSIONS[containerSize] : { length: 12.19, width: 2.44, height: 2.90 };
@@ -550,13 +552,13 @@ function CubeScene({ containerId, voxelIndex, overrideFaces, bayGroupIndices }: 
 
       {/* Dimension labels (voxel cell dimensions) */}
       <Html position={[0, -nH / 2 - 0.5, nD / 2 + EX + 0.15]} center style={DIM_LABEL_STYLE}>
-        {nW.toFixed(1)}m
+        {formatLengthShort(nW, units)}
       </Html>
       <Html position={[nW / 2 + EX + 0.15, -nH / 2 - 0.5, 0]} center style={DIM_LABEL_STYLE}>
-        {nD.toFixed(1)}m
+        {formatLengthShort(nD, units)}
       </Html>
       <Html position={[-nW / 2 - EX - 0.3, 0, nD / 2 + EX + 0.15]} center style={DIM_LABEL_STYLE}>
-        {nH.toFixed(1)}m
+        {formatLengthShort(nH, units)}
       </Html>
 
       <OrbitControls enableZoom={false} enablePan={false} autoRotate={false} rotateSpeed={0.7} />
@@ -600,6 +602,7 @@ export default function VoxelPreview3D({ containerId, voxelIndex, overrideFaces,
  */
 export function GroupedVoxelPreview({ containerId, indices }: { containerId: string; indices: number[] }) {
   const containerSize = useStore((s) => s.containers[containerId]?.size);
+  const units = useStore((s) => s.units);
   if (!containerSize || indices.length === 0) return null;
 
   const dims = CONTAINER_DIMENSIONS[containerSize];
@@ -640,7 +643,7 @@ export function GroupedVoxelPreview({ containerId, indices }: { containerId: str
       borderRadius: 8, margin: "0 auto", maxWidth: 200,
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-main)", fontFamily: "monospace" }}>
-        {mergedW.toFixed(1)}m × {mergedD.toFixed(1)}m × {mergedH.toFixed(1)}m
+        {formatLengthShort(mergedW, units)} × {formatLengthShort(mergedD, units)} × {formatLengthShort(mergedH, units)}
       </div>
       <div style={{ fontSize: 9, color: "var(--text-muted)" }}>
         {indices.length} voxels · {colSpan}×{rowSpan} grid
