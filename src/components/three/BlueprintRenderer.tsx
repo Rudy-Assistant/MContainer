@@ -618,26 +618,9 @@ function SimpleGrid() {
     <group renderOrder={0}>
       <lineSegments geometry={lines}    material={gridReferenceMat}        renderOrder={0} />
       <lineSegments geometry={sections} material={gridReferenceSectionMat} renderOrder={1} />
-      {/* Honest label: this grid is a meter-stick, not voxel-aligned. */}
-      <Html position={[0, 0.31, 0]} transform={false} prepend={false} style={{ pointerEvents: "none" }}>
-        <div style={{
-          position: "fixed",
-          right: "12px",
-          bottom: "12px",
-          padding: "4px 8px",
-          borderRadius: "4px",
-          background: "rgba(38, 50, 56, 0.65)",
-          color: "#cfd8dc",
-          fontSize: "10px",
-          fontWeight: 500,
-          fontFamily: "system-ui, sans-serif",
-          letterSpacing: "0.02em",
-          pointerEvents: "none",
-          userSelect: "none",
-        }}>
-          1 m reference (5 m emphasis)
-        </div>
-      </Html>
+      {/* No label badge — opacity 0.04/0.08 reads as clearly decorative, no
+          claim to voxel alignment. The per-container VoxelBlueprintGrid is
+          where actual measurement happens. */}
     </group>
   );
 }
