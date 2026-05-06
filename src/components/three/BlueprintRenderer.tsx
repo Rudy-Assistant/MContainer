@@ -321,7 +321,18 @@ function VoxelBlueprintGrid({
                     }
                     if (paintFaceFromActiveBrush(idx, dir, e)) {
                       e.stopPropagation();
+                      return;
                     }
+                    // No brush armed: select this voxel + face so the
+                    // Walls tab in the inspector activates with the
+                    // clicked face's swatch picker. Bruce 2026-05-06:
+                    // BP must let users edit voxel faces without leaving
+                    // top-down mental model; previously a no-brush edge
+                    // click was a no-op (silent dead-zone).
+                    e.stopPropagation();
+                    select(container.id, e.nativeEvent.shiftKey);
+                    setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
+                    useStore.getState().setSelectedFace(dir);
                   }}
                 >
                   <planeGeometry args={[hitW, hitH]} />
