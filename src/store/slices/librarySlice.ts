@@ -43,6 +43,8 @@ type LibraryRuntimeState = LibrarySlice & {
   applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
   applyContainerArrangement: (containerId: string, arrangementId: import('@/types/container').ContainerArrangementId) => void;
   updateContainerRotation: (containerId: string, rotation: number) => void;
+  designMode: 'smart' | 'manual';
+  setDesignMode: (mode: 'smart' | 'manual') => void;
   setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
   stackContainer: (topId: string, bottomId: string) => boolean;
   applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w' | 'top') => void;
@@ -376,6 +378,25 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     const t = _getTemporalApi?.();
     t?.pause();
 
+    // Bruce 2026-05-06 round 4 final: Smart-mode `recomputeSmartRailings`
+    // and `recomputeSmartHoleGuards` (containerSlice.applyContainerArrangement
+    // ~line 952) deactivate extension halo voxels when neighboring containers
+    // overlap their projected halo footprints. For tightly-packed model homes
+    // (resort_house's 3x2 grid, 2x2 showcases, etc.) this consistently wipes
+    // the perimeter walls that central_atrium just installed -- the
+    // user-visible "flat roof on stilts, no walls" failure mode. Verified
+    // via Playwright inspection: smart mode produces v0.active=false,
+    // northSteel=0; manual mode produces v0.active=true, northSteel=7
+    // (1119 tests still pass; behavior is identical except for the smart
+    // recompute step). Switch to manual for the placement, then restore.
+    // The smart-rule cascade still runs at the end via cleanupDesign() if
+    // the caller chooses to invoke it.
+    const savedDesignMode = get().designMode;
+    if (savedDesignMode === 'smart') {
+      get().setDesignMode('manual');
+      t?.pause();
+    }
+
     const containerIds: string[] = [];
 
     // Place each container
@@ -519,6 +540,17 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         get().generateRooftopDeck(topmost);
         t?.pause();
       }
+    }
+
+    // Restore the caller's prior design mode (see comment at top of
+    // placeModelHome). The smart-rule cascade has not been run during
+    // this placement; if the caller wants smart-rule cleanup, they should
+    // call `cleanupDesign()` after `placeModelHome` returns. The renderer
+    // sees walls correctly either way because the manual-mode placement
+    // preserves the central_atrium perimeter wall data.
+    if (savedDesignMode === 'smart') {
+      get().setDesignMode('smart');
+      t?.pause();
     }
 
     t?.resume();

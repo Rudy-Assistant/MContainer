@@ -48,6 +48,13 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     // code path the user actually sees.
     useStore.getState().cleanupDesign?.();
 
+    // CRITICAL: scheduleAdjacency() at the end of placeModelHome fires
+    // inside requestAnimationFrame(), which vitest's environment never
+    // executes. The browser DOES execute it, and refreshAdjacency() is
+    // where shared walls get auto-melted to 'Open'. Drive it manually
+    // here so the test exercises the same end-state the user observes.
+    useStore.getState().refreshAdjacency();
+
     const containers = useStore.getState().containers;
     // L1 NW position (-12.19, 0, -1.22) per current preset.
     const l1nw = Object.values(containers).find(
