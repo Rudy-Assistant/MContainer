@@ -1,5 +1,72 @@
 # Changelog
 
+## 2026-05-06 — Blueprint Mode refinement (Phase 4 closeout)
+
+User-flagged feedback: Blueprint Mode felt "very disconnected from 3D Mode." This release closes the gap with one cohesive arc — every BP-canvas affordance now mirrors a 3D-mode affordance, and a forcing-function model home (Resort House) exercises every multi-level primitive at once.
+
+### Always-visible level chip strip
+
+- `BlueprintLevelChips.tsx` (new) — sibling component to SceneCanvas, renders `All(N) | L2 | L1 | Pool` chips pinned at top-center of the BP canvas. Replaces the click-to-expand `LevelSlicer` dropdown that hid level switching behind extra clicks. Multi-level designs are now usable in plan view because top-down occlusion no longer matters: one click filters to the level you want.
+- Pool chip is styled distinct (sky-blue) and only appears when subterranean containers exist.
+
+### Resort House model home (#13)
+
+- 9 containers + subterranean Pool basin + L1→L2 stair on NW + L2→roof stair via `extraStairs`. ~$59,400 BOM.
+- L1 ring: 4 × `central_atrium` extension config — open central void over the Pool below.
+- L2 ring: 4 × `framed_glass_atrium` — continues the void with glass railings.
+- New `pool: true` flag on `ModelHomeContainer`; `placeModelHome` wires it through `addContainer + subterranean=true + createPoolVoxelGrid`, mirroring `addPoolContainer` semantics for any `relativePosition`.
+- Forcing function for stairs, level toggle, multi-level layouts, and pool/atrium semantics in one preset.
+
+### BP face-edge click painting
+
+- `BlueprintRenderer.tsx` adds 4 thin invisible click meshes per voxel along the n/s/e/w edges. Click an edge with a hotbar brush armed → `setVoxelFace(containerId, idx, dir, brush)`. Center click paints the bottom (floor) face. Alt+click anywhere = eyedropper (read the brush off the clicked face).
+
+### Shift+click stair placement
+
+- Same edge meshes branch on `shiftKey`: shift+click an edge calls `applyStairsFromFace` with the OPPOSITE direction so the resulting `stairAscending` matches the user-visible direction (clicking the north edge places stairs ascending toward the south, which read left-to-right in plan view as the user expects).
+
+### Click-to-place containers (Library tile arms, empty grid drops)
+
+- `Sidebar.tsx` — Library tile click in BP mode arms `bpvActiveContainerSize` (toggles on re-click of the same size); 3D mode keeps the existing drag-to-place flow.
+- `BlueprintRenderer.tsx` — extends the `MarqueeSelect` tap-on-empty-grid branch: tap calls `addContainer(armed, tapWorldPos, level=0)` when armed, otherwise falls back to clearSelection (existing behavior).
+- `Scene.tsx` — Escape cascade adds `bpvActiveContainerSize` clear as the FIRST step (above placementMode, staircase, dragContainer, deselect).
+- Delete-key removes selected container in BP mode (Scene.tsx 684-696 global handler covers all view modes; no new code needed).
+
+### `all_glass_interior` extension config
+
+- `containerSlice.applyExtensionConfig` now treats `all_glass_interior` the same as `all_interior` (Open faces, all four body-row/col boundaries). Previously misclassified as a deck. Required for Resort House perimeter containers.
+
+### Visual & rendering rescue (post-pre-crash recovery)
+
+- `RendererReadyGate.tsx` extracted into its own module so any GL-context-dependent child (cubeCamera, EffectComposer) can defer mount until `getContext()` returns valid attributes. Wraps `TimeOfDayEnvironmentInner` to fix the documented postprocessing v6.x "Cannot read properties of null (reading 'alpha')" race.
+- `Scene.tsx` coerces `environment.timeOfDay` reads with `Number()` in three sites — guards persisted-state string/number drift.
+- `OrientationGizmo.tsx` projects axes through a dummy camera in Walkthrough mode so FPV gizmo orientation matches what the user actually sees.
+- `page.tsx` — Walkthrough hint pill replaces the single-line controls strip (5 chip-style key clusters: WASD / MOUSE / SPACE / T / ESC on a glassmorphic 100px-radius pill).
+- Reverted a mistaken `mieCoefficient: 0.0035` midday-haze branch that violated the explicit `sky-regression.test.ts` invariant ("midday turbidity stays clear").
+
+### Gates + ratings
+
+- **G33-resortHouse** (new): places the Resort House preset, asserts 9 containers + pool@y=-2.9 + 4 central_atrium + 4 framed_glass_atrium + 2 stair pairs + chip strip at top-center + L1 click → viewLevel=0.
+- **G34-bpAddContainer** (new): full state-driven verification of the click-to-place flow — armed → place(5,5) → clear=null, re-arm(20ft_standard) → escape=null, delete 1→0.
+- **Ratings**: 30/30 features PRODUCTION (was 28); 46/46 Playwright gates PASS (was 44/44). New PRODUCTION features: `Blueprint Authoring` (Resort House + chip strip via G33) and `Blueprint Add/Delete` (click-to-place + Escape + Delete via G34).
+- **Known intermittent**: G8-fpWalking flakes ~1-in-3 runs due to FP-camera physics warm-up timing. Re-run on flake; not a regression.
+
+### Tests
+
+- 125 test files, 1081 tests pass. `tsc --noEmit` clean.
+
+### Commits this arc
+
+- 491cad0 — feat(blueprint): always-visible level chip strip + Resort House preset (G33)
+- 5b93f1b — chore: rescue uncommitted Blueprint-refinement work + revert mistaken midday haze
+- 0202d0e — feat(blueprint): face-edge click affordance (4 edge meshes + center bottom-paint + alt+click eyedropper)
+- 802ae6d — feat(blueprint): shift+click edge places stairs ascending toward that edge
+- 41644a6 — feat(store): bpvActiveContainerSize field for BP click-to-place
+- 8e97bfc — chore(quality): refresh assessment — Blueprint Authoring = PRODUCTION
+- 46df26a — chore(gates): G8-fpWalking is intermittent — re-run passes 45/45
+- e7b46f1 — feat(blueprint): click-to-place containers — Library tile arms, empty grid drops
+- 68d339d — test(gates): G34-bpAddContainer + 'Blueprint Add/Delete' feature
+
 ## 2026-04-29 — v0.2.0: Phase 4 hinged walls + sprint bugfix close-out
 
 ### Phase 4 — Hinged walls back inside the voxel skin

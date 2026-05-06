@@ -346,7 +346,7 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 
 ## §6 Feature Status
 
-28/28 features at PRODUCTION quality. 44/44 Playwright gates PASS (verified 2026-05-02 against v0.2.0 + post-release fixes; Animation Lifecycle promoted PROTOTYPE→PRODUCTION via G31-animations; AI Designer wired end-to-end and gated via G32-aiDesigner with mocked fetch). See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
+30/30 features at PRODUCTION quality. 46 Playwright gates total (verified 2026-05-05 against post-Phase-4 master; Animation Lifecycle promoted PROTOTYPE→PRODUCTION via G31-animations; AI Designer gated via G32-aiDesigner with mocked fetch; Resort House preset + BP level chip strip gated via G33-resortHouse; BP click-to-place + Escape-cancel + Delete-removes gated via G34-bpAddContainer). G8-fpWalking is a known intermittent (FP-camera physics warm-up); re-run on flake. See `CURRENT-QUALITY-ASSESSMENT.md` for full ratings with evidence.
 
 | Feature | Rating |
 |---------|--------|
@@ -357,6 +357,8 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 | Walkthrough | PRODUCTION |
 | Export | PRODUCTION |
 | Blueprint | PRODUCTION |
+| Blueprint Authoring (Resort House preset + level chip strip) | PRODUCTION |
+| Blueprint Add/Delete (click-to-place + Escape-cancel + Delete-removes) | PRODUCTION |
 | Theme System | PRODUCTION |
 | Stacking | PRODUCTION |
 | Save/Load | PRODUCTION |
@@ -369,6 +371,19 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 | Hotbar + Controls | PRODUCTION |
 | Ground + Atmosphere | PRODUCTION |
 | Animation Lifecycle (Extension Unpack + Stair Telescope) | PRODUCTION |
+| AI Designer (prompt → DesignPlan → store) | PRODUCTION |
+
+### Phase 4: Blueprint Mode refinement (2026-05-05)
+
+The user called out Blueprint Mode as feeling "disconnected from 3D Mode" and asked for the fundamentals to be sharpened. Phase 4 closed that gap with five interlocking changes that mirror 3D affordances in the top-down view:
+
+1. **Always-visible level chip strip** — `BlueprintLevelChips.tsx` renders `All(N) | L2 | L1 | Pool` chips pinned at top-center of the BP canvas. Click any chip to filter the rendered level (replaces the hidden click-to-expand LevelSlicer dropdown for multi-level designs).
+2. **Face-edge click painting** — `BlueprintRenderer.tsx` adds 4 thin invisible click meshes per voxel along the n/s/e/w edges. Click an edge with a hotbar brush armed → `setVoxelFace(containerId, idx, dir, brush)`. Center click paints the bottom (floor) face. Alt+click = eyedropper.
+3. **Shift+click stair placement** — Same edge meshes branch on shiftKey: shift+click an edge calls `applyStairsFromFace` with the OPPOSITE direction so the resulting `stairAscending` matches the user-visible direction. Easier in 2D than 3D because edges are visible from above without occlusion.
+4. **Click-to-place containers** — Library tile click in BP mode arms `bpvActiveContainerSize` (toggles on re-click); tap on empty BP grid via the marquee handler's tap branch calls `addContainer(armed, tapWorldPos, level=0)`. Escape cancels. Delete removes selected (existing global handler in Scene.tsx covers all view modes).
+5. **Resort House model home** — three-level forcing function: subterranean Pool basin + 4×L1 `central_atrium` ring over the pool + 4×L2 `framed_glass_atrium` continuation + L1→L2 stair on NW + L2→roof stair via `extraStairs`. 9 containers, ~$59,400 BOM, exercises every multi-level primitive.
+
+All changes are atomic-Zustand-selector clean and gated by G31/G32/G33/G34.
 
 ---
 

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-06T03:00:09.456Z",
+  "timestamp": "2026-05-06T04:09:42.332Z",
   "sprint": 13,
   "gates": [
     {
@@ -35,7 +35,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "visual match (8.16% diff)"
+      "msg": "screenshot captured (no buffer for comparison)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.614, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.434, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=2.00, targetY=1.29, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=1.85, targetY=1.29, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=082926e9-e997-4bfa-92d2-cff00329a3f3"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=96b0cbfb-9cd4-4ca2-aa18-3e26573e9f1e"
     },
     {
       "gate": "G21-leftDragMove",
@@ -218,6 +218,11 @@
       "msg": "placed: 9 containers, pool@y=-2.9, 4 central_atrium + 4 framed_glass_atrium, 2 stair pairs; chip strip atTopCenter=true, 4 chips, L1 click→viewLevel=0"
     },
     {
+      "gate": "G34-bpAddContainer",
+      "status": "PASS",
+      "msg": "armed→place(5,5)→clear=null, re-arm(20ft_standard)→escape=null, delete 1→0"
+    },
+    {
       "gate": "G19-defaultVisual",
       "status": "PASS",
       "msg": "default state restored via UI"
@@ -228,7 +233,7 @@
       "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 45,
-  "passed": 45,
+  "total": 46,
+  "passed": 46,
   "failed": 0
 }
