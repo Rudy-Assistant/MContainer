@@ -185,6 +185,7 @@ function VoxelBlueprintGrid({
   const setHoveredVoxel  = useStore((s) => s.setHoveredVoxel);
   const setVoxelFace     = useStore((s) => s.setVoxelFace);
   const setActiveBrush   = useStore((s) => s.setActiveBrush);
+  const applyStairsFromFace = useStore((s) => s.applyStairsFromFace);
   const selectedVoxel    = useSelectedVoxel();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
@@ -206,6 +207,25 @@ function VoxelBlueprintGrid({
       return true;
     },
     [container.id, select, setActiveBrush, setSelectedElements, setVoxelFace]
+  );
+
+  // BP stair-placement gesture: shift+click on a wall edge places stairs at the
+  // current voxel ascending toward the clicked direction. applyStairsFromFace
+  // takes the ENTRY face (opposite of ascent), so we flip the clicked edge
+  // direction before passing it. e.g. shift+click on the north edge means the
+  // user wants stairs ascending NORTH; we pass face='s' (entry from south) so
+  // STAIR_FLIP['s']='n' becomes the ascending direction. Easier in 2D than 3D
+  // because edges are visible from above without occlusion.
+  const STAIR_OPPOSITE: Record<'n' | 's' | 'e' | 'w', 'n' | 's' | 'e' | 'w'> = {
+    n: 's', s: 'n', e: 'w', w: 'e',
+  };
+  const placeStairsAtEdge = useCallback(
+    (idx: number, dir: 'n' | 's' | 'e' | 'w') => {
+      applyStairsFromFace(container.id, idx, STAIR_OPPOSITE[dir]);
+      select(container.id);
+      setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
+    },
+    [container.id, select, setSelectedElements, applyStairsFromFace]
   );
 
   const grid: Voxel[] = container.voxelGrid ?? [];
@@ -287,6 +307,13 @@ function VoxelBlueprintGrid({
                   rotation={[-Math.PI / 2, 0, 0]}
                   renderOrder={1003}
                   onClick={(e: ThreeEvent<MouseEvent>) => {
+                    // Shift+click on an edge = place stairs ascending toward
+                    // that edge direction. Wins over paint when shift is held.
+                    if (e.nativeEvent.shiftKey) {
+                      e.stopPropagation();
+                      placeStairsAtEdge(idx, dir);
+                      return;
+                    }
                     if (paintFaceFromActiveBrush(idx, dir, e)) {
                       e.stopPropagation();
                     }
