@@ -165,6 +165,9 @@ function Library() {
   const selection   = useStore((s) => s.selection);
   const setDragContainer = useStore((s) => s.setDragContainer);
   const addFurniture     = useStore((s) => s.addFurniture);
+  const viewMode         = useStore((s) => s.viewMode);
+  const setBpvActiveContainerSize = useStore((s) => s.setBpvActiveContainerSize);
+  const bpvActiveContainerSize    = useStore((s) => s.bpvActiveContainerSize);
   const [activeTab, setActiveTab] = useState<"structure" | "interior" | "saved">("structure");
   const [dragging, setDragging]   = useState<string | null>(null);
   const [dragPos, setDragPos]     = useState({ x: 0, y: 0 });
@@ -174,6 +177,15 @@ function Library() {
   const handleContainerDrag = useCallback(
     (size: ContainerSize, e: React.MouseEvent) => {
       e.preventDefault();
+      // Blueprint mode: click-to-arm instead of drag-to-place. Top-down
+      // canvas has no clean drop target during drag, and the user already
+      // sees the grid cell they want to fill — clicking the tile arms the
+      // active size, then clicking the empty grid cell places it.
+      if (viewMode === ViewMode.Blueprint) {
+        // Toggle: click again with the same size armed = clear (cancel).
+        setBpvActiveContainerSize(bpvActiveContainerSize === size ? null : size);
+        return;
+      }
       setDragging(size);
       setDragPos({ x: e.clientX, y: e.clientY });
       setDragContainer(size);
@@ -186,7 +198,7 @@ function Library() {
       document.addEventListener("mousemove", handleMove);
       document.addEventListener("mouseup", handleUp);
     },
-    [setDragContainer]
+    [setDragContainer, viewMode, bpvActiveContainerSize, setBpvActiveContainerSize]
   );
 
   const handleFurnitureDrop = useCallback(

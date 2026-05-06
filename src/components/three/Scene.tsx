@@ -847,7 +847,9 @@ function useKeyboardShortcuts() {
 
       // Escape = Cancel placement mode / staircase mode / deselect / cancel drag
       if (e.code === "Escape") {
-        if (store.placementMode) {
+        if (store.bpvActiveContainerSize) {
+          store.setBpvActiveContainerSize(null);
+        } else if (store.placementMode) {
           store.setPlacementMode(null);
         } else if (store.staircasePlacementMode) {
           store.setStaircasePlacementMode(false);

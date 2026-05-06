@@ -680,6 +680,8 @@ const DRAG_THRESHOLD = 5;
 function MarqueeSelect({ containers }: { containers: Container[] }) {
   const selectMultiple = useStore((s) => s.selectMultiple);
   const clearSelection = useStore((s) => s.clearSelection);
+  const addContainer   = useStore((s) => s.addContainer);
+  const setBpvActiveContainerSize = useStore((s) => s.setBpvActiveContainerSize);
   const { camera, gl } = useThree();
 
   const [marquee, setMarquee] = useState<{
@@ -761,7 +763,16 @@ function MarqueeSelect({ containers }: { containers: Container[] }) {
         if (selected.length > 0) selectMultiple(selected);
         else clearSelection();
       } else {
-        clearSelection();
+        // Tap on empty grid (no drag). If a container size is armed via the
+        // BP Library tile, place a container at the tap point. Otherwise
+        // fall back to existing clear-selection behavior.
+        const armed = useStore.getState().bpvActiveContainerSize;
+        if (armed) {
+          addContainer(armed, { x: dragRef.current.startX, y: 0, z: dragRef.current.startZ }, 0);
+          setBpvActiveContainerSize(null);
+        } else {
+          clearSelection();
+        }
       }
 
       dragRef.current = null;
@@ -774,7 +785,7 @@ function MarqueeSelect({ containers }: { containers: Container[] }) {
       canvas.removeEventListener("pointermove", handleMove);
       canvas.removeEventListener("pointerup", handleUp);
     };
-  }, [gl.domElement, screenToWorld, containers, selectMultiple, clearSelection]);
+  }, [gl.domElement, screenToWorld, containers, selectMultiple, clearSelection, addContainer, setBpvActiveContainerSize]);
 
   return (
     <>
