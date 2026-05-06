@@ -542,19 +542,27 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       }
     }
 
-    // Restore the caller's prior design mode (see comment at top of
-    // placeModelHome). The smart-rule cascade has not been run during
-    // this placement; if the caller wants smart-rule cleanup, they should
-    // call `cleanupDesign()` after `placeModelHome` returns. The renderer
-    // sees walls correctly either way because the manual-mode placement
-    // preserves the central_atrium perimeter wall data.
-    if (savedDesignMode === 'smart') {
-      get().setDesignMode('smart');
-      t?.pause();
-    }
-
     t?.resume();
     scheduleAdjacency(get);
+
+    // Restore the caller's prior design mode AFTER scheduleAdjacency has
+    // had a chance to fire (it uses requestAnimationFrame; we defer the
+    // restore by 2 frames so the rAF fires while we're still in manual
+    // mode -- otherwise refreshAdjacency runs in smart mode and the
+    // auto-merge step at containerSlice.ts:1801+ wipes the perimeter
+    // walls we just installed). Browser-only path: requestAnimationFrame
+    // fires near 16ms; vitest never fires rAF, so the test path doesn't
+    // need this delay.
+    if (savedDesignMode === 'smart' && typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          get().setDesignMode('smart');
+        });
+      });
+    } else if (savedDesignMode === 'smart') {
+      get().setDesignMode('smart');
+    }
+
     return containerIds;
   },
 });
