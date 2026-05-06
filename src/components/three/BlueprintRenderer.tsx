@@ -1023,8 +1023,10 @@ export default function BlueprintRenderer() {
   const containers = useStore((s) => s.containers);
   const zones      = useStore((s) => s.zones);
   const viewLevel  = useStore((s) => s.viewLevel);
-  const bpvLevel   = useStore((s) => s.bpvLevel);
-  const setBpvLevel = useStore((s) => s.setBpvLevel);
+  const bpvLevel        = useStore((s) => s.bpvLevel);
+  const setBpvLevel     = useStore((s) => s.setBpvLevel);
+  const inspectorView   = useStore((s) => s.inspectorView);
+  const setInspectorView = useStore((s) => s.setInspectorView);
 
   const allContainers     = Object.values(containers);
   const visibleContainers = viewLevel === null
@@ -1048,34 +1050,124 @@ export default function BlueprintRenderer() {
 
       <MarqueeSelect containers={visibleContainers} />
 
-      {/* BPV level toggle — top-right corner overlay */}
+      {/* Top-right BP overlay — TWO toggles, stacked, with explicit labels.
+       *
+       *   Row 1 ("Voxel level"): which voxel-level inside the container is
+       *       currently being interacted with (lower body / upper body).
+       *       Used for atrium voids, mid-floor edits, etc. Drives `bpvLevel`.
+       *
+       *   Row 2 ("Face to paint"): which face of the clicked voxel a brush
+       *       paint targets — 'floor' → bottom, 'ceiling' → top. Drives
+       *       `inspectorView`. Critical for designing rooftop decks
+       *       (paint top of upper voxels) without needing to open the
+       *       Inspector → Container tab. Bruce 2026-05-06: exposed this
+       *       in BP because the face-paint toggle was previously only
+       *       reachable via the Inspector sidebar — a real "BP disconnect"
+       *       gap. */}
       <Html
         position={[0, 0, 0]}
         style={{ position: "fixed", top: 68, right: 12, pointerEvents: "none" }}
         zIndexRange={[9999, 9999]}
       >
-        <div style={{ pointerEvents: "auto", display: "flex", gap: 4 }}>
-          {([0, 1] as const).map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => setBpvLevel(lvl)}
+        <div
+          style={{
+            pointerEvents: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            alignItems: "flex-end",
+          }}
+        >
+          {/* Row 1: voxel-level toggle (bpvLevel) */}
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <span
               style={{
-                padding: "4px 10px",
-                fontSize: 11,
+                fontSize: 9,
                 fontWeight: 600,
                 fontFamily: "system-ui",
-                borderRadius: 6,
-                border: "1.5px solid",
-                borderColor: bpvLevel === lvl ? "#1565c0" : "#cfd8dc",
-                background: bpvLevel === lvl ? "#1565c0" : "#ffffff",
-                color: bpvLevel === lvl ? "#ffffff" : "#37474f",
-                cursor: "pointer",
-                transition: "all 0.15s",
+                color: "#78909c",
+                marginRight: 4,
+                letterSpacing: 0.4,
+                textTransform: "uppercase",
               }}
+              title="Which voxel-level inside the container is being shown / edited"
             >
-              {lvl === 0 ? "Floor" : "Ceiling"}
-            </button>
-          ))}
+              Level
+            </span>
+            {([0, 1] as const).map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => setBpvLevel(lvl)}
+                title={
+                  lvl === 0
+                    ? "Lower voxel level (ground / body voxels)"
+                    : "Upper voxel level (ceiling / atrium voids)"
+                }
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "system-ui",
+                  borderRadius: 6,
+                  border: "1.5px solid",
+                  borderColor: bpvLevel === lvl ? "#1565c0" : "#cfd8dc",
+                  background: bpvLevel === lvl ? "#1565c0" : "#ffffff",
+                  color: bpvLevel === lvl ? "#ffffff" : "#37474f",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {lvl === 0 ? "Lower" : "Upper"}
+              </button>
+            ))}
+          </div>
+
+          {/* Row 2: face-paint toggle (inspectorView). Determines which
+           *  face brush-clicks target — bottom (floor surface) or top
+           *  (ceiling surface = roof underside / upstairs floor underside). */}
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                fontFamily: "system-ui",
+                color: "#78909c",
+                marginRight: 4,
+                letterSpacing: 0.4,
+                textTransform: "uppercase",
+              }}
+              title="Which face the active brush will paint when you click a voxel"
+            >
+              Paint
+            </span>
+            {(["floor", "ceiling"] as const).map((view) => (
+              <button
+                key={view}
+                onClick={() => setInspectorView(view)}
+                title={
+                  view === "floor"
+                    ? "Paint the FLOOR face (bottom of the clicked voxel) — e.g. wood deck on the ground floor"
+                    : "Paint the CEILING face (top of the clicked voxel) — e.g. rooftop deck or skylight"
+                }
+                aria-pressed={inspectorView === view}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "system-ui",
+                  borderRadius: 6,
+                  border: "1.5px solid",
+                  borderColor: inspectorView === view ? "#00838f" : "#cfd8dc",
+                  background: inspectorView === view ? "#00838f" : "#ffffff",
+                  color: inspectorView === view ? "#ffffff" : "#37474f",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {view === "floor" ? "Floor" : "Ceiling"}
+              </button>
+            ))}
+          </div>
         </div>
       </Html>
     </>
