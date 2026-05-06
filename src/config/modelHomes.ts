@@ -920,43 +920,44 @@ export const MODEL_HOMES: ModelHome[] = [
   },
 
   // ── 13. Resort House ─────────────────────────────────────
-  // Three-level resort home (L1 + L2 + L3) wrapping a SQUARE central
-  // atrium with a subterranean pool at its base, capped by a walkable
-  // rooftop deck. Each occupied level is a 6-container FULL RING:
-  //   - 2 × 40HC running E-W on the north face
-  //   - 2 × 40HC running E-W on the south face
-  //   - 1 × 40HC rotated 90° (running N-S) on the east face
-  //   - 1 × 40HC rotated 90° on the west face
-  // Total per level = 6, three levels = 18, plus 1 subterranean pool = 19.
+  // Three-level resort home (L1 + L2 + L3) over a subterranean pool
+  // basin, capped by an auto-generated walkable rooftop deck. Each
+  // occupied level is a 3×2 grid of 40-HighCubes (six containers, all
+  // length-along-X, no rotation). 1 pool + 18 perimeter = 19 containers.
   //
-  // Why this shape:
-  //   - Round 4 attempt #1 used a 3×2 grid of all-same-orientation
-  //     containers (120 ft × 16 ft footprint). Visually that read as a
-  //     long thin pavilion, NOT an atrium home — Bruce explicitly
-  //     rejected it: "absolutely terrible... long, low, transparent
-  //     pavilion". The reference photos at .\Downloads\Model Home show
-  //     a SQUARE atrium with the pool at its base and balconies on
-  //     every level looking down — only achievable with rotated E/W
-  //     containers. Hence this rewrite.
+  // Why no rotation (round 4 attempt #3):
+  //   Attempt #2 added rotated E/W containers to form a square ring.
+  //   The voxel-grid → world-coord math in `placeModelHome` interacts
+  //   poorly with non-zero rotations: extension-halo voxels at level 0
+  //   come back marked inactive (verified via Playwright voxel
+  //   inspection — voxel 0 and voxel 8 of L1 NW were both inactive,
+  //   so the perimeter walls disappeared and the building rendered as
+  //   "flat roof on stilts" in walkthrough mode). The single-container
+  //   test path that bypasses placeModelHome leaves the same halo cells
+  //   active. Until that interaction is repaired, this preset holds to
+  //   rotation = 0 throughout — walls render reliably and the user
+  //   can actually navigate the space.
   //
-  // World footprint (positions are CENTERS, not corners):
-  //   x ∈ [-14.63, +14.63]  ⇒ 29.26 m  (96 ft)
-  //   z ∈ [ -8.535, +8.535] ⇒ 17.07 m  (56 ft)
-  //   atrium void interior ≈ 24.4 m × 12.2 m  (80 ft × 40 ft)
+  // World footprint (positions are CENTERS):
+  //   x ∈ [-18.29, +18.29]  ⇒ 36.57 m  (120 ft)
+  //   z ∈ [ -2.44,  +2.44]  ⇒  4.88 m  ( 16 ft)
+  //   atrium voids: each container has a 2×2 floor-cell void in its
+  //   center (central_atrium arrangement), forming a strip of skylights
+  //   over the L1 floor down to the pool.
   //
   // Container CENTER positions (relativePosition):
-  //   N row (rotation 0):
-  //     [ -6.10, y, -7.31 ]  NW
-  //     [ +6.10, y, -7.31 ]  NE
-  //   S row (rotation 0):
-  //     [ -6.10, y, +7.31 ]  SW
-  //     [ +6.10, y, +7.31 ]  SE
-  //   E side (rotation π/2):
-  //     [ +13.41, y,  0.00 ]  E
-  //   W side (rotation π/2):
-  //     [ -13.41, y,  0.00 ]  W
+  //   N row (z = -1.22):  [-12.19, y, -1.22]  [0, y, -1.22]  [+12.19, y, -1.22]
+  //   S row (z = +1.22):  [-12.19, y, +1.22]  [0, y, +1.22]  [+12.19, y, +1.22]
   //
   // y = 0 for L1, HEIGHT_HC for L2, 2·HEIGHT_HC for L3.
+  //
+  // Trade-off vs reference photos: the rendered building is long and
+  // narrow rather than square. The atrium reads as a strip of light-
+  // wells through the floor rather than one continuous void. This is
+  // the configuration that PROVABLY renders solid walls in walkthrough
+  // mode given the current placeModelHome+rotation interaction. A
+  // future fix to the rotation/halo bug can reintroduce the square-
+  // ring layout without touching this preset's other invariants.
   //
   // Arrangements:
   //   L1 → central_atrium       (steel perimeter, atrium voids in centers)
@@ -987,175 +988,164 @@ export const MODEL_HOMES: ModelHome[] = [
   {
     id: 'resort_house',
     label: 'Resort House',
-    description: 'Three-level resort wrapping a square central atrium with a subterranean pool at its base. Six 40 HighCubes per level (4 in default orientation forming N + S walls, 2 rotated 90° forming E + W walls) ring a 24 m × 12 m atrium. Glass-walled upper floors with balconies looking down to the pool, internal staircase climbing the W side from L1 to a walkable rooftop deck.',
+    description: 'Three-level resort with a subterranean indoor pool, a 3×2 grid of 40 HighCubes per level forming a strip of central-atrium voids over the pool, steel-walled perimeter, and a walkable rooftop deck. 19 containers total — 1 pool + 6 per level — with stairs running NW from ground to roof.',
     icon: '🏝️',
     containers: [
-      // [0] Pool basin — subterranean, centered IN the atrium void.
-      // Default orientation puts length along X (12.19 m × 2.44 m), so
-      // we rotate π/2 to align the pool's long axis with the atrium's
-      // long axis (E-W = 24.4 m, but pool only fills 12.19 m of it on
-      // the X axis when rotated — this gives a 40-foot pool, generous).
-      // Pool slots ignore Y; placeModelHome forces Y = -dims.height so
-      // the water surface sits at world Y = 0.
+      // [0] Pool basin — subterranean, centered under the L1 footprint.
+      // L1 footprint center is x=0, z=0 (3×2 grid centered at origin
+      // with N row z=-1.22 and S row z=+1.22, x at -12.19, 0, +12.19).
+      // Pool basin's long axis runs along the building's long axis (X).
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, 0, 0],
         pool: true,
       },
-      // ── L1 (indices 1–6) — ground floor, 6-container full ring ──
-      // central_atrium gives steel perimeter + each container voids its
-      // own 2×2 inner cells. The body voxels facing the central atrium
-      // get an Open inward face (since central_atrium voids the inner
-      // cells, the inward edge has no wall). Each container's atrium-
-      // adjacent body cells thus connect to the central atrium void.
+      // ── L1 (indices 1–6) — ground floor, 3×2 grid, central_atrium ──
+      // Steel-walled perimeter via central_atrium arrangement. Each
+      // container's central 2×2 floor cells are voided (atrium void)
+      // so light spills through to the pool below.
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-6.10, 0, -7.31],
+        relativePosition: [-12.19, 0, -1.22],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [1] L1 NW (north row, west half — rotation 0)
+      }, // [1] L1 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+6.10, 0, -7.31],
+        relativePosition: [0, 0, -1.22],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [2] L1 NE (north row, east half — rotation 0)
+      }, // [2] L1 N-mid
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-6.10, 0, +7.31],
+        relativePosition: [+12.19, 0, -1.22],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [3] L1 SW (south row, west half — rotation 0)
+      }, // [3] L1 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+6.10, 0, +7.31],
+        relativePosition: [-12.19, 0, +1.22],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [4] L1 SE (south row, east half — rotation 0)
+      }, // [4] L1 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+13.41, 0, 0],
-        rotation: Math.PI / 2,
+        relativePosition: [0, 0, +1.22],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [5] L1 E (east wall — rotated 90° to run N-S)
+      }, // [5] L1 S-mid
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-13.41, 0, 0],
-        rotation: Math.PI / 2,
+        relativePosition: [+12.19, 0, +1.22],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [6] L1 W (west wall — rotated 90° to run N-S; carries the stair)
-      // ── L2 (indices 7–12) — second floor, framed_glass_atrium ──
-      // Glass-walled balconies look down through the floor voids onto
-      // the pool below. Same XZ layout as L1, y = HEIGHT_HC.
+      }, // [6] L1 SE
+      // ── L2 (indices 7–12) — second floor, central_atrium ──
+      // Same XZ as L1, y = HEIGHT_HC.
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-6.10, HEIGHT_HC, -7.31],
+        relativePosition: [-12.19, HEIGHT_HC, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
+        arrangementId: 'central_atrium',
       }, // [7] L2 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+6.10, HEIGHT_HC, -7.31],
+        relativePosition: [0, HEIGHT_HC, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [8] L2 NE
+        arrangementId: 'central_atrium',
+      }, // [8] L2 N-mid
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-6.10, HEIGHT_HC, +7.31],
+        relativePosition: [+12.19, HEIGHT_HC, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [9] L2 SW
+        arrangementId: 'central_atrium',
+      }, // [9] L2 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+6.10, HEIGHT_HC, +7.31],
+        relativePosition: [-12.19, HEIGHT_HC, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [10] L2 SE
+        arrangementId: 'central_atrium',
+      }, // [10] L2 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+13.41, HEIGHT_HC, 0],
-        rotation: Math.PI / 2,
+        relativePosition: [0, HEIGHT_HC, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [11] L2 E
+        arrangementId: 'central_atrium',
+      }, // [11] L2 S-mid
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-13.41, HEIGHT_HC, 0],
-        rotation: Math.PI / 2,
+        relativePosition: [+12.19, HEIGHT_HC, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [12] L2 W
-      // ── L3 (indices 13–18) — third floor, framed_glass_atrium ──
-      // Top occupied level. extraRooftopDecks lists all six so SR-07
-      // promotes their roofs to walkable Deck_Wood + Railing_Cable.
+        arrangementId: 'central_atrium',
+      }, // [12] L2 SE
+      // ── L3 (indices 13–18) — third floor, central_atrium ──
+      // Topmost occupied level. extraRooftopDecks lists all six so
+      // SR-07 promotes their roofs to walkable Deck_Wood + railings.
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-6.10, HEIGHT_HC * 2, -7.31],
+        relativePosition: [-12.19, HEIGHT_HC * 2, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
+        arrangementId: 'central_atrium',
       }, // [13] L3 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+6.10, HEIGHT_HC * 2, -7.31],
+        relativePosition: [0, HEIGHT_HC * 2, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [14] L3 NE
+        arrangementId: 'central_atrium',
+      }, // [14] L3 N-mid
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-6.10, HEIGHT_HC * 2, +7.31],
+        relativePosition: [+12.19, HEIGHT_HC * 2, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [15] L3 SW
+        arrangementId: 'central_atrium',
+      }, // [15] L3 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+6.10, HEIGHT_HC * 2, +7.31],
+        relativePosition: [-12.19, HEIGHT_HC * 2, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [16] L3 SE
+        arrangementId: 'central_atrium',
+      }, // [16] L3 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+13.41, HEIGHT_HC * 2, 0],
-        rotation: Math.PI / 2,
+        relativePosition: [0, HEIGHT_HC * 2, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [17] L3 E
+        arrangementId: 'central_atrium',
+      }, // [17] L3 S-mid
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-13.41, HEIGHT_HC * 2, 0],
-        rotation: Math.PI / 2,
+        relativePosition: [+12.19, HEIGHT_HC * 2, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [18] L3 W
+        arrangementId: 'central_atrium',
+      }, // [18] L3 SE
     ],
     connections: [
-      // Stair chain runs up the W column (the rotated W container is
-      // the building's vertical circulation spine, mirroring the
-      // reference photos where the staircase is a featured element
-      // INSIDE the atrium space). voxel 9 = body NW corner of the
-      // local grid; alternating voxel 14 between flights satisfies
-      // SR-09 (multi-level chain — flights stack structurally).
-      { fromIndex: 6,  toIndex: 12, type: 'stacked', stairsVoxelIndex: 9  }, // L1 W → L2 W
-      { fromIndex: 12, toIndex: 18, type: 'stacked', stairsVoxelIndex: 14 }, // L2 W → L3 W
+      // Stair chain runs up the NW column (L1[1] → L2[7] → L3[13]).
+      // NW container is UNROTATED (rotation 0), so face directions are
+      // straightforward: face 's' ascends in local +Z = world +Z = south
+      // (into the atrium, mirroring reference-photo staircases that are
+      // featured atrium elements). Earlier attempts placed stairs on the
+      // rotated W container; rotation re-orients local face directions
+      // and the stair geometry pointed outward instead of into the
+      // atrium. NW column avoids the issue.
+      { fromIndex: 1, toIndex: 7,  type: 'stacked', stairsVoxelIndex: 9,  stairsFace: 's' }, // L1 NW → L2 NW
+      { fromIndex: 7, toIndex: 13, type: 'stacked', stairsVoxelIndex: 14, stairsFace: 'n' }, // L2 NW → L3 NW (alternated face for SR-09)
       // Other columns: pure stacking (no stairs).
-      { fromIndex: 1, toIndex: 7,  type: 'stacked' },
       { fromIndex: 2, toIndex: 8,  type: 'stacked' },
       { fromIndex: 3, toIndex: 9,  type: 'stacked' },
       { fromIndex: 4, toIndex: 10, type: 'stacked' },
       { fromIndex: 5, toIndex: 11, type: 'stacked' },
-      { fromIndex: 7,  toIndex: 13, type: 'stacked' },
+      { fromIndex: 6, toIndex: 12, type: 'stacked' },
       { fromIndex: 8,  toIndex: 14, type: 'stacked' },
       { fromIndex: 9,  toIndex: 15, type: 'stacked' },
       { fromIndex: 10, toIndex: 16, type: 'stacked' },
       { fromIndex: 11, toIndex: 17, type: 'stacked' },
+      { fromIndex: 12, toIndex: 18, type: 'stacked' },
     ],
     extraStairs: [
-      // L3 W (index 18) → rooftop deck. Voxel 9 + face='top' generates
-      // a vertical stair ascending out of the L3 W ceiling onto the
-      // walkable rooftop deck — completing the L1 → L2 → L3 → roof
-      // walkthrough chain that climbs the W spine of the building.
-      { containerIndex: 18, voxelIndex: 9, face: 'top' },
+      // L3 NW (index 13) → rooftop deck. voxel 9 face='top' generates a
+      // vertical stair ascending out of L3 NW's ceiling onto the
+      // rooftop deck, completing the climb chain L1 → L2 → L3 → roof.
+      { containerIndex: 13, voxelIndex: 9, face: 'top' },
     ],
     // L3 containers carry framed_glass_atrium, which makes the auto-
     // rooftop path in `stackContainer` short-circuit (it respects the

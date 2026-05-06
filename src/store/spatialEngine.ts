@@ -612,6 +612,28 @@ export function computeGlobalCulling(
     const aBound = wallSideToBoundary(pair.sideA);
     const bBound = wallSideToBoundary(pair.sideB);
 
+    // ── Rotation-mismatch bail-out ──────────────────────────────
+    // The voxel-grid → world-coord math below (lines that compute
+    // `aWorldZ = a.position.z + (row - 1.5) * aRowPitch` and analogous
+    // `aWorldX` for cols) assumes the container's local row-axis aligns
+    // with world Z and local col-axis aligns with world X. That assumption
+    // only holds when rotation = 0. When two adjacent containers have
+    // DIFFERENT Y-rotations (e.g. resort_house's rotated E/W containers
+    // touching the unrotated N/S row), this math computes geometrically
+    // invalid world positions, the overlap check returns spurious matches,
+    // and EXTERIOR perimeter-wall faces get culled into oblivion — producing
+    // the "flat-roof on stilts, no walls" failure mode in walkthrough mode.
+    //
+    // Properly fixing the math requires rotating the (row, col) → (worldX,
+    // worldZ) projection per container (cos/sin transform on each side).
+    // Until that lands, bail out cleanly: leave walls visible whenever the
+    // rotations differ. This is overly conservative — interior seams
+    // between mismatched-rotation neighbors will not melt — but the
+    // alternative is the user-visible bug shown in the round-4 attempt-2
+    // walkthrough screenshot. Rendering "too many" walls is acceptable;
+    // rendering "almost no walls" is not.
+    if (a.rotation !== b.rotation) continue;
+
     // Compute pitch and grid extents for geometric overlap checks.
     // Same math as refreshAdjacency: colPitch = body length / 6 body cols,
     // rowPitch = body width / 2 body rows. Grid half-extent = (total cols or rows / 2) * pitch.
