@@ -42,6 +42,7 @@ type LibraryRuntimeState = LibrarySlice & {
   addContainer: (size: Container['size'], position: ContainerPosition, level: number, skipSmartPlacement?: boolean) => string;
   applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
   applyContainerArrangement: (containerId: string, arrangementId: import('@/types/container').ContainerArrangementId) => void;
+  updateContainerRotation: (containerId: string, rotation: number) => void;
   setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean) => void;
   stackContainer: (topId: string, bottomId: string) => boolean;
   applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w' | 'top') => void;
@@ -410,6 +411,15 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       const id = get().addContainer(mc.size, pos, Math.round(pos.y / 2.9), true);
       t?.pause();
       containerIds.push(id);
+
+      // Apply container rotation (Y-axis radians) BEFORE arrangement so
+      // rendered geometry + adjacency engine see the final orientation.
+      // The voxel grid stays in LOCAL coords (rotation is render-only),
+      // so arrangement voids/walls remain in correct local positions.
+      if (mc.rotation !== undefined && mc.rotation !== 0) {
+        get().updateContainerRotation(id, mc.rotation);
+        t?.pause();
+      }
 
       if (mc.role) {
         get().applyContainerRole(id, mc.role, true);

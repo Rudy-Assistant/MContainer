@@ -34,7 +34,22 @@ export interface ModelHomeContainer {
    *  is added later via the `furniture: [...]` array if at all). */
   role?: string;
   size: ContainerSize;
-  relativePosition: [number, number, number];    // Offset from model home origin [x, y, z]
+  /** Offset of this container's CENTER from the model home origin
+   *  [x, y, z]. NOT the NW corner — `addContainer` and `getFootprintAt`
+   *  treat the position as the center of the container's bounding box,
+   *  with the body extending half-length / half-width on each axis.
+   *  Stacked containers share the same (x, z) center; only y differs. */
+  relativePosition: [number, number, number];
+  /** Y-axis rotation in radians. 0 = default (length-along-X);
+   *  Math.PI / 2 = 90° CCW (length-along-Z, container runs N-S);
+   *  Math.PI = 180° (flipped); 3 * Math.PI / 2 = 270°.
+   *
+   *  When non-zero, `placeModelHome` calls `updateContainerRotation`
+   *  AFTER `addContainer` so the renderer + adjacency engine pick up
+   *  the rotation. The voxel grid stays in LOCAL coordinates, so any
+   *  arrangement (e.g. central_atrium voids cols 3-4 rows 1-2)
+   *  rotates with the container in world space. */
+  rotation?: number;
   extensionConfig?: string;                      // 'none' | 'all_deck' | etc.
   arrangementId?: ContainerArrangementId;
   /** Optional entry door — installed at the given voxel face after arrangement
@@ -905,12 +920,43 @@ export const MODEL_HOMES: ModelHome[] = [
   },
 
   // ── 13. Resort House ─────────────────────────────────────
-  // Three-level resort home (L1 + L2 + L3) over a subterranean pool basin,
-  // capped by an auto-generated rooftop deck. Each occupied level is a 3×2
-  // ring of 40-HighCubes (six containers, length-along-X) — total 1 pool +
-  // 18 perimeter = 19 containers. The user spec was "L0 pool + at least 5
-  // perimeter containers per L1/L2/L3 level", so 6/level overshoots cleanly
-  // and gives the central column a void column for the pool to sit under.
+  // Three-level resort home (L1 + L2 + L3) wrapping a SQUARE central
+  // atrium with a subterranean pool at its base, capped by a walkable
+  // rooftop deck. Each occupied level is a 6-container FULL RING:
+  //   - 2 × 40HC running E-W on the north face
+  //   - 2 × 40HC running E-W on the south face
+  //   - 1 × 40HC rotated 90° (running N-S) on the east face
+  //   - 1 × 40HC rotated 90° on the west face
+  // Total per level = 6, three levels = 18, plus 1 subterranean pool = 19.
+  //
+  // Why this shape:
+  //   - Round 4 attempt #1 used a 3×2 grid of all-same-orientation
+  //     containers (120 ft × 16 ft footprint). Visually that read as a
+  //     long thin pavilion, NOT an atrium home — Bruce explicitly
+  //     rejected it: "absolutely terrible... long, low, transparent
+  //     pavilion". The reference photos at .\Downloads\Model Home show
+  //     a SQUARE atrium with the pool at its base and balconies on
+  //     every level looking down — only achievable with rotated E/W
+  //     containers. Hence this rewrite.
+  //
+  // World footprint (positions are CENTERS, not corners):
+  //   x ∈ [-14.63, +14.63]  ⇒ 29.26 m  (96 ft)
+  //   z ∈ [ -8.535, +8.535] ⇒ 17.07 m  (56 ft)
+  //   atrium void interior ≈ 24.4 m × 12.2 m  (80 ft × 40 ft)
+  //
+  // Container CENTER positions (relativePosition):
+  //   N row (rotation 0):
+  //     [ -6.10, y, -7.31 ]  NW
+  //     [ +6.10, y, -7.31 ]  NE
+  //   S row (rotation 0):
+  //     [ -6.10, y, +7.31 ]  SW
+  //     [ +6.10, y, +7.31 ]  SE
+  //   E side (rotation π/2):
+  //     [ +13.41, y,  0.00 ]  E
+  //   W side (rotation π/2):
+  //     [ -13.41, y,  0.00 ]  W
+  //
+  // y = 0 for L1, HEIGHT_HC for L2, 2·HEIGHT_HC for L3.
   //
   // Arrangements:
   //   L1 → central_atrium       (steel perimeter, atrium voids in centers)
@@ -941,172 +987,183 @@ export const MODEL_HOMES: ModelHome[] = [
   {
     id: 'resort_house',
     label: 'Resort House',
-    description: 'Three-level resort with a subterranean indoor pool, perimeter rings of containers around a central atrium void on L1/L2/L3, framed-glass upper floors, and a rooftop deck. 19 containers total — 1 pool + 6 per level — with stairs running NW from ground to roof.',
+    description: 'Three-level resort wrapping a square central atrium with a subterranean pool at its base. Six 40 HighCubes per level (4 in default orientation forming N + S walls, 2 rotated 90° forming E + W walls) ring a 24 m × 12 m atrium. Glass-walled upper floors with balconies looking down to the pool, internal staircase climbing the W side from L1 to a walkable rooftop deck.',
     icon: '🏝️',
     containers: [
-      // [0] Pool basin — subterranean, centered under the L1 footprint.
-      // The 3×2 L1 grid spans x∈[0, 3·LENGTH_40] = [0, 36.57] and
-      // z∈[0, 2·WIDTH] = [0, 4.88]. We center the pool below the middle
-      // column at x = LENGTH_40 (between cols 1 and 2 of the 3-wide grid)
-      // and z = WIDTH/2 (between the two N-S rows). Pool slots ignore Y;
-      // placeModelHome forces Y=-dims.height so the basin's water surface
-      // sits at world Y=0.
-      {
-        size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40, 0, WIDTH / 2],
-        pool: true,
-      },
-      // ── L1 (indices 1–6) — ground floor, 3×2 ring with central_atrium ──
-      // Steel perimeter + 2×2 floor void in each container's center forms
-      // a strip of skylights through the L1 floor down to the pool.
+      // [0] Pool basin — subterranean, centered IN the atrium void.
+      // Default orientation puts length along X (12.19 m × 2.44 m), so
+      // we rotate π/2 to align the pool's long axis with the atrium's
+      // long axis (E-W = 24.4 m, but pool only fills 12.19 m of it on
+      // the X axis when rotated — this gives a 40-foot pool, generous).
+      // Pool slots ignore Y; placeModelHome forces Y = -dims.height so
+      // the water surface sits at world Y = 0.
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, 0, 0],
-        extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
-      }, // [1] L1 NW
+        pool: true,
+      },
+      // ── L1 (indices 1–6) — ground floor, 6-container full ring ──
+      // central_atrium gives steel perimeter + each container voids its
+      // own 2×2 inner cells. The body voxels facing the central atrium
+      // get an Open inward face (since central_atrium voids the inner
+      // cells, the inward edge has no wall). Each container's atrium-
+      // adjacent body cells thus connect to the central atrium void.
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40, 0, 0],
+        relativePosition: [-6.10, 0, -7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [2] L1 N-mid
+      }, // [1] L1 NW (north row, west half — rotation 0)
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40 * 2, 0, 0],
+        relativePosition: [+6.10, 0, -7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [3] L1 NE
+      }, // [2] L1 NE (north row, east half — rotation 0)
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, 0, WIDTH],
+        relativePosition: [-6.10, 0, +7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [4] L1 SW
+      }, // [3] L1 SW (south row, west half — rotation 0)
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40, 0, WIDTH],
+        relativePosition: [+6.10, 0, +7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [5] L1 S-mid
+      }, // [4] L1 SE (south row, east half — rotation 0)
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40 * 2, 0, WIDTH],
+        relativePosition: [+13.41, 0, 0],
+        rotation: Math.PI / 2,
         extensionConfig: 'all_deck',
         arrangementId: 'central_atrium',
-      }, // [6] L1 SE
+      }, // [5] L1 E (east wall — rotated 90° to run N-S)
+      {
+        size: ContainerSize.HighCube40,
+        relativePosition: [-13.41, 0, 0],
+        rotation: Math.PI / 2,
+        extensionConfig: 'all_deck',
+        arrangementId: 'central_atrium',
+      }, // [6] L1 W (west wall — rotated 90° to run N-S; carries the stair)
       // ── L2 (indices 7–12) — second floor, framed_glass_atrium ──
-      // Glass perimeter so light spills through the upper-floor envelope
-      // and continues down through the L1 floor voids to the pool.
+      // Glass-walled balconies look down through the floor voids onto
+      // the pool below. Same XZ layout as L1, y = HEIGHT_HC.
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC, 0],
+        relativePosition: [-6.10, HEIGHT_HC, -7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
       }, // [7] L2 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40, HEIGHT_HC, 0],
+        relativePosition: [+6.10, HEIGHT_HC, -7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [8] L2 N-mid
+      }, // [8] L2 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40 * 2, HEIGHT_HC, 0],
+        relativePosition: [-6.10, HEIGHT_HC, +7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [9] L2 NE
+      }, // [9] L2 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC, WIDTH],
+        relativePosition: [+6.10, HEIGHT_HC, +7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [10] L2 SW
+      }, // [10] L2 SE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40, HEIGHT_HC, WIDTH],
+        relativePosition: [+13.41, HEIGHT_HC, 0],
+        rotation: Math.PI / 2,
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [11] L2 S-mid
+      }, // [11] L2 E
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40 * 2, HEIGHT_HC, WIDTH],
+        relativePosition: [-13.41, HEIGHT_HC, 0],
+        rotation: Math.PI / 2,
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [12] L2 SE
+      }, // [12] L2 W
       // ── L3 (indices 13–18) — third floor, framed_glass_atrium ──
-      // Topmost level — SR-07 promotes the L3 roof to a walkable rooftop
-      // deck with auto-railings.
+      // Top occupied level. extraRooftopDecks lists all six so SR-07
+      // promotes their roofs to walkable Deck_Wood + Railing_Cable.
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC * 2, 0],
+        relativePosition: [-6.10, HEIGHT_HC * 2, -7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
       }, // [13] L3 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40, HEIGHT_HC * 2, 0],
+        relativePosition: [+6.10, HEIGHT_HC * 2, -7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [14] L3 N-mid
+      }, // [14] L3 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40 * 2, HEIGHT_HC * 2, 0],
+        relativePosition: [-6.10, HEIGHT_HC * 2, +7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [15] L3 NE
+      }, // [15] L3 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC * 2, WIDTH],
+        relativePosition: [+6.10, HEIGHT_HC * 2, +7.31],
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [16] L3 SW
+      }, // [16] L3 SE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40, HEIGHT_HC * 2, WIDTH],
+        relativePosition: [+13.41, HEIGHT_HC * 2, 0],
+        rotation: Math.PI / 2,
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [17] L3 S-mid
+      }, // [17] L3 E
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [LENGTH_40 * 2, HEIGHT_HC * 2, WIDTH],
+        relativePosition: [-13.41, HEIGHT_HC * 2, 0],
+        rotation: Math.PI / 2,
         extensionConfig: 'all_deck',
         arrangementId: 'framed_glass_atrium',
-      }, // [18] L3 SE
+      }, // [18] L3 W
     ],
     connections: [
-      // NW column carries the stair chain L1 → L2 → L3 (alternating voxel
-      // 9 / 14 so each flight rises from a different end of the previous
-      // landing — required by SR-09 multi-level stair-chain rule so flights
-      // stack structurally instead of overlapping).
-      { fromIndex: 1, toIndex: 7,  type: 'stacked', stairsVoxelIndex: 9  }, // L1 NW → L2 NW
-      { fromIndex: 7, toIndex: 13, type: 'stacked', stairsVoxelIndex: 14 }, // L2 NW → L3 NW
-      // Remaining columns: pure stacking (no stairs — SR-07 promotes the
-      // L3 roof to rooftop deck on every column for a full-footprint deck).
-      { fromIndex: 2,  toIndex: 8,  type: 'stacked' },
-      { fromIndex: 3,  toIndex: 9,  type: 'stacked' },
-      { fromIndex: 4,  toIndex: 10, type: 'stacked' },
-      { fromIndex: 5,  toIndex: 11, type: 'stacked' },
-      { fromIndex: 6,  toIndex: 12, type: 'stacked' },
+      // Stair chain runs up the W column (the rotated W container is
+      // the building's vertical circulation spine, mirroring the
+      // reference photos where the staircase is a featured element
+      // INSIDE the atrium space). voxel 9 = body NW corner of the
+      // local grid; alternating voxel 14 between flights satisfies
+      // SR-09 (multi-level chain — flights stack structurally).
+      { fromIndex: 6,  toIndex: 12, type: 'stacked', stairsVoxelIndex: 9  }, // L1 W → L2 W
+      { fromIndex: 12, toIndex: 18, type: 'stacked', stairsVoxelIndex: 14 }, // L2 W → L3 W
+      // Other columns: pure stacking (no stairs).
+      { fromIndex: 1, toIndex: 7,  type: 'stacked' },
+      { fromIndex: 2, toIndex: 8,  type: 'stacked' },
+      { fromIndex: 3, toIndex: 9,  type: 'stacked' },
+      { fromIndex: 4, toIndex: 10, type: 'stacked' },
+      { fromIndex: 5, toIndex: 11, type: 'stacked' },
+      { fromIndex: 7,  toIndex: 13, type: 'stacked' },
       { fromIndex: 8,  toIndex: 14, type: 'stacked' },
       { fromIndex: 9,  toIndex: 15, type: 'stacked' },
       { fromIndex: 10, toIndex: 16, type: 'stacked' },
       { fromIndex: 11, toIndex: 17, type: 'stacked' },
-      { fromIndex: 12, toIndex: 18, type: 'stacked' },
     ],
     extraStairs: [
-      // L3 NW (index 13) → rooftop deck. Voxel 9 + face='top' produces a
-      // stair ascending out of the L3 floor onto the rooftop deck.
-      { containerIndex: 13, voxelIndex: 9, face: 'top' },
+      // L3 W (index 18) → rooftop deck. Voxel 9 + face='top' generates
+      // a vertical stair ascending out of the L3 W ceiling onto the
+      // walkable rooftop deck — completing the L1 → L2 → L3 → roof
+      // walkthrough chain that climbs the W spine of the building.
+      { containerIndex: 18, voxelIndex: 9, face: 'top' },
     ],
-    // L3 carries framed_glass_atrium so the auto-rooftop path in
-    // `stackContainer` short-circuits (it sees topPreset and respects the
-    // arrangement choice). We need the rooftop deck explicitly: list every
-    // L3 container index here so `placeModelHome` calls
-    // `generateRooftopDeck` on each after stacking completes. SR-07 keeps
-    // the deck only on topmost containers, so this is safe.
+    // L3 containers carry framed_glass_atrium, which makes the auto-
+    // rooftop path in `stackContainer` short-circuit (it respects the
+    // arrangement choice). List every L3 index so `placeModelHome`
+    // explicitly calls generateRooftopDeck on each after stacking.
+    // SR-07 enforces the topmost-only invariant.
     extraRooftopDecks: [13, 14, 15, 16, 17, 18],
-    tags: ['resort', 'pool', 'atrium', '3x2', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],
+    tags: ['resort', 'pool', 'atrium', 'square-ring', 'rotation', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],
   },
 ];
 
