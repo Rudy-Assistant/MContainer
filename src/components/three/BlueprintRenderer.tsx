@@ -85,6 +85,11 @@ const zoneColors = [
 // Grid line materials
 const gridLineMat    = new THREE.LineBasicMaterial({ color: "#e0e0e0", depthTest: false });
 const gridSectionMat = new THREE.LineBasicMaterial({ color: "#cfd8dc", depthTest: false, linewidth: 1 });
+// Sparse world-reference grid (1m / 5m). Honest meter-stick — does NOT claim
+// voxel alignment. Per-container voxel grid (VoxelBlueprintGrid) is rendered
+// separately and IS voxel-aligned via colPitch=length/6, rowPitch=width/2.
+const gridReferenceMat = new THREE.LineBasicMaterial({ color: "#90a4ae", transparent: true, opacity: 0.04, depthTest: false });
+const gridReferenceSectionMat = new THREE.LineBasicMaterial({ color: "#607d8b", transparent: true, opacity: 0.08, depthTest: false });
 
 // ── FlatRect helper ─────────────────────────────────────────
 function FlatRect({
@@ -325,15 +330,20 @@ function VoxelBlueprintGrid({
               );
             })}
 
-            {/* Center hit mesh — selection by default; paints .bottom (floor)
-                when activeBrush is set, mirroring 3D top-face paint behavior. */}
+            {/* Center hit mesh — selection by default; paints the floor or
+                ceiling face when activeBrush is set. inspectorView ('floor'
+                or 'ceiling') decides which face: 'floor' -> 'bottom' face,
+                'ceiling' -> 'top' face. Previously hardcoded to 'bottom'
+                (Bruce 2026-05-06 audit: ceiling painting in BP was absent). */}
             <mesh
               position={[px, Y + 0.004, pz]}
               rotation={[-Math.PI / 2, 0, 0]}
               renderOrder={1001}
               onClick={(e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
-                if (paintFaceFromActiveBrush(idx, 'bottom', e)) return;
+                const targetFace: keyof import('@/types/container').VoxelFaces =
+                  useStore.getState().inspectorView === 'ceiling' ? 'top' : 'bottom';
+                if (paintFaceFromActiveBrush(idx, targetFace, e)) return;
                 select(container.id, e.nativeEvent.shiftKey);
                 setSelectedElements({ type: 'voxel', items: [{ containerId: container.id, id: String(idx) }] });
               }}
@@ -567,11 +577,16 @@ function BlueprintContainer({ container }: { container: Container }) {
 }
 
 // ── Grid ─────────────────────────────────────────────────────
+// Sparse world-reference grid only. The previous dense uniform grid hardcoded
+// CELL=1.2 / SECTION=2.4 which decoupled from real container voxel pitches
+// (20ft body voxel = 1.010 x 1.220 m; 40ft body voxel = 2.032 x 1.220 m).
+// Per-container voxel-accurate grids are rendered by VoxelBlueprintGrid.
+// This grid is now an honest meter-stick at 1m / 5m, not a voxel claim.
 function SimpleGrid() {
   const { lines, sections } = useMemo(() => {
-    const EXTENT = 60;
-    const CELL    = 1.2;
-    const SECTION = 2.4;
+    const EXTENT  = 60;
+    const CELL    = 1.0; // 1 m reference
+    const SECTION = 5.0; // 5 m emphasis
     const GY = 0.3;
 
     const linePoints: THREE.Vector3[]    = [];
@@ -580,6 +595,8 @@ function SimpleGrid() {
     const cellCount = Math.floor(EXTENT / CELL);
     for (let n = -cellCount; n <= cellCount; n++) {
       const pos = n * CELL;
+      // Skip 1m lines that coincide with 5m section lines to avoid double-draw.
+      if (n % 5 === 0) continue;
       linePoints.push(new THREE.Vector3(pos, GY, -EXTENT), new THREE.Vector3(pos, GY, EXTENT));
       linePoints.push(new THREE.Vector3(-EXTENT, GY, pos), new THREE.Vector3(EXTENT, GY, pos));
     }
@@ -599,8 +616,28 @@ function SimpleGrid() {
 
   return (
     <group renderOrder={0}>
-      <lineSegments geometry={lines}    material={gridLineMat}    renderOrder={0} />
-      <lineSegments geometry={sections} material={gridSectionMat} renderOrder={1} />
+      <lineSegments geometry={lines}    material={gridReferenceMat}        renderOrder={0} />
+      <lineSegments geometry={sections} material={gridReferenceSectionMat} renderOrder={1} />
+      {/* Honest label: this grid is a meter-stick, not voxel-aligned. */}
+      <Html position={[0, 0.31, 0]} transform={false} prepend={false} style={{ pointerEvents: "none" }}>
+        <div style={{
+          position: "fixed",
+          right: "12px",
+          bottom: "12px",
+          padding: "4px 8px",
+          borderRadius: "4px",
+          background: "rgba(38, 50, 56, 0.65)",
+          color: "#cfd8dc",
+          fontSize: "10px",
+          fontWeight: 500,
+          fontFamily: "system-ui, sans-serif",
+          letterSpacing: "0.02em",
+          pointerEvents: "none",
+          userSelect: "none",
+        }}>
+          1 m reference (5 m emphasis)
+        </div>
+      </Html>
     </group>
   );
 }
@@ -764,11 +801,16 @@ function MarqueeSelect({ containers }: { containers: Container[] }) {
         else clearSelection();
       } else {
         // Tap on empty grid (no drag). If a container size is armed via the
-        // BP Library tile, place a container at the tap point. Otherwise
-        // fall back to existing clear-selection behavior.
+        // BP Library tile, place a container at the tap point. The level
+        // honors the active chip-strip filter (viewLevel): clicking the L2
+        // chip then placing a tile lands at L1 instead of silently L0.
+        // Bruce 2026-05-06: BP must not lie about which level the user
+        // is editing. viewLevel===null (All) defaults to L0.
         const armed = useStore.getState().bpvActiveContainerSize;
         if (armed) {
-          addContainer(armed, { x: dragRef.current.startX, y: 0, z: dragRef.current.startZ }, 0);
+          const filterLevel = useStore.getState().viewLevel;
+          const placeLevel = typeof filterLevel === "number" && filterLevel >= 0 ? filterLevel : 0;
+          addContainer(armed, { x: dragRef.current.startX, y: 0, z: dragRef.current.startZ }, placeLevel);
           setBpvActiveContainerSize(null);
         } else {
           clearSelection();

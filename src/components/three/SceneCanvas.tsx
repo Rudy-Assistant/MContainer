@@ -65,6 +65,7 @@ export default function SceneCanvas() {
   const activeBrush = useStore((s) => s.activeBrush);
   const activeSlot = useStore((s) => s.activeHotbarSlot);
   const staircaseMode = useStore((s) => s.staircasePlacementMode);
+  const viewMode = useStore((s) => s.viewMode);
   const cursor = (staircaseMode || activeBrush || activeSlot !== null) ? 'crosshair' : 'default';
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraQuaternionRef = useRef<THREE.Quaternion | null>(new THREE.Quaternion());
@@ -119,10 +120,14 @@ export default function SceneCanvas() {
         </Suspense>
       </Canvas>
       <StaircaseModeIndicator />
-      <OrientationGizmo
-        cameraQuaternionRef={cameraQuaternionRef}
-        onSnapToAxis={handleSnapToAxis}
-      />
+      {/* Hide orientation gizmo in Blueprint (ortho top-down has no axes
+          to snap and rendered an empty disc — Bruce 2026-05-06 audit). */}
+      {viewMode !== "blueprint" && (
+        <OrientationGizmo
+          cameraQuaternionRef={cameraQuaternionRef}
+          onSnapToAxis={handleSnapToAxis}
+        />
+      )}
       </div>
     </SceneErrorBoundary>
   );

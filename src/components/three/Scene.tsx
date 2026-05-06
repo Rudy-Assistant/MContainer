@@ -1977,14 +1977,14 @@ function DragMoveGhostBlueprint() {
 
   const groundPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
-  const ghostPos = useRef({ x: 0, z: 0, valid: true, snapped: false });
+  const ghostPos = useRef({ x: 0, z: 0, valid: true, snapped: false, stacking: false, stackTargetId: null as string | null });
 
   // Initialize ghostPos to container's current position to prevent jump-to-origin on quick click
   useEffect(() => {
     if (!dragMovingId) return;
     const container = useStore.getState().containers[dragMovingId];
     if (container) {
-      ghostPos.current = { x: container.position.x, z: container.position.z, valid: true, snapped: false };
+      ghostPos.current = { x: container.position.x, z: container.position.z, valid: true, snapped: false, stacking: false, stackTargetId: null };
     }
   }, [dragMovingId]);
 
@@ -2003,10 +2003,14 @@ function DragMoveGhostBlueprint() {
     const snap = findEdgeSnap(containers, dragMovingId, sx, sz, container.size, container.rotation);
     if (snap.snapped) { sx = snap.x; sz = snap.z; }
 
+    const stackTarget = findStackTarget(containers, sx, sz, container.size, dragMovingId);
+    const stacking = stackTarget !== null;
+
     const foot = getFootprintAt(sx, sz, container.size, container.rotation);
     const overlaps = checkOverlap(containers, dragMovingId, foot);
+    const valid = stacking ? true : !overlaps;
 
-    ghostPos.current = { x: sx, z: sz, valid: !overlaps, snapped: snap.snapped };
+    ghostPos.current = { x: sx, z: sz, valid, snapped: snap.snapped, stacking, stackTargetId: stackTarget?.containerId ?? null };
   });
 
   useLayoutEffect(() => {
@@ -2014,7 +2018,7 @@ function DragMoveGhostBlueprint() {
     const handleUp = () => {
       const g = ghostPos.current;
       if (g.valid) {
-        commitContainerDrag(g.x, g.z);
+        commitContainerDrag(g.x, g.z, g.stackTargetId);
       } else {
         cancelContainerDrag();
       }
@@ -2048,7 +2052,7 @@ function BpMoveGhostVisual({
   rotation,
 }: {
   dims: { length: number; width: number; height: number };
-  ghostPos: React.RefObject<{ x: number; z: number; valid: boolean; snapped: boolean }>;
+  ghostPos: React.RefObject<{ x: number; z: number; valid: boolean; snapped: boolean; stacking: boolean; stackTargetId: string | null }>;
   rotation: number;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);

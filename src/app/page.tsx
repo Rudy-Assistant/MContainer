@@ -94,6 +94,7 @@ export default function Home() {
   const [aiDesignOpen, setAiDesignOpen] = useState(false);
   const viewMode = useStore((s) => s.viewMode);
   const isWalkthrough = viewMode === ViewMode.Walkthrough;
+  const isBlueprint = viewMode === ViewMode.Blueprint;
   const isPreviewMode = useStore((s) => s.isPreviewMode);
   const hasHydrated = useStore((s) => s._hasHydrated);
   const activeHotbarSlot = useStore((s) => s.activeHotbarSlot);
@@ -143,7 +144,11 @@ export default function Home() {
           {viewMode === ViewMode.Blueprint && <BlueprintLevelChips />}
 
           {/* Face filter widget — restrict pointer events to roof / walls / floor */}
-          {!isWalkthrough && !isPreviewMode && <FaceFilterWidget />}
+          {/* FaceFilterWidget gates 3D pointer events by face-category. In
+              top-down BP the cube is visually inconsistent (no isometric
+              context) and pointer-gating doesn't help — clutter only.
+              Bruce 2026-05-06 audit. */}
+          {!isWalkthrough && !isBlueprint && !isPreviewMode && <FaceFilterWidget />}
 
           {/* Hotbars — visible when showHotbar enabled (not walkthrough, not preview) */}
           {showHotbar && !isWalkthrough && !isPreviewMode && <CustomHotbar />}
