@@ -212,6 +212,17 @@ export interface ContainerSlice {
   // ── Vertical Stacking ─────────────────────────────────────
   stackContainer: (topId: string, bottomId: string) => boolean;
   unstackContainer: (id: string) => void;
+  /**
+   * One-step helper that creates a new container, stacks it atop `bottomId`,
+   * and cleans up on failure. Bundles the addContainer + stackContainer dance
+   * (with orphan cleanup on rejection) so callers don't have to know about it.
+   *
+   * Returns the new container id on success, or null if:
+   *   - bottom container not found
+   *   - bottom is already at MAX_STACK_LEVEL (no headroom)
+   *   - stackContainer rejects the placement (we removeContainer the orphan)
+   */
+  addStackedContainer: (bottomId: string, size?: ContainerSize) => string | null;
 
   // ── Furniture ─────────────────────────────────────────────
   addFurniture: (containerId: string, type: FurnitureType, position?: { x: number; y: number; z: number }, rotation?: number) => string | null;
@@ -433,6 +444,39 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
   // applyContainerPreset — moved to voxelSlice
   // addContainerWithPreset — moved to voxelSlice
+
+  /**
+   * addStackedContainer — Atomic create + stack helper.
+   *
+   * Mirrors the production right-click "Stack Container Above" flow
+   * (ContainerContextMenu.tsx). Internally:
+   *   1. Look up bottom container; bail null if missing or already at
+   *      MAX_STACK_LEVEL (no headroom for another level).
+   *   2. addContainer(size ?? bottom.size) at bottom.level + 1, with
+   *      skipSmartPlacement=true so the new container lands directly
+   *      above (stackContainer will set the correct Y).
+   *   3. stackContainer(newId, bottomId). On failure: removeContainer(newId)
+   *      to avoid leaving an orphan, return null.
+   *   4. On success: return newId.
+   */
+  addStackedContainer: (bottomId, size) => {
+    const bottom = get().containers[bottomId] as Container | undefined;
+    if (!bottom) return null;
+    if ((bottom.level ?? 0) + 1 > MAX_STACK_LEVEL) return null;
+
+    const newId = get().addContainer(
+      size ?? bottom.size,
+      { x: bottom.position.x, y: 0, z: bottom.position.z },
+      (bottom.level ?? 0) + 1,
+      true, // skipSmartPlacement — we're stacking, not auto-offsetting
+    );
+    const success = get().stackContainer(newId, bottomId);
+    if (!success) {
+      get().removeContainer(newId);
+      return null;
+    }
+    return newId;
+  },
 
   applyContainerRole: (containerId, roleId, skipOverlapCheck) => {
     const role = getContainerRole(roleId);

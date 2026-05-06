@@ -48,6 +48,7 @@ import { SceneObjectRenderer } from '@/components/objects/SceneObjectRenderer';
 import { PlacementGhost } from '@/components/objects/PlacementGhost';
 import { HoverPreviewGhost } from '@/components/objects/HoverPreviewGhost';
 // pbrTextures.ts removed — texture loading consolidated into materialCache.ts via textureLoader.ts
+import { formatLengthShort } from "@/utils/unitFormat";
 import GroundManager from "./GroundManager";
 import SiteFeatures from "./SiteFeatures";
 import MEPOverlay from "./MEPOverlay";
@@ -359,29 +360,33 @@ const dimLabelStyle: React.CSSProperties = {
 };
 
 function DimensionLabels() {
+  const units = useStore((s) => s.units);
   const { minX, maxX, minZ, maxZ, empty } = useContainerBounds(0);
   if (empty) return null;
 
   const midX = (minX + maxX) / 2;
   const midZ = (minZ + maxZ) / 2;
-  const width = (maxX - minX).toFixed(1);
-  const depth = (maxZ - minZ).toFixed(1);
+  // Use unit-aware formatter so BP outer footprint dims honor Imperial vs
+  // Metric setting (uiSlice.units). Stored values are meters; formatter
+  // converts as needed. Bruce 2026-05-06 R3: imperial default, switchable.
+  const widthLabel = formatLengthShort(maxX - minX, units);
+  const depthLabel = formatLengthShort(maxZ - minZ, units);
 
   return (
     <group>
       {/* Width labels (along X) at top and bottom edges */}
       <Html position={[midX, 0.5, maxZ + 1]} transform={false} style={dimLabelStyle} center>
-        {width}m
+        {widthLabel}
       </Html>
       <Html position={[midX, 0.5, minZ - 1]} transform={false} style={dimLabelStyle} center>
-        {width}m
+        {widthLabel}
       </Html>
       {/* Depth labels (along Z) at left and right edges */}
       <Html position={[maxX + 1, 0.5, midZ]} transform={false} style={dimLabelStyle} center>
-        {depth}m
+        {depthLabel}
       </Html>
       <Html position={[minX - 1, 0.5, midZ]} transform={false} style={dimLabelStyle} center>
-        {depth}m
+        {depthLabel}
       </Html>
     </group>
   );

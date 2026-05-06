@@ -38,6 +38,7 @@ const FEATURE_GATES = {
   'Blueprint Authoring': ['G33-resortHouse'],
   'Blueprint Add/Delete': ['G34-bpAddContainer'],
   'Blueprint Dogfood (level-aware placement + edge-click face select)': ['G35-bpDogfood'],
+  'Saved Home Persistence': ['G36-saveLoadHome'],
 };
 
 // Previously ungated features — now gated as of Sprint 13.

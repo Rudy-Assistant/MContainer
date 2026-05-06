@@ -1550,6 +1550,95 @@ async function run() {
     await page.waitForTimeout(300);
   } catch (e) { fail('G35-bpDogfood', e.message); }
 
+  // ═══ G36: Saved Home Persistence — saveHomeDesign + loadHomeDesign round trip ═══
+  // Verifies the user-saved-home-design persistence flow end-to-end:
+  //   1. Place a 40ft HC + apply 'largest_glass' (Glass Box) arrangement.
+  //   2. saveHomeDesign('Test Home', 'G36 fixture') returns a string id.
+  //   3. libraryHomeDesigns has the entry with matching label.
+  //   4. Clear containers (designs survive) and confirm canvas is empty.
+  //   5. loadHomeDesign restores: count, size, origin position, and the
+  //      sampled body-voxel face (idx (row=0,col=1).n === 'Glass_Pane').
+  try {
+    // Reset
+    await page.evaluate(() => {
+      const s = window.__store.getState();
+      for (const id of Object.keys(s.containers)) s.removeContainer(id);
+      // Clear any stale designs from prior runs so length checks are deterministic.
+      for (const d of [...s.libraryHomeDesigns]) s.removeLibraryItem(d.id);
+    });
+    await page.waitForTimeout(300);
+
+    const r = await page.evaluate(() => {
+      const s = window.__store.getState();
+      // 1. Place a 40ft HC at the known origin.
+      const placedId = s.addContainer('40ft_high_cube', { x: 0, y: 0, z: 0 }, 0, true);
+      // 2. Apply 'largest_glass' arrangement (Glass Box: glass perimeter walls).
+      s.applyContainerArrangement(placedId, 'largest_glass');
+      const placed = window.__store.getState().containers[placedId];
+      // Sample body-voxel face that the arrangement should have set to glass.
+      // idx(row=0,col=1) on level 0 = 0*32 + 0*8 + 1 = 1 (n-edge body voxel).
+      const sampleIdx = 0 * 32 + 0 * 8 + 1;
+      const savedFaceN = placed?.voxelGrid?.[sampleIdx]?.faces?.n;
+
+      // 3. Save the design.
+      const designId = s.saveHomeDesign('Test Home', 'G36 fixture');
+      const designs = window.__store.getState().libraryHomeDesigns;
+      const savedDesign = designs.find((d) => d.id === designId);
+
+      // 4. Reset containers (designs persist in libraryHomeDesigns).
+      for (const id of Object.keys(window.__store.getState().containers)) {
+        window.__store.getState().removeContainer(id);
+      }
+      const emptyCount = Object.keys(window.__store.getState().containers).length;
+
+      // 5. Load the design back at default origin (0,0,0).
+      const loadedIds = window.__store.getState().loadHomeDesign(designId);
+      const after = window.__store.getState();
+      const loadedContainers = Object.values(after.containers);
+      const lc = loadedContainers[0];
+      const restoredFaceN = lc?.voxelGrid?.[sampleIdx]?.faces?.n;
+
+      return {
+        designId,
+        designIdType: typeof designId,
+        designsLength: designs.length,
+        designLabel: savedDesign?.label,
+        designDescription: savedDesign?.description,
+        savedFaceN,
+        emptyCount,
+        loadedIdsLength: loadedIds.length,
+        loadedCount: loadedContainers.length,
+        loadedSize: lc?.size,
+        loadedPos: lc ? { x: lc.position.x, y: lc.position.y, z: lc.position.z } : null,
+        restoredFaceN,
+      };
+    });
+
+    const ok =
+      typeof r.designId === 'string' && r.designId.length > 0 &&
+      r.designsLength === 1 &&
+      r.designLabel === 'Test Home' &&
+      r.designDescription === 'G36 fixture' &&
+      r.savedFaceN === 'Glass_Pane' &&
+      r.emptyCount === 0 &&
+      r.loadedIdsLength === 1 &&
+      r.loadedCount === 1 &&
+      r.loadedSize === '40ft_high_cube' &&
+      r.loadedPos?.x === 0 && r.loadedPos?.y === 0 && r.loadedPos?.z === 0 &&
+      r.restoredFaceN === 'Glass_Pane';
+    ok
+      ? pass('G36-saveLoadHome', `saved=${r.designLabel}, count=${r.designsLength}, restored: container ${r.loadedSize} at (${r.loadedPos.x},${r.loadedPos.y},${r.loadedPos.z}) glass walls`)
+      : fail('G36-saveLoadHome', JSON.stringify(r));
+
+    // Tear down: clear containers + the test design so later gates start clean.
+    await page.evaluate(() => {
+      const s = window.__store.getState();
+      for (const id of Object.keys(s.containers)) s.removeContainer(id);
+      for (const d of [...s.libraryHomeDesigns]) s.removeLibraryItem(d.id);
+    });
+    await page.waitForTimeout(300);
+  } catch (e) { fail('G36-saveLoadHome', e.message); }
+
   // ═══ G19: Default visual — restore defaults + visual comparison ═══
   try {
     // Reset to clean state

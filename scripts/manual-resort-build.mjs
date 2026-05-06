@@ -139,8 +139,8 @@ note('=== Step 3: Click L2 chip in topbar to switch placement target to L1 ===')
 // The user wants real UI clicks, so let's do (a): right-click stack first L0,
 // then chip-click L2, then tile+place for remaining 3.
 
-note('   Mirroring "Stack Container Above" production flow (ContainerContextMenu.tsx:58-69):');
-note('   Two-step: addContainer at level+1 with skipSmartPlacement=true, then stackContainer(newId, existingId).');
+note('   Mirroring "Stack Container Above" production flow (ContainerContextMenu.tsx):');
+note('   One-step: addStackedContainer(bottomId) handles add+stack and orphan cleanup.');
 // Stack one L1 above each L0 corner.
 const stackResults = await p.evaluate(([l0_NW, l0_NE, l0_SW, l0_SE]) => {
   const s = window.__store.getState();
@@ -148,15 +148,8 @@ const stackResults = await p.evaluate(([l0_NW, l0_NE, l0_SW, l0_SE]) => {
   for (const bottomId of [l0_NW, l0_NE, l0_SW, l0_SE]) {
     const bottom = s.containers[bottomId];
     if (!bottom) { results.push({ bottomId: bottomId.slice(0, 8), error: 'missing' }); continue; }
-    const newId = s.addContainer(
-      bottom.size,
-      { x: bottom.position.x, y: 0, z: bottom.position.z },
-      (bottom.level ?? 0) + 1,
-      true, // skipSmartPlacement
-    );
-    const ok = s.stackContainer(newId, bottomId);
-    if (!ok) {
-      s.removeContainer(newId);
+    const newId = s.addStackedContainer(bottomId);
+    if (!newId) {
       results.push({ bottomId: bottomId.slice(0, 8), error: 'stack-rejected' });
     } else {
       results.push({ bottomId: bottomId.slice(0, 8), newId: newId.slice(0, 8), level: window.__store.getState().containers[newId]?.level });

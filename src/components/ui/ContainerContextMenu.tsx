@@ -58,12 +58,8 @@ export default function ContainerContextMenu() {
   const handleStackAbove = useCallback(() => {
     if (!ctx || !container) return;
     const store = useStore.getState();
-    // stackContainer sets the correct Y position, so pass dummy Y here
-    const newId = store.addContainer(container.size, { x: container.position.x, y: 0, z: container.position.z }, (container.level ?? 0) + 1, true);
-    const success = store.stackContainer(newId, ctx.containerId);
-    if (!success) {
-      // Stacking failed — remove the orphaned container
-      store.removeContainer(newId);
+    const newId = store.addStackedContainer(ctx.containerId);
+    if (!newId) {
       closeMenu();
       return;
     }

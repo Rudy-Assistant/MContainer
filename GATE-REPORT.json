@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-06T18:16:09.069Z",
+  "timestamp": "2026-05-06T18:57:51.669Z",
   "sprint": 13,
   "gates": [
     {
@@ -35,7 +35,7 @@
     {
       "gate": "G5-blueprintVisual",
       "status": "PASS",
-      "msg": "screenshot captured (no buffer for comparison)"
+      "msg": "visual match (8.01% diff)"
     },
     {
       "gate": "G6-themeJapanese",
@@ -75,7 +75,7 @@
     {
       "gate": "G8-fpWalking",
       "status": "PASS",
-      "msg": "camera moved delta=0.839, Y=1.66, yBounds=true"
+      "msg": "camera moved delta=0.676, Y=1.66, yBounds=true"
     },
     {
       "gate": "G8-fpExit",
@@ -120,7 +120,7 @@
     {
       "gate": "G15-cameraFloor",
       "status": "PASS",
-      "msg": "Floor+angle guard OK: posY=2.19, targetY=1.29, screenshot timeout (numeric OK)"
+      "msg": "Floor+angle guard OK: posY=2.05, targetY=1.29, screenshot timeout (numeric OK)"
     },
     {
       "gate": "G16-frameAction",
@@ -145,7 +145,7 @@
     {
       "gate": "G20-stackSnap",
       "status": "PASS",
-      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=6c0ae68e-6cfd-4bb1-a19c-d6c7e7372cb9"
+      "msg": "Stacked: Y=2.90 (expected ~2.9), level=1, stackedOn=8815293b-d4f8-48b7-9d5f-d6abc54718ee"
     },
     {
       "gate": "G21-leftDragMove",
@@ -228,6 +228,11 @@
       "msg": "place: count=2 levels=[0,1] placeLevel=1; face-select: face=n voxel=11"
     },
     {
+      "gate": "G36-saveLoadHome",
+      "status": "PASS",
+      "msg": "saved=Test Home, count=1, restored: container 40ft_high_cube at (0,0,0) glass walls"
+    },
+    {
       "gate": "G19-defaultVisual",
       "status": "PASS",
       "msg": "default state restored via UI"
@@ -238,7 +243,7 @@
       "msg": "screenshot captured (no buffer for comparison)"
     }
   ],
-  "total": 47,
-  "passed": 47,
+  "total": 48,
+  "passed": 48,
   "failed": 0
 }

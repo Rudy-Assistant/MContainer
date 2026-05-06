@@ -25,6 +25,7 @@ import {
   VOXEL_COLS,
 } from "@/types/container";
 import { useStore } from "@/store/useStore";
+import { formatLengthShort } from "@/utils/unitFormat";
 import { useSelectedVoxel } from "@/hooks/useSelectedVoxel";
 import { useSelectedVoxels } from "@/hooks/useSelectedVoxels";
 import { HIGHLIGHT_HEX_SELECT, HIGHLIGHT_HEX_HOVER, HIGHLIGHT_HEX_HOVER_FILTERED } from "@/config/highlightColors";
@@ -2603,6 +2604,7 @@ export default function ContainerMesh({ container }: { container: Container }) {
   const startContainerDrag = useStore((s) => s.startContainerDrag);
   const dragMovingId = useStore((s) => s.dragMovingId);
   const viewMode = useStore((s) => s.viewMode);
+  const units    = useStore((s) => s.units);
   const isSelected = selection.includes(container.id);
   const isBeingDragged = dragMovingId === container.id;
   const [hovered, setHovered] = useState(false);
@@ -2816,7 +2818,9 @@ export default function ContainerMesh({ container }: { container: Container }) {
             {container.name}
             {viewMode === ViewMode.Blueprint && (
               <span style={{ color: "rgba(255,255,255,0.6)", marginLeft: "6px" }}>
-                {dims.length.toFixed(1)}×{dims.width.toFixed(1)}×{dims.height.toFixed(1)}m
+                {formatLengthShort(dims.length, units)}{" × "}
+                {formatLengthShort(dims.width, units)}{" × "}
+                {formatLengthShort(dims.height, units)}
               </span>
             )}
           </div>
