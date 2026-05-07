@@ -545,23 +545,25 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     t?.resume();
     scheduleAdjacency(get);
 
-    // Restore the caller's prior design mode AFTER scheduleAdjacency has
-    // had a chance to fire (it uses requestAnimationFrame; we defer the
-    // restore by 2 frames so the rAF fires while we're still in manual
-    // mode -- otherwise refreshAdjacency runs in smart mode and the
-    // auto-merge step at containerSlice.ts:1801+ wipes the perimeter
-    // walls we just installed). Browser-only path: requestAnimationFrame
-    // fires near 16ms; vitest never fires rAF, so the test path doesn't
-    // need this delay.
-    if (savedDesignMode === 'smart' && typeof requestAnimationFrame !== 'undefined') {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          get().setDesignMode('smart');
-        });
-      });
-    } else if (savedDesignMode === 'smart') {
-      get().setDesignMode('smart');
-    }
+    // Bruce 2026-05-06 round 4 final: do NOT restore designMode to 'smart'.
+    // The smart-mode auto-merge cascade in `refreshAdjacency` (and downstream
+    // smart-rule recomputes triggered by selection / view-mode toggles)
+    // progressively deactivates extension halo voxels for tightly-packed
+    // model homes (resort_house's 3x2 grid, 2x2 showcases). Once the user
+    // sees the building rendered, walls visibly degrade as adjacency
+    // recomputes fire. The d7d2008 manual-build-script-v2 commit
+    // demonstrated that walls survive ONLY when designMode stays 'manual'.
+    // A proper fix requires patching the recompute chain to preserve halo
+    // activation, but that fix was not landed within the round-4 budget.
+    // The user-facing impact of staying in manual mode is minor: the
+    // smart-rule warnings panel still surfaces issues, but auto-merge of
+    // shared walls is suppressed (visible interior cross-walls instead of
+    // dissolved seams). Acceptable trade-off vs. an empty pavilion.
+    //
+    // Discarded `savedDesignMode` is intentional -- referencing it ensures
+    // TypeScript doesn't flag it unused while preserving the restore-decision
+    // log for future maintainers reading the diff.
+    void savedDesignMode;
 
     return containerIds;
   },

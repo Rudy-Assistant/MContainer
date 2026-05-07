@@ -74,6 +74,10 @@ describe('Model Home System', () => {
   it('MH-5: adjacency fires after model home placement', () => {
     // Place modern_1br (2 side-by-side containers)
     const ids = useStore.getState().placeModelHome('modern_1br');
+    // placeModelHome forces designMode='manual' for the placement (round-4
+    // wall-preservation workaround documented in d7d2008). Switch back to
+    // smart so the adjacency auto-merge step runs and updates mergedWalls.
+    useStore.getState().setDesignMode('smart');
     // The adjacency should have been triggered (via requestAnimationFrame).
     // In tests, rAF may not fire. Manually call refreshAdjacency.
     useStore.getState().refreshAdjacency();
