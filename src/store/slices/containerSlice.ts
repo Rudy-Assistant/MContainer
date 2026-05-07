@@ -1950,7 +1950,21 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     // For VOXEL_LEVELS=2 this is level 1 (idx 32-63); falls back to level 0 for single-level.
     const topLevelBase = (VOXEL_LEVELS - 1) * VOXEL_ROWS * VOXEL_COLS;
 
-    // Set body voxel top faces to Deck_Wood, perimeter walls to Railing_Cable
+    // Set body voxel top faces to Deck_Wood, perimeter walls to Railing_Cable.
+    //
+    // For containers with an applied arrangement (framed_glass_atrium etc.),
+    // the level-1 halo cells were marked active=true with `top: Solid_Steel`
+    // by the arrangement's `full_shell` upper-level branch -- without further
+    // intervention the rooftop reads as a Deck_Wood square buried inside a
+    // tall steel parapet ring, indistinguishable from "flat steel roof"
+    // when viewed from the side. Promote those halo cells to Deck_Wood top +
+    // Railing_Cable on the outward face so the deck reads as a continuous
+    // walkable surface from any angle.
+    const refreshedForHalo = get().containers[containerId];
+    const arrangedTop = !!refreshedForHalo?.appliedPreset && CONTAINER_ARRANGEMENT_SPECS.some(
+      (spec) => spec.id === refreshedForHalo.appliedPreset,
+    );
+
     set((state) => {
       const container = state.containers[containerId];
       if (!container?.voxelGrid) return {};
@@ -1959,21 +1973,40 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       for (let row = 0; row < VOXEL_ROWS; row++) {
         for (let col = 0; col < VOXEL_COLS; col++) {
           const idx = topLevelBase + row * VOXEL_COLS + col;
-          const isBody = row >= 1 && row <= 2 && col >= 1 && col <= 6;
-          if (!isBody) continue;
-
           const voxel = grid[idx];
           if (!voxel) continue;
+          const isBody = row >= 1 && row <= 2 && col >= 1 && col <= 6;
+          const isHalo = row === 0 || row === VOXEL_ROWS - 1 || col === 0 || col === VOXEL_COLS - 1;
 
-          const newFaces = { ...voxel.faces, top: 'Deck_Wood' as SurfaceType };
+          if (isBody) {
+            const newFaces = { ...voxel.faces, top: 'Deck_Wood' as SurfaceType };
+            // Body→halo inner edges get railing only when the halo is NOT
+            // also being made into walkable deck. With arrangedTop=true we
+            // continue the deck across the halo, so the railing belongs at
+            // the outer edge instead (set below in the halo block).
+            if (!arrangedTop) {
+              if (row === 1) newFaces.n = 'Railing_Cable' as SurfaceType;
+              if (row === 2) newFaces.s = 'Railing_Cable' as SurfaceType;
+              if (col === 1) newFaces.w = 'Railing_Cable' as SurfaceType;
+              if (col === 6) newFaces.e = 'Railing_Cable' as SurfaceType;
+            }
+            grid[idx] = { ...voxel, faces: newFaces };
+            continue;
+          }
 
-          // Perimeter body voxels get railing on outward wall faces
-          if (row === 1) newFaces.n = 'Railing_Cable' as SurfaceType;
-          if (row === 2) newFaces.s = 'Railing_Cable' as SurfaceType;
-          if (col === 1) newFaces.w = 'Railing_Cable' as SurfaceType;
-          if (col === 6) newFaces.e = 'Railing_Cable' as SurfaceType;
-
-          grid[idx] = { ...voxel, faces: newFaces };
+          if (isHalo && arrangedTop && voxel.active) {
+            // Continue the deck wood across the halo, with Railing_Cable on
+            // the OUTWARD-facing edge so the rooftop reads as a single
+            // walkable terrace bounded by railings -- matching the user's
+            // sketch where the rooftop (red) is a clearly distinct level
+            // above the third floor, not a steel parapet over a sunken deck.
+            const newFaces = { ...voxel.faces, top: 'Deck_Wood' as SurfaceType };
+            if (row === 0) newFaces.n = 'Railing_Cable' as SurfaceType;
+            if (row === VOXEL_ROWS - 1) newFaces.s = 'Railing_Cable' as SurfaceType;
+            if (col === 0) newFaces.w = 'Railing_Cable' as SurfaceType;
+            if (col === VOXEL_COLS - 1) newFaces.e = 'Railing_Cable' as SurfaceType;
+            grid[idx] = { ...voxel, faces: newFaces };
+          }
         }
       }
 

@@ -83,14 +83,18 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
         "If this assertion fails, placeModelHome's stacking flow (stackContainer side effects, scheduleAdjacency, or smart-rule cleanup cascade) is wiping the halo activation that applyContainerArrangement just set.",
     ).toBe(true);
 
-    // INVARIANT 2: west face must be Solid_Steel (perimeterWall from
-    // central_atrium). If active is true but face is Open, the
-    // arrangement was applied but a downstream pass cleared face data.
+    // INVARIANT 2: west face must be the perimeterWall surface from the
+    // arrangement currently used by resort_house's L1. Originally
+    // 'central_atrium' (Solid_Steel); switched to 'framed_glass_atrium'
+    // (Window_Standard) on 2026-05-07 for the all-glass perimeter look.
+    // What this assertion really protects: the perimeter face must be a
+    // SOLID arrangement-defined surface (not 'Open'). Open here means the
+    // perimeter wall data was either never set or was wiped by a
+    // subsequent pass.
     expect(
-      v8.faces.w,
-      "L1 NW voxel 8 west face must be Solid_Steel from central_atrium's perimeterWall. " +
-        'Open here means the perimeter wall data was either never set or was wiped by a subsequent pass.',
-    ).toBe('Solid_Steel');
+      ['Window_Standard', 'Solid_Steel'],
+      `L1 NW voxel 8 west face must be a solid perimeter surface (Window_Standard from framed_glass_atrium, or Solid_Steel from central_atrium). Got: ${v8.faces.w}. Open or any other value indicates the perimeter wall was never set or was wiped.`,
+    ).toContain(v8.faces.w);
   });
 
   it('L1 NW voxel 0 (NW corner halo) is active after placeModelHome', () => {
@@ -112,7 +116,7 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     ).toBe(true);
   });
 
-  it('L1 NW north face has at least 4 Solid_Steel voxels (north perimeter wall ring)', () => {
+  it('L1 NW north face has at least 4 perimeter-wall voxels (north perimeter ring intact)', () => {
     useStore.getState().placeModelHome('resort_house');
     const containers = useStore.getState().containers;
     const l1nw = Object.values(containers).find(
@@ -124,17 +128,20 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     );
     expect(l1nw).toBeDefined();
     const grid = l1nw!.voxelGrid!;
-    let northSteelCount = 0;
+    let perimWallCount = 0;
     for (const v of grid) {
-      if (v?.faces?.n === 'Solid_Steel') northSteelCount++;
+      // Either Solid_Steel (central_atrium) or Window_Standard
+      // (framed_glass_atrium) constitutes a valid perimeter wall. 'Open'
+      // means the wall is missing -- the failure mode under test.
+      if (v?.faces?.n === 'Solid_Steel' || v?.faces?.n === 'Window_Standard') perimWallCount++;
     }
-    // central_atrium produces 8 north-face Solid_Steel cells per container
-    // (row 0 voxels across both voxel-levels). Allow a small tolerance for
-    // adjacency-merging with the L1 N-mid neighbor: -2 cells max.
+    // The L1 arrangement (framed_glass_atrium since 2026-05-07) puts
+    // perimeterWall on row=0 voxels' n-face, ~8 cells per container across
+    // both voxel-levels. Allow tolerance for adjacency-merging with N-mid
+    // neighbour: -2 cells max.
     expect(
-      northSteelCount,
-      `L1 NW north face must have >= 4 Solid_Steel voxels (got ${northSteelCount}). ` +
-        'central_atrium spec puts perimeterWall: Solid_Steel on row=0 voxels n-face. ' +
+      perimWallCount,
+      `L1 NW north face must have >= 4 perimeter-wall voxels (got ${perimWallCount}). ` +
         'Counts near zero indicate the wall was never written or was wiped after arrangement.',
     ).toBeGreaterThanOrEqual(4);
   });

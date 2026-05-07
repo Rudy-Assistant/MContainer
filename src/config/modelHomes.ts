@@ -988,7 +988,7 @@ export const MODEL_HOMES: ModelHome[] = [
   {
     id: 'resort_house',
     label: 'Resort House',
-    description: 'Three-level resort with a subterranean indoor pool, a 3×2 grid of 40 HighCubes per level forming a strip of central-atrium voids over the pool, steel-walled perimeter, and a walkable rooftop deck. 19 containers total — 1 pool + 6 per level — with stairs running NW from ground to roof.',
+    description: 'Three-level resort with a subterranean indoor pool, a 3×2 grid of 40 HighCubes per level forming a strip of central-atrium voids over the pool, framed-glass perimeter walls on every level, and a walkable rooftop deck. 19 containers total — 1 pool + 6 per level — with stairs running NW from ground to roof.',
     icon: '🏝️',
     containers: [
       // [0] Pool basin — subterranean, centered under the L1 footprint.
@@ -1000,122 +1000,125 @@ export const MODEL_HOMES: ModelHome[] = [
         relativePosition: [0, 0, 0],
         pool: true,
       },
-      // ── L1 (indices 1–6) — ground floor, 3×2 grid, central_atrium ──
-      // Steel-walled perimeter via central_atrium arrangement. Each
-      // container's central 2×2 floor cells are voided (atrium void)
-      // so light spills through to the pool below.
+      // ── L1 (indices 1–6) — ground floor, 3×2 grid, framed_glass_atrium ──
+      // Glass-walled perimeter (Window_Standard) so the indoor pool is
+      // visible through every face of the ground floor. Each container's
+      // central 2×2 floor cells are voided (atrium void) so light spills
+      // down to the subterranean pool basin.
       {
         size: ContainerSize.HighCube40,
         relativePosition: [-12.19, 0, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [1] L1 NW
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, 0, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [2] L1 N-mid
       {
         size: ContainerSize.HighCube40,
         relativePosition: [+12.19, 0, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [3] L1 NE
       {
         size: ContainerSize.HighCube40,
         relativePosition: [-12.19, 0, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [4] L1 SW
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, 0, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [5] L1 S-mid
       {
         size: ContainerSize.HighCube40,
         relativePosition: [+12.19, 0, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [6] L1 SE
-      // ── L2 (indices 7–12) — second floor, central_atrium ──
-      // Same XZ as L1, y = HEIGHT_HC.
+      // ── L2 (indices 7–12) — second floor, framed_glass_atrium ──
+      // Same XZ as L1, y = HEIGHT_HC. Window_Standard perimeter walls
+      // so the floor reads as a continuous glass volume from outside.
       {
         size: ContainerSize.HighCube40,
         relativePosition: [-12.19, HEIGHT_HC, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [7] L2 NW
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, HEIGHT_HC, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [8] L2 N-mid
       {
         size: ContainerSize.HighCube40,
         relativePosition: [+12.19, HEIGHT_HC, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [9] L2 NE
       {
         size: ContainerSize.HighCube40,
         relativePosition: [-12.19, HEIGHT_HC, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [10] L2 SW
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, HEIGHT_HC, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [11] L2 S-mid
       {
         size: ContainerSize.HighCube40,
         relativePosition: [+12.19, HEIGHT_HC, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [12] L2 SE
-      // ── L3 (indices 13–18) — third floor, central_atrium ──
-      // Topmost occupied level. extraRooftopDecks lists all six so
-      // SR-07 promotes their roofs to walkable Deck_Wood + railings.
+      // ── L3 (indices 13–18) — third floor, framed_glass_atrium ──
+      // Topmost occupied level with framed-glass perimeter. extraRooftopDecks
+      // lists all six so generateRooftopDeck promotes their roofs to walkable
+      // Deck_Wood + Railing_Cable, distinct from the glass walls below.
       {
         size: ContainerSize.HighCube40,
         relativePosition: [-12.19, HEIGHT_HC * 2, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [13] L3 NW
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, HEIGHT_HC * 2, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [14] L3 N-mid
       {
         size: ContainerSize.HighCube40,
         relativePosition: [+12.19, HEIGHT_HC * 2, -1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [15] L3 NE
       {
         size: ContainerSize.HighCube40,
         relativePosition: [-12.19, HEIGHT_HC * 2, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [16] L3 SW
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, HEIGHT_HC * 2, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [17] L3 S-mid
       {
         size: ContainerSize.HighCube40,
         relativePosition: [+12.19, HEIGHT_HC * 2, +1.22],
         extensionConfig: 'all_deck',
-        arrangementId: 'central_atrium',
+        arrangementId: 'framed_glass_atrium',
       }, // [18] L3 SE
     ],
     connections: [

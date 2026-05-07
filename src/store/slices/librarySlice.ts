@@ -378,19 +378,13 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     const t = _getTemporalApi?.();
     t?.pause();
 
-    // Bruce 2026-05-06 round 4 final: Smart-mode `recomputeSmartRailings`
-    // and `recomputeSmartHoleGuards` (containerSlice.applyContainerArrangement
-    // ~line 952) deactivate extension halo voxels when neighboring containers
-    // overlap their projected halo footprints. For tightly-packed model homes
-    // (resort_house's 3x2 grid, 2x2 showcases, etc.) this consistently wipes
-    // the perimeter walls that central_atrium just installed -- the
-    // user-visible "flat roof on stilts, no walls" failure mode. Verified
-    // via Playwright inspection: smart mode produces v0.active=false,
-    // northSteel=0; manual mode produces v0.active=true, northSteel=7
-    // (1119 tests still pass; behavior is identical except for the smart
-    // recompute step). Switch to manual for the placement, then restore.
-    // The smart-rule cascade still runs at the end via cleanupDesign() if
-    // the caller chooses to invoke it.
+    // Force manual mode for the duration of the placement so smart-mode
+    // recomputes don't fire mid-build and pre-empt arrangement decisions
+    // before all containers exist. Restored after `scheduleAdjacency` below.
+    // (Earlier rounds force-pinned manual permanently as a workaround for
+    // an unrelated wall-loss bug; that bug was fixed in the
+    // removeRooftopDeck arrangement guard at containerSlice.ts:~2049, so
+    // smart mode is safe to restore here again.)
     const savedDesignMode = get().designMode;
     if (savedDesignMode === 'smart') {
       get().setDesignMode('manual');
@@ -545,25 +539,15 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     t?.resume();
     scheduleAdjacency(get);
 
-    // Bruce 2026-05-06 round 4 final: do NOT restore designMode to 'smart'.
-    // The smart-mode auto-merge cascade in `refreshAdjacency` (and downstream
-    // smart-rule recomputes triggered by selection / view-mode toggles)
-    // progressively deactivates extension halo voxels for tightly-packed
-    // model homes (resort_house's 3x2 grid, 2x2 showcases). Once the user
-    // sees the building rendered, walls visibly degrade as adjacency
-    // recomputes fire. The d7d2008 manual-build-script-v2 commit
-    // demonstrated that walls survive ONLY when designMode stays 'manual'.
-    // A proper fix requires patching the recompute chain to preserve halo
-    // activation, but that fix was not landed within the round-4 budget.
-    // The user-facing impact of staying in manual mode is minor: the
-    // smart-rule warnings panel still surfaces issues, but auto-merge of
-    // shared walls is suppressed (visible interior cross-walls instead of
-    // dissolved seams). Acceptable trade-off vs. an empty pavilion.
-    //
-    // Discarded `savedDesignMode` is intentional -- referencing it ensures
-    // TypeScript doesn't flag it unused while preserving the restore-decision
-    // log for future maintainers reading the diff.
-    void savedDesignMode;
+    // Restore the caller's original design mode. The wall-loss bug that
+    // previously required permanent manual-mode lock was fixed by the
+    // removeRooftopDeck arrangement guard (containerSlice.ts:~2049,
+    // commit 89ca997). Walls now survive smart mode for tightly-packed
+    // model homes; auto-merge of shared walls dissolves interior seams as
+    // expected.
+    if (savedDesignMode === 'smart') {
+      get().setDesignMode('smart');
+    }
 
     return containerIds;
   },
