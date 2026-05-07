@@ -2040,8 +2040,28 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       };
     });
 
-    // Retract deck extensions
-    get().setAllExtensions(containerId, 'none');
+    // Retract deck extensions, but ONLY when no deliberate arrangement has
+    // already shaped the container's envelope. Mirrors the symmetric guard in
+    // `generateRooftopDeck` above. Without this guard, `stackContainer` (line
+    // ~1601) calls `removeRooftopDeck(bottomId)` on every container that gets
+    // something stacked on top of it -- and for arranged containers (Atrium,
+    // Glass Box, etc.) that turns into `setAllExtensions('none')`, which marks
+    // every active halo voxel with `unpackPhase: 'reverse'`. The deferred
+    // `clearUnpackPhase` callback (fired ~150ms later by ContainerSkin's
+    // useFrame when the reverse animation completes) then sets `active: false`
+    // on those halo voxels. User-visible result: model homes that combine
+    // arrangements + stacking (resort_house, the 2x2 / 3x2 showcases) render
+    // as a flat steel roof on stilts with no enclosing walls -- the
+    // "Resort House wall-loss" bug (4+ rounds of failed fixes, 2026-05).
+    // Arranged containers don't have a "rooftop deck" to retract anyway: the
+    // arrangement owns the perimeter envelope. Bail.
+    const refreshed = get().containers[containerId];
+    const hasArrangement = !!refreshed?.appliedPreset && CONTAINER_ARRANGEMENT_SPECS.some(
+      (spec) => spec.id === refreshed.appliedPreset,
+    );
+    if (!hasArrangement) {
+      get().setAllExtensions(containerId, 'none');
+    }
   },
 
   // ── Shared Design Import ────────────────────────────────
