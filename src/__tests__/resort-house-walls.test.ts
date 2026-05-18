@@ -255,6 +255,41 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     expect(sampleL3NW()?.voxelGrid?.[56]?.faces?.top).toBe('Open');
   });
 
+  it('Pool basin body cells expose water surface (top=Open) at level 0 after placeModelHome', () => {
+    // Codex tech-debt v2 follow-up + Stage 5 visual gap: looking straight
+    // DOWN at the atrium center should reveal water — pool basin body cells
+    // must have top='Open' (and be active) so the basin opens upward. The
+    // surrounding halo (rows 0, 3 and cols 0, 7) should remain solid concrete
+    // walls so the basin holds water.
+    useStore.getState().placeModelHome('resort_house');
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    const pool = Object.values(useStore.getState().containers).find((c) => c.subterranean);
+    expect(pool, 'pool basin must exist').toBeDefined();
+    const grid = pool!.voxelGrid;
+    expect(grid, 'pool must have a voxel grid').toBeDefined();
+
+    // Body cells = level 0, rows 1-2, cols 1-6 (interior, 12 cells).
+    // VOXEL_COLS=8, body row 1 starts at idx=8, ends at idx=14; row 2 starts at idx=16.
+    const bodyCellIndices = [9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22];
+    for (const idx of bodyCellIndices) {
+      const v = grid![idx];
+      expect(v?.active, `pool body cell ${idx} must be active`).toBe(true);
+      expect(
+        v?.faces?.top,
+        `pool body cell ${idx} top-face must be Open (water surface visible from above)`,
+      ).toBe('Open');
+    }
+
+    // Basin walls (cols 0 and 7, the long-axis perimeter at level 0)
+    // remain Concrete so the basin holds water — assert one corner cell.
+    expect(
+      grid![0]?.faces?.s ?? grid![0]?.faces?.n,
+      'pool basin perimeter cell (level 0 NW) must have non-Open walls (Concrete basin shell)',
+    ).toBeDefined();
+  });
+
   it('Resort House description matches the actual U-ring 16-container layout', async () => {
     // Codex tech-debt v2 finding 2: description was 3×2 / 19 containers /
     // NW stair chain (pre-U-ring layout, deleted in d37c005). Description
