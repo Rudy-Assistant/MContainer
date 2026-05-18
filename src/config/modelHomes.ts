@@ -1182,6 +1182,30 @@ export const MODEL_HOMES: ModelHome[] = [
           }
         }
       }
+      // Atrium SKYLIGHT — open the rooftop above the atrium-facing halo
+      // rows of the L3 topmost containers (indices 11..15). Without this,
+      // generateRooftopDeck + the topmost row's Solid_Steel roof close the
+      // atrium shaft from above, sealing the pool basin from sky. We stamp
+      // the TOP face of the atrium-facing halo voxels (L3 N-row south halo
+      // and L3 S-row north halo, voxel level 1 only — the topmost layer)
+      // to 'Open' so the rooftop has cut-outs above the atrium gap, making
+      // the central shaft skylit from pool to sky.
+      const L3_N_ROW = [11, 12, 13];
+      const L3_S_ROW = [14, 15];
+      for (const containerIndex of L3_N_ROW) {
+        for (let col = 0; col < COLS; col++) {
+          // L3 topmost = voxel level 1, south halo row 3
+          const voxelIndex = 1 * ROW_AREA + 3 * COLS + col;
+          overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
+        }
+      }
+      for (const containerIndex of L3_S_ROW) {
+        for (let col = 0; col < COLS; col++) {
+          // L3 topmost = voxel level 1, north halo row 0
+          const voxelIndex = 1 * ROW_AREA + 0 * COLS + col;
+          overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
+        }
+      }
       return overrides;
     })(),
     tags: ['resort', 'pool', 'atrium', 'u-ring', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],

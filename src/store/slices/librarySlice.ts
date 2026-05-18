@@ -502,21 +502,6 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       }
     }
 
-    // Stamp atrium-facing face overrides BEFORE rooftop promotion so the
-    // override sticks for the user's first view. Used by Resort House to
-    // open the south wall of N-row containers (and north wall of S-row)
-    // toward the central z-gap atrium — without this, the framed_glass_box
-    // perimeterWall ('Window_Standard') renders as narrow window strips
-    // instead of an open atrium-facing room.
-    if (model.extraVoxelFaces) {
-      for (const o of model.extraVoxelFaces) {
-        const targetId = containerIds[o.containerIndex];
-        if (!targetId) continue;
-        get().setVoxelFace(targetId, o.voxelIndex, o.face, o.material as never);
-        t?.pause();
-      }
-    }
-
     // Force a rooftop deck onto specific containers — needed when the
     // topmost row carries an arrangement (framed_glass_atrium etc.) that
     // makes `stackContainer`'s auto-rooftop path skip itself. See
@@ -527,6 +512,22 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         const targetId = containerIds[idx];
         if (!targetId) continue;
         get().generateRooftopDeck(targetId);
+        t?.pause();
+      }
+    }
+
+    // Stamp atrium-facing face overrides AFTER rooftop promotion so the
+    // override has the final word (rooftop generation would otherwise
+    // overwrite atrium-facing top-face 'Open' settings with Deck_Wood).
+    // Used by Resort House to open south wall of N-row + north wall of
+    // S-row containers (perimeter rooms see open atrium) AND to cut a
+    // skylight in the topmost rooftop deck above the atrium z-gap so the
+    // pool basin below sees sky through the multi-level shaft.
+    if (model.extraVoxelFaces) {
+      for (const o of model.extraVoxelFaces) {
+        const targetId = containerIds[o.containerIndex];
+        if (!targetId) continue;
+        get().setVoxelFace(targetId, o.voxelIndex, o.face, o.material as never);
         t?.pause();
       }
     }
