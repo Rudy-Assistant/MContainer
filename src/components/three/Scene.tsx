@@ -67,6 +67,7 @@ import type { MaterialPalette } from "@/store/slices/librarySlice";
 import { QUALITY_PRESETS } from "@/config/qualityPresets";
 import { QualityAutoDetect } from './QualityAutoDetect';
 import { getStyle } from '@/config/styleRegistry';
+import { installWalkthroughCameraPoseApi } from '@/utils/walkthroughCameraPose';
 
 type CameraControlsLike = {
   getPosition: (target: THREE.Vector3) => THREE.Vector3;
@@ -2278,6 +2279,11 @@ function SceneExporter() {
   return null;
 }
 
+function WalkthroughCameraPoseApi() {
+  useEffect(() => installWalkthroughCameraPoseApi(), []);
+  return null;
+}
+
 // DevSceneExpose imported from ./DevSceneExpose (standalone, with __inspectScene + __inspectStore)
 
 interface SceneProps {
@@ -2295,6 +2301,7 @@ export default function Scene({ cameraQuaternionRef }: SceneProps) {
       <QualityManager />
       <DevSceneExpose />
       <SceneExporter />
+      <WalkthroughCameraPoseApi />
       <RaycasterConfig />
       <CameraController />
       <FrameBuilder />

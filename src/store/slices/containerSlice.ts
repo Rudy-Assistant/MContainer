@@ -1651,8 +1651,14 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         const bottomVoxel = bottomGrid[i];
         const topVoxel = topGrid[i];
         if (!bottomVoxel || !topVoxel) continue;
-        // Copy bottom container's ceiling (top face) → top container's floor (bottom face)
-        if (bottomVoxel.faces.top !== 'Open') {
+        // Copy bottom container's ceiling (top face) -> top container's floor
+        // (bottom face), but do not close an active floor opening that the
+        // top container already owns. Arrangements like framed_glass_atrium
+        // deliberately mark their upper void cells as active with
+        // bottom='Open'; stack inheritance must not turn those atrium shafts
+        // back into Solid_Steel.
+        const topHasIntentionalFloorVoid = topVoxel.active && topVoxel.faces.bottom === 'Open';
+        if (bottomVoxel.faces.top !== 'Open' && !topHasIntentionalFloorVoid) {
           newTopGrid[i] = {
             ...topVoxel,
             faces: { ...topVoxel.faces, bottom: bottomVoxel.faces.top },

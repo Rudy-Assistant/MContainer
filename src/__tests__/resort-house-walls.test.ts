@@ -24,7 +24,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useStore } from '@/store/useStore';
-import { VOXEL_COLS } from '@/types/container';
+import { VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
 
 function resetStore() {
   const initial = useStore.getInitialState();
@@ -38,33 +38,22 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
 
   it('L1 NW voxel 8 (west halo body row) is active with Solid_Steel west face after placeModelHome + cleanupDesign', () => {
     const ids = useStore.getState().placeModelHome('resort_house');
-    expect(ids.length).toBeGreaterThanOrEqual(19);
+    // U-ring layout (2026-05-17): 5 containers/level × 3 + 1 pool = 16.
+    expect(ids.length).toBeGreaterThanOrEqual(16);
 
-    // The live dev-server reproduction loop calls cleanupDesign() after
-    // placeModelHome (UserLibrary `replaceWithModelHome` -> share-import
-    // path -> normalizeDesign cascade). vitest tests that omit this step
-    // pass GREEN, but the in-browser experience is a wall-less pavilion.
-    // Simulating cleanupDesign here forces the test to exercise the SAME
-    // code path the user actually sees.
     useStore.getState().cleanupDesign?.();
-
-    // CRITICAL: scheduleAdjacency() at the end of placeModelHome fires
-    // inside requestAnimationFrame(), which vitest's environment never
-    // executes. The browser DOES execute it, and refreshAdjacency() is
-    // where shared walls get auto-melted to 'Open'. Drive it manually
-    // here so the test exercises the same end-state the user observes.
     useStore.getState().refreshAdjacency();
 
     const containers = useStore.getState().containers;
-    // L1 NW position (-12.19, 0, -1.22) per current preset.
+    // L1 NW position (-12.19, 0, -4.0) per U-ring preset.
     const l1nw = Object.values(containers).find(
       (c) =>
         c.level === 0 &&
         Math.abs(c.position.x - -12.19) < 0.05 &&
-        Math.abs(c.position.z - -1.22) < 0.05 &&
+        Math.abs(c.position.z - -4.0) < 0.05 &&
         !c.subterranean,
     );
-    expect(l1nw, 'L1 NW container at (-12.19, 0, -1.22) must exist').toBeDefined();
+    expect(l1nw, 'L1 NW container at (-12.19, 0, -4.0) must exist').toBeDefined();
     const grid = l1nw!.voxelGrid;
     expect(grid, 'L1 NW container must have a voxelGrid').toBeDefined();
 
@@ -104,7 +93,7 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
       (c) =>
         c.level === 0 &&
         Math.abs(c.position.x - -12.19) < 0.05 &&
-        Math.abs(c.position.z - -1.22) < 0.05 &&
+        Math.abs(c.position.z - -4.0) < 0.05 &&
         !c.subterranean,
     );
     expect(l1nw).toBeDefined();
@@ -123,7 +112,7 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
       (c) =>
         c.level === 0 &&
         Math.abs(c.position.x - -12.19) < 0.05 &&
-        Math.abs(c.position.z - -1.22) < 0.05 &&
+        Math.abs(c.position.z - -4.0) < 0.05 &&
         !c.subterranean,
     );
     expect(l1nw).toBeDefined();
@@ -144,5 +133,37 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
       `L1 NW north face must have >= 4 perimeter-wall voxels (got ${perimWallCount}). ` +
         'Counts near zero indicate the wall was never written or was wiped after arrangement.',
     ).toBeGreaterThanOrEqual(4);
+  });
+
+  it('all framed_glass_atrium containers keep an open atrium shaft visible from perimeter rooms', () => {
+    useStore.getState().placeModelHome('resort_house');
+
+    // Match the user-visible end state, not just the immediate preset write.
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    const containers = Object.values(useStore.getState().containers);
+    // U-ring layout (2026-05-17): 15 framed_glass_box containers (5/level × 3).
+    // The atrium is the SPATIAL GAP between the N row (z=-4.0) and S row
+    // (z=+4.0), not per-container void cells. Verify the gap exists by
+    // confirming no perimeter container spans z = 0.
+    const perimeterContainers = containers.filter(
+      (c) => !c.subterranean && c.appliedPreset === 'framed_glass_box',
+    );
+    expect(perimeterContainers).toHaveLength(15);
+
+    // No perimeter container should overlap the central atrium band z ∈ [-2.78, +2.78].
+    // Each container body is 2.44m deep along z; centers at z=-4 or z=+4 keep
+    // body bounds entirely outside [-2.78, +2.78].
+    for (const c of perimeterContainers) {
+      const halfWidth = 1.22; // 40HC body half-width
+      const minZ = c.position.z - halfWidth;
+      const maxZ = c.position.z + halfWidth;
+      const overlapsAtrium = !(maxZ <= -2.78 || minZ >= 2.78);
+      expect(
+        overlapsAtrium,
+        `${c.name} at z=${c.position.z} overlaps the central atrium band -- atrium gap is filled`,
+      ).toBe(false);
+    }
   });
 });

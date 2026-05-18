@@ -991,172 +991,149 @@ export const MODEL_HOMES: ModelHome[] = [
     description: 'Three-level resort with a subterranean indoor pool, a 3×2 grid of 40 HighCubes per level forming a strip of central-atrium voids over the pool, framed-glass perimeter walls on every level, and a walkable rooftop deck. 19 containers total — 1 pool + 6 per level — with stairs running NW from ground to roof.',
     icon: '🏝️',
     containers: [
-      // [0] Pool basin — subterranean, centered under the L1 footprint.
-      // L1 footprint center is x=0, z=0 (3×2 grid centered at origin
-      // with N row z=-1.22 and S row z=+1.22, x at -12.19, 0, +12.19).
-      // Pool basin's long axis runs along the building's long axis (X).
+      // [0] Pool basin — subterranean, centered IN the atrium void
+      // (the central z-gap between the N row and S row).
       {
         size: ContainerSize.HighCube40,
         relativePosition: [0, 0, 0],
         pool: true,
       },
-      // ── L1 (indices 1–6) — ground floor, 3×2 grid, framed_glass_atrium ──
-      // Glass-walled perimeter (Window_Standard) so the indoor pool is
-      // visible through every face of the ground floor. Each container's
-      // central 2×2 floor cells are voided (atrium void) so light spills
-      // down to the subterranean pool basin.
+      // ── L1 (indices 1–5) — ground floor, U-ring around central atrium ──
+      // Atrium-revealing layout (Bruce 2026-05-17): the previous 3×2
+      // tightly-packed grid produced no visible atrium from inside
+      // because per-container 2x2 floor voids were scattered, not aligned.
+      // This layout instead creates a 5.56 m × 30.48 m central VOID
+      // between the N row and S row, with the pool at its base. From
+      // inside any perimeter container, looking toward the atrium reveals
+      // a multi-level open shaft down to the pool / up to the rooftop.
+      //
+      // N row (3 containers, z=-4.0): NW + stair-tower (center) + NE
+      // S row (2 containers, z=+4.0): SW + SE
+      // Atrium void: z ∈ [-2.78, +2.78] (5.56 m deep), full x width
+      // 5 containers/level × 3 levels = 15 + 1 pool = 16 (matches user spec)
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-12.19, 0, -1.22],
+        relativePosition: [-12.19, 0, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
+        arrangementId: 'framed_glass_box',
       }, // [1] L1 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, 0, -1.22],
+        relativePosition: [0, 0, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [2] L1 N-mid
+        arrangementId: 'framed_glass_box',
+      }, // [2] L1 N-center / stair tower
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+12.19, 0, -1.22],
+        relativePosition: [+12.19, 0, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
+        arrangementId: 'framed_glass_box',
       }, // [3] L1 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-12.19, 0, +1.22],
+        relativePosition: [-6.10, 0, +4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
+        arrangementId: 'framed_glass_box',
       }, // [4] L1 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, 0, +1.22],
+        relativePosition: [+6.10, 0, +4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [5] L1 S-mid
+        arrangementId: 'framed_glass_box',
+      }, // [5] L1 SE
+      // ── L2 (indices 6–10) — second floor, same U-ring ──
+      // framed_glass_box gives continuous glass perimeter; atrium void
+      // continues upward as the N + S rows have no center-row container
+      // filling z ∈ [-2.78, +2.78].
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+12.19, 0, +1.22],
+        relativePosition: [-12.19, HEIGHT_HC, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [6] L1 SE
-      // ── L2 (indices 7–12) — second floor, framed_glass_atrium ──
-      // Same XZ as L1, y = HEIGHT_HC. Window_Standard perimeter walls
-      // so the floor reads as a continuous glass volume from outside.
+        arrangementId: 'framed_glass_box',
+      }, // [6] L2 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-12.19, HEIGHT_HC, -1.22],
+        relativePosition: [0, HEIGHT_HC, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [7] L2 NW
+        arrangementId: 'framed_glass_box',
+      }, // [7] L2 N-center / stair tower
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC, -1.22],
+        relativePosition: [+12.19, HEIGHT_HC, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [8] L2 N-mid
+        arrangementId: 'framed_glass_box',
+      }, // [8] L2 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+12.19, HEIGHT_HC, -1.22],
+        relativePosition: [-6.10, HEIGHT_HC, +4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [9] L2 NE
+        arrangementId: 'framed_glass_box',
+      }, // [9] L2 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-12.19, HEIGHT_HC, +1.22],
+        relativePosition: [+6.10, HEIGHT_HC, +4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [10] L2 SW
-      {
-        size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC, +1.22],
-        extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [11] L2 S-mid
-      {
-        size: ContainerSize.HighCube40,
-        relativePosition: [+12.19, HEIGHT_HC, +1.22],
-        extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [12] L2 SE
+        arrangementId: 'framed_glass_box',
+      }, // [10] L2 SE
       // ── L3 (indices 13–18) — third floor, framed_glass_atrium ──
       // Topmost occupied level with framed-glass perimeter. extraRooftopDecks
       // lists all six so generateRooftopDeck promotes their roofs to walkable
       // Deck_Wood + Railing_Cable, distinct from the glass walls below.
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-12.19, HEIGHT_HC * 2, -1.22],
+        relativePosition: [-12.19, HEIGHT_HC * 2, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [13] L3 NW
+        arrangementId: 'framed_glass_box',
+      }, // [11] L3 NW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC * 2, -1.22],
+        relativePosition: [0, HEIGHT_HC * 2, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [14] L3 N-mid
+        arrangementId: 'framed_glass_box',
+      }, // [12] L3 N-center / stair tower
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [+12.19, HEIGHT_HC * 2, -1.22],
+        relativePosition: [+12.19, HEIGHT_HC * 2, -4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [15] L3 NE
+        arrangementId: 'framed_glass_box',
+      }, // [13] L3 NE
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [-12.19, HEIGHT_HC * 2, +1.22],
+        relativePosition: [-6.10, HEIGHT_HC * 2, +4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [16] L3 SW
+        arrangementId: 'framed_glass_box',
+      }, // [14] L3 SW
       {
         size: ContainerSize.HighCube40,
-        relativePosition: [0, HEIGHT_HC * 2, +1.22],
+        relativePosition: [+6.10, HEIGHT_HC * 2, +4.0],
         extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [17] L3 S-mid
-      {
-        size: ContainerSize.HighCube40,
-        relativePosition: [+12.19, HEIGHT_HC * 2, +1.22],
-        extensionConfig: 'all_deck',
-        arrangementId: 'framed_glass_atrium',
-      }, // [18] L3 SE
+        arrangementId: 'framed_glass_box',
+      }, // [15] L3 SE
     ],
     connections: [
-      // Stair chain runs up the NW column (L1[1] → L2[7] → L3[13]).
-      // NW container is UNROTATED (rotation 0), so face directions are
-      // straightforward: face 's' ascends in local +Z = world +Z = south
-      // (into the atrium, mirroring reference-photo staircases that are
-      // featured atrium elements). Earlier attempts placed stairs on the
-      // rotated W container; rotation re-orients local face directions
-      // and the stair geometry pointed outward instead of into the
-      // atrium. NW column avoids the issue.
-      { fromIndex: 1, toIndex: 7,  type: 'stacked', stairsVoxelIndex: 9,  stairsFace: 's' }, // L1 NW → L2 NW
-      { fromIndex: 7, toIndex: 13, type: 'stacked', stairsVoxelIndex: 14, stairsFace: 'n' }, // L2 NW → L3 NW (alternated face for SR-09)
-      // Other columns: pure stacking (no stairs).
-      { fromIndex: 2, toIndex: 8,  type: 'stacked' },
-      { fromIndex: 3, toIndex: 9,  type: 'stacked' },
-      { fromIndex: 4, toIndex: 10, type: 'stacked' },
-      { fromIndex: 5, toIndex: 11, type: 'stacked' },
-      { fromIndex: 6, toIndex: 12, type: 'stacked' },
-      { fromIndex: 8,  toIndex: 14, type: 'stacked' },
-      { fromIndex: 9,  toIndex: 15, type: 'stacked' },
-      { fromIndex: 10, toIndex: 16, type: 'stacked' },
-      { fromIndex: 11, toIndex: 17, type: 'stacked' },
-      { fromIndex: 12, toIndex: 18, type: 'stacked' },
+      // Stair chain runs up the N-center / stair-tower column
+      // (L1[2] → L2[7] → L3[12]). The stair tower sits between NW and NE
+      // on the north row; stairs face SOUTH so they ascend INTO the
+      // central atrium void (the open z-gap between N and S rows),
+      // mirroring reference-photo atrium staircases.
+      { fromIndex: 2, toIndex: 7,  type: 'stacked', stairsVoxelIndex: 9,  stairsFace: 's' }, // L1 N-ctr → L2 N-ctr
+      { fromIndex: 7, toIndex: 12, type: 'stacked', stairsVoxelIndex: 14, stairsFace: 'n' }, // L2 N-ctr → L3 N-ctr
+      // Other columns: pure stacking.
+      { fromIndex: 1, toIndex: 6,  type: 'stacked' },
+      { fromIndex: 3, toIndex: 8,  type: 'stacked' },
+      { fromIndex: 4, toIndex: 9,  type: 'stacked' },
+      { fromIndex: 5, toIndex: 10, type: 'stacked' },
+      { fromIndex: 6,  toIndex: 11, type: 'stacked' },
+      { fromIndex: 8,  toIndex: 13, type: 'stacked' },
+      { fromIndex: 9,  toIndex: 14, type: 'stacked' },
+      { fromIndex: 10, toIndex: 15, type: 'stacked' },
     ],
     extraStairs: [
-      // L3 NW (index 13) → rooftop deck. voxel 9 face='top' generates a
-      // vertical stair ascending out of L3 NW's ceiling onto the
-      // rooftop deck, completing the climb chain L1 → L2 → L3 → roof.
-      { containerIndex: 13, voxelIndex: 9, face: 'top' },
+      // L3 stair-tower (index 12) → rooftop deck.
+      { containerIndex: 12, voxelIndex: 9, face: 'top' },
     ],
-    // L3 containers carry framed_glass_atrium, which makes the auto-
-    // rooftop path in `stackContainer` short-circuit (it respects the
-    // arrangement choice). List every L3 index so `placeModelHome`
-    // explicitly calls generateRooftopDeck on each after stacking.
-    // SR-07 enforces the topmost-only invariant.
-    extraRooftopDecks: [13, 14, 15, 16, 17, 18],
-    tags: ['resort', 'pool', 'atrium', 'square-ring', 'rotation', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],
+    extraRooftopDecks: [11, 12, 13, 14, 15],
+    tags: ['resort', 'pool', 'atrium', 'u-ring', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],
   },
 ];
 

@@ -7,6 +7,11 @@ import { PointerLockControls } from "@react-three/drei";
 import { useStore } from "@/store/useStore";
 import { CONTAINER_DIMENSIONS, ViewMode, WallSide, ModuleType, FurnitureType, FURNITURE_CATALOG, type FloorMaterialType, type HingedWall, VOXEL_COLS, VOXEL_ROWS } from "@/types/container";
 import { getCycleForFace, getVoxelLayout } from "@/components/objects/ContainerSkin";
+import {
+  consumeWalkthroughCameraPoseOverride,
+  registerWalkthroughCameraPoseApplier,
+  type WalkthroughCameraPose,
+} from "@/utils/walkthroughCameraPose";
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -29,6 +34,35 @@ function safeExitPointerLock() {
   } catch {
     // Ignore errors from unmounted/detached elements
   }
+}
+
+function applyWalkthroughCameraPose(
+  camera: THREE.Camera,
+  pose: WalkthroughCameraPose,
+  currentFloorY: { current: number },
+  yawRef: { current: number },
+) {
+  const [px, py, pz] = pose.position;
+  camera.position.set(px, py, pz);
+  currentFloorY.current = pose.floorY ?? (py - EYE_HEIGHT);
+
+  if (pose.target) {
+    const [tx, ty, tz] = pose.target;
+    camera.lookAt(tx, ty, tz);
+  } else if (pose.yaw != null || pose.pitch != null) {
+    const yaw = pose.yaw ?? yawRef.current;
+    const pitch = pose.pitch ?? 0;
+    const horizontal = Math.cos(pitch);
+    camera.lookAt(
+      px + Math.sin(yaw) * horizontal * 5,
+      py + Math.sin(pitch) * 5,
+      pz + Math.cos(yaw) * horizontal * 5,
+    );
+  }
+
+  const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+  euler.setFromQuaternion(camera.quaternion);
+  yawRef.current = euler.y;
 }
 
 // ── Auto-Tour waypoint generation ────────────────────────────
@@ -913,17 +947,31 @@ export default function WalkthroughControls() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // cleanup only
 
+  useEffect(() => {
+    return registerWalkthroughCameraPoseApplier((pose) => {
+      tourRef.current = null;
+      applyWalkthroughCameraPose(camera, pose, currentFloorY, yawRef);
+    });
+  }, [camera]);
+
   // Set initial camera position — restore saved FPV position or spawn inside ground floor container
   const hasSpawned = useRef(false);
   useEffect(() => {
     if (hasSpawned.current) return;
     hasSpawned.current = true;
 
+    const overridePose = consumeWalkthroughCameraPoseOverride();
+    if (overridePose) {
+      applyWalkthroughCameraPose(camera, overridePose, currentFloorY, yawRef);
+      return;
+    }
+
     // WU-6: Restore saved FPV position if available
     const savedPos = useStore.getState().savedWalkthroughPos;
     if (savedPos) {
       camera.position.set(...savedPos.position);
       yawRef.current = savedPos.yaw;
+      currentFloorY.current = savedPos.position[1] - EYE_HEIGHT;
       // Reconstruct look direction from saved yaw
       const lookX = camera.position.x + Math.sin(savedPos.yaw) * 5;
       const lookZ = camera.position.z + Math.cos(savedPos.yaw) * 5;

@@ -192,6 +192,8 @@ Ground presets with per-preset texture filename overrides. Grass uses ambientCG 
 
 Built on drei `<PointerLockControls>`. Adds: voxel-granular wall collision, floor detection with stair support, auto-tour (interior + exterior waypoints), smart spawn, door toggling, camera save/restore, fly mode. Respects all four wall-feature overlays — cabinets and fixtures block movement (~0.5m collision box extending into the room), mid- and bottom-anchor shelves block (top-anchor shelves above head height pass through), decor (flat against wall) is passable. **Not a candidate for replacement.**
 
+Playwright/debug camera hook: `window.__setWalkthroughCameraPose({ position, target?, yaw?, pitch?, floorY? })` queues a first-person pose before entering walkthrough or applies it immediately while walkthrough is mounted. `WalkthroughControls` consumes the queued pose before saved-position restore and before the largest-L0-container spawn fallback.
+
 ### Camera System (Scene.tsx)
 
 Three mutually exclusive modes switched by `viewMode`. CameraControls (orbit) is only mounted in RealisticScene; PointerLockControls only in WalkthroughScene.
