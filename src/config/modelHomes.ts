@@ -6,7 +6,7 @@
  * and connections (adjacency / stacking).
  */
 
-import { ContainerSize, type ContainerArrangementId, FurnitureType, type SurfaceType } from '@/types/container';
+import { ContainerSize, type ContainerArrangementId, FurnitureType, type SurfaceType, VOXEL_COLS, VOXEL_ROWS } from '@/types/container';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -153,7 +153,9 @@ const HEIGHT_HC = 2.90;
 //
 //   Total = 280 entries
 //
-// Voxel index = level * 32 + row * 8 + col. VOXEL_COLS=8, VOXEL_ROWS=4.
+// Voxel index = level * (VOXEL_ROWS * VOXEL_COLS) + row * VOXEL_COLS + col.
+// Imports VOXEL_COLS / VOXEL_ROWS from container.ts so this helper survives
+// any future change to the voxel-grid resolution.
 function buildResortHouseAtriumOverrides(): Array<{
   containerIndex: number;
   voxelIndex: number;
@@ -161,28 +163,30 @@ function buildResortHouseAtriumOverrides(): Array<{
   material: SurfaceType;
 }> {
   const overrides: Array<{ containerIndex: number; voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: SurfaceType }> = [];
-  const COLS = 8;
-  const ROW_AREA = 4 * COLS; // 32 voxels per level
+  const ROW_AREA = VOXEL_ROWS * VOXEL_COLS; // voxels per level
 
   // N-row perimeter containers (z=-4): NW + N-center + NE × L1/L2/L3.
-  // Open the SOUTH halo (row 3) so atrium-facing wall reads as open.
+  // Open the SOUTH halo (row VOXEL_ROWS-1 = the south outer ring) so the
+  // atrium-facing wall reads as open from inside.
   const N_ROW_INDICES = [1, 2, 3, 6, 7, 8, 11, 12, 13];
+  const SOUTH_HALO_ROW = VOXEL_ROWS - 1; // row 3 when VOXEL_ROWS=4
   for (const containerIndex of N_ROW_INDICES) {
     for (let level = 0; level < 2; level++) {
-      for (let col = 0; col < COLS; col++) {
-        const voxelIndex = level * ROW_AREA + 3 * COLS + col;
+      for (let col = 0; col < VOXEL_COLS; col++) {
+        const voxelIndex = level * ROW_AREA + SOUTH_HALO_ROW * VOXEL_COLS + col;
         overrides.push({ containerIndex, voxelIndex, face: 's', material: 'Open' });
       }
     }
   }
 
   // S-row perimeter containers (z=+4): SW + SE × L1/L2/L3.
-  // Open the NORTH halo (row 0) so atrium-facing wall reads as open.
+  // Open the NORTH halo (row 0) so the atrium-facing wall reads as open.
   const S_ROW_INDICES = [4, 5, 9, 10, 14, 15];
+  const NORTH_HALO_ROW = 0;
   for (const containerIndex of S_ROW_INDICES) {
     for (let level = 0; level < 2; level++) {
-      for (let col = 0; col < COLS; col++) {
-        const voxelIndex = level * ROW_AREA + 0 * COLS + col;
+      for (let col = 0; col < VOXEL_COLS; col++) {
+        const voxelIndex = level * ROW_AREA + NORTH_HALO_ROW * VOXEL_COLS + col;
         overrides.push({ containerIndex, voxelIndex, face: 'n', material: 'Open' });
       }
     }
@@ -191,17 +195,18 @@ function buildResortHouseAtriumOverrides(): Array<{
   // Atrium SKYLIGHT — open the rooftop above the atrium-facing halo on the
   // L3 topmost containers. Without this, generateRooftopDeck + Solid_Steel
   // roof close the atrium shaft from above, sealing the pool from sky.
+  const L3_TOPMOST_LEVEL = 1; // voxel level 1 = roof layer of the container
   const L3_N_ROW = [11, 12, 13];
   for (const containerIndex of L3_N_ROW) {
-    for (let col = 0; col < COLS; col++) {
-      const voxelIndex = 1 * ROW_AREA + 3 * COLS + col; // L3 topmost, south halo
+    for (let col = 0; col < VOXEL_COLS; col++) {
+      const voxelIndex = L3_TOPMOST_LEVEL * ROW_AREA + SOUTH_HALO_ROW * VOXEL_COLS + col;
       overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
     }
   }
   const L3_S_ROW = [14, 15];
   for (const containerIndex of L3_S_ROW) {
-    for (let col = 0; col < COLS; col++) {
-      const voxelIndex = 1 * ROW_AREA + 0 * COLS + col; // L3 topmost, north halo
+    for (let col = 0; col < VOXEL_COLS; col++) {
+      const voxelIndex = L3_TOPMOST_LEVEL * ROW_AREA + NORTH_HALO_ROW * VOXEL_COLS + col;
       overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
     }
   }

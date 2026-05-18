@@ -530,14 +530,19 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     // are author-applied, not user paint; they shouldn't pre-fill the
     // user's repeat-last-stamp slot.
     if (model.extraVoxelFaces) {
-      const savedLastStamp = get().lastStamp;
+      // lastStamp lives on voxelSlice — pull it through the cross-slice
+      // (typed via the local handle as VoxelRuntimeState would create an
+      // import cycle; an unknown-cast is the smallest local escape hatch).
+      const getCrossSlice = get as unknown as () => { lastStamp: unknown };
+      const setCrossSlice = set as unknown as (partial: { lastStamp: unknown }) => void;
+      const savedLastStamp = getCrossSlice().lastStamp;
       for (const o of model.extraVoxelFaces) {
         const targetId = containerIds[o.containerIndex];
         if (!targetId) continue;
         get().setVoxelFace(targetId, o.voxelIndex, o.face, o.material);
         t?.pause();
       }
-      set({ lastStamp: savedLastStamp });
+      setCrossSlice({ lastStamp: savedLastStamp });
     }
 
     // Auto-expand extensions only when the model home leaves extension behavior unspecified.
