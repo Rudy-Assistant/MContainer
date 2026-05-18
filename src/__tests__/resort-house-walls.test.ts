@@ -166,4 +166,84 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
       ).toBe(false);
     }
   });
+
+  it('extraVoxelFaces opens atrium-facing halo on every N-row + S-row perimeter container', () => {
+    useStore.getState().placeModelHome('resort_house');
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    const containers = useStore.getState().containers;
+    // N row (z=-4): atrium is to +z → south halo (row 3) s-face must be 'Open'
+    // S row (z=+4): atrium is to -z → north halo (row 0) n-face must be 'Open'
+    const nRow = Object.values(containers).filter(
+      (c) => !c.subterranean && Math.abs(c.position.z - -4.0) < 0.05,
+    );
+    const sRow = Object.values(containers).filter(
+      (c) => !c.subterranean && Math.abs(c.position.z - 4.0) < 0.05,
+    );
+    expect(nRow.length, 'expected 3 N-row containers per level × 3 levels = 9').toBe(9);
+    expect(sRow.length, 'expected 2 S-row containers per level × 3 levels = 6').toBe(6);
+
+    for (const c of nRow) {
+      const grid = c.voxelGrid!;
+      for (let level = 0; level < 2; level++) {
+        for (let col = 0; col < VOXEL_COLS; col++) {
+          const idx = level * 32 + 3 * VOXEL_COLS + col; // row 3 = south halo
+          expect(
+            grid[idx]?.faces?.s,
+            `${c.name} L${c.level} voxel ${idx} (south halo level=${level} col=${col}) s-face must be Open`,
+          ).toBe('Open');
+        }
+      }
+    }
+    for (const c of sRow) {
+      const grid = c.voxelGrid!;
+      for (let level = 0; level < 2; level++) {
+        for (let col = 0; col < VOXEL_COLS; col++) {
+          const idx = level * 32 + 0 * VOXEL_COLS + col; // row 0 = north halo
+          expect(
+            grid[idx]?.faces?.n,
+            `${c.name} L${c.level} voxel ${idx} (north halo level=${level} col=${col}) n-face must be Open`,
+          ).toBe('Open');
+        }
+      }
+    }
+  });
+
+  it('extraVoxelFaces cuts L3 atrium skylight (top=Open on L3 atrium-facing halo)', () => {
+    useStore.getState().placeModelHome('resort_house');
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    const containers = useStore.getState().containers;
+    // L3 N-row (level=2, z=-4): voxel level 1, row 3, cols 0..7 → top must be Open
+    // L3 S-row (level=2, z=+4): voxel level 1, row 0, cols 0..7 → top must be Open
+    const l3nRow = Object.values(containers).filter(
+      (c) => c.level === 2 && Math.abs(c.position.z - -4.0) < 0.05,
+    );
+    const l3sRow = Object.values(containers).filter(
+      (c) => c.level === 2 && Math.abs(c.position.z - 4.0) < 0.05,
+    );
+    expect(l3nRow.length).toBe(3);
+    expect(l3sRow.length).toBe(2);
+
+    for (const c of l3nRow) {
+      for (let col = 0; col < VOXEL_COLS; col++) {
+        const idx = 1 * 32 + 3 * VOXEL_COLS + col;
+        expect(
+          c.voxelGrid![idx]?.faces?.top,
+          `L3 N-row ${c.name} voxel ${idx} (skylight cell) top-face must be Open`,
+        ).toBe('Open');
+      }
+    }
+    for (const c of l3sRow) {
+      for (let col = 0; col < VOXEL_COLS; col++) {
+        const idx = 1 * 32 + 0 * VOXEL_COLS + col;
+        expect(
+          c.voxelGrid![idx]?.faces?.top,
+          `L3 S-row ${c.name} voxel ${idx} (skylight cell) top-face must be Open`,
+        ).toBe('Open');
+      }
+    }
+  });
 });

@@ -6,7 +6,7 @@
  * and connections (adjacency / stacking).
  */
 
-import { ContainerSize, type ContainerArrangementId, FurnitureType } from '@/types/container';
+import { ContainerSize, type ContainerArrangementId, FurnitureType, type SurfaceType } from '@/types/container';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -101,19 +101,22 @@ export interface ModelHome {
    *  Deck_Wood + Railing_Cable on their roof voxels (`generateRooftopDeck`
    *  runs after stacking, respecting the topmost-only invariant of SR-07). */
   extraRooftopDecks?: number[];
-  /** Stamps specific voxel face materials AFTER arrangement is applied.
-   *  Required when a preset needs to override the arrangement-installed
-   *  perimeter wall — e.g. the Resort House preset opens the atrium-facing
-   *  halo rows on each perimeter container so the central z-gap reads as a
-   *  truly OPEN atrium from inside, not just a sliver visible through a
-   *  Window_Standard strip. Each entry runs after arrangement/stair/door
-   *  installation but BEFORE rooftop-deck promotion, so the override sticks
-   *  for the user's first view of the home. */
+  /** Stamps specific voxel face materials AFTER arrangement AND AFTER
+   *  rooftop-deck generation. Required when a preset needs to override
+   *  arrangement- or deck-installed surfaces — e.g. the Resort House preset
+   *  opens the atrium-facing halo rows of every perimeter container so the
+   *  central z-gap reads as a truly OPEN atrium from inside (not just a
+   *  sliver through a Window_Standard strip), and cuts a skylight in the
+   *  L3 rooftop deck above the atrium gap. Running AFTER rooftop-deck
+   *  promotion ensures overrides aren't overwritten by `generateRooftopDeck`.
+   *  Caveat: applied via `setVoxelFace`, which marks the affected faces as
+   *  user-painted — keep this in mind when deciding whether a surface should
+   *  be preset-authored geometry vs. a separate "stamp" not flagged as paint. */
   extraVoxelFaces?: Array<{
     containerIndex: number;
     voxelIndex: number;
     face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom';
-    material: string;
+    material: SurfaceType;
   }>;
   tags?: string[];
 }
@@ -1161,7 +1164,7 @@ export const MODEL_HOMES: ModelHome[] = [
     //     → face 'n' = 'Open'.  Atrium is to -z.
     // Voxel index = level * 32 + row * 8 + col. VOXEL_COLS=8, VOXEL_ROWS=4.
     extraVoxelFaces: (() => {
-      const overrides: Array<{ containerIndex: number; voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: string }> = [];
+      const overrides: Array<{ containerIndex: number; voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: SurfaceType }> = [];
       const N_ROW_INDICES = [1, 2, 3, 6, 7, 8, 11, 12, 13];   // NW, N-center, NE × L1/L2/L3
       const S_ROW_INDICES = [4, 5, 9, 10, 14, 15];            // SW, SE × L1/L2/L3
       const COLS = 8;

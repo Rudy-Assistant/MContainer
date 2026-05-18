@@ -527,7 +527,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       for (const o of model.extraVoxelFaces) {
         const targetId = containerIds[o.containerIndex];
         if (!targetId) continue;
-        get().setVoxelFace(targetId, o.voxelIndex, o.face, o.material as never);
+        get().setVoxelFace(targetId, o.voxelIndex, o.face, o.material);
         t?.pause();
       }
     }
