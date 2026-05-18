@@ -541,7 +541,13 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     }
 
     // Auto-expand extensions only when the model home leaves extension behavior unspecified.
+    // Skip pool slots — ModelHomeContainer.pool docstring already states
+    // extension fields are ignored for subterranean basins, but the earlier
+    // version of this loop still called setAllExtensions on pool containers,
+    // triggering "Extension 'all_deck' blocked: would overlap adjacent
+    // container" warnings on every Resort House placement.
     for (const [i, mc] of model.containers.entries()) {
+      if (mc.pool) continue;
       if (!mc.extensionConfig && !mc.arrangementId) {
         get().setAllExtensions(containerIds[i], DEFAULT_EXTENSION_CONFIG, false);
         t?.pause();

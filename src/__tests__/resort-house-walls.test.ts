@@ -255,6 +255,30 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     expect(sampleL3NW()?.voxelGrid?.[56]?.faces?.top).toBe('Open');
   });
 
+  it('placeModelHome("resort_house") does NOT emit "Extension blocked" warning for the pool slot', async () => {
+    // Codex tech-debt v2 finding 3 (LOW/MEDIUM): the auto-expand extensions
+    // loop in librarySlice.placeModelHome doesn't skip mc.pool slots,
+    // so pool containers hit setAllExtensions even though
+    // ModelHomeContainer.pool says extension fields are ignored. Result:
+    // every Resort House placement logs "Extension 'all_deck' on <id>
+    // blocked: would overlap adjacent container" for the pool slot.
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      useStore.getState().placeModelHome('resort_house');
+    } finally {
+      console.warn = originalWarn;
+    }
+    const blocked = warnings.filter((w) => /Extension.*blocked/.test(w));
+    expect(
+      blocked,
+      `pool slot triggered ${blocked.length} extension-blocked warnings: ${JSON.stringify(blocked, null, 2)}`,
+    ).toHaveLength(0);
+  });
+
   it('placeModelHome("resort_house") does NOT leak preset overrides into lastStamp (space-repeat protection)', () => {
     // Bug: extraVoxelFaces apply via setVoxelFace, which writes lastStamp
     // every call. After placeModelHome, lastStamp ends up as the preset's
