@@ -34,6 +34,7 @@ import {
   type ElementConfig,
   type PoleConfig,
   type LightPlacement,
+  isVoxelFaceProtected,
 } from "@/types/container";
 import {
   createContainer,
@@ -560,8 +561,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
   /**
    * Apply auto-doors on body voxel faces that border active extensions.
-   * Follows same pattern as _preMergeWalls: only modifies Solid_Steel faces,
-   * preserves user-painted faces, saves originals for restoration.
+   * Follows same pattern as _preMergeWalls: only modifies unprotected
+   * Solid_Steel faces, saves originals for restoration.
    */
   _applyExtensionDoors: (containerId: string, config: ExtensionConfig) => {
     set((s) => {
@@ -613,7 +614,8 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
           if (!bodyVoxel?.active) continue;
           const currentFace = bodyVoxel.faces[b.face];
 
-          // Only modify default Solid_Steel faces (preserve user-painted faces)
+          // Only modify default Solid_Steel faces (preserve user/preset-protected faces)
+          if (isVoxelFaceProtected(bodyVoxel, b.face)) continue;
           if (currentFace !== 'Solid_Steel') continue;
 
           const key = `${bodyIdx}:${b.face}`;

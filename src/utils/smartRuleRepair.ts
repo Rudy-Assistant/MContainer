@@ -15,7 +15,7 @@
  */
 
 import type { Container, SurfaceType, Voxel, VoxelFaces } from '@/types/container';
-import { VOXEL_COLS, VOXEL_LEVELS, VOXEL_ROWS } from '@/types/container';
+import { VOXEL_COLS, VOXEL_LEVELS, VOXEL_ROWS, isVoxelFaceProtected } from '@/types/container';
 import {
   ASCEND_DELTA,
   STAIR_FLIP,
@@ -147,7 +147,7 @@ export function repairCrossContainerVoid(containers: Record<string, Container>):
 // ── SR-04 — Open-edge railing repair ────────────────────────
 
 /** For every elevated-deck voxel whose wall faces OOB without a railing,
- *  install `Railing_Cable`. Skip user-painted faces. */
+ *  install `Railing_Cable`. Skip user/preset-protected faces. */
 export function repairOpenEdgeRailing(containers: Record<string, Container>): Record<string, Container> {
   const out: Record<string, Container> = { ...containers };
   for (const [id, c] of Object.entries(out)) {
@@ -178,7 +178,7 @@ export function repairOpenEdgeRailing(containers: Record<string, Container>): Re
         const inBounds = nRow >= 0 && nRow < VOXEL_ROWS && nCol >= 0 && nCol < VOXEL_COLS;
         const neighborActive = inBounds && (grid[idxOf(nRow, nCol, level)]?.active ?? false);
         if (neighborActive) continue;
-        if (v.userPaintedFaces?.[face]) continue;
+        if (isVoxelFaceProtected(v, face)) continue;
         const current = v.faces[face];
         // Protected face types — anything intentionally placed by the user
         // or a glass/door/window arrangement should NOT be silently promoted
@@ -234,7 +234,7 @@ export function repairFallHazardGuard(containers: Record<string, Container>): Re
         const inBounds = nRow >= 0 && nRow < VOXEL_ROWS && nCol >= 0 && nCol < VOXEL_COLS;
         const neighborActive = inBounds && (grid[idxOf(nRow, nCol, level)]?.active ?? false);
         if (neighborActive) continue;
-        if (v.userPaintedFaces?.[face]) continue;
+        if (isVoxelFaceProtected(v, face)) continue;
         const current = v.faces[face];
         // Same protected-list expansion as SR-04 — window/shoji/washi faces
         // are intentional choices and must not be silently railed over.

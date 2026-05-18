@@ -243,8 +243,9 @@ interface Voxel {
   floorOverlay?:   Partial<Record<keyof VoxelFaces, FloorOverlayConfig>>;    // rugs, runners (uses 'bottom')
   ceilingOverlay?: Partial<Record<keyof VoxelFaces, CeilingOverlayConfig>>;  // fans, pendants, recessed grids, beams (uses 'top')
 
-  // Smart-stair tracking + user-painted preservation
+  // Smart-stair tracking + protected face preservation
   userPaintedFaces?: Partial<Record<keyof VoxelFaces, boolean>>;
+  presetProtectedFaces?: Partial<Record<keyof VoxelFaces, boolean>>;
   _smartStairChanges?: SmartStairChanges;
 
   // Ephemeral animation state — stripped in partialize, never persisted to IDB.

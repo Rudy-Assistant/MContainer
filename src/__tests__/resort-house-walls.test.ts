@@ -231,6 +231,10 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     // Baseline assertions (post-place)
     expect(sampleL1NW()?.voxelGrid?.[24]?.faces?.s).toBe('Open');  // south halo row 3 col 0
     expect(sampleL3NW()?.voxelGrid?.[56]?.faces?.top).toBe('Open'); // L3 skylight top cell
+    expect(sampleL1NW()?.voxelGrid?.[24]?.presetProtectedFaces?.s).toBe(true);
+    expect(sampleL1NW()?.voxelGrid?.[24]?.userPaintedFaces?.s).toBeFalsy();
+    expect(sampleL3NW()?.voxelGrid?.[56]?.presetProtectedFaces?.top).toBe(true);
+    expect(sampleL3NW()?.voxelGrid?.[56]?.userPaintedFaces?.top).toBeFalsy();
 
     // Run smart-rule cascade again — overrides must survive
     useStore.getState().setDesignMode?.('smart');
@@ -240,7 +244,7 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
 
     expect(
       sampleL1NW()?.voxelGrid?.[24]?.faces?.s,
-      'atrium-facing s-face must survive smart-mode cascade — userPaintedFaces marker protects preset override',
+      'atrium-facing s-face must survive smart-mode cascade — presetProtectedFaces marker protects preset override',
     ).toBe('Open');
     expect(
       sampleL3NW()?.voxelGrid?.[56]?.faces?.top,
@@ -332,11 +336,10 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
   });
 
   it('placeModelHome("resort_house") does NOT leak preset overrides into lastStamp (space-repeat protection)', () => {
-    // Bug: extraVoxelFaces apply via setVoxelFace, which writes lastStamp
-    // every call. After placeModelHome, lastStamp ends up as the preset's
-    // INTERNAL override (the final atrium skylight cell), so when the user
-    // hits Space (useInputHandler.ts:33), the repeat-last-stamp action
-    // repeats a preset-internal override instead of their last actual paint.
+    // Preset overrides apply via setVoxelFacePreset. They should be protected
+    // from smart cleanup but must not populate the user's repeat-last-stamp
+    // slot. If lastStamp changes here, Space-repeat would repeat a
+    // preset-internal override instead of the user's last actual paint.
     // Expectation: after placeModelHome with NO prior user paint, lastStamp
     // should be null/undefined — the preset shouldn't pre-fill it.
     useStore.getState().placeModelHome('resort_house');
@@ -386,5 +389,34 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
         ).toBe('Open');
       }
     }
+  });
+
+  it('extraVoxelFaces overrides mark presetProtectedFaces, NOT userPaintedFaces (step E architectural fix)', () => {
+    // Codex tech-debt v1 finding 1 (HIGH) addressed: preset author-applied
+    // overrides should NOT count as user paint. They should set
+    // presetProtectedFaces[face]=true so smart-rule cleanup respects them
+    // while inspector flows + Space-repeat can still distinguish "the user
+    // hasn't painted anything yet."
+    useStore.getState().placeModelHome('resort_house');
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    const containers = useStore.getState().containers;
+    const l1nw = Object.values(containers).find(
+      (c) => c.level === 0 && Math.abs(c.position.x - -12.19) < 0.05 && Math.abs(c.position.z - -4.0) < 0.05 && !c.subterranean,
+    );
+    expect(l1nw, 'L1 NW must exist').toBeDefined();
+
+    // Voxel 24 is L1 NW row 3 col 0 — atrium-facing south halo.
+    const v = l1nw!.voxelGrid![24];
+    expect(v?.faces?.s, 'preset override should have set s=Open').toBe('Open');
+    expect(
+      v?.userPaintedFaces?.s,
+      'preset-applied face must NOT be marked as user paint (use presetProtectedFaces instead)',
+    ).toBeFalsy();
+    expect(
+      v?.presetProtectedFaces?.s,
+      'preset-applied face must be marked as preset-protected so smart-rule cleanup respects it',
+    ).toBe(true);
   });
 });

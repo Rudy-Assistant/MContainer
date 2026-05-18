@@ -479,6 +479,10 @@ export interface Voxel {
   /** Faces explicitly set by the user (not auto-generated). Smart system preserves these.
    *  Only set to true; absent/false = auto-generated (eligible for Smart auto-removal). */
   userPaintedFaces?: Partial<Record<keyof VoxelFaces, boolean>>;
+  /** Faces authored by presets/model-home overrides. Smart systems preserve these
+   *  like user-painted faces, but they do not count as user paint or update
+   *  repeat-stamp state. Only set to true; absent/false = auto-generated. */
+  presetProtectedFaces?: Partial<Record<keyof VoxelFaces, boolean>>;
   /** Smart stair change tracking — stored on the LOWER stair voxel.
    *  Records all auto-modified faces so removeStairs can restore originals. */
   _smartStairChanges?: SmartStairChanges;
@@ -499,6 +503,13 @@ export interface Voxel {
   _stairExiting?: boolean;
   /** Per-face finish overrides — absent values fall back to theme defaults */
   faceFinishes?: FaceFinishes;
+}
+
+export function isVoxelFaceProtected(
+  voxel: Pick<Voxel, 'userPaintedFaces' | 'presetProtectedFaces'> | undefined,
+  face: keyof VoxelFaces,
+): boolean {
+  return !!(voxel?.userPaintedFaces?.[face] || voxel?.presetProtectedFaces?.[face]);
 }
 
 /** Per-face finish overrides — absent values fall back to theme defaults */

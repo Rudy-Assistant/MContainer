@@ -23,6 +23,7 @@ import {
   LONG_WALL_BAYS,
   SHORT_WALL_BAYS,
   WallSide,
+  isVoxelFaceProtected,
 } from '@/types/container';
 import {
   createDefaultVoxelGrid,
@@ -69,6 +70,7 @@ type VoxelStoreRef = {
 
 export interface VoxelSlice {
   setVoxelFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
+  setVoxelFacePreset: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
   setVoxelAllFaces: (containerId: string, voxelIndex: number, mat: SurfaceType) => void;
   setVoxelActive: (containerId: string, voxelIndex: number, active: boolean) => void;
   paintFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, surface: SurfaceType) => void;
@@ -340,7 +342,7 @@ function _getDoorConstraints(
 // Scans a container's voxel grid for fall-hazard faces and auto-places
 // Railing_Cable on exposed edges of open-air voxels. Tracks originals
 // in container._smartRailingChanges for reversal.
-// Skips stair voxels (owned by stair system) and user-painted faces.
+// Skips stair voxels (owned by stair system) and protected faces.
 
 const WALL_FACES = ['n', 's', 'e', 'w'] as const;
 const FACE_NEIGHBOR_DELTA: Record<string, { dr: number; dc: number }> = {
@@ -375,7 +377,7 @@ export function recomputeSmartRailings(
       if (v.voxelType === 'stairs') continue;       // owned by stair system
 
       for (const face of WALL_FACES) {
-        if (v.userPaintedFaces?.[face]) continue;   // user override
+        if (isVoxelFaceProtected(v, face)) continue;   // user or preset override
         // Intentional architectural envelope surfaces — fold panels (act as
         // enclosures), framed windows, glazed walls, doors, shoji, washi.
         // None of these should be silently rewritten to railings just
@@ -432,8 +434,8 @@ export function recomputeSmartRailings(
     const idx = parseInt(idxStr, 10);
     const v = grid[idx];
     if (!v) continue;
-    // Check if user has painted this face since (don't revert user changes)
-    if (v.userPaintedFaces?.[face as keyof VoxelFaces]) continue;
+    // Check if user/preset has claimed this face since (don't revert intentional changes)
+    if (isVoxelFaceProtected(v, face as keyof VoxelFaces)) continue;
     // Restore original
     grid[idx] = {
       ...v,
@@ -489,7 +491,7 @@ function holeHasWalkableContinuation(
   const oppositeFace = STAIR_FLIP[face] as keyof VoxelFaces;
   return neighbor.voxelType === 'stairs' || (
     neighbor.faces[oppositeFace] === 'Open' &&
-    !!neighbor.userPaintedFaces?.[oppositeFace]
+    isVoxelFaceProtected(neighbor, oppositeFace)
   );
 }
 
@@ -541,7 +543,7 @@ export function recomputeSmartHoleGuards(
 
         const stairExitFaces = stairExitFacesForHole(grid, idx, row, col);
         for (const face of WALL_FACES) {
-          if (voxel.userPaintedFaces?.[face]) continue;
+          if (isVoxelFaceProtected(voxel, face)) continue;
 
           const delta = HOLE_FACE_DELTA[face];
           const nr = row + delta.dr;
@@ -586,7 +588,7 @@ export function recomputeSmartHoleGuards(
     const voxel = grid[idx];
     const typedFace = face as keyof VoxelFaces;
     if (!voxel) continue;
-    if (voxel.userPaintedFaces?.[typedFace]) continue;
+    if (isVoxelFaceProtected(voxel, typedFace)) continue;
     if (voxel.faces[typedFace] !== originalSurface) {
       grid[idx] = {
         ...voxel,
@@ -601,6 +603,60 @@ export function recomputeSmartHoleGuards(
 // applyUpperHoleConsequences superseded by computeFloorVoid (SR-01) in stairEnforcement.ts.
 // Local alias retained for call sites in this file that still reference the old name.
 const applyUpperHoleConsequences = computeFloorVoid;
+
+type VoxelFaceMutationSource = 'user' | 'preset';
+
+function applyVoxelFaceMaterial(
+  set: Set,
+  get: Get,
+  containerId: string,
+  voxelIndex: number,
+  face: keyof VoxelFaces,
+  mat: SurfaceType,
+  source: VoxelFaceMutationSource,
+): void {
+  if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
+
+  set((s) => {
+    const c = s.containers[containerId];
+    if (!c) return {};
+    const grid = c.voxelGrid ? [...c.voxelGrid] : createDefaultVoxelGrid();
+    if (voxelIndex < 0 || voxelIndex >= grid.length) return {};
+    const voxel = grid[voxelIndex];
+    const updatedVoxel: Voxel = {
+      ...voxel,
+      faces: { ...voxel.faces, [face]: mat },
+    };
+
+    if (source === 'user') {
+      updatedVoxel.userPaintedFaces = { ...voxel.userPaintedFaces, [face]: true };
+    } else {
+      updatedVoxel.presetProtectedFaces = { ...voxel.presetProtectedFaces, [face]: true };
+    }
+
+    // Auto-create doorConfig when painting Door face.
+    if (mat === 'Door' && (face === 'n' || face === 's' || face === 'e' || face === 'w')) {
+      const existing = updatedVoxel.doorConfig?.[face];
+      if (!existing) {
+        updatedVoxel.doorConfig = {
+          ...updatedVoxel.doorConfig,
+          [face]: _computeSmartDoorConfig(grid, voxelIndex, face),
+        };
+      }
+    }
+
+    grid[voxelIndex] = updatedVoxel;
+    const updatedContainer = { ...c, voxelGrid: grid };
+    if (get().designMode !== 'manual') {
+      recomputeSmartRailings(grid, updatedContainer);
+    }
+
+    return {
+      containers: { ...s.containers, [containerId]: updatedContainer },
+      ...(source === 'user' ? { lastStamp: { containerId, voxelIndex, face, surfaceType: mat } } : {}),
+    };
+  });
+}
 
 /**
  * createVoxelSlice — Voxel-level operations: face painting, stair placement, templates.
@@ -1003,7 +1059,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
           const entryNeighbor = grid[entryNeighborIdx];
           if (entryNeighbor?.active) {
             const neighborFace = STAIR_FLIP[entryFace] as keyof VoxelFaces;
-            if (!entryNeighbor.userPaintedFaces?.[neighborFace]) {
+            if (!isVoxelFaceProtected(entryNeighbor, neighborFace)) {
               changedFaces[`${entryNeighborIdx}:${neighborFace}`] = entryNeighbor.faces[neighborFace];
               grid[entryNeighborIdx] = {
                 ...entryNeighbor,
@@ -1027,7 +1083,7 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
         const sRow = Math.floor((stairIdx % (VOXEL_ROWS * VOXEL_COLS)) / VOXEL_COLS);
         const sCol = stairIdx % VOXEL_COLS;
         for (const latFace of lateralFaces) {
-          if (stairVoxel.userPaintedFaces?.[latFace]) continue;
+          if (isVoxelFaceProtected(stairVoxel, latFace)) continue;
           const delta = ASCEND_DELTA[latFace];
           if (!delta) continue;
           const nRow = sRow + delta.dr;
@@ -1728,38 +1784,20 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       get().applyStairsFromFace(containerId, voxelIndex, flip[face]);
       return;
     }
-    if (get().lockedVoxels[`${containerId}_${voxelIndex}`]) return;
+    applyVoxelFaceMaterial(set, get, containerId, voxelIndex, face, mat, 'user');
+  },
 
-    set((s) => {
-      const c = s.containers[containerId];
-      if (!c) return {};
-      const grid = c.voxelGrid ? [...c.voxelGrid] : createDefaultVoxelGrid();
-      if (voxelIndex < 0 || voxelIndex >= grid.length) return {};
-      const updatedVoxel = {
-        ...grid[voxelIndex],
-        faces: { ...grid[voxelIndex].faces, [face]: mat },
-        userPaintedFaces: { ...grid[voxelIndex].userPaintedFaces, [face]: true },
-      };
-      // Auto-create doorConfig when painting Door face
-      if (mat === 'Door' && (face === 'n' || face === 's' || face === 'e' || face === 'w')) {
-        const existing = updatedVoxel.doorConfig?.[face];
-        if (!existing) {
-          updatedVoxel.doorConfig = {
-            ...updatedVoxel.doorConfig,
-            [face]: _computeSmartDoorConfig(grid, voxelIndex, face),
-          };
-        }
-      }
-      grid[voxelIndex] = updatedVoxel;
-      const updatedContainer = { ...c, voxelGrid: grid };
-      if (get().designMode !== 'manual') {
-        recomputeSmartRailings(grid, updatedContainer);
-      }
-      return {
-        containers: { ...s.containers, [containerId]: updatedContainer },
-        lastStamp: { containerId, voxelIndex, face, surfaceType: mat },
-      };
-    });
+  setVoxelFacePreset: (containerId, voxelIndex, face, mat) => {
+    if (mat === 'Stairs' && (face === 'n' || face === 's' || face === 'e' || face === 'w')) {
+      get().applyStairsFromFace(containerId, voxelIndex, face as 'n' | 's' | 'e' | 'w');
+      return;
+    }
+    if (mat === 'Stairs_Down' && (face === 'n' || face === 's' || face === 'e' || face === 'w')) {
+      const flip: Record<string, 'n' | 's' | 'e' | 'w'> = { n: 's', s: 'n', e: 'w', w: 'e' };
+      get().applyStairsFromFace(containerId, voxelIndex, flip[face]);
+      return;
+    }
+    applyVoxelFaceMaterial(set, get, containerId, voxelIndex, face, mat, 'preset');
   },
 
   setVoxelAllFaces: (containerId, voxelIndex, mat) => {

@@ -18,7 +18,7 @@
  */
 
 import type { Container, SurfaceType, Voxel, VoxelFaces } from '@/types/container';
-import { VOXEL_COLS, VOXEL_LEVELS, VOXEL_ROWS } from '@/types/container';
+import { VOXEL_COLS, VOXEL_LEVELS, VOXEL_ROWS, isVoxelFaceProtected } from '@/types/container';
 
 // ── Shared stair-direction constants ────────────────────────
 // STAIR_FLIP: clicked face → ascending direction (opposite). You click the n
@@ -94,7 +94,7 @@ export function computeFloorVoid(
   // must be a no-op the second time (reference-equal container state).
   const desired: VoxelFaces = { ...voxel.faces, bottom: 'Open' };
   for (const wallFace of ['n', 's', 'e', 'w'] as const) {
-    if (voxel.userPaintedFaces?.[wallFace]) continue;
+    if (isVoxelFaceProtected(voxel, wallFace)) continue;
     desired[wallFace] = wallFace === exitFace ? 'Open' : 'Railing_Cable';
   }
   if (
@@ -109,7 +109,7 @@ export function computeFloorVoid(
 
   trackSmartFaceChange(changedFaces, voxelIndex, 'bottom', voxel.faces.bottom);
   for (const wallFace of ['n', 's', 'e', 'w'] as const) {
-    if (voxel.userPaintedFaces?.[wallFace]) continue;
+    if (isVoxelFaceProtected(voxel, wallFace)) continue;
     trackSmartFaceChange(changedFaces, voxelIndex, wallFace, voxel.faces[wallFace]);
   }
   grid[voxelIndex] = { ...voxel, faces: desired };
@@ -123,8 +123,8 @@ export function computeFloorVoid(
  *
  * The voxel on the *entry* side of the stair (where you step in from) shares a
  * wall with the stair voxel. That shared wall has to be Open or you're walking
- * into a solid panel. If the face hasn't been hand-painted by the user, set it
- * to Open. Otherwise respect the user's choice.
+ * into a solid panel. If the face hasn't been claimed by the user or a preset,
+ * set it to Open. Otherwise respect the intentional face.
  *
  * Mutates `grid` in place; records the pre-change value in `changedFaces` so
  * `removeStairs` can reverse it later.
@@ -152,7 +152,7 @@ export function computeEntryWallClear(
   if (!entryNeighbor?.active) return false;
 
   const neighborFace = STAIR_FLIP[entryFace] as keyof VoxelFaces;
-  if (entryNeighbor.userPaintedFaces?.[neighborFace]) return false;
+  if (isVoxelFaceProtected(entryNeighbor, neighborFace)) return false;
   // Idempotency: no mutation if the face is already Open — same pattern as
   // `computeFloorVoid` so repeated normalize() calls are no-ops.
   if (entryNeighbor.faces[neighborFace] === 'Open') return false;
@@ -173,7 +173,7 @@ export function computeEntryWallClear(
  * For a stair ascending n/s, the east and west faces of the stair voxels face
  * "outward" along the run. If those faces look into open air (OOB or inactive
  * neighbour), they're fall hazards and need a cable railing. Respect any
- * user-painted face.
+ * user-painted or preset-protected face.
  *
  * Applies to both the lower AND upper stair voxels (a two-voxel stair run has
  * two sides of railings). Caller passes the indices that exist (`upperVoxelIdx`
@@ -200,7 +200,7 @@ export function computeLateralRailings(
     const sCol = local % VOXEL_COLS;
 
     for (const latFace of lateralFaces) {
-      if (stairVoxel.userPaintedFaces?.[latFace]) continue;
+      if (isVoxelFaceProtected(stairVoxel, latFace)) continue;
       const delta = ASCEND_DELTA[latFace];
       if (!delta) continue;
       const nRow = sRow + delta.dr;

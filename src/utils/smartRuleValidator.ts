@@ -18,6 +18,7 @@ import {
   VOXEL_COLS,
   VOXEL_LEVELS,
   VOXEL_ROWS,
+  isVoxelFaceProtected,
 } from '@/types/container';
 import { ASCEND_DELTA, STAIR_FLIP } from '@/utils/stairEnforcement';
 
@@ -169,7 +170,7 @@ function checkFloorCornerPole(c: Container): SmartRuleViolation[] {
  *    - container is elevated (position.y > 0.1 OR stackedOn is set)
  *    - voxel is active and has an open top (outdoor — fall hazard if you trip)
  *    - a wall face is `Open` AND its neighbour is OOB or inactive
- *    - the user hasn't explicitly hand-painted that face
+ *    - the user or a preset hasn't explicitly protected that face
  *
  *  Accepted non-violations on a wall face: Railing_Cable, Railing_Glass,
  *  Solid_Steel, Glass_Pane, or Door. */
@@ -198,7 +199,7 @@ function checkOpenEdgeRailing(c: Container): SmartRuleViolation[] {
       ['w', row, col - 1],
     ];
     for (const [face, nRow, nCol] of faces) {
-      if (v.userPaintedFaces?.[face]) continue;
+      if (isVoxelFaceProtected(v, face)) continue;
       const inBounds = nRow >= 0 && nRow < VOXEL_ROWS && nCol >= 0 && nCol < VOXEL_COLS;
       const neighborActive = inBounds && (grid[localIdxOf(nRow, nCol, level)]?.active ?? false);
       if (neighborActive) continue;
@@ -206,7 +207,7 @@ function checkOpenEdgeRailing(c: Container): SmartRuleViolation[] {
       const current = v.faces[face];
       // "Open" wall with no active neighbour = unprotected edge.
       // Other non-railing values (e.g. Deck_Wood, Glass_Shoji) on a fall-hazard
-      // perimeter also fail — the user-painted guard skips those intentionally.
+      // perimeter also fail — the protected-face guard skips those intentionally.
       const allowed = ['Railing_Cable', 'Railing_Glass', 'Solid_Steel', 'Glass_Pane', 'Door'];
       if (allowed.includes(current)) continue;
 
@@ -440,7 +441,7 @@ function checkFallHazardGuard(c: Container): SmartRuleViolation[] {
       const inBounds = nRow >= 0 && nRow < VOXEL_ROWS && nCol >= 0 && nCol < VOXEL_COLS;
       const neighborActive = inBounds && (grid[localIdxOf(nRow, nCol, level)]?.active ?? false);
       if (neighborActive) continue;
-      if (v.userPaintedFaces?.[face]) continue;
+      if (isVoxelFaceProtected(v, face)) continue;
       const allowed = ['Railing_Cable', 'Railing_Glass', 'Solid_Steel', 'Glass_Pane'];
       if (!allowed.includes(v.faces[face])) {
         out.push({

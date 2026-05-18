@@ -109,9 +109,8 @@ export interface ModelHome {
    *  sliver through a Window_Standard strip), and cuts a skylight in the
    *  L3 rooftop deck above the atrium gap. Running AFTER rooftop-deck
    *  promotion ensures overrides aren't overwritten by `generateRooftopDeck`.
-   *  Caveat: applied via `setVoxelFace`, which marks the affected faces as
-   *  user-painted — keep this in mind when deciding whether a surface should
-   *  be preset-authored geometry vs. a separate "stamp" not flagged as paint. */
+   *  Applied through `setVoxelFacePreset`, which protects the authored face
+   *  from smart cleanup without marking it as user paint. */
   extraVoxelFaces?: Array<{
     containerIndex: number;
     voxelIndex: number;

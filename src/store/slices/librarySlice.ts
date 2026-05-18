@@ -56,6 +56,12 @@ type LibraryRuntimeState = LibrarySlice & {
     face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom',
     surface: import('@/types/container').SurfaceType,
   ) => void;
+  setVoxelFacePreset: (
+    containerId: string,
+    voxelIndex: number,
+    face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom',
+    surface: import('@/types/container').SurfaceType,
+  ) => void;
   addFurniture: (
     containerId: string,
     type: import('@/types/container').FurnitureType,
@@ -454,7 +460,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       // Install an entry door if the preset requested one. Walkthrough-ready
       // presets use this so the spawn pose lands the user at a working door.
       if (mc.entryDoor) {
-        get().setVoxelFace(id, mc.entryDoor.voxelIndex, mc.entryDoor.face, 'Door');
+        get().setVoxelFacePreset(id, mc.entryDoor.voxelIndex, mc.entryDoor.face, 'Door');
         t?.pause();
       }
 
@@ -524,25 +530,15 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     // skylight in the topmost rooftop deck above the atrium z-gap so the
     // pool basin below sees sky through the multi-level shaft.
     //
-    // Save & restore lastStamp around the loop — setVoxelFace writes to
-    // lastStamp on every call, which would otherwise leak the FINAL preset
-    // override into Space-repeat (useInputHandler.ts:33). Preset overrides
-    // are author-applied, not user paint; they shouldn't pre-fill the
-    // user's repeat-last-stamp slot.
+    // Preset overrides are author-applied geometry. They are protected from
+    // smart-rule cleanup, but do not mark userPaintedFaces or change lastStamp.
     if (model.extraVoxelFaces) {
-      // lastStamp lives on voxelSlice — pull it through the cross-slice
-      // (typed via the local handle as VoxelRuntimeState would create an
-      // import cycle; an unknown-cast is the smallest local escape hatch).
-      const getCrossSlice = get as unknown as () => { lastStamp: unknown };
-      const setCrossSlice = set as unknown as (partial: { lastStamp: unknown }) => void;
-      const savedLastStamp = getCrossSlice().lastStamp;
       for (const o of model.extraVoxelFaces) {
         const targetId = containerIds[o.containerIndex];
         if (!targetId) continue;
-        get().setVoxelFace(targetId, o.voxelIndex, o.face, o.material);
+        get().setVoxelFacePreset(targetId, o.voxelIndex, o.face, o.material);
         t?.pause();
       }
-      setCrossSlice({ lastStamp: savedLastStamp });
     }
 
     // Auto-expand extensions only when the model home leaves extension behavior unspecified.

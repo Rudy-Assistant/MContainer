@@ -18,6 +18,7 @@ import {
   VOXEL_LEVELS,
   WallSide,
   isRailingSurface,
+  isVoxelFaceProtected,
 } from "@/types/container";
 
 // ── Types ───────────────────────────────────────────────────
@@ -575,11 +576,6 @@ export function computeGlobalCulling(
     return false;
   }
 
-  /** Smart override: skip culling if EITHER side was explicitly user-painted */
-  function isUserPainted(voxel: Voxel | undefined, face: keyof VoxelFaces): boolean {
-    return !!(voxel?.userPaintedFaces?.[face]);
-  }
-
   /** Try to cull a single voxel pair across the boundary */
   function tryCullPair(
     a: Container, aIdx: number, aBound: ReturnType<typeof wallSideToBoundary>,
@@ -599,8 +595,8 @@ export function computeGlobalCulling(
     const bSurface = bActive ? bVox!.faces[bBound.face] : undefined;
 
     if (shouldMelt(aSurface, bSurface)) {
-      if (aActive && !isUserPainted(aVox!, aBound.face)) cullSet.add(`${a.id}:${aIdx}:${aBound.face}`);
-      if (bActive && !isUserPainted(bVox!, bBound.face)) cullSet.add(`${b.id}:${bIdx}:${bBound.face}`);
+      if (aActive && !isVoxelFaceProtected(aVox!, aBound.face)) cullSet.add(`${a.id}:${aIdx}:${aBound.face}`);
+      if (bActive && !isVoxelFaceProtected(bVox!, bBound.face)) cullSet.add(`${b.id}:${bIdx}:${bBound.face}`);
     }
   }
 
