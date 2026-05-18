@@ -580,6 +580,16 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       get().setDesignMode('smart');
     }
 
+    // If the preset declares a walkthroughSpawn, push it through
+    // saveWalkthroughPos so the next walkthrough entry lands the user at
+    // the preset's signature vantage (Resort House → atrium courtyard).
+    if (model.walkthroughSpawn) {
+      const sw = (get as unknown as () => {
+        saveWalkthroughPos?: (pos: [number, number, number], yaw: number) => void;
+      })().saveWalkthroughPos;
+      sw?.(model.walkthroughSpawn.position, model.walkthroughSpawn.yaw);
+    }
+
     return containerIds;
   },
 });

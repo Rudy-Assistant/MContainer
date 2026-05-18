@@ -117,6 +117,13 @@ export interface ModelHome {
     face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom';
     material: SurfaceType;
   }>;
+  /** Optional preset-specific first-walk-through FPV camera pose. When set,
+   *  placeModelHome calls saveWalkthroughPos with this pose so the next
+   *  walkthrough entry drops the user at the preset's signature vantage
+   *  (e.g. Resort House → ground-floor atrium courtyard facing inward).
+   *  Format: [x, y, z] eye position + yaw radians (yaw=0 looks +z=south,
+   *  yaw=π looks -z=north). */
+  walkthroughSpawn?: { position: [number, number, number]; yaw: number };
   tags?: string[];
 }
 
@@ -1230,6 +1237,12 @@ export const MODEL_HOMES: ModelHome[] = [
     // (defined above the preset). 280-entry list deliberately extracted from inline
     // IIFE for readability + isolated testing (resort-house-walls.test.ts).
     extraVoxelFaces: buildResortHouseAtriumOverrides(),
+    // First-walkthrough vantage: stand just south of the atrium gap at L1
+    // floor level (z = +5.5 keeps the camera inside the SE container body
+    // but right at its north edge) and face NORTH (yaw=π → look -z) so the
+    // user immediately sees the open atrium courtyard with N row visible
+    // across the void. Best showcase of the preset's signature view.
+    walkthroughSpawn: { position: [0, 1.6, 5.5], yaw: Math.PI },
     tags: ['resort', 'pool', 'atrium', 'u-ring', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],
   },
 ];

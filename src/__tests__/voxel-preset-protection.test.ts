@@ -17,7 +17,7 @@ function resetStore() {
 }
 
 function addContainer(): string {
-  return useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 });
+  return useStore.getState().addContainer(ContainerSize.HighCube40, { x: 0, y: 0, z: 0 }, 0, true);
 }
 
 function idx(level: number, row: number, col: number) {

@@ -391,6 +391,25 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     }
   });
 
+  it('placeModelHome("resort_house") sets walkthrough spawn pose facing the atrium (step B)', () => {
+    // UX: when a user enters walkthrough mode immediately after placing
+    // resort_house, the FPV camera should drop them at the L1 atrium
+    // courtyard edge looking INTO the open atrium — showcasing the preset's
+    // signature view. Without a preset-specific spawn, walkthrough lands at
+    // a generic default that buries the lede.
+    useStore.getState().placeModelHome('resort_house');
+    const saved = useStore.getState().savedWalkthroughPos;
+    expect(saved, 'walkthrough spawn pose should be set after placeModelHome').not.toBeNull();
+    expect(saved!.position[1], 'eye y should be at L1 floor + 1.6 = 1.6').toBeCloseTo(1.6, 1);
+    // Position somewhere INSIDE the building on the south row OR atrium edge,
+    // facing inward. z should be in the south wing (z ≥ +2.78) so user sees
+    // north into the atrium across to N row.
+    expect(
+      saved!.position[2],
+      `spawn z should be in the south wing (>= +2.78) to face north into atrium. Got: ${saved!.position[2]}`,
+    ).toBeGreaterThanOrEqual(2.78);
+  });
+
   it('extraVoxelFaces overrides mark presetProtectedFaces, NOT userPaintedFaces (step E architectural fix)', () => {
     // Codex tech-debt v1 finding 1 (HIGH) addressed: preset author-applied
     // overrides should NOT count as user paint. They should set
