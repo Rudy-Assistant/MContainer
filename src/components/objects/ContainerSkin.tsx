@@ -4411,7 +4411,20 @@ export default function ContainerSkin({
         // Build face nodes — hitbox rendering is CONTEXTUAL (Phase 5):
         // Open faces only get hitboxes when this voxel is selected.
         const faceNodes = FACE_DIRS.map((dir) => {
-          const surface = voxel.faces[dir];
+          // Step G (Codex tech-debt v1 finding 3): when rendering the top
+          // face of a level-0 voxel, consult the level-1 (roof) voxel's top
+          // face material instead. The Resort House skylight overrides
+          // stamp top='Open' on level-1 voxels (idx 32..63 in the 64-voxel
+          // grid). Without this redirect, ContainerSkin reads only level-0
+          // voxel.faces.top and the skylight cuts never reach the renderer.
+          let surface = voxel.faces[dir];
+          if (dir === 'top') {
+            const roofIdx = idx + VOXEL_ROWS * VOXEL_COLS;
+            const roofVoxel = grid[roofIdx];
+            if (roofVoxel && roofVoxel.active) {
+              surface = roofVoxel.faces.top;
+            }
+          }
 
           // Frame mode: show only floor — hide walls and ceiling so frame structure is visible
           if (frameMode && dir !== 'bottom') return null;

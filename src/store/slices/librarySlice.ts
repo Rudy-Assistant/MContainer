@@ -16,6 +16,7 @@ import {
   type FurnitureItem,
   type Container,
   type ExtensionConfig,
+  type SurfaceType,
   type Zone,
   ViewMode,
   CONTAINER_DIMENSIONS,
@@ -50,18 +51,13 @@ type LibraryRuntimeState = LibrarySlice & {
   applyStairsFromFace: (containerId: string, voxelIndex: number, face: 'n' | 's' | 'e' | 'w' | 'top') => void;
   generateRooftopDeck: (containerId: string) => void;
   refreshAdjacency: () => void;
-  setVoxelFace: (
-    containerId: string,
-    voxelIndex: number,
-    face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom',
-    surface: import('@/types/container').SurfaceType,
-  ) => void;
   setVoxelFacePreset: (
     containerId: string,
     voxelIndex: number,
     face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom',
-    surface: import('@/types/container').SurfaceType,
+    surface: SurfaceType,
   ) => void;
+  setVoxelFacesPresetBatch: (containerId: string, overrides: VoxelFacePresetOverride[]) => void;
   addFurniture: (
     containerId: string,
     type: import('@/types/container').FurnitureType,
@@ -72,6 +68,7 @@ type LibraryRuntimeState = LibrarySlice & {
 type Set = SliceSet<LibraryRuntimeState>;
 type Get = SliceGet<LibraryRuntimeState>;
 type TemporalApi = { pause: () => void; resume: () => void };
+type VoxelFacePresetOverride = { voxelIndex: number; face: keyof VoxelFaces; material: SurfaceType };
 type ImportedContainer = Partial<Container> & Pick<Container, 'size' | 'position' | 'rotation' | 'walls'>;
 type ImportedProjectState = Partial<LibraryRuntimeState> & {
   containers?: Record<string, ImportedContainer>;
@@ -538,10 +535,7 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
       // perf path: Resort House's 280 overrides land in ~16 grouped writes
       // (one per container) instead of 280 individual writes that each
       // re-run smart-railing recompute.
-      const byContainer = new Map<
-        string,
-        Array<{ voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: import('@/types/container').SurfaceType }>
-      >();
+      const byContainer = new Map<string, VoxelFacePresetOverride[]>();
       for (const o of model.extraVoxelFaces) {
         const targetId = containerIds[o.containerIndex];
         if (!targetId) continue;
@@ -549,15 +543,8 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
         if (arr) arr.push({ voxelIndex: o.voxelIndex, face: o.face, material: o.material });
         else byContainer.set(targetId, [{ voxelIndex: o.voxelIndex, face: o.face, material: o.material }]);
       }
-      const batch = (get as unknown as () => {
-        setVoxelFacesPresetBatch?: (
-          id: string,
-          overrides: Array<{ voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: import('@/types/container').SurfaceType }>,
-        ) => void;
-      })().setVoxelFacesPresetBatch;
       for (const [id, list] of byContainer.entries()) {
-        if (batch) batch(id, list);
-        else for (const o of list) get().setVoxelFacePreset(id, o.voxelIndex, o.face, o.material);
+        get().setVoxelFacesPresetBatch(id, list);
         t?.pause();
       }
     }

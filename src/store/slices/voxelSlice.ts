@@ -71,11 +71,10 @@ type VoxelStoreRef = {
 export interface VoxelSlice {
   setVoxelFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
   setVoxelFacePreset: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
-  /** Batch variant: apply many preset face overrides to a single container
-   *  in ONE store update. Sets presetProtectedFaces on each touched face,
-   *  does NOT write lastStamp, skips locked voxels. Significantly faster
-   *  than looping setVoxelFacePreset when applying preset-authored geometry
-   *  (e.g. Resort House: 9.4s → expected <100ms for 280 entries). */
+  /** Apply many preset face overrides to one container in a single store update.
+   *  Sets presetProtectedFaces on each touched face, skips locked voxels, and
+   *  never writes lastStamp. Intended for preset-authored geometry such as
+   *  Resort House's atrium-face override list. */
   setVoxelFacesPresetBatch: (
     containerId: string,
     overrides: Array<{ voxelIndex: number; face: keyof VoxelFaces; material: SurfaceType }>,
