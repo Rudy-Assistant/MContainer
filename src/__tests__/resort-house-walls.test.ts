@@ -210,6 +210,51 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     }
   });
 
+  it('extraVoxelFaces overrides survive smart-rule cascade and design-mode toggles (regression guard)', () => {
+    useStore.getState().placeModelHome('resort_house');
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    const sampleL1NW = () => {
+      const containers = useStore.getState().containers;
+      return Object.values(containers).find(
+        (c) => c.level === 0 && Math.abs(c.position.x - -12.19) < 0.05 && Math.abs(c.position.z - -4.0) < 0.05 && !c.subterranean,
+      );
+    };
+    const sampleL3NW = () => {
+      const containers = useStore.getState().containers;
+      return Object.values(containers).find(
+        (c) => c.level === 2 && Math.abs(c.position.x - -12.19) < 0.05 && Math.abs(c.position.z - -4.0) < 0.05,
+      );
+    };
+
+    // Baseline assertions (post-place)
+    expect(sampleL1NW()?.voxelGrid?.[24]?.faces?.s).toBe('Open');  // south halo row 3 col 0
+    expect(sampleL3NW()?.voxelGrid?.[56]?.faces?.top).toBe('Open'); // L3 skylight top cell
+
+    // Run smart-rule cascade again — overrides must survive
+    useStore.getState().setDesignMode?.('smart');
+    useStore.getState().refreshAdjacency();
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    expect(
+      sampleL1NW()?.voxelGrid?.[24]?.faces?.s,
+      'atrium-facing s-face must survive smart-mode cascade — userPaintedFaces marker protects preset override',
+    ).toBe('Open');
+    expect(
+      sampleL3NW()?.voxelGrid?.[56]?.faces?.top,
+      'L3 skylight top-face must survive smart-mode cascade',
+    ).toBe('Open');
+
+    // Toggle back to manual and re-run
+    useStore.getState().setDesignMode?.('manual');
+    useStore.getState().refreshAdjacency();
+
+    expect(sampleL1NW()?.voxelGrid?.[24]?.faces?.s).toBe('Open');
+    expect(sampleL3NW()?.voxelGrid?.[56]?.faces?.top).toBe('Open');
+  });
+
   it('extraVoxelFaces cuts L3 atrium skylight (top=Open on L3 atrium-facing halo)', () => {
     useStore.getState().placeModelHome('resort_house');
     useStore.getState().cleanupDesign?.();
