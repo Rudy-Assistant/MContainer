@@ -255,6 +255,26 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     expect(sampleL3NW()?.voxelGrid?.[56]?.faces?.top).toBe('Open');
   });
 
+  it('placeModelHome("resort_house") does NOT leak preset overrides into lastStamp (space-repeat protection)', () => {
+    // Bug: extraVoxelFaces apply via setVoxelFace, which writes lastStamp
+    // every call. After placeModelHome, lastStamp ends up as the preset's
+    // INTERNAL override (the final atrium skylight cell), so when the user
+    // hits Space (useInputHandler.ts:33), the repeat-last-stamp action
+    // repeats a preset-internal override instead of their last actual paint.
+    // Expectation: after placeModelHome with NO prior user paint, lastStamp
+    // should be null/undefined — the preset shouldn't pre-fill it.
+    useStore.getState().placeModelHome('resort_house');
+    useStore.getState().cleanupDesign?.();
+    useStore.getState().refreshAdjacency();
+
+    const lastStamp = useStore.getState().lastStamp;
+    expect(
+      lastStamp,
+      `placeModelHome leaked preset override into lastStamp (got ${JSON.stringify(lastStamp)}). ` +
+        'Space-repeat would now repeat a preset-internal override instead of the user\'s last paint.',
+    ).toBeNull();
+  });
+
   it('extraVoxelFaces cuts L3 atrium skylight (top=Open on L3 atrium-facing halo)', () => {
     useStore.getState().placeModelHome('resort_house');
     useStore.getState().cleanupDesign?.();

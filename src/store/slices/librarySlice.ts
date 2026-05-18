@@ -523,13 +523,21 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     // S-row containers (perimeter rooms see open atrium) AND to cut a
     // skylight in the topmost rooftop deck above the atrium z-gap so the
     // pool basin below sees sky through the multi-level shaft.
+    //
+    // Save & restore lastStamp around the loop — setVoxelFace writes to
+    // lastStamp on every call, which would otherwise leak the FINAL preset
+    // override into Space-repeat (useInputHandler.ts:33). Preset overrides
+    // are author-applied, not user paint; they shouldn't pre-fill the
+    // user's repeat-last-stamp slot.
     if (model.extraVoxelFaces) {
+      const savedLastStamp = get().lastStamp;
       for (const o of model.extraVoxelFaces) {
         const targetId = containerIds[o.containerIndex];
         if (!targetId) continue;
         get().setVoxelFace(targetId, o.voxelIndex, o.face, o.material);
         t?.pause();
       }
+      set({ lastStamp: savedLastStamp });
     }
 
     // Auto-expand extensions only when the model home leaves extension behavior unspecified.
