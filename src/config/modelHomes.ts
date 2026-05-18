@@ -137,6 +137,78 @@ const HEIGHT_STD = 2.59;
  *  cramped when the L2 floor is partially open as an atrium. */
 const HEIGHT_HC = 2.90;
 
+// ── Resort House atrium-override builder ─────────────────────
+// Extracted from the inline IIFE for readability + test isolation.
+// Generates the full 280-entry override list that opens the atrium-facing
+// perimeter walls AND cuts the L3 rooftop skylight above the central z-gap.
+//
+//   • 9 N-row containers × 16 south-halo voxels (row 3, cols 0..7, levels 0..1)
+//     → face 's' = 'Open' = 144 entries
+//   • 6 S-row containers × 16 north-halo voxels (row 0, cols 0..7, levels 0..1)
+//     → face 'n' = 'Open' = 96 entries
+//   • 3 L3 N-row × 8 south-halo skylight voxels (row 3, cols 0..7, level 1 only)
+//     → face 'top' = 'Open' = 24 entries
+//   • 2 L3 S-row × 8 north-halo skylight voxels (row 0, cols 0..7, level 1 only)
+//     → face 'top' = 'Open' = 16 entries
+//
+//   Total = 280 entries
+//
+// Voxel index = level * 32 + row * 8 + col. VOXEL_COLS=8, VOXEL_ROWS=4.
+function buildResortHouseAtriumOverrides(): Array<{
+  containerIndex: number;
+  voxelIndex: number;
+  face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom';
+  material: SurfaceType;
+}> {
+  const overrides: Array<{ containerIndex: number; voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: SurfaceType }> = [];
+  const COLS = 8;
+  const ROW_AREA = 4 * COLS; // 32 voxels per level
+
+  // N-row perimeter containers (z=-4): NW + N-center + NE × L1/L2/L3.
+  // Open the SOUTH halo (row 3) so atrium-facing wall reads as open.
+  const N_ROW_INDICES = [1, 2, 3, 6, 7, 8, 11, 12, 13];
+  for (const containerIndex of N_ROW_INDICES) {
+    for (let level = 0; level < 2; level++) {
+      for (let col = 0; col < COLS; col++) {
+        const voxelIndex = level * ROW_AREA + 3 * COLS + col;
+        overrides.push({ containerIndex, voxelIndex, face: 's', material: 'Open' });
+      }
+    }
+  }
+
+  // S-row perimeter containers (z=+4): SW + SE × L1/L2/L3.
+  // Open the NORTH halo (row 0) so atrium-facing wall reads as open.
+  const S_ROW_INDICES = [4, 5, 9, 10, 14, 15];
+  for (const containerIndex of S_ROW_INDICES) {
+    for (let level = 0; level < 2; level++) {
+      for (let col = 0; col < COLS; col++) {
+        const voxelIndex = level * ROW_AREA + 0 * COLS + col;
+        overrides.push({ containerIndex, voxelIndex, face: 'n', material: 'Open' });
+      }
+    }
+  }
+
+  // Atrium SKYLIGHT — open the rooftop above the atrium-facing halo on the
+  // L3 topmost containers. Without this, generateRooftopDeck + Solid_Steel
+  // roof close the atrium shaft from above, sealing the pool from sky.
+  const L3_N_ROW = [11, 12, 13];
+  for (const containerIndex of L3_N_ROW) {
+    for (let col = 0; col < COLS; col++) {
+      const voxelIndex = 1 * ROW_AREA + 3 * COLS + col; // L3 topmost, south halo
+      overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
+    }
+  }
+  const L3_S_ROW = [14, 15];
+  for (const containerIndex of L3_S_ROW) {
+    for (let col = 0; col < COLS; col++) {
+      const voxelIndex = 1 * ROW_AREA + 0 * COLS + col; // L3 topmost, north halo
+      overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
+    }
+  }
+
+  return overrides;
+}
+
 // ── Model Home Definitions ───────────────────────────────────
 
 export const MODEL_HOMES: ModelHome[] = [
@@ -1150,67 +1222,10 @@ export const MODEL_HOMES: ModelHome[] = [
       { containerIndex: 12, voxelIndex: 9, face: 'top' },
     ],
     extraRooftopDecks: [11, 12, 13, 14, 15],
-    // Atrium-facing wall overrides — Bruce 2026-05-17 visual-QA fix.
-    //
-    // framed_glass_box paints all 4 perimeter halo faces with Window_Standard,
-    // which renders as a narrow per-voxel framed pane. Looking from inside a
-    // perimeter room toward the z-gap atrium therefore reads as a window slot,
-    // not an open atrium. To deliver the "Bali resort, perimeter rooms
-    // overlooking a multi-level central atrium" requirement, we explicitly
-    // OPEN the atrium-facing halo row of every perimeter container:
-    //   • N-row containers (z=-4): south halo (row 3) cols 0..7, both levels
-    //     → face 's' = 'Open'.  Atrium is to +z.
-    //   • S-row containers (z=+4): north halo (row 0) cols 0..7, both levels
-    //     → face 'n' = 'Open'.  Atrium is to -z.
-    // Voxel index = level * 32 + row * 8 + col. VOXEL_COLS=8, VOXEL_ROWS=4.
-    extraVoxelFaces: (() => {
-      const overrides: Array<{ containerIndex: number; voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: SurfaceType }> = [];
-      const N_ROW_INDICES = [1, 2, 3, 6, 7, 8, 11, 12, 13];   // NW, N-center, NE × L1/L2/L3
-      const S_ROW_INDICES = [4, 5, 9, 10, 14, 15];            // SW, SE × L1/L2/L3
-      const COLS = 8;
-      const ROW_AREA = 4 * COLS; // 32 voxels per level
-      for (const containerIndex of N_ROW_INDICES) {
-        for (let level = 0; level < 2; level++) {
-          for (let col = 0; col < COLS; col++) {
-            const voxelIndex = level * ROW_AREA + 3 * COLS + col; // row=3 = south halo
-            overrides.push({ containerIndex, voxelIndex, face: 's', material: 'Open' });
-          }
-        }
-      }
-      for (const containerIndex of S_ROW_INDICES) {
-        for (let level = 0; level < 2; level++) {
-          for (let col = 0; col < COLS; col++) {
-            const voxelIndex = level * ROW_AREA + 0 * COLS + col; // row=0 = north halo
-            overrides.push({ containerIndex, voxelIndex, face: 'n', material: 'Open' });
-          }
-        }
-      }
-      // Atrium SKYLIGHT — open the rooftop above the atrium-facing halo
-      // rows of the L3 topmost containers (indices 11..15). Without this,
-      // generateRooftopDeck + the topmost row's Solid_Steel roof close the
-      // atrium shaft from above, sealing the pool basin from sky. We stamp
-      // the TOP face of the atrium-facing halo voxels (L3 N-row south halo
-      // and L3 S-row north halo, voxel level 1 only — the topmost layer)
-      // to 'Open' so the rooftop has cut-outs above the atrium gap, making
-      // the central shaft skylit from pool to sky.
-      const L3_N_ROW = [11, 12, 13];
-      const L3_S_ROW = [14, 15];
-      for (const containerIndex of L3_N_ROW) {
-        for (let col = 0; col < COLS; col++) {
-          // L3 topmost = voxel level 1, south halo row 3
-          const voxelIndex = 1 * ROW_AREA + 3 * COLS + col;
-          overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
-        }
-      }
-      for (const containerIndex of L3_S_ROW) {
-        for (let col = 0; col < COLS; col++) {
-          // L3 topmost = voxel level 1, north halo row 0
-          const voxelIndex = 1 * ROW_AREA + 0 * COLS + col;
-          overrides.push({ containerIndex, voxelIndex, face: 'top', material: 'Open' });
-        }
-      }
-      return overrides;
-    })(),
+    // Atrium-facing wall + skylight overrides — see buildResortHouseAtriumOverrides
+    // (defined above the preset). 280-entry list deliberately extracted from inline
+    // IIFE for readability + isolated testing (resort-house-walls.test.ts).
+    extraVoxelFaces: buildResortHouseAtriumOverrides(),
     tags: ['resort', 'pool', 'atrium', 'u-ring', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],
   },
 ];
