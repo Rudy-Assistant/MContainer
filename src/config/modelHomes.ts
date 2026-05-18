@@ -101,6 +101,20 @@ export interface ModelHome {
    *  Deck_Wood + Railing_Cable on their roof voxels (`generateRooftopDeck`
    *  runs after stacking, respecting the topmost-only invariant of SR-07). */
   extraRooftopDecks?: number[];
+  /** Stamps specific voxel face materials AFTER arrangement is applied.
+   *  Required when a preset needs to override the arrangement-installed
+   *  perimeter wall — e.g. the Resort House preset opens the atrium-facing
+   *  halo rows on each perimeter container so the central z-gap reads as a
+   *  truly OPEN atrium from inside, not just a sliver visible through a
+   *  Window_Standard strip. Each entry runs after arrangement/stair/door
+   *  installation but BEFORE rooftop-deck promotion, so the override sticks
+   *  for the user's first view of the home. */
+  extraVoxelFaces?: Array<{
+    containerIndex: number;
+    voxelIndex: number;
+    face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom';
+    material: string;
+  }>;
   tags?: string[];
 }
 
@@ -1133,6 +1147,43 @@ export const MODEL_HOMES: ModelHome[] = [
       { containerIndex: 12, voxelIndex: 9, face: 'top' },
     ],
     extraRooftopDecks: [11, 12, 13, 14, 15],
+    // Atrium-facing wall overrides — Bruce 2026-05-17 visual-QA fix.
+    //
+    // framed_glass_box paints all 4 perimeter halo faces with Window_Standard,
+    // which renders as a narrow per-voxel framed pane. Looking from inside a
+    // perimeter room toward the z-gap atrium therefore reads as a window slot,
+    // not an open atrium. To deliver the "Bali resort, perimeter rooms
+    // overlooking a multi-level central atrium" requirement, we explicitly
+    // OPEN the atrium-facing halo row of every perimeter container:
+    //   • N-row containers (z=-4): south halo (row 3) cols 0..7, both levels
+    //     → face 's' = 'Open'.  Atrium is to +z.
+    //   • S-row containers (z=+4): north halo (row 0) cols 0..7, both levels
+    //     → face 'n' = 'Open'.  Atrium is to -z.
+    // Voxel index = level * 32 + row * 8 + col. VOXEL_COLS=8, VOXEL_ROWS=4.
+    extraVoxelFaces: (() => {
+      const overrides: Array<{ containerIndex: number; voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: string }> = [];
+      const N_ROW_INDICES = [1, 2, 3, 6, 7, 8, 11, 12, 13];   // NW, N-center, NE × L1/L2/L3
+      const S_ROW_INDICES = [4, 5, 9, 10, 14, 15];            // SW, SE × L1/L2/L3
+      const COLS = 8;
+      const ROW_AREA = 4 * COLS; // 32 voxels per level
+      for (const containerIndex of N_ROW_INDICES) {
+        for (let level = 0; level < 2; level++) {
+          for (let col = 0; col < COLS; col++) {
+            const voxelIndex = level * ROW_AREA + 3 * COLS + col; // row=3 = south halo
+            overrides.push({ containerIndex, voxelIndex, face: 's', material: 'Open' });
+          }
+        }
+      }
+      for (const containerIndex of S_ROW_INDICES) {
+        for (let level = 0; level < 2; level++) {
+          for (let col = 0; col < COLS; col++) {
+            const voxelIndex = level * ROW_AREA + 0 * COLS + col; // row=0 = north halo
+            overrides.push({ containerIndex, voxelIndex, face: 'n', material: 'Open' });
+          }
+        }
+      }
+      return overrides;
+    })(),
     tags: ['resort', 'pool', 'atrium', 'u-ring', 'glass', 'rooftop', 'three-level', 'subterranean', 'large'],
   },
 ];
