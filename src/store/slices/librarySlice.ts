@@ -532,11 +532,32 @@ export const createLibrarySlice = (set: Set, get: Get, DEFAULT_HOTBAR: HotbarSlo
     //
     // Preset overrides are author-applied geometry. They are protected from
     // smart-rule cleanup, but do not mark userPaintedFaces or change lastStamp.
-    if (model.extraVoxelFaces) {
+    if (model.extraVoxelFaces && model.extraVoxelFaces.length > 0) {
+      // Group overrides by container so each container receives one batched
+      // update instead of N individual setVoxelFacePreset calls. This is the
+      // perf path: Resort House's 280 overrides land in ~16 grouped writes
+      // (one per container) instead of 280 individual writes that each
+      // re-run smart-railing recompute.
+      const byContainer = new Map<
+        string,
+        Array<{ voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: import('@/types/container').SurfaceType }>
+      >();
       for (const o of model.extraVoxelFaces) {
         const targetId = containerIds[o.containerIndex];
         if (!targetId) continue;
-        get().setVoxelFacePreset(targetId, o.voxelIndex, o.face, o.material);
+        const arr = byContainer.get(targetId);
+        if (arr) arr.push({ voxelIndex: o.voxelIndex, face: o.face, material: o.material });
+        else byContainer.set(targetId, [{ voxelIndex: o.voxelIndex, face: o.face, material: o.material }]);
+      }
+      const batch = (get as unknown as () => {
+        setVoxelFacesPresetBatch?: (
+          id: string,
+          overrides: Array<{ voxelIndex: number; face: 'n' | 's' | 'e' | 'w' | 'top' | 'bottom'; material: import('@/types/container').SurfaceType }>,
+        ) => void;
+      })().setVoxelFacesPresetBatch;
+      for (const [id, list] of byContainer.entries()) {
+        if (batch) batch(id, list);
+        else for (const o of list) get().setVoxelFacePreset(id, o.voxelIndex, o.face, o.material);
         t?.pause();
       }
     }

@@ -71,6 +71,15 @@ type VoxelStoreRef = {
 export interface VoxelSlice {
   setVoxelFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
   setVoxelFacePreset: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
+  /** Batch variant: apply many preset face overrides to a single container
+   *  in ONE store update. Sets presetProtectedFaces on each touched face,
+   *  does NOT write lastStamp, skips locked voxels. Significantly faster
+   *  than looping setVoxelFacePreset when applying preset-authored geometry
+   *  (e.g. Resort House: 9.4s → expected <100ms for 280 entries). */
+  setVoxelFacesPresetBatch: (
+    containerId: string,
+    overrides: Array<{ voxelIndex: number; face: keyof VoxelFaces; material: SurfaceType }>,
+  ) => void;
   setVoxelAllFaces: (containerId: string, voxelIndex: number, mat: SurfaceType) => void;
   setVoxelActive: (containerId: string, voxelIndex: number, active: boolean) => void;
   paintFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, surface: SurfaceType) => void;
@@ -1798,6 +1807,48 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       return;
     }
     applyVoxelFaceMaterial(set, get, containerId, voxelIndex, face, mat, 'preset');
+  },
+
+  setVoxelFacesPresetBatch: (containerId, overrides) => {
+    if (overrides.length === 0) return;
+    const lockedSet = get().lockedVoxels;
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c) return {};
+      const grid = c.voxelGrid ? [...c.voxelGrid] : createDefaultVoxelGrid();
+      const cloned = new Set<number>();
+      for (const o of overrides) {
+        if (lockedSet[`${containerId}_${o.voxelIndex}`]) continue;
+        if (o.voxelIndex < 0 || o.voxelIndex >= grid.length) continue;
+        const original = grid[o.voxelIndex];
+        const target: Voxel = cloned.has(o.voxelIndex)
+          ? grid[o.voxelIndex]
+          : {
+              ...original,
+              faces: { ...original.faces },
+              presetProtectedFaces: { ...original.presetProtectedFaces },
+            };
+        target.faces[o.face] = o.material;
+        target.presetProtectedFaces = { ...target.presetProtectedFaces, [o.face]: true };
+        // Auto-create doorConfig for Door faces (mirror setVoxelFace).
+        if (o.material === 'Door' && (o.face === 'n' || o.face === 's' || o.face === 'e' || o.face === 'w')) {
+          const existing = target.doorConfig?.[o.face];
+          if (!existing) {
+            target.doorConfig = {
+              ...target.doorConfig,
+              [o.face]: _computeSmartDoorConfig(grid, o.voxelIndex, o.face),
+            };
+          }
+        }
+        grid[o.voxelIndex] = target;
+        cloned.add(o.voxelIndex);
+      }
+      const updatedContainer = { ...c, voxelGrid: grid };
+      if (get().designMode !== 'manual') {
+        recomputeSmartRailings(grid, updatedContainer);
+      }
+      return { containers: { ...s.containers, [containerId]: updatedContainer } };
+    });
   },
 
   setVoxelAllFaces: (containerId, voxelIndex, mat) => {

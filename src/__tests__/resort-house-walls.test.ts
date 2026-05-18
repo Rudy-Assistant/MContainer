@@ -391,6 +391,22 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     }
   });
 
+  it('placeModelHome("resort_house") completes preset face overrides in <1s (perf budget for step F)', () => {
+    // Step F: 280 setVoxelFacePreset calls during placeModelHome each trigger
+    // a separate set((s) => ...) update, immutable container clone, smart-
+    // railing recompute, and React re-render. Even on test rig the apply
+    // loop alone takes a noticeable chunk. Lock a generous perf budget of
+    // 1000ms so future regressions surface, and so batching gains are
+    // visible as a budget cut later.
+    const t0 = performance.now();
+    useStore.getState().placeModelHome('resort_house');
+    const elapsed = performance.now() - t0;
+    expect(
+      elapsed,
+      `placeModelHome('resort_house') took ${elapsed.toFixed(0)}ms (budget 1000ms). Likely cause: 280 individual setVoxelFacePreset calls. Consider setVoxelFacesBatch.`,
+    ).toBeLessThan(1000);
+  });
+
   it('placeModelHome("resort_house") sets walkthrough spawn pose facing the atrium (step B)', () => {
     // UX: when a user enters walkthrough mode immediately after placing
     // resort_house, the FPV camera should drop them at the L1 atrium
