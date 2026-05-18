@@ -1077,7 +1077,7 @@ export const MODEL_HOMES: ModelHome[] = [
   {
     id: 'resort_house',
     label: 'Resort House',
-    description: 'Three-level resort with a subterranean indoor pool, a 3×2 grid of 40 HighCubes per level forming a strip of central-atrium voids over the pool, framed-glass perimeter walls on every level, and a walkable rooftop deck. 19 containers total — 1 pool + 6 per level — with stairs running NW from ground to roof.',
+    description: 'Three-level Bali-style resort with a subterranean indoor pool at the base of a central atrium. U-ring layout: 5 framed-glass HighCubes per level (NW + N-center stair tower + NE on the north row, SW + SE on the south row) leave a 5.56 m × 30.48 m open atrium gap between the rows. Every perimeter room overlooks the wood-deck courtyard atrium; a stair tower ascends the central N column from L1 to the walkable rooftop deck. 16 containers total — 1 pool + 5 per level × 3 levels.',
     icon: '🏝️',
     containers: [
       // [0] Pool basin — subterranean, centered IN the atrium void

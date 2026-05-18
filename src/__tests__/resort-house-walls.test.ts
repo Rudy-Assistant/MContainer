@@ -255,6 +255,23 @@ describe('Resort House — perimeter wall regression (RED until placeModelHome s
     expect(sampleL3NW()?.voxelGrid?.[56]?.faces?.top).toBe('Open');
   });
 
+  it('Resort House description matches the actual U-ring 16-container layout', async () => {
+    // Codex tech-debt v2 finding 2: description was 3×2 / 19 containers /
+    // NW stair chain (pre-U-ring layout, deleted in d37c005). Description
+    // is user-visible in the model-home picker — stale text mismatches what
+    // the user gets when they click.
+    const { getModelHome } = await import('@/config/modelHomes');
+    const m = getModelHome('resort_house');
+    expect(m, 'resort_house preset must exist').toBeDefined();
+    const desc = m!.description;
+    expect(desc, `description must mention 16 containers, got: ${desc}`).toMatch(/\b16\b/);
+    expect(desc, `description must mention U-ring or U shape, got: ${desc}`).toMatch(/U[- ]?(ring|shape|shaped)/i);
+    expect(desc, `description must mention atrium, got: ${desc}`).toMatch(/atrium/i);
+    expect(desc, `description must NOT mention 19 containers, got: ${desc}`).not.toMatch(/\b19\b/);
+    expect(desc, `description must NOT mention 3x2 grid, got: ${desc}`).not.toMatch(/3\s*[×x]\s*2/);
+    expect(desc, `description must NOT say "NW" stair chain (now N-center), got: ${desc}`).not.toMatch(/NW\s+(stair|from ground)/i);
+  });
+
   it('placeModelHome("resort_house") does NOT emit "Extension blocked" warning for the pool slot', async () => {
     // Codex tech-debt v2 finding 3 (LOW/MEDIUM): the auto-expand extensions
     // loop in librarySlice.placeModelHome doesn't skip mc.pool slots,
