@@ -991,6 +991,10 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
   },
 
   removeContainer: (id) => {
+    // U8: capture the removed container's name BEFORE deletion so the
+    // destructive-action toast can announce what just went away.
+    const removedName = get().containers[id]?.name ?? 'container';
+
     // Cascade-delete scene objects belonging to this container
     get().removeObjectsByContainer(id);
 
@@ -1043,6 +1047,11 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     });
     // Refresh adjacency after removal so remaining containers recalculate shared walls
     scheduleAdjacency(get);
+
+    // U8: emit destructive-action toast. Cross-slice access — uiSlice owns
+    // setLastDestructiveAction; safe to call after the mutation lands.
+    (get as unknown as () => { setLastDestructiveAction?: (a: { description: string } | null) => void })()
+      .setLastDestructiveAction?.({ description: `Deleted ${removedName}` });
   },
 
   updateContainerPosition: (id, position) => {

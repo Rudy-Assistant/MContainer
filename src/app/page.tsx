@@ -13,6 +13,7 @@ import FloorDetailModal from "@/components/ui/FloorDetailModal";
 import ContainerContextMenu from "@/components/ui/ContainerContextMenu";
 import FaceFilterWidget from "@/components/ui/FaceFilterWidget";
 import TopToolbar from "@/components/ui/TopToolbar";
+import { DestructiveToast } from "@/components/ui/DestructiveToast";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
@@ -116,6 +117,10 @@ export default function Home() {
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenAiDesign={() => setAiDesignOpen(true)}
       />
+      {/* U8: destructive-action toast — fixed-position overlay; renders nothing
+          when no recent destructive action. Mounted at app shell so it persists
+          across sidebar/canvas toggles. */}
+      <DestructiveToast />
 
       {/* Workspace: Sidebar + (Canvas + BottomPanel) */}
       <div className="flex flex-1 min-h-0">

@@ -56,6 +56,14 @@ export interface UiSlice {
   setShowAdvancedSettings: (v: boolean) => void;
   toggleAdvancedSettings: () => void;
 
+  /** U8 (R8, AE6): records the most recent destructive action so the
+   *  DestructiveToast can render "<description> — Ctrl+Z to undo" briefly
+   *  and the user understands what just happened. Set by destructive
+   *  store actions (removeContainer, etc.) AT THE MOMENT of mutation.
+   *  Ephemeral — not persisted, not undoable. */
+  lastDestructiveAction: { description: string; at: number } | null;
+  setLastDestructiveAction: (a: { description: string } | null) => void;
+
   // Hotbar tab: 0=Rooms, 1=Surfaces, 2=Materials, 3=Furniture (see SmartHotbar.tsx lines 1475-1478)
   activeHotbarTab: number;
   setActiveHotbarTab: (tab: number) => void;
@@ -264,6 +272,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   dollhouseActive: false,
   showFurnitureLabels: false,
   showAdvancedSettings: false,
+  lastDestructiveAction: null,
 
   // ── Actions ────────────────────────────────────────────
   setHoveredVoxel: (v) => set({ hoveredVoxel: v }),
@@ -275,6 +284,9 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   toggleFurnitureLabels: () => set((s) => ({ showFurnitureLabels: !s.showFurnitureLabels })),
   setShowAdvancedSettings: (v) => set({ showAdvancedSettings: v }),
   toggleAdvancedSettings: () => set((s) => ({ showAdvancedSettings: !s.showAdvancedSettings })),
+  setLastDestructiveAction: (a) => set({
+    lastDestructiveAction: a === null ? null : { description: a.description, at: Date.now() },
+  }),
 
   activeHotbarTab: 1, // Default: Surfaces (was Rooms)
   setActiveHotbarTab: (tab) => set({ activeHotbarTab: tab }),
