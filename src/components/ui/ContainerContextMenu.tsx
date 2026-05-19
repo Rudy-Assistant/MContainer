@@ -10,7 +10,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useStore } from "@/store/useStore";
-import { Frame, Layers, ArrowUpFromLine, Footprints } from "lucide-react";
+import { Frame, Layers, ArrowUpFromLine, Footprints, RotateCw, Copy, Trash2, Palette } from "lucide-react";
 import { MAX_STACK_LEVEL, DEFAULT_EXTENSION_CONFIG } from "@/types/container";
 
 export default function ContainerContextMenu() {
@@ -75,6 +75,36 @@ export default function ContainerContextMenu() {
     closeMenu();
   }, [ctx, container, closeMenu]);
 
+  // ── Sprint D3 quad-menu additions ─────────────────────────
+  const handleRotate = useCallback(() => {
+    if (!ctx || !container) return;
+    const store = useStore.getState();
+    const next = ((container.rotation ?? 0) + Math.PI / 2) % (Math.PI * 2);
+    store.updateContainerRotation(ctx.containerId, next);
+    closeMenu();
+  }, [ctx, container, closeMenu]);
+
+  const handleDuplicate = useCallback(() => {
+    if (!ctx) return;
+    useStore.getState().duplicateContainer(ctx.containerId);
+    closeMenu();
+  }, [ctx, closeMenu]);
+
+  const handleDelete = useCallback(() => {
+    if (!ctx) return;
+    useStore.getState().removeContainer(ctx.containerId);
+    closeMenu();
+  }, [ctx, closeMenu]);
+
+  const handlePaint = useCallback(() => {
+    if (!ctx) return;
+    // Selection-drives-Inspector: selecting this container opens the
+    // Inspector's finishes panel so the user can paint surfaces.
+    const store = useStore.getState();
+    store.setSelectedElements({ type: 'voxel', items: [{ containerId: ctx.containerId, id: '0' }] });
+    closeMenu();
+  }, [ctx, closeMenu]);
+
   // Check if stacking is possible (not already at max level)
   const canStack = container ? (container.level ?? 0) < MAX_STACK_LEVEL : false;
 
@@ -113,6 +143,45 @@ export default function ContainerContextMenu() {
           <span className="text-xs font-semibold text-gray-500 truncate block max-w-[180px]">
             {container.name}
           </span>
+        </div>
+
+        {/* Sprint D3 quad-action row: Rotate / Duplicate / Paint / Delete.
+            These are the 4 most-used contextual verbs per the industry-
+            comparison brief; surfaced visually as a compact icon row at
+            the top of the menu so they're one click from right-click. */}
+        <div className="flex gap-1 px-2 py-2 border-b border-gray-100">
+          <button
+            onClick={handleRotate}
+            title="Rotate 90°"
+            data-testid="quad-rotate"
+            className="flex-1 flex items-center justify-center py-2 rounded-md hover:bg-blue-50 text-gray-600 hover:text-blue-700 transition-colors"
+          >
+            <RotateCw size={16} />
+          </button>
+          <button
+            onClick={handleDuplicate}
+            title="Duplicate (Ctrl+D)"
+            data-testid="quad-duplicate"
+            className="flex-1 flex items-center justify-center py-2 rounded-md hover:bg-blue-50 text-gray-600 hover:text-blue-700 transition-colors"
+          >
+            <Copy size={16} />
+          </button>
+          <button
+            onClick={handlePaint}
+            title="Paint surfaces"
+            data-testid="quad-paint"
+            className="flex-1 flex items-center justify-center py-2 rounded-md hover:bg-blue-50 text-gray-600 hover:text-blue-700 transition-colors"
+          >
+            <Palette size={16} />
+          </button>
+          <button
+            onClick={handleDelete}
+            title="Delete container"
+            data-testid="quad-delete"
+            className="flex-1 flex items-center justify-center py-2 rounded-md hover:bg-red-50 text-gray-600 hover:text-red-700 transition-colors"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
 
         {/* Menu items */}

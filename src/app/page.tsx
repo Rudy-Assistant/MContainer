@@ -21,6 +21,7 @@ import { FirstLaunchHint } from "@/components/ui/FirstLaunchHint";
 import { WelcomeWizard } from "@/components/ui/WelcomeWizard";
 import { DragPrecisionOverlay } from "@/components/ui/DragPrecisionOverlay";
 import { DuplicateHotkey } from "@/components/ui/DuplicateHotkey";
+import { QuickMaterialsStrip } from "@/components/ui/QuickMaterialsStrip";
 import { ToastEscapeHotkey } from "@/components/ui/ToastEscapeHotkey";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
@@ -149,6 +150,9 @@ export default function Home() {
       <DragPrecisionOverlay />
       {/* Sprint C4: Ctrl+D duplicates selection */}
       <DuplicateHotkey />
+      {/* Sprint D2: global materials swatch strip (Twinmotion-style
+          click-and-paint affordance). */}
+      <QuickMaterialsStrip />
       {/* Global Esc handler — dismisses all active toasts at once. Capture-
           phase so it fires before walkthrough-exit / selection-clear when a
           toast is up. */}
