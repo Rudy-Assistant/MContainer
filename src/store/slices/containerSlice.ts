@@ -196,6 +196,12 @@ export interface ContainerSlice {
   applyContainerArrangement: (containerId: string, arrangementId: ContainerArrangementId) => void;
   removeContainer: (id: string) => void;
   updateContainerPosition: (id: string, position: ContainerPosition) => void;
+  /** Brainstorm-deferred "AI-assisted placement": offsets N selected
+   *  containers in a diagonal stagger pattern. Each container i moves to
+   *  position (base.x + i*offsetX, base.y, base.z + i*offsetZ). Default
+   *  offsets are 1.5m on x and 1.5m on z (half the snap-zone of a 40HC).
+   *  No-op when fewer than 2 ids are passed. */
+  staggerContainers: (ids: string[], offsetX?: number, offsetZ?: number) => void;
   updateContainerRotation: (id: string, rotation: number) => void;
   renameContainer: (id: string, name: string) => void;
   resizeContainer: (id: string, newSize: ContainerSize) => void;
@@ -1074,6 +1080,35 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       },
     }));
     scheduleAdjacency(get);
+  },
+
+  staggerContainers: (ids, offsetX = 1.5, offsetZ = 1.5) => {
+    if (ids.length < 2) return;
+    set((s) => {
+      const baseId = ids[0];
+      const base = s.containers[baseId];
+      if (!base) return {};
+      const updated = { ...s.containers };
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const c = updated[id];
+        if (!c) continue;
+        updated[id] = {
+          ...c,
+          position: {
+            x: base.position.x + i * offsetX,
+            y: c.position.y,
+            z: base.position.z + i * offsetZ,
+          },
+        };
+      }
+      return { containers: updated };
+    });
+    scheduleAdjacency(get);
+    // U8 expansion-compatible: announce via toast so the user sees what
+    // happened and can Ctrl+Z back to the original layout in one step.
+    (get as unknown as () => { setLastDestructiveAction?: (a: { description: string } | null) => void })()
+      .setLastDestructiveAction?.({ description: `Staggered ${ids.length} containers` });
   },
 
   renameContainer: (id, name) =>
