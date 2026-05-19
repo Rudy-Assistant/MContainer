@@ -184,6 +184,14 @@ Scene graph for all three view modes:
 - **BlueprintScene**: Orthographic camera, 1m grid, dimension labels
 - **WalkthroughScene**: PointerLockControls, voxel collision, auto-tour, InteriorLights, PostProcessingStack
 
+**Ephemeral overlay render passes (May 2026 building-UX batch):** additional R3F components rendered alongside the main scene in RealisticScene mode, each subscribed to a slice of ephemeral interaction state (not zundo'd, not persisted):
+- **`DragGhost`** (Scene.tsx) — translucent material clone of the container being dragged. Drives `dragWorldPos` via per-frame raycast + grid/edge snap.
+- **`FacePaintPreview`** (components/three/FacePaintPreview.tsx) — translucent plane at the hovered voxel face showing the would-be material from the active hotbar slot. Cached material clones keyed on (theme, surface). Suppressed in walkthrough.
+- **`AutoStairsAffordance`** (components/ui/AutoStairsAffordance.tsx) — DOM banner at top-center after successful stack; offers "+ Stairs" one-click commit.
+- **`DestructiveToast`** (components/ui/DestructiveToast.tsx) — DOM banner at top-right after destructive ops; shows description + "Ctrl+Z to undo" hint.
+
+Affordance vocabulary, state-location reference, and per-affordance "when fires / what user sees / suppression rules" live in `docs/INTERACTIONS.md`.
+
 ### GroundManager.tsx
 
 Ground presets with per-preset texture filename overrides. Grass uses ambientCG 1K set (Color, NormalGL, Roughness, Displacement, AO). Other presets (concrete/gravel/dirt) use generic `color.jpg`/`normal.jpg`/`roughness.jpg`. All presets have ErrorBoundary fallback to solid color + procedural displacement. Random UV rotation per session breaks visible tiling.
@@ -375,6 +383,24 @@ AABB proximity detection with `CONTACT_EPSILON=0.001`. Auto-merge: adjacent Soli
 | Ground + Atmosphere | PRODUCTION |
 | Animation Lifecycle (Extension Unpack + Stair Telescope) | PRODUCTION |
 | AI Designer (prompt → DesignPlan → store) | PRODUCTION |
+| Building-UX Affordances (Snap-and-Infer + Single-Action) | PRODUCTION |
+
+### Phase 5: Building-UX industry-leader parity (2026-05-18)
+
+User feedback after the Resort House polish landed: "Building is still not simple or intuitive. We should copy from industry leaders (Sims, Townscaper, Figma, SketchUp, Minecraft)." Routed through `/ce-brainstorm` → `/ce-plan` → `/ce-work` to ship 8 implementation units across Snap-and-Infer + Single-Action principles. Substrate already in place from prior Resort House work (`presetProtectedFaces`, `setVoxelFacesPresetBatch`, `walkthroughSpawn`, `extraVoxelFaces`) — Phase 5 extended the interaction layer above them without touching the voxel data model or R3F pipeline.
+
+Origin documents: `docs/brainstorms/2026-05-18-001-building-ux-requirements.md`, `docs/plans/2026-05-18-001-feat-building-ux-industry-parity-plan.md`. Affordance reference: `docs/INTERACTIONS.md`.
+
+1. **Drag-ghost preview** — already shipped in `Scene.tsx::DragGhost`; ratified for R1/AE1.
+2. **Snap-to-grid + snap-to-adjacent** — already shipped via `gridSnap` + `findEdgeSnap` + `findStackTarget`; ratified for R2.
+3. **Voxel-face hover preview** — new `FacePaintPreview` R3F overlay renders translucent (45%) material at hovered face. Mounted in Scene.tsx Realistic3D branch. Suppressed in walkthrough. Cached material clones keyed on (theme, surface).
+4. **Auto-stack + "+ Stairs" affordance** — new `AutoStairsAffordance` top-center DOM banner appears after `stackContainer` succeeds. Click commits stairs on the lower container's south-halo voxel (level 1, row 3, col 4). 4s TTL.
+5. **Smart-mode invisible default** — `showAdvancedSettings: false` hides the Smart/Manual toolbar pill. Smart-rule cascade still runs. Power users flip the preference to surface the pill.
+6. **Per-rule contextual Smart opt-out** — new `Voxel.userOptOut?: Partial<Record<keyof VoxelFaces, boolean>>` field consulted by `isVoxelFaceProtected` alongside `userPaintedFaces` and `presetProtectedFaces`. New `setUserOptOut` action in voxelSlice.
+7. **Arrangement gallery** — already shipped via `ContainerPresetRow` + `ContainerPresetCard` + `IsometricVoxelSVG`; ratified for R7.
+8. **Visible Undo button + destructive-action toast** — Undo button + Ctrl+Z tooltip already in TopToolbar; new `DestructiveToast` top-right DOM banner shows "<description> — Ctrl+Z to undo" after `removeContainer`, `removeStairs`, `removeFurniture`. 2.5s TTL.
+
+Browser-verified evidence: `.qa/ux-u{3,4,5,8}-*.jpg`. Test gate: 1160+ vitest tests pass · 0 TS errors throughout the batch.
 
 ### Phase 4: Blueprint Mode refinement (2026-05-05)
 
