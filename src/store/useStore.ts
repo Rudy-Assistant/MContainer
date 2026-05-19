@@ -226,7 +226,8 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
   partialize: (state) => {
     const { containers, zones, environment, viewMode, pricing, furnitureIndex,
             libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-            palettes, activePaletteId, currentTheme, activeStyle, sceneObjects } = state;
+            palettes, activePaletteId, currentTheme, activeStyle, sceneObjects,
+            containerGroups } = state;
     // Strip ephemeral smart tracking and voxel-only animation state from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
@@ -250,7 +251,8 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     }
     return { containers: cleanContainers, zones, environment, viewMode, pricing, furnitureIndex,
              libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
-             palettes, activePaletteId, currentTheme, activeStyle, sceneObjects } as StoreState;
+             palettes, activePaletteId, currentTheme, activeStyle, sceneObjects,
+             containerGroups } as StoreState;
   },
   merge: (persistedState, currentState) => {
     if (!persistedState) return currentState as StoreState;
