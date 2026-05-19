@@ -1,5 +1,51 @@
 # Changelog
 
+## 2026-05-18 — Building-UX industry-leader parity (Snap-and-Infer + Single-Action)
+
+User feedback: "Building is still not simple or intuitive. We should copy from industry leaders."
+
+Routed via `/ce-plan` → `/ce-brainstorm` → `/ce-plan` → `/ce-work` chain. Brainstorm doc at `docs/brainstorms/2026-05-18-001-building-ux-requirements.md`; plan at `docs/plans/2026-05-18-001-feat-building-ux-industry-parity-plan.md`; affordance reference at `docs/INTERACTIONS.md`.
+
+### Snap-and-Infer (already shipped, ratified)
+- Drag-ghost preview with translucent material clone, grid-snap, snap-to-adjacent edge, stack-target detection — all in `Scene.tsx` `DragGhost` + `findEdgeSnap` + `findStackTarget`. AE1 satisfied.
+
+### Single-Action: Smart mode now invisible-default
+- **`showAdvancedSettings: false` default** hides the Smart/Manual toolbar pill (`01f531e`). Smart-rule cascade still runs; no mode dialogs on common paths. AE4 satisfied.
+- **`userOptOut` per voxel face** lets a user opt OUT of further smart auto-fixes on a specific face. Added to `Voxel` type alongside `userPaintedFaces` + `presetProtectedFaces`; `isVoxelFaceProtected` respects all 3 flags with OR-semantics (`15e56bb`). Companion `setUserOptOut` action ships in `voxelSlice`.
+
+### Voxel-face hover preview (R3, AE2)
+- **`FacePaintPreview`** R3F overlay renders a translucent (45%) mesh of the would-be material on the hovered face BEFORE click (`937b7ea`). Uses cached material clones keyed on (theme, surface). Suppressed in walkthrough mode.
+
+### Auto-stack + "+ Stairs" affordance (R4, AE3)
+- **`AutoStairsAffordance`** top-center banner appears after a successful `stackContainer` ("Stacked. Add stairs to access?"). Click commits stairs on lower container's south halo voxel; 4s TTL; click-anywhere or ✕ dismisses (`3f31c9e`).
+
+### Destructive-action toast (R8, AE6)
+- **`DestructiveToast`** top-right banner announces destructive ops ("Deleted L1 NW container — Ctrl+Z to undo"). Wired into `removeContainer`, `removeStairs`, `removeFurniture` (`b895d4c` + `64e4c76`).
+
+### Browser-verified
+- `.qa/ux-u3-face-paint-preview.jpg` — face overlay rendered at hover
+- `.qa/ux-u4-stairs-affordance.jpg` — stairs banner with `+ Stairs` button
+- `.qa/ux-u5-toolbar-pill-hidden.jpg` — toolbar without Smart/Manual pill
+- `.qa/ux-u8-destructive-toast.jpg` — toast with "Ctrl+Z to undo" hint
+
+### Documentation
+- `docs/INTERACTIONS.md` (new) — single-source-of-truth affordance vocabulary, state-location reference, recipe for adding new affordances, AE → commit traceability.
+
+### Test gate
+- 1160+ vitest tests pass (+19 new across the shipping batch); 0 TS errors throughout.
+
+---
+
+## 2026-05-18 — Resort House polish (16 commits, U-ring atrium)
+
+Major polish pass on the Resort House model home preset shipped earlier this session. 16 commits including: U-ring layout (16 containers = 1 pool + 5/level × 3 levels) with central z-gap atrium (`d37c005`), `extraVoxelFaces` opens atrium-facing perimeter walls (`98534db`), 5-stage walkthrough evidence (`c1e7193`), skylight overrides + face-override ordering fix (`9977bbd`), `SurfaceType` typing + missing test coverage (`cb34120`), smart-rule cascade regression guard (`8dd28ae`), `buildResortHouseAtriumOverrides()` extracted (`5af83dd`), lastStamp leak fix (`458871e`), pool-extension skip (`9eadd75`), stale description refresh (`81fe88b`), `VOXEL_COLS` imports (`1d86ba3`), pool basin water-surface invariant (`18e67ea`), `setVoxelFacePreset` + `presetProtectedFaces` architectural fix (`2e4c477`), preset-specific walkthrough spawn pose (`466c388`), batch preset face overrides 9.4s→554ms (`3c4d4a6`), ContainerSkin top-face level-1 redirect (`124dfb4`).
+
+Cascade-delegated: Haiku simplifier (extract IIFE); Codex tech-debt audit (V1+V2, 8 findings applied); Codex rooftop skylight design lane.
+
+Test gate: 1140 vitest pass throughout, 0 TS errors. Visual evidence: `.qa/walk-resort-final-stage{1..5}-*.jpg`.
+
+---
+
 ## 2026-05-06 — Level selector consolidation (Bruce round-3 audit)
 
 - Bruce: "The Level is selectable twice (once on top, once on the side) ... previously just a selector placed in the topbar — please correct."
