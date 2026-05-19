@@ -1706,6 +1706,13 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
 
     // generateRooftopDeck already called above (before inheritance)
     scheduleAdjacency(get);
+
+    // U4 (R4, AE3): emit affordance hook for "+ Stairs" inline button.
+    // Cross-slice — uiSlice owns setLastStackedPair. Safe to call after
+    // the mutation lands.
+    (get as unknown as () => { setLastStackedPair?: (p: { topId: string; bottomId: string } | null) => void })()
+      .setLastStackedPair?.({ topId, bottomId });
+
     return true;
   },
 

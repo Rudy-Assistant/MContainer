@@ -64,6 +64,13 @@ export interface UiSlice {
   lastDestructiveAction: { description: string; at: number } | null;
   setLastDestructiveAction: (a: { description: string } | null) => void;
 
+  /** U4 (R4, AE3): records the most recently-completed stack so the
+   *  AutoStairsAffordance UI can offer "+ Stairs" on the lower container's
+   *  roof. Set by stackContainer when the stack succeeds; cleared by
+   *  acceptance, dismiss, or TTL. */
+  lastStackedPair: { topId: string; bottomId: string; at: number } | null;
+  setLastStackedPair: (p: { topId: string; bottomId: string } | null) => void;
+
   // Hotbar tab: 0=Rooms, 1=Surfaces, 2=Materials, 3=Furniture (see SmartHotbar.tsx lines 1475-1478)
   activeHotbarTab: number;
   setActiveHotbarTab: (tab: number) => void;
@@ -273,6 +280,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   showFurnitureLabels: false,
   showAdvancedSettings: false,
   lastDestructiveAction: null,
+  lastStackedPair: null,
 
   // ── Actions ────────────────────────────────────────────
   setHoveredVoxel: (v) => set({ hoveredVoxel: v }),
@@ -286,6 +294,9 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   toggleAdvancedSettings: () => set((s) => ({ showAdvancedSettings: !s.showAdvancedSettings })),
   setLastDestructiveAction: (a) => set({
     lastDestructiveAction: a === null ? null : { description: a.description, at: Date.now() },
+  }),
+  setLastStackedPair: (p) => set({
+    lastStackedPair: p === null ? null : { topId: p.topId, bottomId: p.bottomId, at: Date.now() },
   }),
 
   activeHotbarTab: 1, // Default: Surfaces (was Rooms)
