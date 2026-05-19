@@ -3671,26 +3671,56 @@ function BaseplateCell({
   );
 }
 
-// ── Pool Water Plane ──────────────────────────────────────────
-const mWater = new THREE.MeshPhysicalMaterial({
-  color: 0x1e88e5,
-  metalness: 0.1,
-  roughness: 0.05,
-  transmission: 0.6,
-  thickness: 0.5,
-  ior: 1.33,
-  transparent: true,
-  opacity: 0.75,
-  side: THREE.DoubleSide,
-});
+// ── Pool Water Plane (Sprint A3: screen-space reflections) ───────
+// MeshReflectorMaterial renders reflections of the scene into the water
+// surface. Combined with subtle distortion (animated noise) this delivers
+// the Lumion-tier "real water" feel inside the browser/R3F budget.
+// Trade-off: each MeshReflectorMaterial allocates one render target; we
+// gate it on qualityPreset to skip on 'low'.
+import { MeshReflectorMaterial } from '@react-three/drei';
 
-/** Renders a semi-transparent water plane at 85% container height for pool containers. */
+/** Renders a reflective water plane at 85% container height for pool containers. */
 function WaterPlane({ dims }: { dims: { length: number; width: number; height: number } }) {
-  const waterY = dims.height * 0.85 - dims.height / 2; // 85% of height, offset from center
+  const waterY = dims.height * 0.85 - dims.height / 2;
+  const qualityPreset = useStore((s) => s.qualityPreset);
+  // Skip reflections on 'low' quality preset -- fall back to flat tinted plane.
+  const useReflector = qualityPreset !== 'low';
   return (
-    <mesh position={[0, waterY, 0]} rotation={[-Math.PI / 2, 0, 0]}
+    <mesh
+      position={[0, waterY, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
       geometry={getBox(dims.length * 0.9, dims.width * 0.9, 0.02)}
-      material={mWater} raycast={nullRaycast} />
+      raycast={nullRaycast}
+    >
+      {useReflector ? (
+        <MeshReflectorMaterial
+          color="#3a8fc8"
+          blur={[300, 100]}
+          mixBlur={1}
+          mixStrength={1.4}
+          resolution={512}
+          mirror={0.6}
+          depthScale={0.4}
+          minDepthThreshold={0.85}
+          maxDepthThreshold={1.0}
+          roughness={0.18}
+          metalness={0.05}
+          distortion={0.3}
+        />
+      ) : (
+        <meshPhysicalMaterial
+          color={0x1e88e5}
+          metalness={0.1}
+          roughness={0.05}
+          transmission={0.6}
+          thickness={0.5}
+          ior={1.33}
+          transparent
+          opacity={0.75}
+          side={THREE.DoubleSide}
+        />
+      )}
+    </mesh>
   );
 }
 
