@@ -39,6 +39,7 @@ import {
   Palette, Scan, Grid3x3,
 } from "lucide-react";
 import UserLibrary from "@/components/ui/UserLibrary";
+import { PrefabsPanel } from "@/components/ui/PrefabsPanel";
 import { useTabletDrawer } from "@/hooks/useTabletDrawer";
 import { WIZARD_PRESETS } from "@/config/wizardPresets";
 // Theme/Ground imports removed — selectors moved to TopToolbar Appearance popover
@@ -302,7 +303,14 @@ function Library() {
           </>
         )}
 
-        {activeTab === "saved" && <UserLibrary />}
+        {activeTab === "saved" && (
+          <>
+            <UserLibrary />
+            <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: `1px solid ${BORDER}` }}>
+              <PrefabsPanel />
+            </div>
+          </>
+        )}
       </div>
 
       {containerCount > 0 && (
