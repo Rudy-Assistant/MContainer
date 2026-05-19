@@ -66,6 +66,7 @@ import { applyPalette } from "@/utils/applyPalette";
 import type { MaterialPalette } from "@/store/slices/librarySlice";
 import { QUALITY_PRESETS } from "@/config/qualityPresets";
 import { QualityAutoDetect } from './QualityAutoDetect';
+import { FacePaintPreview } from './FacePaintPreview';
 import { getStyle } from '@/config/styleRegistry';
 import { installWalkthroughCameraPoseApi } from '@/utils/walkthroughCameraPose';
 
@@ -2307,6 +2308,9 @@ export default function Scene({ cameraQuaternionRef }: SceneProps) {
       <FrameBuilder />
       {viewMode === ViewMode.Realistic3D && <DragGhost />}
       {viewMode === ViewMode.Blueprint && <DragGhostBlueprint />}
+      {/* U3: hover-paint preview overlay — translucent material on the hovered
+          face matching the current hotbar's surface for that direction. */}
+      {viewMode === ViewMode.Realistic3D && <FacePaintPreview />}
       {viewMode !== ViewMode.Walkthrough && <KeyboardPanControls />}
       {viewMode === ViewMode.Blueprint && <><BlueprintGrid /><BlueprintScene /></>}
       {viewMode === ViewMode.Realistic3D && <RealisticScene cameraQuaternionRef={cameraQuaternionRef} />}
