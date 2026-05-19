@@ -1752,6 +1752,11 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
       return { containers };
     });
     scheduleAdjacency(get);
+    // U8 expansion: unstacking is destructive (loses stair connections, roof
+    // promotion may need to re-fire). Announce via toast.
+    const unstackedName = get().containers[id]?.name ?? 'container';
+    (get as unknown as () => { setLastDestructiveAction?: (a: { description: string } | null) => void })()
+      .setLastDestructiveAction?.({ description: `Unstacked ${unstackedName}` });
   },
 
   // ── Adjacency Detection ───────────────────────────────────

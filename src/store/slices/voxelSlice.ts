@@ -1591,12 +1591,15 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
   },
 
   resetVoxelGrid: (containerId) => {
-
+    const containerName = get().containers[containerId]?.name ?? 'container';
     set((s) => {
       const c = s.containers[containerId];
       if (!c) return {};
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: createDefaultVoxelGrid(), _smartRailingChanges: undefined } } };
     });
+    // U8 expansion: resetting a voxel grid wipes ALL face customizations — destructive.
+    (get as unknown as () => { setLastDestructiveAction?: (a: { description: string } | null) => void })()
+      .setLastDestructiveAction?.({ description: `Reset voxel grid on ${containerName}` });
   },
 
   toggleVoxelLock: (containerId, voxelIndex) => {
