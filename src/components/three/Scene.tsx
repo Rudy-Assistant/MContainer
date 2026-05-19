@@ -58,6 +58,7 @@ import DebugOverlay from "./DebugOverlay";
 import StaircaseGhost from "./StaircaseGhost";
 import TouchGestureControls from "./TouchGestureControls";
 import { Vegetation } from "./Vegetation";
+import { SnapInferenceLabel } from "./SnapInferenceLabel";
 import { RendererReadyGate } from '@/components/system/RendererReadyGate';
 // FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats, rebuildThemeMaterials } from "@/config/materialCache";
@@ -1469,6 +1470,9 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
       {/* A2: stylized low-poly vegetation ring (trees / grass / dirt) */}
       <Vegetation />
 
+      {/* C1: floating snap-inference label ("edge" / "midpoint" / "stack") */}
+      <SnapInferenceLabel />
+
       {/* Clouds REMOVED — see SkyDome comment above */}
 
       {/* Active level containers — 100% opacity, fully interactive */}
@@ -1664,7 +1668,14 @@ function DragGhost() {
       const overlaps = checkOverlap(containers, null, foot);
       validRef.current = stacking ? true : !overlaps;
 
-      setDragWorldPos({ x: sx, y: ghostY, z: sz, stackTargetId: target?.containerId ?? null });
+      // Sprint C1: label the inferred snap so SnapInferenceLabel can show
+      // it ("edge" / "midpoint" / "stack") near the drop point.
+      const snapLabel: 'edge' | 'midpoint' | 'stack' | null = target
+        ? 'stack'
+        : snap.snapped
+          ? (snap.label ?? 'edge')
+          : null;
+      setDragWorldPos({ x: sx, y: ghostY, z: sz, stackTargetId: target?.containerId ?? null, snapLabel });
     }
   });
 

@@ -54,8 +54,8 @@ export interface DragSlice {
   // ── Container palette drag ──────────────────────────────
   dragContainer: ContainerSize | null;
   setDragContainer: (size: ContainerSize | null) => void;
-  dragWorldPos: { x: number; y: number; z: number; stackTargetId: string | null } | null;
-  setDragWorldPos: (pos: { x: number; y: number; z: number; stackTargetId: string | null } | null) => void;
+  dragWorldPos: { x: number; y: number; z: number; stackTargetId: string | null; snapLabel?: 'edge' | 'midpoint' | 'stack' | null } | null;
+  setDragWorldPos: (pos: { x: number; y: number; z: number; stackTargetId: string | null; snapLabel?: 'edge' | 'midpoint' | 'stack' | null } | null) => void;
 
   // ── Furniture palette drag ──────────────────────────────
   dragFurniture: FurnitureType | null;

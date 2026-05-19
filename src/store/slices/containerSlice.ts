@@ -190,6 +190,10 @@ export interface ContainerSlice {
 
   // ── Container CRUD ────────────────────────────────────────
   addContainer: (size?: ContainerSize, position?: ContainerPosition, level?: number, skipSmartPlacement?: boolean) => string;
+  /** Sprint C4: duplicates an existing container at an offset. Defaults to
+   *  +length-along-X (Blender Shift+R semantics adapted to voxel containers).
+   *  Copies size, rotation, and a deep-copy of the voxel grid + faces. */
+  duplicateContainer: (id: string, offset?: { x?: number; y?: number; z?: number }) => string | null;
   addPoolContainer: () => string;
   applyContainerRole: (containerId: string, roleId: string, skipOverlapCheck?: boolean) => void;
   setAllExtensions: (containerId: string, config: ExtensionConfig, skipOverlapCheck?: boolean, animate?: boolean) => void;
@@ -361,6 +365,36 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
   tapePoints: [],
 
   // ── Container CRUD ──────────────────────────────────────
+
+  duplicateContainer: (id, offset) => {
+    const src = get().containers[id];
+    if (!src) return null;
+    const dims = CONTAINER_DIMENSIONS[src.size];
+    const dx = offset?.x ?? dims.length + 0.1;
+    const dy = offset?.y ?? 0;
+    const dz = offset?.z ?? 0;
+    const newPos = {
+      x: src.position.x + dx,
+      y: src.position.y + dy,
+      z: src.position.z + dz,
+    };
+    const newId = get().addContainer(src.size, newPos, 0, true);
+    // Best-effort: copy rotation and voxelGrid deep so paint state carries over.
+    set((s) => {
+      const dst = s.containers[newId];
+      if (!dst) return;
+      dst.rotation = src.rotation ?? 0;
+      if (src.voxelGrid && src.voxelGrid.length > 0) {
+        dst.voxelGrid = src.voxelGrid.map((v) => ({
+          ...v,
+          faces: { ...v.faces },
+        }));
+      }
+    });
+    const announce = (get() as unknown as { setLastDestructiveAction?: (a: { description: string } | null) => void }).setLastDestructiveAction;
+    if (announce) announce({ description: 'Duplicated container — Ctrl+Z to undo' });
+    return newId;
+  },
 
   addContainer: (size, position, level = 0, skipSmartPlacement) => {
 

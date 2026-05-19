@@ -278,6 +278,11 @@ export interface SnapResult {
   z: number;
   snapped: boolean;
   adjacentTo: string | null;
+  /** Sprint C1: human-readable label for the kind of snap that fired.
+   *  Surfaced in-scene by SnapInferenceLabel so users can see WHY the
+   *  container is jumping to that spot ("edge" / "midpoint" / null).
+   *  null when no snap fired (free placement / grid only). */
+  label?: 'edge' | 'midpoint' | null;
 }
 
 /**
@@ -311,6 +316,7 @@ export function findEdgeSnap(
   let bestZ = z;
   let bestDist = Infinity;
   let adjacentTo: string | null = null;
+  let bestLabel: 'edge' | 'midpoint' | null = null;
 
   for (const c of Object.values(containers)) {
     if (c.id === excludeId) continue;
@@ -330,6 +336,7 @@ export function findEdgeSnap(
       bestZ = z;
       bestDist = distXRight;
       adjacentTo = c.id;
+      bestLabel = 'edge';
     }
 
     // New container's left edge → existing container's right edge
@@ -341,6 +348,7 @@ export function findEdgeSnap(
       bestZ = z;
       bestDist = distXLeft;
       adjacentTo = c.id;
+      bestLabel = 'edge';
     }
 
     // New container's front edge → existing container's back edge
@@ -352,6 +360,7 @@ export function findEdgeSnap(
       bestZ = snapZFront;
       bestDist = distZFront;
       adjacentTo = c.id;
+      bestLabel = 'edge';
     }
 
     // New container's back edge → existing container's front edge
@@ -363,6 +372,7 @@ export function findEdgeSnap(
       bestZ = snapZBack;
       bestDist = distZBack;
       adjacentTo = c.id;
+      bestLabel = 'edge';
     }
 
     // Also snap Z alignment when X-snapped (align containers along their shared axis)
@@ -385,11 +395,13 @@ export function findEdgeSnap(
         bestZ = c.position.z;
         bestDist = centerDist;
         adjacentTo = c.id;
+        bestLabel = 'midpoint';
       }
     }
   }
 
-  return { x: bestX, z: bestZ, snapped: bestDist < snapDistance, adjacentTo };
+  const snapped = bestDist < snapDistance;
+  return { x: bestX, z: bestZ, snapped, adjacentTo, label: snapped ? bestLabel : null };
 }
 
 // ── Stack Target Detection ──────────────────────────────────

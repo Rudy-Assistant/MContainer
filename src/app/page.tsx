@@ -19,6 +19,8 @@ import { AdvancedSettingsToggleHotkey } from "@/components/ui/AdvancedSettingsTo
 import { SmartRuleToast } from "@/components/ui/SmartRuleToast";
 import { FirstLaunchHint } from "@/components/ui/FirstLaunchHint";
 import { WelcomeWizard } from "@/components/ui/WelcomeWizard";
+import { DragPrecisionOverlay } from "@/components/ui/DragPrecisionOverlay";
+import { DuplicateHotkey } from "@/components/ui/DuplicateHotkey";
 import { ToastEscapeHotkey } from "@/components/ui/ToastEscapeHotkey";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
@@ -143,6 +145,10 @@ export default function Home() {
           consumer-app pattern). Suppresses itself when containers already
           exist (returning user). */}
       <WelcomeWizard />
+      {/* Sprint C2+C3: type-to-set + axis-lock during container drag */}
+      <DragPrecisionOverlay />
+      {/* Sprint C4: Ctrl+D duplicates selection */}
+      <DuplicateHotkey />
       {/* Global Esc handler — dismisses all active toasts at once. Capture-
           phase so it fires before walkthrough-exit / selection-clear when a
           toast is up. */}
