@@ -18,6 +18,7 @@ import { AutoStairsAffordance } from "@/components/ui/AutoStairsAffordance";
 import { AdvancedSettingsToggleHotkey } from "@/components/ui/AdvancedSettingsToggleHotkey";
 import { SmartRuleToast } from "@/components/ui/SmartRuleToast";
 import { FirstLaunchHint } from "@/components/ui/FirstLaunchHint";
+import { ToastEscapeHotkey } from "@/components/ui/ToastEscapeHotkey";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
@@ -136,6 +137,10 @@ export default function Home() {
       {/* Plan deferred #4: first-launch announcement banner explaining where
           the Smart/Manual toggle went + the new keyboard hint. Shows once. */}
       <FirstLaunchHint />
+      {/* Global Esc handler — dismisses all active toasts at once. Capture-
+          phase so it fires before walkthrough-exit / selection-clear when a
+          toast is up. */}
+      <ToastEscapeHotkey />
 
       {/* Workspace: Sidebar + (Canvas + BottomPanel) */}
       <div className="flex flex-1 min-h-0">
