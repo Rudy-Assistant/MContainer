@@ -71,6 +71,21 @@ export interface UiSlice {
   lastStackedPair: { topId: string; bottomId: string; at: number } | null;
   setLastStackedPair: (p: { topId: string; bottomId: string } | null) => void;
 
+  /** U6 second-half (R6): records the most recent smart-rule fire so the
+   *  SmartRuleToast UI can offer Undo + "Don't auto-fix this face again"
+   *  (which calls setUserOptOut). Set by recomputeSmartRailings (and any
+   *  future smart-rule path) when a face is modified. */
+  lastSmartRuleFire: {
+    containerId: string;
+    voxelIndex: number;
+    face: keyof VoxelFaces;
+    ruleName?: string;
+    at: number;
+  } | null;
+  setLastSmartRuleFire: (
+    p: { containerId: string; voxelIndex: number; face: keyof VoxelFaces; ruleName?: string } | null,
+  ) => void;
+
   // Hotbar tab: 0=Rooms, 1=Surfaces, 2=Materials, 3=Furniture (see SmartHotbar.tsx lines 1475-1478)
   activeHotbarTab: number;
   setActiveHotbarTab: (tab: number) => void;
@@ -281,6 +296,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   showAdvancedSettings: false,
   lastDestructiveAction: null,
   lastStackedPair: null,
+  lastSmartRuleFire: null,
 
   // ── Actions ────────────────────────────────────────────
   setHoveredVoxel: (v) => set({ hoveredVoxel: v }),
@@ -297,6 +313,11 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   }),
   setLastStackedPair: (p) => set({
     lastStackedPair: p === null ? null : { topId: p.topId, bottomId: p.bottomId, at: Date.now() },
+  }),
+  setLastSmartRuleFire: (p) => set({
+    lastSmartRuleFire: p === null
+      ? null
+      : { containerId: p.containerId, voxelIndex: p.voxelIndex, face: p.face, ruleName: p.ruleName, at: Date.now() },
   }),
 
   activeHotbarTab: 1, // Default: Surfaces (was Rooms)

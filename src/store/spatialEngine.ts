@@ -291,9 +291,17 @@ export function findEdgeSnap(
   z: number,
   size: ContainerSize,
   rotation: number = 0,
-  snapDistance: number = 0.3
+  snapDistance?: number,
 ): SnapResult {
   const dims = CONTAINER_DIMENSIONS[size];
+  // Building-UX plan, "Deferred to Follow-Up Work" #1 (now in-scope):
+  // snap radius scales by container size — 33% of the shorter edge.
+  // Falls back to 0.3 when dims are missing. Callers can still override
+  // explicitly via the snapDistance arg.
+  if (snapDistance === undefined) {
+    const shorter = Math.min(dims.width, dims.length);
+    snapDistance = Math.max(0.3, shorter * 0.33);
+  }
   const cosA = Math.abs(Math.cos(rotation));
   const sinA = Math.abs(Math.sin(rotation));
   const halfExtX = (dims.length / 2) * cosA + (dims.width / 2) * sinA;

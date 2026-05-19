@@ -15,6 +15,8 @@ import FaceFilterWidget from "@/components/ui/FaceFilterWidget";
 import TopToolbar from "@/components/ui/TopToolbar";
 import { DestructiveToast } from "@/components/ui/DestructiveToast";
 import { AutoStairsAffordance } from "@/components/ui/AutoStairsAffordance";
+import { AdvancedSettingsToggleHotkey } from "@/components/ui/AdvancedSettingsToggleHotkey";
+import { SmartRuleToast } from "@/components/ui/SmartRuleToast";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
@@ -124,6 +126,12 @@ export default function Home() {
       <DestructiveToast />
       {/* U4: "+ Stairs" inline affordance after a successful stack. */}
       <AutoStairsAffordance />
+      {/* U5 second-half: Ctrl+Shift+A toggles showAdvancedSettings — surfaces
+          the Smart/Manual pill in the toolbar without requiring DevTools. */}
+      <AdvancedSettingsToggleHotkey />
+      {/* U6 second-half: contextual smart-rule opt-out toast. Renders below
+          DestructiveToast when a smart rule has fired. */}
+      <SmartRuleToast />
 
       {/* Workspace: Sidebar + (Canvas + BottomPanel) */}
       <div className="flex flex-1 min-h-0">

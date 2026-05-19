@@ -659,13 +659,36 @@ function applyVoxelFaceMaterial(
 
     grid[voxelIndex] = updatedVoxel;
     const updatedContainer = { ...c, voxelGrid: grid };
+
+    // U6 second-half: capture pre-recompute tracking so we can detect if a
+    // smart-railing rule fired on a face the user didn't explicitly paint.
+    // If so, surface the contextual opt-out toast via setLastSmartRuleFire.
+    const prevTracking = c._smartRailingChanges ?? {};
     if (get().designMode !== 'manual') {
       recomputeSmartRailings(grid, updatedContainer);
+    }
+    const nextTracking = updatedContainer._smartRailingChanges ?? {};
+    const newKeys = Object.keys(nextTracking).filter((k) => !(k in prevTracking));
+    let smartRuleFire: { containerId: string; voxelIndex: number; face: keyof VoxelFaces; ruleName?: string; at: number } | null = null;
+    if (source === 'user' && newKeys.length > 0) {
+      const [idxStr, ruleFace] = newKeys[0].split(':');
+      const idx = parseInt(idxStr, 10);
+      // Only fire for railings that aren't the same voxel-face the user just painted.
+      if (!(idx === voxelIndex && ruleFace === face)) {
+        smartRuleFire = {
+          containerId,
+          voxelIndex: idx,
+          face: ruleFace as keyof VoxelFaces,
+          ruleName: 'Auto-railing',
+          at: Date.now(),
+        };
+      }
     }
 
     return {
       containers: { ...s.containers, [containerId]: updatedContainer },
       ...(source === 'user' ? { lastStamp: { containerId, voxelIndex, face, surfaceType: mat } } : {}),
+      ...(smartRuleFire ? { lastSmartRuleFire: smartRuleFire } : {}),
     };
   });
 }
@@ -1786,6 +1809,13 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       }
       return { containers: { ...s.containers, [containerId]: updatedContainer } };
     });
+
+    // U8 expansion: deactivating a voxel is destructive — announce via toast
+    // so the user sees what just happened and remembers Ctrl+Z is available.
+    if (active === false) {
+      (get as unknown as () => { setLastDestructiveAction?: (a: { description: string } | null) => void })()
+        .setLastDestructiveAction?.({ description: 'Cleared voxel' });
+    }
   },
 
   setVoxelFace: (containerId, voxelIndex, face, mat) => {
