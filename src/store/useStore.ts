@@ -30,6 +30,7 @@ import {
 } from "./slices/voxelSlice";
 import { createContainerSlice, type ContainerSlice, setContainerTemporalAccessor } from "./slices/containerSlice";
 import { createSceneObjectSlice, type SceneObjectSlice } from "./slices/sceneObjectSlice";
+import { createGroupSlice, type GroupSlice } from "./slices/groupSlice";
 import { THEMES, type ThemeId } from "@/config/themes";
 
 // ── Voxel Target Union ─────────────────────────────────────
@@ -164,7 +165,7 @@ export function autoStairAscending(
 
 // ── Store ───────────────────────────────────────────────────
 
-export type StoreState = AppState & EnvironmentSlice & UiSlice & SelectionSlice & DragSlice & LibrarySlice & VoxelSlice & ContainerSlice & SceneObjectSlice & { _hasHydrated: boolean };
+export type StoreState = AppState & EnvironmentSlice & UiSlice & SelectionSlice & DragSlice & LibrarySlice & VoxelSlice & ContainerSlice & SceneObjectSlice & GroupSlice & { _hasHydrated: boolean };
 type LegacyVoxel = Voxel & { stairDir?: string };
 type DevWindow = Window & typeof globalThis & { __store?: typeof useStore };
 
@@ -199,6 +200,10 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
   ...createSceneObjectSlice(
     set as unknown as Parameters<typeof createSceneObjectSlice>[0],
     get as unknown as Parameters<typeof createSceneObjectSlice>[1],
+  ),
+  ...createGroupSlice(
+    set as unknown as Parameters<typeof createGroupSlice>[0],
+    get as unknown as Parameters<typeof createGroupSlice>[1],
   ),
 
   // ── Initial State ───────────────────────────────────────
