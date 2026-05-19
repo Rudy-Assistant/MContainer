@@ -41,6 +41,7 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette, onOpenAiDesign
   const viewMode = useStore((s) => s.viewMode);
   const setViewMode = useStore((s) => s.setViewMode);
   const designMode = useStore((s) => s.designMode);
+  const showAdvancedSettings = useStore((s) => s.showAdvancedSettings);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const openWizard = useStore((s) => s.openWizard);
@@ -223,23 +224,29 @@ export default function TopToolbar({ onOpenBudget, onOpenPalette, onOpenAiDesign
       {/* ═══ ZONE C: Right — Floor/Roof + Wall Vis + Overflow ═══ */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
 
-        {/* ── Smart/Manual pill — restricts auto-fixes; high-frequency toggle, so reads as a clear pair. ── */}
-        <div style={{
-          display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 8, overflow: "hidden",
-          border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 12, fontWeight: 600,
-        }}>
-          {(['smart', 'manual'] as const).map((m) => (
-            <button key={m} onClick={() => useStore.getState().setDesignMode(m)} style={{
-              padding: "6px 14px", border: "none", cursor: "pointer",
-              background: designMode === m ? "var(--accent, #2563eb)" : "transparent",
-              color: designMode === m ? "#fff" : "var(--text-muted, #6b7280)",
-              transition: "all 150ms ease-out",
-              letterSpacing: "0.01em",
-            }}>
-              {narrow ? (m === 'smart' ? 'S' : 'M') : (m === 'smart' ? 'Smart' : 'Manual')}
-            </button>
-          ))}
-        </div>
+        {/* ── Smart/Manual pill — restricts auto-fixes; high-frequency toggle, so reads as a clear pair. ──
+            U5 (plan 2026-05-18-001): pill hidden by default for casual users (A1).
+            Power users (A2) flip `showAdvancedSettings` to surface it. The underlying
+            designMode is unchanged — Smart stays the invisible default and smart-rule
+            cascade runs normally regardless of this UI control. */}
+        {showAdvancedSettings && (
+          <div style={{
+            display: "flex", background: "var(--input-bg, #f3f4f6)", borderRadius: 8, overflow: "hidden",
+            border: "1px solid var(--btn-border, #e5e7eb)", fontSize: 12, fontWeight: 600,
+          }}>
+            {(['smart', 'manual'] as const).map((m) => (
+              <button key={m} onClick={() => useStore.getState().setDesignMode(m)} style={{
+                padding: "6px 14px", border: "none", cursor: "pointer",
+                background: designMode === m ? "var(--accent, #2563eb)" : "transparent",
+                color: designMode === m ? "#fff" : "var(--text-muted, #6b7280)",
+                transition: "all 150ms ease-out",
+                letterSpacing: "0.01em",
+              }}>
+                {narrow ? (m === 'smart' ? 'S' : 'M') : (m === 'smart' ? 'Smart' : 'Manual')}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Separator: groups the ephemeral status chips, lets Cost read as the primary indicator. */}
         <div style={{ width: "1px", height: "20px", background: "var(--border, #e5e7eb)", flexShrink: 0, margin: "0 2px" }} />

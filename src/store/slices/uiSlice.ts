@@ -48,6 +48,14 @@ export interface UiSlice {
   showFurnitureLabels: boolean;
   toggleFurnitureLabels: () => void;
 
+  /** U5 (R5/R6): hides the Smart/Manual toolbar pill behind a power-user
+   *  opt-in. Default false. When true, the TopToolbar renders the
+   *  designMode pill again. designMode itself is unaffected — Smart stays
+   *  the invisible default. See docs/plans/2026-05-18-001-feat-building-ux-industry-parity-plan.md */
+  showAdvancedSettings: boolean;
+  setShowAdvancedSettings: (v: boolean) => void;
+  toggleAdvancedSettings: () => void;
+
   // Hotbar tab: 0=Rooms, 1=Surfaces, 2=Materials, 3=Furniture (see SmartHotbar.tsx lines 1475-1478)
   activeHotbarTab: number;
   setActiveHotbarTab: (tab: number) => void;
@@ -255,6 +263,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   facePreview: null,
   dollhouseActive: false,
   showFurnitureLabels: false,
+  showAdvancedSettings: false,
 
   // ── Actions ────────────────────────────────────────────
   setHoveredVoxel: (v) => set({ hoveredVoxel: v }),
@@ -264,6 +273,8 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   setFacePreview: (p) => set({ facePreview: p }),
   toggleDollhouse: () => set((s) => ({ dollhouseActive: !s.dollhouseActive })),
   toggleFurnitureLabels: () => set((s) => ({ showFurnitureLabels: !s.showFurnitureLabels })),
+  setShowAdvancedSettings: (v) => set({ showAdvancedSettings: v }),
+  toggleAdvancedSettings: () => set((s) => ({ showAdvancedSettings: !s.showAdvancedSettings })),
 
   activeHotbarTab: 1, // Default: Surfaces (was Rooms)
   setActiveHotbarTab: (tab) => set({ activeHotbarTab: tab }),
