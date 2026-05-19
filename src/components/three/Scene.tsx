@@ -56,6 +56,7 @@ import XRLocomotion from "./XRLocomotion";
 import FloorGrid from "./FloorGrid";
 import DebugOverlay from "./DebugOverlay";
 import StaircaseGhost from "./StaircaseGhost";
+import TouchGestureControls from "./TouchGestureControls";
 import { RendererReadyGate } from '@/components/system/RendererReadyGate';
 // FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats, rebuildThemeMaterials } from "@/config/materialCache";
@@ -1508,6 +1509,7 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
         mouseButtons={CAMERA_MOUSE_BUTTONS}
         truckSpeed={0.5}
       />
+      <TouchGestureControls />
       <CameraTargetLerp desired={orbitTarget} />
       <CameraBroadcast />
       <CameraFloorGuard />
@@ -1595,6 +1597,7 @@ function BlueprintScene() {
           RIGHT: THREE.MOUSE.PAN,
         }}
       />
+      <TouchGestureControls />
     </>
   );
 }

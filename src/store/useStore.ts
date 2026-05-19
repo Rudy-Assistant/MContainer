@@ -31,6 +31,7 @@ import {
 import { createContainerSlice, type ContainerSlice, setContainerTemporalAccessor } from "./slices/containerSlice";
 import { createSceneObjectSlice, type SceneObjectSlice } from "./slices/sceneObjectSlice";
 import { createGroupSlice, type GroupSlice } from "./slices/groupSlice";
+import { createPrefabSlice, type PrefabSlice } from "./slices/prefabSlice";
 import { THEMES, type ThemeId } from "@/config/themes";
 
 // ── Voxel Target Union ─────────────────────────────────────
@@ -165,7 +166,7 @@ export function autoStairAscending(
 
 // ── Store ───────────────────────────────────────────────────
 
-export type StoreState = AppState & EnvironmentSlice & UiSlice & SelectionSlice & DragSlice & LibrarySlice & VoxelSlice & ContainerSlice & SceneObjectSlice & GroupSlice & { _hasHydrated: boolean };
+export type StoreState = AppState & EnvironmentSlice & UiSlice & SelectionSlice & DragSlice & LibrarySlice & VoxelSlice & ContainerSlice & SceneObjectSlice & GroupSlice & PrefabSlice & { _hasHydrated: boolean };
 type LegacyVoxel = Voxel & { stairDir?: string };
 type DevWindow = Window & typeof globalThis & { __store?: typeof useStore };
 
@@ -205,6 +206,10 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     set as unknown as Parameters<typeof createGroupSlice>[0],
     get as unknown as Parameters<typeof createGroupSlice>[1],
   ),
+  ...createPrefabSlice(
+    set as unknown as Parameters<typeof createPrefabSlice>[0],
+    get as unknown as Parameters<typeof createPrefabSlice>[1],
+  ),
 
   // ── Initial State ───────────────────────────────────────
   _hasHydrated: false,
@@ -227,7 +232,7 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     const { containers, zones, environment, viewMode, pricing, furnitureIndex,
             libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
             palettes, activePaletteId, currentTheme, activeStyle, sceneObjects,
-            containerGroups } = state;
+            containerGroups, prefabModules } = state;
     // Strip ephemeral smart tracking and voxel-only animation state from persisted containers
     const cleanContainers: Record<string, Container> = {};
     for (const [id, c] of Object.entries(containers)) {
@@ -252,7 +257,7 @@ export const useStore = create<StoreState>()(persist(temporal(immer((set, get) =
     return { containers: cleanContainers, zones, environment, viewMode, pricing, furnitureIndex,
              libraryBlocks, libraryContainers, libraryHomeDesigns, customHotbar,
              palettes, activePaletteId, currentTheme, activeStyle, sceneObjects,
-             containerGroups } as StoreState;
+             containerGroups, prefabModules } as StoreState;
   },
   merge: (persistedState, currentState) => {
     if (!persistedState) return currentState as StoreState;
