@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Component, type ReactNode, useEffect, useMemo, useState } from 'react';
+import React, { Component, type ReactNode, useMemo } from 'react';
 import * as THREE from 'three';
 import {
   EffectComposer,
@@ -12,7 +12,6 @@ import {
   BrightnessContrast,
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
-import { useThree } from '@react-three/fiber';
 import { useStore } from '@/store/useStore';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
 import { getStyle } from '@/config/styleRegistry';
