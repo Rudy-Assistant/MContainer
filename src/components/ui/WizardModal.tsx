@@ -334,7 +334,7 @@ export default function WizardModal() {
               }}
             >
               <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-main, #0f172a)" }}>
-                What you'll get
+                What you&apos;ll get
               </div>
             </div>
             <ol

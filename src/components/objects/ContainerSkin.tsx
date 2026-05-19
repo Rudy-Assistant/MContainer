@@ -1529,7 +1529,7 @@ function ShelfFace({ w, h, isNS, dir, shelfConfig }: {
   }
 
   // Cube grid templates: vertical dividers between cubes
-  let dividers: React.ReactNode[] = [];
+  const dividers: React.ReactNode[] = [];
   if (tmpl.id === 'cube_grid_2x2' || tmpl.id === 'cube_grid_3x2') {
     const cols = tmpl.id === 'cube_grid_2x2' ? 2 : 3;
     const dividerCount = cols - 1;
