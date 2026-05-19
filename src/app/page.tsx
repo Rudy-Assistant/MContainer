@@ -17,6 +17,7 @@ import { DestructiveToast } from "@/components/ui/DestructiveToast";
 import { AutoStairsAffordance } from "@/components/ui/AutoStairsAffordance";
 import { AdvancedSettingsToggleHotkey } from "@/components/ui/AdvancedSettingsToggleHotkey";
 import { SmartRuleToast } from "@/components/ui/SmartRuleToast";
+import { FirstLaunchHint } from "@/components/ui/FirstLaunchHint";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
 import CustomHotbar from "@/components/ui/CustomHotbar";
@@ -132,6 +133,9 @@ export default function Home() {
       {/* U6 second-half: contextual smart-rule opt-out toast. Renders below
           DestructiveToast when a smart rule has fired. */}
       <SmartRuleToast />
+      {/* Plan deferred #4: first-launch announcement banner explaining where
+          the Smart/Manual toggle went + the new keyboard hint. Shows once. */}
+      <FirstLaunchHint />
 
       {/* Workspace: Sidebar + (Canvas + BottomPanel) */}
       <div className="flex flex-1 min-h-0">
