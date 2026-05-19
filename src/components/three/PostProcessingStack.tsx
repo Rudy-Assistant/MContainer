@@ -10,7 +10,11 @@ import {
   Outline,
   HueSaturation,
   BrightnessContrast,
+  Vignette,
+  ChromaticAberration,
+  Noise,
 } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import { useStore } from '@/store/useStore';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
@@ -166,6 +170,24 @@ function PostProcessingEffects() {
   children.push(
     <ToneMapping key="tonemap" mode={ToneMappingMode.ACES_FILMIC} />,
   );
+
+  // Sprint A4: cinematic post-stack add-ons -- low-intensity defaults so
+  // they add perceived production value without veering into "Instagram
+  // filter" territory. ChromaticAberration adds a subtle lens-fringe at
+  // the corners; Vignette softly frames the image; Noise adds the faintest
+  // film-grain texture that hides banding in flat sky / shadow gradients.
+  if (config.bloomEnabled) {
+    children.push(
+      <ChromaticAberration
+        key="chromatic"
+        offset={new THREE.Vector2(0.0006, 0.0006)}
+        radialModulation
+        modulationOffset={0.5}
+      />,
+      <Vignette key="vignette" offset={0.35} darkness={0.35} eskil={false} />,
+      <Noise key="grain" premultiply blendFunction={BlendFunction.SOFT_LIGHT} opacity={0.18} />,
+    );
+  }
 
   return <EffectComposer>{children}</EffectComposer>;
 }

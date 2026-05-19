@@ -57,6 +57,7 @@ import FloorGrid from "./FloorGrid";
 import DebugOverlay from "./DebugOverlay";
 import StaircaseGhost from "./StaircaseGhost";
 import TouchGestureControls from "./TouchGestureControls";
+import { Vegetation } from "./Vegetation";
 import { RendererReadyGate } from '@/components/system/RendererReadyGate';
 // FaceContextWidget removed — replaced by Materials hotbar
 import { _themeMats, rebuildThemeMaterials } from "@/config/materialCache";
@@ -639,9 +640,9 @@ function GroundContactShadows() {
   return (
     <ContactShadows
       position={[0, 0.015, 0]}
-      opacity={0.22}
+      opacity={0.42}
       scale={160}
-      blur={1.8}
+      blur={2.2}
       far={90}
       resolution={1024}
       color="#000000"
@@ -1464,6 +1465,9 @@ function RealisticScene({ cameraQuaternionRef }: { cameraQuaternionRef?: React.R
       <XRLocomotion />
 
       <GroundContactShadows />
+
+      {/* A2: stylized low-poly vegetation ring (trees / grass / dirt) */}
+      <Vegetation />
 
       {/* Clouds REMOVED — see SkyDome comment above */}
 
