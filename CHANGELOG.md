@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-05-19 — Industry-comparison roadmap shipped (Sprints A + B + C + D)
+
+15 items closed across 4 sprints from `docs/research/2026-05-19-industry-comparison-brief.md`, addressing the "Lumion looks more beautiful than we have accomplished" feedback.
+
+### Sprint A — visual polish (the "Lumion gap")
+- **A1 PBR materials** — verified pre-existing: 15 PBR material folders (color/normal/roughness) wired through `textureLoader.ts` + `materialCache.ts` + `GroundManager.tsx`. No code change required; documented.
+- **A2 Vegetation library** (`099c016`) — 4 instanced low-poly trees + 60 grass tufts + 6 dirt patches in a 15-35m ring. Deterministic Mulberry32 PRNG layout. `src/components/three/Vegetation.tsx`.
+- **A3 Water shader** (`348d6c9`) — `MeshReflectorMaterial` on Pool Container with screen-space reflections + distortion. Quality-gated; falls back to flat `MeshPhysicalMaterial` on `low`.
+- **A4 Post stack add-ons** (`099c016`) — ChromaticAberration + Vignette + Noise (film grain) added to `PostProcessingStack.tsx` at low default intensity.
+- **A5 ContactShadows** (`099c016`) — already shipped as `GroundContactShadows`; bumped opacity 0.22→0.42, blur 1.8→2.2 for stronger ground-anchor.
+
+### Sprint B — onboarding
+- **B1+B2 WelcomeWizard** (`ab48f7d`) — first-launch modal with 5 options (Studio / Family / Resort / Pool House / Start Fresh). Picks invoke existing `placeModelHome`. Suppresses on hydration / containers-exist / localStorage-seen. 5 TDD tests for visibility decision helper.
+- **B3 Arrangement thumbnail polish** (`499fadf`) — radial sky gradient background + ground-anchor ellipse shadow + soft drop-shadow filter on the SVG isometric volumes. Live R3F mini-canvases deferred (browser WebGL-context limit ~16); SVG approach delivers visual-quality gain at zero GPU cost.
+
+### Sprint C — precision controls (SketchUp / Blender power-user affordances)
+- **C1 Inference labels** (`137b95d`) — `SnapResult.label` extended ('edge' | 'midpoint' | null); `SnapInferenceLabel.tsx` renders a floating Html pill near the snap point. 3 TDD tests.
+- **C2 Type-to-set + C3 axis lock** (`137b95d`) — `DragPrecisionOverlay.tsx` mounts during drag, captures X/Y/Z axis-lock keys and digit/period/minus into a numeric buffer; Enter applies the offset along the locked axis.
+- **C4 Ctrl+D duplicate** (`137b95d`) — new `duplicateContainer(id, offset?)` action in containerSlice preserves size + rotation + voxel-grid. `DuplicateHotkey.tsx` listens globally. 5 TDD tests.
+
+### Sprint D — affordance polish
+- **D1 Material brush** — already shipped pre-existing at `ContainerSkin.tsx:4140-4174` (Ctrl+hold + drag paints continuously).
+- **D2 QuickMaterialsStrip** (`2d414f0`) — left-edge floating panel with 8 common surface swatches (Steel, Glass, Wood, Concrete, Cable/Glass Rail, Window, Door). Click sets activeBrush; click any face to paint. Twinmotion-style click-and-paint without requiring per-face selection first.
+- **D3 Quad menu** (`2d414f0`) — right-click ContainerContextMenu gains a 4-button icon row at the top (Rotate / Duplicate / Paint / Delete). Each is one click from right-click.
+
+### Test gate
+- 1194/1194 vitest pass (+13 new across the sprint), 0 TS errors, all changes on `origin/master`.
+
+---
+
 ## 2026-05-19 — Brainstorm-deferred completion: component-snap + touch input
 
 Final two items from the building-UX brainstorm's "Deferred for later" list ship in `faaca8f`, closing the brainstorm doc.
