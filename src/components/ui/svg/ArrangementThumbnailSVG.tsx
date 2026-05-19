@@ -246,8 +246,23 @@ function renderModel(model: ModelHome) {
   );
 }
 
+/**
+ * Sprint B3 polish — radial sky gradient background + soft drop-shadow
+ * on the isometric volumes. The brief asked for live R3F thumbnails per
+ * arrangement; per-card WebGL canvases hit browser context limits at
+ * ~16 simultaneous renderers, so the practical ship is to LIFT the
+ * existing SVG so it visually competes. Each thumbnail still renders
+ * in pure SVG (zero GPU cost) but now reads as "scene" rather than
+ * "blueprint."
+ *
+ * Gradient ids must be unique-per-instance so multiple cards don't
+ * collide; we derive a stable suffix from arrangement.id / model.id.
+ */
 export function ArrangementThumbnailSVG({ arrangement, model, size = 76 }: ArrangementThumbnailSVGProps) {
   const title = model?.label ?? arrangement?.label ?? 'Design';
+  const uid = `${model?.id ?? arrangement?.id ?? 'gen'}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const skyGradId = `sky-${uid}`;
+  const shadowFilterId = `shadow-${uid}`;
   return (
     <svg
       width={size}
@@ -258,8 +273,30 @@ export function ArrangementThumbnailSVG({ arrangement, model, size = 76 }: Arran
       xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'block' }}
     >
-      <rect x="0.5" y="0.5" width="75" height="75" rx="7" fill="#f8fafc" stroke="#dbe4ef" />
-      {model ? renderModel(model) : arrangement ? renderArrangement(arrangement) : null}
+      <defs>
+        <radialGradient id={skyGradId} cx="50%" cy="20%" r="80%">
+          <stop offset="0%" stopColor="#eaf2fb" />
+          <stop offset="55%" stopColor="#dbe7f4" />
+          <stop offset="100%" stopColor="#b3c5d8" />
+        </radialGradient>
+        <filter id={shadowFilterId} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="0.9" />
+          <feOffset dx="0" dy="1.4" result="offsetblur" />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.35" />
+          </feComponentTransfer>
+          <feMerge>
+            <feMergeNode />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect x="0.5" y="0.5" width="75" height="75" rx="7" fill={`url(#${skyGradId})`} stroke="#cdd9e6" />
+      {/* Subtle ground line shadow at ~70% height to anchor the volume */}
+      <ellipse cx="38" cy="58" rx="26" ry="3.2" fill="rgba(15,23,42,0.18)" />
+      <g filter={`url(#${shadowFilterId})`}>
+        {model ? renderModel(model) : arrangement ? renderArrangement(arrangement) : null}
+      </g>
     </svg>
   );
 }
