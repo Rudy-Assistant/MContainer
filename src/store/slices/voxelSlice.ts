@@ -1410,6 +1410,10 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
 
       return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
     });
+
+    // U8 expansion: emit destructive-action toast after stair removal.
+    (get as unknown as () => { setLastDestructiveAction?: (a: { description: string } | null) => void })()
+      .setLastDestructiveAction?.({ description: 'Removed stairs' });
   },
 
   clearStairExit: (containerId, voxelIndex) => {

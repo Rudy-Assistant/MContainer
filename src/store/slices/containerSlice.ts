@@ -1179,7 +1179,9 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
     return item.id;
   },
 
-  removeFurniture: (furnitureId) =>
+  removeFurniture: (furnitureId) => {
+    // Capture name BEFORE deletion for the U8 destructive-action toast.
+    const removedType = get().furnitureIndex[furnitureId]?.type ?? 'furniture';
     set((s) => {
       const item = s.furnitureIndex[furnitureId];
       if (!item) return s;
@@ -1198,7 +1200,11 @@ export const createContainerSlice = (set: SetFn, get: GetFn): ContainerSlice => 
         },
         furnitureIndex: restIndex,
       };
-    }),
+    });
+    // U8 expansion: announce furniture removal so the user sees what just left.
+    (get as unknown as () => { setLastDestructiveAction?: (a: { description: string } | null) => void })()
+      .setLastDestructiveAction?.({ description: `Removed ${removedType}` });
+  },
 
   moveFurniture: (furnitureId, position) =>
     set((s) => {
