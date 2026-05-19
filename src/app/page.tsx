@@ -18,6 +18,7 @@ import { AutoStairsAffordance } from "@/components/ui/AutoStairsAffordance";
 import { AdvancedSettingsToggleHotkey } from "@/components/ui/AdvancedSettingsToggleHotkey";
 import { SmartRuleToast } from "@/components/ui/SmartRuleToast";
 import { FirstLaunchHint } from "@/components/ui/FirstLaunchHint";
+import { WelcomeWizard } from "@/components/ui/WelcomeWizard";
 import { ToastEscapeHotkey } from "@/components/ui/ToastEscapeHotkey";
 // import SmartHotbar from "@/components/ui/SmartHotbar"; // replaced by RecentItemsBar (Task 6)
 import RecentItemsBar from "@/components/ui/RecentItemsBar";
@@ -137,6 +138,11 @@ export default function Home() {
       {/* Plan deferred #4: first-launch announcement banner explaining where
           the Smart/Manual toggle went + the new keyboard hint. Shows once. */}
       <FirstLaunchHint />
+      {/* Sprint B1+B2: first-launch wizard surfacing existing MODEL_HOMES
+          so new users skip the blank-canvas problem (Lumion/Sims/Planner 5D
+          consumer-app pattern). Suppresses itself when containers already
+          exist (returning user). */}
+      <WelcomeWizard />
       {/* Global Esc handler — dismisses all active toasts at once. Capture-
           phase so it fires before walkthrough-exit / selection-clear when a
           toast is up. */}
