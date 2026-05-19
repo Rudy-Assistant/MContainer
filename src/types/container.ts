@@ -483,6 +483,13 @@ export interface Voxel {
    *  like user-painted faces, but they do not count as user paint or update
    *  repeat-stamp state. Only set to true; absent/false = auto-generated. */
   presetProtectedFaces?: Partial<Record<keyof VoxelFaces, boolean>>;
+  /** U6 (R6 building-UX): faces the user explicitly opted OUT of further
+   *  smart-rule auto-fixes via the contextual "Don't auto-fix this face
+   *  again" affordance. Distinct from userPaintedFaces (set whenever the
+   *  user paints) — userOptOut is set only when the user actively dismisses
+   *  a smart-rule auto-fix. Consulted by isVoxelFaceProtected with the
+   *  same OR-semantics as the other two protection flags. */
+  userOptOut?: Partial<Record<keyof VoxelFaces, boolean>>;
   /** Smart stair change tracking — stored on the LOWER stair voxel.
    *  Records all auto-modified faces so removeStairs can restore originals. */
   _smartStairChanges?: SmartStairChanges;
@@ -506,10 +513,14 @@ export interface Voxel {
 }
 
 export function isVoxelFaceProtected(
-  voxel: Pick<Voxel, 'userPaintedFaces' | 'presetProtectedFaces'> | undefined,
+  voxel: Pick<Voxel, 'userPaintedFaces' | 'presetProtectedFaces' | 'userOptOut'> | undefined,
   face: keyof VoxelFaces,
 ): boolean {
-  return !!(voxel?.userPaintedFaces?.[face] || voxel?.presetProtectedFaces?.[face]);
+  return !!(
+    voxel?.userPaintedFaces?.[face] ||
+    voxel?.presetProtectedFaces?.[face] ||
+    voxel?.userOptOut?.[face]
+  );
 }
 
 /** Per-face finish overrides — absent values fall back to theme defaults */

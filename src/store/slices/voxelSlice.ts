@@ -71,6 +71,10 @@ type VoxelStoreRef = {
 export interface VoxelSlice {
   setVoxelFace: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
   setVoxelFacePreset: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, mat: SurfaceType) => void;
+  /** U6 (R6): set or clear `userOptOut[face]` on a voxel. Called by the
+   *  SmartRuleToast "Don't auto-fix this face again" button. Smart-rule
+   *  cascade respects opt-outs via `isVoxelFaceProtected`. */
+  setUserOptOut: (containerId: string, voxelIndex: number, face: keyof VoxelFaces, value: boolean) => void;
   /** Apply many preset face overrides to one container in a single store update.
    *  Sets presetProtectedFaces on each touched face, skips locked voxels, and
    *  never writes lastStamp. Intended for preset-authored geometry such as
@@ -1793,6 +1797,21 @@ export const createVoxelSlice = (set: Set, get: Get): VoxelSlice => ({
       return;
     }
     applyVoxelFaceMaterial(set, get, containerId, voxelIndex, face, mat, 'user');
+  },
+
+  setUserOptOut: (containerId, voxelIndex, face, value) => {
+    set((s) => {
+      const c = s.containers[containerId];
+      if (!c) return {};
+      const grid = c.voxelGrid ? [...c.voxelGrid] : null;
+      if (!grid || voxelIndex < 0 || voxelIndex >= grid.length) return {};
+      const v = grid[voxelIndex];
+      const nextOptOut = { ...v.userOptOut, [face]: value };
+      // Drop the key entirely when value is false to keep the object tidy
+      if (!value) delete nextOptOut[face];
+      grid[voxelIndex] = { ...v, userOptOut: nextOptOut };
+      return { containers: { ...s.containers, [containerId]: { ...c, voxelGrid: grid } } };
+    });
   },
 
   setVoxelFacePreset: (containerId, voxelIndex, face, mat) => {
