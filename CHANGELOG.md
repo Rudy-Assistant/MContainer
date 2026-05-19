@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-05-19 — Brainstorm-deferred completion: component-snap + touch input
+
+Final two items from the building-UX brainstorm's "Deferred for later" list ship in `faaca8f`, closing the brainstorm doc.
+
+### Component-snap prefab modules (brainstorm deferred #1)
+- **`prefabSlice`** (`src/store/slices/prefabSlice.ts`) — Figma-style reusable assemblies. `savePrefabFromSelection(label)` captures the current selection with relative positions from the first-selected container and deep-copies voxel-face state; `spawnPrefab(prefabId, origin)` re-uses `addContainer` + `setVoxelFacesPresetBatch` so smart-rule cleanup and adjacency fire normally on spawned copies. `removePrefab` / `renamePrefab` round out the registry. Persisted via `useStore` partialize allowlist.
+- Differs from `libraryHomeDesigns` (full-project save/load) and `groupSlice` (live grouping of existing containers): prefabs are templates that get re-spawned as new container instances.
+- 7 TDD tests cover empty-selection null, relative-position capture, fresh-id spawn at origin, unknown-prefab empty return, remove, rename, and destructive-toast announcement.
+
+### Touch / iPad gesture input (brainstorm deferred #3)
+- **`TouchGestureControls`** (`src/components/three/TouchGestureControls.tsx`) — view-mode-aware touch gesture configurator. 3D scene gets one-finger pan, two-finger pinch/orbit, three-finger pinch/pan; Blueprint gets one-finger pan, two-finger pinch/pan. Native browser touch gestures suppressed so touch stays owned by the editor. Mounted inside `RealisticScene` and `BlueprintScene`.
+
+### Brainstorm deferred status — all closed
+- #1 Component-snap prefab modules → shipped (faaca8f)
+- #2 Hierarchical container groups → shipped (13e1ffe)
+- #3 Touch / iPad / gesture input → shipped (faaca8f)
+- #4 AI-assisted placement (`staggerContainers`) → shipped (7570029)
+
+### Test gate
+- 1181/1181 vitest pass, 0 TS errors.
+
+---
+
 ## 2026-05-18 — Building-UX industry-leader parity (Snap-and-Infer + Single-Action)
 
 User feedback: "Building is still not simple or intuitive. We should copy from industry leaders."
