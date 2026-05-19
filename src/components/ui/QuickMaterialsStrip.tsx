@@ -53,7 +53,7 @@ export function QuickMaterialsStrip() {
       data-testid="quick-materials-strip"
       style={{
         position: 'fixed',
-        left: 12,
+        right: 12,
         top: '50%',
         transform: 'translateY(-50%)',
         zIndex: 50,

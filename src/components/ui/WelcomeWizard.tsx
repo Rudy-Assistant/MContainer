@@ -31,7 +31,17 @@ export const WELCOME_WIZARD_STORAGE_KEY = 'mhome.welcome-wizard.seen';
 
 /**
  * Pure decision helper — extracted for testability.
+ *
  * Returns true when the wizard SHOULD show on first launch.
+ *
+ * Gating notes:
+ * - Pre-hydration: suppress (SSR + initial-paint flash).
+ * - Storage-seen flag: suppress (user has dismissed the wizard before).
+ * - Container threshold: suppress only when MORE THAN ONE container
+ *   exists. The app auto-seeds a single default container on first
+ *   hydration, so `containerCount === 0` never holds in production --
+ *   the threshold has to allow that single seed through. Two-or-more
+ *   containers means the user is returning to a real project.
  */
 export function shouldShowWelcomeWizard(
   hasHydrated: boolean,
@@ -39,7 +49,7 @@ export function shouldShowWelcomeWizard(
   storageSeen: string | null,
 ): boolean {
   if (!hasHydrated) return false;
-  if (containerCount > 0) return false;
+  if (containerCount > 1) return false;
   if (storageSeen === '1') return false;
   return true;
 }
@@ -100,8 +110,10 @@ export function WelcomeWizard() {
 
   useEffect(() => {
     if (!hasHydrated) return;
-    // If user already has containers, this is NOT a first launch.
-    if (Object.keys(containers).length > 0) return;
+    // App auto-seeds ONE default container on first hydration -- treat that
+    // as "blank canvas equivalent." Suppress only when 2+ containers exist
+    // (i.e. a real returning project).
+    if (Object.keys(containers).length > 1) return;
     try {
       if (window.localStorage.getItem(STORAGE_KEY) === '1') return;
       const t = setTimeout(() => setVisible(true), 400);

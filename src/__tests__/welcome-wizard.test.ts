@@ -22,8 +22,8 @@ describe('shouldShowWelcomeWizard (Sprint B1+B2)', () => {
     expect(shouldShowWelcomeWizard(true, 0, '1')).toBe(false);
   });
 
-  it('returns false when containers already exist (returning user)', () => {
-    expect(shouldShowWelcomeWizard(true, 1, null)).toBe(false);
+  it('returns false when MORE THAN ONE container exists (returning user)', () => {
+    expect(shouldShowWelcomeWizard(true, 2, null)).toBe(false);
     expect(shouldShowWelcomeWizard(true, 5, null)).toBe(false);
   });
 
@@ -31,6 +31,12 @@ describe('shouldShowWelcomeWizard (Sprint B1+B2)', () => {
     expect(shouldShowWelcomeWizard(true, 0, null)).toBe(true);
     // Empty-string in localStorage is not "1" → still show.
     expect(shouldShowWelcomeWizard(true, 0, '')).toBe(true);
+  });
+
+  it('returns true when only the auto-seeded default container is present', () => {
+    // The app seeds one default container on first hydration; treat that
+    // as blank-canvas-equivalent so the wizard still fires.
+    expect(shouldShowWelcomeWizard(true, 1, null)).toBe(true);
   });
 
   it('exports a stable storage key', () => {
