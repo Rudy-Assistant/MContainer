@@ -24,11 +24,14 @@ export function SmartRuleToast() {
   const fire = useStore((s) => s.lastSmartRuleFire);
   const setFire = useStore((s) => s.setLastSmartRuleFire);
   const setUserOptOut = useStore((s) => s.setUserOptOut);
+  const enabled = useStore((s) => s.smartRuleToastsEnabled);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!fire) {
+    if (!fire || !enabled) {
       setVisible(false);
+      // Drop fire silently when toasts are disabled so future fires retrigger
+      if (fire && !enabled) setFire(null);
       return;
     }
     setVisible(true);
@@ -38,9 +41,9 @@ export function SmartRuleToast() {
     }, TTL_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fire?.at]);
+  }, [fire?.at, enabled]);
 
-  if (!fire) return null;
+  if (!fire || !enabled) return null;
 
   const clear = () => setFire(null);
   const handleUndo = () => {

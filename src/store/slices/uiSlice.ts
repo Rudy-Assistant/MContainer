@@ -85,6 +85,13 @@ export interface UiSlice {
   setLastSmartRuleFire: (
     p: { containerId: string; voxelIndex: number; face: keyof VoxelFaces; ruleName?: string } | null,
   ) => void;
+  /** Plan deferred #3: lets power users mute smart-rule toasts when the
+   *  contextual opt-out gets noisy. Default true — the toast is the
+   *  primary affordance for the opt-out, so off-by-default would defeat
+   *  R6. When false, SmartRuleToast returns null even with a valid
+   *  lastSmartRuleFire. */
+  smartRuleToastsEnabled: boolean;
+  setSmartRuleToastsEnabled: (v: boolean) => void;
 
   // Hotbar tab: 0=Rooms, 1=Surfaces, 2=Materials, 3=Furniture (see SmartHotbar.tsx lines 1475-1478)
   activeHotbarTab: number;
@@ -297,6 +304,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
   lastDestructiveAction: null,
   lastStackedPair: null,
   lastSmartRuleFire: null,
+  smartRuleToastsEnabled: true,
 
   // ── Actions ────────────────────────────────────────────
   setHoveredVoxel: (v) => set({ hoveredVoxel: v }),
@@ -319,6 +327,7 @@ export const createUiSlice = (set: Set, _get: Get): UiSlice => ({
       ? null
       : { containerId: p.containerId, voxelIndex: p.voxelIndex, face: p.face, ruleName: p.ruleName, at: Date.now() },
   }),
+  setSmartRuleToastsEnabled: (v) => set({ smartRuleToastsEnabled: v }),
 
   activeHotbarTab: 1, // Default: Surfaces (was Rooms)
   setActiveHotbarTab: (tab) => set({ activeHotbarTab: tab }),
