@@ -28,6 +28,7 @@ import {
 } from "@/config/cameraConstants";
 import { createDefaultVoxelGrid } from "@/types/factories";
 import { findStackTarget, findEdgeSnap, checkOverlap, getFootprintAt, computePoolUnion } from "@/store/spatialEngine";
+import type { SnapKind } from "@/store/spatialEngine";
 import ContainerMesh from "./ContainerMesh";
 import ContainerSkin from "@/components/objects/ContainerSkin";
 import BlueprintRenderer from "./BlueprintRenderer";
@@ -1636,6 +1637,11 @@ function DragGhost() {
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
   const snappedRef = useRef(false);
   const validRef = useRef(true);
+  // Last-emitted dragWorldPos values; used to skip setDragWorldPos when
+  // nothing meaningful changed this frame -- prevents an N-subscriber
+  // re-render storm (SnapInferenceLabel + DragGhost ghost mesh +
+  // anything else hanging off the store) when the cursor sits still.
+  const lastEmitRef = useRef<{ x: number; y: number; z: number; stack: string | null; label: string | null } | null>(null);
 
   useFrame(() => {
     if (!dragContainer) return;
@@ -1670,12 +1676,31 @@ function DragGhost() {
 
       // Sprint C1: label the inferred snap so SnapInferenceLabel can show
       // it ("edge" / "midpoint" / "stack") near the drop point.
-      const snapLabel: 'edge' | 'midpoint' | 'stack' | null = target
+      const snapLabel: SnapKind | null = target
         ? 'stack'
         : snap.snapped
           ? (snap.label ?? 'edge')
           : null;
-      setDragWorldPos({ x: sx, y: ghostY, z: sz, stackTargetId: target?.containerId ?? null, snapLabel });
+      const stackId = target?.containerId ?? null;
+      // Change-detection guard: skip the store write (and the resulting
+      // subscriber re-render fan-out) when this frame's snap state matches
+      // the last emit at our cm-rounded position precision.
+      const last = lastEmitRef.current;
+      const sxR = Math.round(sx * 100);
+      const syR = Math.round(ghostY * 100);
+      const szR = Math.round(sz * 100);
+      if (
+        last &&
+        Math.round(last.x * 100) === sxR &&
+        Math.round(last.y * 100) === syR &&
+        Math.round(last.z * 100) === szR &&
+        last.stack === stackId &&
+        last.label === snapLabel
+      ) {
+        return;
+      }
+      lastEmitRef.current = { x: sx, y: ghostY, z: sz, stack: stackId, label: snapLabel };
+      setDragWorldPos({ x: sx, y: ghostY, z: sz, stackTargetId: stackId, snapLabel });
     }
   });
 

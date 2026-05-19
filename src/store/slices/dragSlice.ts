@@ -21,6 +21,7 @@ import {
 } from '@/types/container';
 import type { HotbarSlot } from '../useStore';
 import { checkOverlap, getFullFootprint } from '@/store/spatialEngine';
+import type { SnapKind } from '@/store/spatialEngine';
 import { scheduleAdjacency } from '@/store/slices/containerSlice';
 import type { SliceGet, SliceSet } from './types';
 
@@ -54,8 +55,8 @@ export interface DragSlice {
   // ── Container palette drag ──────────────────────────────
   dragContainer: ContainerSize | null;
   setDragContainer: (size: ContainerSize | null) => void;
-  dragWorldPos: { x: number; y: number; z: number; stackTargetId: string | null; snapLabel?: 'edge' | 'midpoint' | 'stack' | null } | null;
-  setDragWorldPos: (pos: { x: number; y: number; z: number; stackTargetId: string | null; snapLabel?: 'edge' | 'midpoint' | 'stack' | null } | null) => void;
+  dragWorldPos: { x: number; y: number; z: number; stackTargetId: string | null; snapLabel?: SnapKind | null } | null;
+  setDragWorldPos: (pos: { x: number; y: number; z: number; stackTargetId: string | null; snapLabel?: SnapKind | null } | null) => void;
 
   // ── Furniture palette drag ──────────────────────────────
   dragFurniture: FurnitureType | null;

@@ -17,6 +17,7 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useStore } from '@/store/useStore';
 import { CONTAINER_DIMENSIONS, type Container } from '@/types/container';
+import { mulberry32, hashId } from '@/utils/prng';
 
 // ── Materials (module-scope cache, one set for the whole scene) ──
 
@@ -51,29 +52,7 @@ const foliageLightMat = new THREE.MeshStandardMaterial({
   roughness: 0.9,
 });
 
-// ── Helpers ──
-
-/** Mulberry32 PRNG — small, deterministic, 32-bit seed.
- *  Used so tree positions are stable for a given container set. */
-function mulberry32(seed: number): () => number {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = seed;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** Hash a container id string into a 32-bit integer for the PRNG seed. */
-function hashId(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+// mulberry32 + hashId moved to src/utils/prng.ts (shared with Vegetation.tsx).
 
 // ── Trees (low-poly: trunk cylinder + 1-2 foliage cones) ──
 

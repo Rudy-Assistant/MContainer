@@ -17,23 +17,7 @@
 import { useStore } from '@/store/useStore';
 import type { SurfaceType } from '@/types/container';
 import { ViewMode } from '@/types/container';
-import { surfaceColor } from '@/components/ui/svg/surfaceColorMap';
-
-interface SwatchDef {
-  surface: SurfaceType;
-  label: string;
-}
-
-const QUICK_SWATCHES: SwatchDef[] = [
-  { surface: 'Solid_Steel', label: 'Steel' },
-  { surface: 'Glass_Pane', label: 'Glass' },
-  { surface: 'Deck_Wood', label: 'Wood' },
-  { surface: 'Concrete', label: 'Concrete' },
-  { surface: 'Railing_Cable', label: 'Cable Rail' },
-  { surface: 'Railing_Glass', label: 'Glass Rail' },
-  { surface: 'Window_Standard', label: 'Window' },
-  { surface: 'Door', label: 'Door' },
-];
+import { QUICK_MATERIALS } from '@/config/surfaceLabels';
 
 export function QuickMaterialsStrip() {
   const viewMode = useStore((s) => s.viewMode);
@@ -81,15 +65,15 @@ export function QuickMaterialsStrip() {
       >
         Paint
       </div>
-      {QUICK_SWATCHES.map((sw) => {
-        const isActive = activeBrush === sw.surface;
-        const color = surfaceColor(sw.surface);
+      {QUICK_MATERIALS.map((sw) => {
+        const isActive = activeBrush === sw.type;
+        const color = sw.color;
         return (
           <button
-            key={sw.surface}
-            data-testid={`quick-swatch-${sw.surface}`}
+            key={sw.type}
+            data-testid={`quick-swatch-${sw.type}`}
             data-active={isActive ? 'true' : 'false'}
-            onClick={() => onClick(sw.surface)}
+            onClick={() => onClick(sw.type)}
             title={`${sw.label} — click any face to paint`}
             style={{
               width: 36,

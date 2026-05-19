@@ -24,8 +24,9 @@
  *   project.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useStore } from '@/store/useStore';
+import { MODEL_HOMES } from '@/config/modelHomes';
 
 export const WELCOME_WIZARD_STORAGE_KEY = 'mhome.welcome-wizard.seen';
 
@@ -64,49 +65,54 @@ interface PresetOption {
   accent: string;
 }
 
-const OPTIONS: PresetOption[] = [
-  {
-    modelId: 'micro_studio',
-    label: 'Studio',
-    description: 'Single 20ft container — smallest livable unit',
-    emoji: '🏠',
-    accent: '#3b82f6',
-  },
-  {
-    modelId: 'family_2br',
-    label: 'Family Home',
-    description: 'Two-bedroom layout — living + bedrooms + bath',
-    emoji: '🏡',
-    accent: '#22c55e',
-  },
-  {
-    modelId: 'resort_house',
-    label: 'Resort',
-    description: 'Three-level Bali-style with atrium + indoor pool',
-    emoji: '🏝️',
-    accent: '#f59e0b',
-  },
-  {
-    modelId: 'entertainer',
-    label: 'Pool House',
-    description: 'Entertainer\'s dream — open layout + outdoor space',
-    emoji: '🏊',
-    accent: '#06b6d4',
-  },
-  {
-    modelId: null,
-    label: 'Start Fresh',
-    description: 'Empty canvas — build from scratch',
-    emoji: '✨',
-    accent: '#94a3b8',
-  },
+/**
+ * MODEL_HOMES ids surfaced in the first-touch wizard. Order = display order.
+ * Label and accent live HERE (not on MODEL_HOMES) because wizard copy is
+ * tuned for first-touch ("Studio" vs the canonical "Micro Studio") and
+ * the accent palette is wizard-specific styling, not data-model state.
+ * Description + emoji are pulled from MODEL_HOMES so curator edits over
+ * there flow through automatically.
+ */
+const WIZARD_SLOTS: Array<{ id: string; label: string; accent: string }> = [
+  { id: 'micro_studio',  label: 'Studio',      accent: '#3b82f6' },
+  { id: 'family_2br',    label: 'Family Home', accent: '#22c55e' },
+  { id: 'resort_house',  label: 'Resort',      accent: '#f59e0b' },
+  { id: 'entertainer',   label: 'Pool House',  accent: '#06b6d4' },
 ];
+
+const FRESH_OPTION: PresetOption = {
+  modelId: null,
+  label: 'Start Fresh',
+  description: 'Empty canvas — build from scratch',
+  emoji: '✨',
+  accent: '#94a3b8',
+};
+
+function buildOptions(): PresetOption[] {
+  const presets: PresetOption[] = [];
+  for (const slot of WIZARD_SLOTS) {
+    const model = MODEL_HOMES.find((m) => m.id === slot.id);
+    if (!model) continue; // Skip silently if the catalog dropped this id.
+    presets.push({
+      modelId: slot.id,
+      label: slot.label,
+      description: model.description,
+      emoji: model.icon ?? '🏠',
+      accent: slot.accent,
+    });
+  }
+  presets.push(FRESH_OPTION);
+  return presets;
+}
 
 export function WelcomeWizard() {
   const hasHydrated = useStore((s) => s._hasHydrated);
   const containers = useStore((s) => s.containers);
   const placeModelHome = useStore((s) => s.placeModelHome);
   const [visible, setVisible] = useState(false);
+  // OPTIONS derive from MODEL_HOMES on mount so curator edits to model
+  // descriptions / icons flow through without touching this file.
+  const options = useMemo(() => buildOptions(), []);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -186,7 +192,7 @@ export function WelcomeWizard() {
             gap: '12px',
           }}
         >
-          {OPTIONS.map((opt) => (
+          {options.map((opt) => (
             <button
               key={opt.label}
               data-testid={`wizard-option-${opt.modelId ?? 'fresh'}`}

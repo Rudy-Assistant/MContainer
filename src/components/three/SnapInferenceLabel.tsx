@@ -16,6 +16,7 @@
 
 import { Html } from '@react-three/drei';
 import { useStore } from '@/store/useStore';
+import type { SnapKind } from '@/store/spatialEngine';
 
 const LABEL_PILL_STYLE: React.CSSProperties = {
   background: 'rgba(15, 23, 42, 0.85)',
@@ -32,26 +33,29 @@ const LABEL_PILL_STYLE: React.CSSProperties = {
   boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
 };
 
-const LABEL_TEXT: Record<'edge' | 'midpoint' | 'stack', string> = {
+const LABEL_TEXT: Record<SnapKind, string> = {
   edge: 'snap • edge',
   midpoint: 'snap • midpoint',
   stack: 'snap • stack',
 };
 
-const LABEL_COLOR: Record<'edge' | 'midpoint' | 'stack', string> = {
+const LABEL_COLOR: Record<SnapKind, string> = {
   edge: '#22c55e',
   midpoint: '#06b6d4',
   stack: '#f59e0b',
 };
 
 export function SnapInferenceLabel() {
-  const dragWorldPos = useStore((s) => s.dragWorldPos);
-  if (!dragWorldPos) return null;
-  const label = dragWorldPos.snapLabel;
+  // Narrow subscriptions: only re-render when the snap label changes;
+  // position updates per drag frame don't re-render this component.
+  const label = useStore((s) => s.dragWorldPos?.snapLabel ?? null);
+  const x = useStore((s) => s.dragWorldPos?.x ?? 0);
+  const y = useStore((s) => s.dragWorldPos?.y ?? 0);
+  const z = useStore((s) => s.dragWorldPos?.z ?? 0);
   if (!label) return null;
 
   return (
-    <group position={[dragWorldPos.x, dragWorldPos.y + 3.2, dragWorldPos.z]}>
+    <group position={[x, y + 3.2, z]}>
       <Html center distanceFactor={10} style={{ pointerEvents: 'none' }}>
         <div
           data-testid="snap-inference-label"

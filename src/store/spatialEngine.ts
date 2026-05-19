@@ -273,6 +273,17 @@ export function checkOverlap(
 
 // ── Adjacency Snap ──────────────────────────────────────────
 
+/**
+ * Sprint C1 — kinds of snap that the engine + UI both speak.
+ * - 'edge' / 'midpoint' come from findEdgeSnap (engine inference)
+ * - 'stack' is a UI-layer label (the engine reports stacking via
+ *    findStackTarget, not via SnapResult.label)
+ * Exported so dragSlice, Scene.tsx, and SnapInferenceLabel stay in
+ * sync without re-typing the string union in every consumer.
+ */
+export type EngineSnapKind = 'edge' | 'midpoint';
+export type SnapKind = EngineSnapKind | 'stack';
+
 export interface SnapResult {
   x: number;
   z: number;
@@ -282,7 +293,7 @@ export interface SnapResult {
    *  Surfaced in-scene by SnapInferenceLabel so users can see WHY the
    *  container is jumping to that spot ("edge" / "midpoint" / null).
    *  null when no snap fired (free placement / grid only). */
-  label?: 'edge' | 'midpoint' | null;
+  label?: EngineSnapKind | null;
 }
 
 /**
@@ -316,7 +327,7 @@ export function findEdgeSnap(
   let bestZ = z;
   let bestDist = Infinity;
   let adjacentTo: string | null = null;
-  let bestLabel: 'edge' | 'midpoint' | null = null;
+  let bestLabel: EngineSnapKind | null = null;
 
   for (const c of Object.values(containers)) {
     if (c.id === excludeId) continue;
